@@ -44,6 +44,17 @@ Version 1 är en **fungerande referensprodukt** som visar för investerare och f
 
 Konfigurationen ligger i `foretag/<namn>/`. Varje företag äger sin egen regelbok.
 
+### 2.1 Samverkan med kundens program
+
+Vera ersätter inte kundens bokföringsprogram. Hon arbetar **i linje med det**, så att kunden slipper byta system och behåller sitt sätt att arbeta:
+
+1. **Data in:** Vera hämtar underlag (bank, kassa, kvitton, fakturor) och läser kundens kontoplan och tidigare verifikationer ur programmet.
+2. **Bearbeta:** Vera konterar enligt kundens egen regelbok och kontoplan.
+3. **Presentera:** kunden ser resultatet och godkänner (avsnitt 4).
+4. **Importera:** först efter godkännande förs verifikationerna in i kundens program. Det sker antingen med en direktkoppling eller, där koppling saknas, som en SIE-fil (ett standardformat som många svenska bokföringsprogram kan importera) som kunden läser in.
+
+Version 1 exporterar en SIE-fil från testdatan. Direktkopplingar byggs senare (Ö2).
+
 ---
 
 ## 3. Roller
@@ -183,7 +194,7 @@ Varje testföretag beskrivs i en egen fil och är skrivskyddat för agenten. Tes
 | # | Fråga | Ägare |
 |---|---|---|
 | Ö1 | **Produktionsarkitektur.** Version 1 körs lokalt som referensprodukt. Hur och var kundens data ska lagras säkert när Vera blir en tjänst är inte bestämt | Hugo |
-| Ö2 | Vilka bokföringsprogram kopplas först (Fortnox, Bokio, Spiris) | Hugo |
+| Ö2 | Vilka bokföringsprogram får direktkoppling först (Fortnox, Bokio, Spiris)? Version 1 använder SIE-export | Hugo |
 | Ö3 | Momssatser och särregler per bransch (restaurang, bygg, begagnade varor) ska verifieras mot Skatteverket eller en redovisningskonsult innan de läggs i någon regelbok | Konsult |
 | Ö4 | Får rutinposter i kassa bokföras samlat per vecka? | Konsult |
 | Ö5 | Vilka kassasystem och bankformat ska stödjas först | Hugo |
