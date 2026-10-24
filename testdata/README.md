@@ -136,8 +136,8 @@ Ett JSON-dokument per leverantörsfaktura och kvitto. Filnamnet är dokumentets 
 Hyresavin är lagd som `leverantorsfaktura`.
 
 Det här finns **inte** som underlag i Q1: specifikation av kortinlösarens avgift och bankens
-specifikation av avgifterna (FIKTIVT_FORETAG.md avsnitt 6 nämner dem i JSON, men uppgiften gällde
-bara leverantörsfakturor och kvitton).
+specifikation av avgifterna (FIKTIVT_FORETAG.md avsnitt 6 nämner dem i JSON). Beslut av Hugo:
+de läggs till när matchningen byggs.
 
 ### Facit (`facit.json`)
 
