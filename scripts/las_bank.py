@@ -17,6 +17,8 @@ Det här gör modulen:
 - Ett fält får inte innehålla radbrytning. CSV tillåter det inuti citattecken, men i en
   bankfil betyder det nästan alltid att ett citattecken i fel läge har slagit ihop flera
   transaktioner till en. Då stoppas filen.
+- Radnumren ska vara 1, 2, 3 … i tur och ordning. Dubbla, osorterade eller saknade
+  radnummer betyder att filen är trasig, och då stoppas den.
 - Belopp tolkas med belopp.tolka_belopp och blir heltal i öre, aldrig flyttal.
 - Varje rad får: id, bokforingsdag, transaktionsdag, referens, beskrivning, belopp_ore,
   saldo_efter_ore, kalla_fil (SHA-256 av hela filen) och radnr (värdet i kolumnen Radnummer).
@@ -171,6 +173,13 @@ def _tolka_rader(data):
 
         if not _HELTAL.fullmatch(varde["radnr"]):
             raise BankfilFel(var + " har ett ogiltigt radnummer: " + repr(varde["radnr"]) + ".")
+        forvantat_radnr = len(resultat) + 1
+        if int(varde["radnr"]) != forvantat_radnr:
+            raise BankfilFel(
+                var + " har radnummer " + str(int(varde["radnr"])) + ", men nästa radnummer ska vara "
+                + str(forvantat_radnr) + ". Radnumren ska vara 1, 2, 3 … i tur och ordning, utan"
+                + " dubbletter eller luckor."
+            )
 
         rad = {
             "radnr": int(varde["radnr"]),

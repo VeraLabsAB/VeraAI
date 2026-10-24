@@ -271,3 +271,32 @@ def test_f1_radbrytning_inuti_falt_stoppas(tmp_path, radbrytning):
                 + '1,2025-01-02,2025-01-02,REF-1,"RAD ETT' + radbrytning + 'RAD TVA",100.00,100.00\n')
     with pytest.raises(BankfilFel, match="radbrytning"):
         las_bankfil(fil, 0, 10000)
+
+
+@pytest.mark.parametrize(
+    "radnummer, felrad, text",
+    [
+        ([1, 1, 2], 3, "radnummer 1, men nästa radnummer ska vara 2"),  # dubbla
+        ([1, 3, 2], 3, "radnummer 3, men nästa radnummer ska vara 2"),  # osorterade
+        ([2, 1, 3], 2, "radnummer 2, men nästa radnummer ska vara 1"),  # osorterade
+        ([1, 5, 6], 3, "radnummer 5, men nästa radnummer ska vara 2"),  # saknade
+    ],
+    ids=["dubbla", "osorterade", "osorterade_forsta", "saknade"],
+)
+def test_f4_radnummer_maste_vara_1_2_3_i_tur_och_ordning(tmp_path, radnummer, felrad, text):
+    """F4: saldokedjan stämmer i filens ordning, men radnumren är fel."""
+    rader = "".join(
+        str(nr) + ",2025-01-02,2025-01-02,REF-" + str(i) + ",M," + "1.00," + str(i + 1) + ".00\n"
+        for i, nr in enumerate(radnummer)
+    )
+    with pytest.raises(BankfilFel) as fel:
+        las_bankfil(skriv(tmp_path, RUBRIK + rader), 0, 300)
+    assert "rad " + str(felrad) + " i filen" in str(fel.value)
+    assert text in str(fel.value)
+
+
+def test_f6_identiska_rader_stoppas(tmp_path):
+    """F6: två helt identiska rader på 0 kr skulle få samma id. Nu stoppas filen."""
+    rad = "1,2025-01-02,2025-01-02,REF-1,M,0.00,0.00\n"
+    with pytest.raises(BankfilFel, match="radnummer 1, men nästa radnummer ska vara 2"):
+        las_bankfil(skriv(tmp_path, RUBRIK + rad + rad), 0, 0)
