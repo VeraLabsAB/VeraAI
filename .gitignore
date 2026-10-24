@@ -1,0 +1,10 @@
+inkorg/
+arkiv/
+forslag/
+godkant/
+arenden/
+rapporter/
+logg/
+.venv/
+__pycache__/
+.DS_Store
