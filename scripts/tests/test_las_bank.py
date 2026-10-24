@@ -249,3 +249,25 @@ def test_f2_avklippt_fil_stoppas(tmp_path):
     assert fel.value.skillnad_ore == 19900  # den bortklippta bankavgiften, 199,00 kr
     assert "kan sakna rader" in str(fel.value)
     assert "utgående saldo" in str(fel.value)
+
+
+def test_f1_citattecken_som_slar_ihop_rader_stoppas(tmp_path):
+    """F1: granskarens fall 4g. Tre transaktioner som läses som en ska stoppas."""
+    fil = skriv(tmp_path, RUBRIK
+                + '1,2025-01-03,2025-01-03,REF-1,"A,200.00,200.00\n'
+                + "2,2025-01-04,2025-01-04,REF-2,B,-200.00,0.00\n"
+                + '3,2025-01-28,2025-01-28,REF-3,C",75.00,75.00\n')
+    resultat = None
+    with pytest.raises(BankfilFel) as fel:
+        resultat = las_bankfil(fil, 0, 7500)  # rätt ingående och utgående saldo
+    assert resultat is None
+    assert "rad 2 i filen" in str(fel.value)
+    assert "radbrytning" in str(fel.value)
+
+
+@pytest.mark.parametrize("radbrytning", ["\n", "\r", "\r\n", "\u2028", "\u2029"])
+def test_f1_radbrytning_inuti_falt_stoppas(tmp_path, radbrytning):
+    fil = skriv(tmp_path, RUBRIK
+                + '1,2025-01-02,2025-01-02,REF-1,"RAD ETT' + radbrytning + 'RAD TVA",100.00,100.00\n')
+    with pytest.raises(BankfilFel, match="radbrytning"):
+        las_bankfil(fil, 0, 10000)

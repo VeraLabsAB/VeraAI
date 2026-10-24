@@ -14,6 +14,9 @@ Det här gör modulen:
 - Rader före rubrikraden hoppas över. Rubrikraden är den första raden som innehåller alla
   kolumnerna ovan.
 - Avgränsaren (komma eller semikolon) upptäcks automatiskt på rubrikraden.
+- Ett fält får inte innehålla radbrytning. CSV tillåter det inuti citattecken, men i en
+  bankfil betyder det nästan alltid att ett citattecken i fel läge har slagit ihop flera
+  transaktioner till en. Då stoppas filen.
 - Belopp tolkas med belopp.tolka_belopp och blir heltal i öre, aldrig flyttal.
 - Varje rad får: id, bokforingsdag, transaktionsdag, referens, beskrivning, belopp_ore,
   saldo_efter_ore, kalla_fil (SHA-256 av hela filen) och radnr (värdet i kolumnen Radnummer).
@@ -47,6 +50,9 @@ AVGRANSARE = [",", ";"]
 
 _DATUM = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
 _HELTAL = re.compile(r"\d+", re.ASCII)
+
+# Radbrytningar som inte får finnas inuti ett fält: \n, \r, U+2028 och U+2029.
+_RADBRYTNINGAR = "\n\r\u2028\u2029"
 
 
 class BankfilFel(Exception):
@@ -143,11 +149,20 @@ def _tolka_rader(data):
 
     resultat = []
     lasare = csv.reader(textrader[rubrik_index + 1:], delimiter=avgransare)
+    lasta_rader = 0  # antal textrader efter rubriken som läsaren har gått igenom
     for falt in lasare:
-        filrad = rubrik_index + 1 + lasare.line_num
+        filrad = rubrik_index + 2 + lasta_rader  # raden i filen där posten börjar
+        lasta_rader = lasare.line_num
         if not falt or all(not f.strip() for f in falt):
             continue  # tom rad
         var = "Bankfilen stoppas: rad " + str(filrad) + " i filen"
+        for index, text in enumerate(falt):
+            if any(tecken in text for tecken in _RADBRYTNINGAR):
+                raise BankfilFel(
+                    var + " har en radbrytning inuti fält nummer " + str(index + 1)
+                    + ". Det beror troligen på ett citattecken i fel läge, som kan slå ihop"
+                    + " flera transaktioner till en."
+                )
         if len(falt) != antal_kolumner:
             raise BankfilFel(
                 var + " har " + str(len(falt)) + " fält, men rubrikraden har " + str(antal_kolumner) + "."
