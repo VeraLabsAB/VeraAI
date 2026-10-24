@@ -31,6 +31,12 @@ def bankfil(manad):
     return DATAMAPP / facit()["bank"][manad]["fil"]
 
 
+def saldon(manad):
+    """(ingående saldo, utgående saldo) i öre för månaden, enligt facit."""
+    fakta = facit()["bank"][manad]
+    return fakta["ingaende_saldo_ore"], fakta["utgaende_saldo_ore"]
+
+
 def utan_kalla_fil(rader):
     return [{k: v for k, v in rad.items() if k != "kalla_fil"} for rad in rader]
 
@@ -39,17 +45,18 @@ def utan_kalla_fil(rader):
 
 def test_januari_och_februari_klarar_k1():
     bank = facit()["bank"]
-    januari = las_bankfil(bankfil("2025-01"), bank["2025-01"]["ingaende_saldo_ore"])
+    januari = las_bankfil(bankfil("2025-01"), *saldon("2025-01"))
     assert januari[-1]["saldo_efter_ore"] == bank["2025-01"]["utgaende_saldo_ore"]
 
     # Februaris ingående saldo är januaris utgående, både i facit och i filen.
     assert bank["2025-02"]["ingaende_saldo_ore"] == bank["2025-01"]["utgaende_saldo_ore"]
-    februari = las_bankfil(bankfil("2025-02"), januari[-1]["saldo_efter_ore"])
+    februari = las_bankfil(bankfil("2025-02"), januari[-1]["saldo_efter_ore"],
+                           bank["2025-02"]["utgaende_saldo_ore"])
     assert februari[-1]["saldo_efter_ore"] == bank["2025-02"]["utgaende_saldo_ore"]
 
 
 def test_raderna_har_ratt_falt():
-    rader = las_bankfil(bankfil("2025-01"), facit()["bank"]["2025-01"]["ingaende_saldo_ore"])
+    rader = las_bankfil(bankfil("2025-01"), *saldon("2025-01"))
     assert all(list(rad) == FALT for rad in rader)
     assert rader[0]["radnr"] == 1
     assert rader[0]["bokforingsdag"] == "2025-01-02"
@@ -63,7 +70,8 @@ def test_raderna_har_ratt_falt():
 
 def test_fel_ingaende_saldo_stoppar_januari():
     with pytest.raises(K1Fel) as fel:
-        las_bankfil(bankfil("2025-01"), facit()["bank"]["2025-01"]["ingaende_saldo_ore"] + 1)
+        ingaende, utgaende = saldon("2025-01")
+        las_bankfil(bankfil("2025-01"), ingaende + 1, utgaende)
     assert fel.value.radnr == 1
     assert fel.value.skillnad_ore == -1
 
@@ -74,7 +82,7 @@ def test_mars_stoppas_av_k1_pa_raden_som_facit_anger():
     planterat = [f for f in facit()["planterade_fel"] if f["typ"] == "brott_i_saldokedjan"][0]
     resultat = None
     with pytest.raises(K1Fel) as fel:
-        resultat = las_bankfil(bankfil("2025-03"), facit()["bank"]["2025-03"]["ingaende_saldo_ore"])
+        resultat = las_bankfil(bankfil("2025-03"), *saldon("2025-03"))
     assert resultat is None  # ingen rad returneras
 
     assert fel.value.radnr == planterat["rad"] == 74
@@ -96,11 +104,11 @@ def test_k1_godkanner_korrekt_kedja_och_stoppar_pa_forsta_felet():
         {"radnr": 2, "belopp_ore": 50, "saldo_efter_ore": 150},
         {"radnr": 3, "belopp_ore": -20, "saldo_efter_ore": 130},
     ]
-    kontrollera_k1(rader, 0)
+    kontrollera_k1(rader, 0, 130)
 
     rader[1]["saldo_efter_ore"] = 160  # rad 2 fel, och därmed även rad 3 räknat från rad 2
     with pytest.raises(K1Fel) as fel:
-        kontrollera_k1(rader, 0)
+        kontrollera_k1(rader, 0, 130)
     assert fel.value.radnr == 2
     assert fel.value.skillnad_ore == 10
 
@@ -124,9 +132,8 @@ def test_windows_1252_ger_samma_resultat(tmp_path):
     kopia.write_bytes(original.read_text(encoding="utf-8").encode("cp1252"))
     assert kopia.read_bytes() != original.read_bytes()
 
-    ingaende = facit()["bank"]["2025-01"]["ingaende_saldo_ore"]
-    fran_original = las_bankfil(original, ingaende)
-    fran_kopia = las_bankfil(kopia, ingaende)
+    fran_original = las_bankfil(original, *saldon("2025-01"))
+    fran_kopia = las_bankfil(kopia, *saldon("2025-01"))
     # Allt är lika utom kontrollsumman av filen, eftersom filerna har olika bytes.
     assert utan_kalla_fil(fran_kopia) == utan_kalla_fil(fran_original)
     assert fran_kopia[0]["kalla_fil"] != fran_original[0]["kalla_fil"]
@@ -144,9 +151,8 @@ def test_semikolon_och_rader_fore_rubriken_ger_samma_resultat(tmp_path):
     kopia.write_bytes(text.getvalue().encode("utf-8"))
     assert kopia.read_text(encoding="utf-8").splitlines()[2].startswith("Radnummer;")
 
-    ingaende = facit()["bank"]["2025-01"]["ingaende_saldo_ore"]
-    fran_original = las_bankfil(original, ingaende)
-    fran_kopia = las_bankfil(kopia, ingaende)
+    fran_original = las_bankfil(original, *saldon("2025-01"))
+    fran_kopia = las_bankfil(kopia, *saldon("2025-01"))
     assert utan_kalla_fil(fran_kopia) == utan_kalla_fil(fran_original)
     assert fran_kopia[0]["kalla_fil"] != fran_original[0]["kalla_fil"]
 
@@ -154,7 +160,7 @@ def test_semikolon_och_rader_fore_rubriken_ger_samma_resultat(tmp_path):
 # --- (e) Beloppen är heltal ---
 
 def test_beloppen_ar_heltal_aldrig_float():
-    rader = las_bankfil(bankfil("2025-01"), facit()["bank"]["2025-01"]["ingaende_saldo_ore"])
+    rader = las_bankfil(bankfil("2025-01"), *saldon("2025-01"))
     for rad in rader:
         for falt in ("belopp_ore", "saldo_efter_ore", "radnr"):
             assert type(rad[falt]) is int, (rad["radnr"], falt)
@@ -162,9 +168,11 @@ def test_beloppen_ar_heltal_aldrig_float():
 
 def test_k1_vagrar_float():
     with pytest.raises(TypeError):
-        kontrollera_k1([{"radnr": 1, "belopp_ore": 1.0, "saldo_efter_ore": 1}], 0)
+        kontrollera_k1([{"radnr": 1, "belopp_ore": 1.0, "saldo_efter_ore": 1}], 0, 1)
     with pytest.raises(TypeError):
-        kontrollera_k1([{"radnr": 1, "belopp_ore": 1, "saldo_efter_ore": 1}], 0.0)
+        kontrollera_k1([{"radnr": 1, "belopp_ore": 1, "saldo_efter_ore": 1}], 0.0, 1)
+    with pytest.raises(TypeError):
+        kontrollera_k1([{"radnr": 1, "belopp_ore": 1, "saldo_efter_ore": 1}], 0, 1.0)
 
 
 # --- (f) Ogiltiga filer stoppas med tydligt fel ---
@@ -183,7 +191,7 @@ def test_ogiltigt_belopp_stoppar_filen(tmp_path):
                 + "1,2025-01-02,2025-01-02,REF-1,MOTPART-A,100.00,100.00\n"
                 + "2,2025-01-02,2025-01-02,REF-2,MOTPART-B,12.3x,112.30\n")
     with pytest.raises(BankfilFel) as fel:
-        las_bankfil(fil, 0)
+        las_bankfil(fil, 0, 11230)
     meddelande = str(fel.value)
     assert "rad 3 i filen" in meddelande
     assert "ogiltigt belopp" in meddelande
@@ -203,21 +211,41 @@ def test_ogiltigt_belopp_stoppar_filen(tmp_path):
 )
 def test_andra_ogiltiga_rader_stoppar_filen(tmp_path, rad, text):
     with pytest.raises(BankfilFel, match=text):
-        las_bankfil(skriv(tmp_path, RUBRIK + rad), 0)
+        las_bankfil(skriv(tmp_path, RUBRIK + rad), 0, 10000)
 
 
 def test_fil_utan_rubrikrad_stoppas(tmp_path):
     with pytest.raises(BankfilFel, match="ingen rubrikrad"):
-        las_bankfil(skriv(tmp_path, "1,2025-01-02,2025-01-02,REF-1,MOTPART-A,100.00,100.00\n"), 0)
+        las_bankfil(skriv(tmp_path, "1,2025-01-02,2025-01-02,REF-1,MOTPART-A,100.00,100.00\n"), 0, 10000)
 
 
 def test_fil_utan_transaktioner_stoppas(tmp_path):
     with pytest.raises(BankfilFel, match="inga transaktionsrader"):
-        las_bankfil(skriv(tmp_path, RUBRIK), 0)
+        las_bankfil(skriv(tmp_path, RUBRIK), 0, 0)
 
 
 def test_okand_teckenkodning_stoppas(tmp_path):
     fil = tmp_path / "bank.csv"
     fil.write_bytes(RUBRIK.encode("utf-8") + b"1,2025-01-02,2025-01-02,REF-\x81,M,1.00,1.00\n")
     with pytest.raises(BankfilFel, match="teckenkodningen"):
-        las_bankfil(fil, 0)
+        las_bankfil(fil, 0, 100)
+
+
+# --- Rättelser efter granskningen (GRANSKNING.md) ---
+
+def test_f2_avklippt_fil_stoppas(tmp_path):
+    """F2 och F10: en fil där sista raden saknas stoppas av jämförelsen med utgående saldo."""
+    rader = bankfil("2025-01").read_bytes().splitlines(keepends=True)
+    kopia = tmp_path / "bank_avklippt.csv"
+    kopia.write_bytes(b"".join(rader[:-1]))
+
+    ingaende, utgaende = saldon("2025-01")
+    resultat = None
+    with pytest.raises(K1Fel) as fel:
+        resultat = las_bankfil(kopia, ingaende, utgaende)
+    assert resultat is None
+    assert fel.value.radnr == 117  # sista raden som finns kvar
+    assert fel.value.forvantat_ore == utgaende
+    assert fel.value.skillnad_ore == 19900  # den bortklippta bankavgiften, 199,00 kr
+    assert "kan sakna rader" in str(fel.value)
+    assert "utgående saldo" in str(fel.value)

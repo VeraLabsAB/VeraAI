@@ -19,8 +19,9 @@ Det här gör modulen:
   saldo_efter_ore, kalla_fil (SHA-256 av hela filen) och radnr (värdet i kolumnen Radnummer).
 
 K1 (saldokedjan): varje rads saldo ska vara föregående saldo plus radens belopp, där första
-raden räknas från ingående saldo. Ingående saldo plus summan av alla belopp ska vara lika med
-sista radens saldo.
+raden räknas från ingående saldo. Sista radens saldo ska dessutom vara lika med utgående saldo
+(saldot vid periodens slut), som anroparen måste ange. Utan den kontrollen skulle en fil där de
+sista raderna saknas kunna godkännas, eftersom kedjan stämmer för de rader som finns kvar.
 
 Vid minsta fel stoppas hela filen: inga rader returneras, och ett BankfilFel kastas.
 """
@@ -184,9 +185,10 @@ def _kontrollera_heltal(varde, namn):
         raise TypeError(namn + " måste vara ett heltal i öre, inte " + type(varde).__name__ + ".")
 
 
-def kontrollera_k1(rader, ingaende_saldo_ore):
+def kontrollera_k1(rader, ingaende_saldo_ore, utgaende_saldo_ore):
     """Kontroll K1. Kastar K1Fel vid första felet. Returnerar inget om allt stämmer."""
     _kontrollera_heltal(ingaende_saldo_ore, "Ingående saldo")
+    _kontrollera_heltal(utgaende_saldo_ore, "Utgående saldo")
     if not rader:
         raise BankfilFel("Bankfilen stoppas: det finns inga rader att kontrollera.")
 
@@ -207,23 +209,28 @@ def kontrollera_k1(rader, ingaende_saldo_ore):
             )
         saldo = faktiskt
 
-    forvantat = ingaende_saldo_ore + sum(rad["belopp_ore"] for rad in rader)
-    faktiskt = rader[-1]["saldo_efter_ore"]
-    if faktiskt != forvantat:
+    # Kedjan ovan stämmer även om de sista raderna saknas. Därför jämförs sista radens saldo
+    # med det utgående saldot som anroparen har angett.
+    sista = rader[-1]
+    if sista["saldo_efter_ore"] != utgaende_saldo_ore:
         raise K1Fel(
-            "K1 saldokedjan: ingående saldo plus summan av beloppen stämmer inte med sista radens saldo"
-            + " (radnummer " + str(rader[-1]["radnr"]) + "). Förväntat saldo " + kronor(forvantat)
-            + ", faktiskt saldo " + kronor(faktiskt)
-            + ", skillnad " + kronor(faktiskt - forvantat)
-            + ". Hela filen är stoppad och ingen rad har lästs in.",
-            rader[-1]["radnr"], forvantat, faktiskt,
+            "K1 saldokedjan: sista radens saldo (radnummer " + str(sista["radnr"]) + ") är "
+            + kronor(sista["saldo_efter_ore"]) + ", men utgående saldo ska vara "
+            + kronor(utgaende_saldo_ore) + ", skillnad "
+            + kronor(sista["saldo_efter_ore"] - utgaende_saldo_ore)
+            + ". Filen kan sakna rader, eller så är det angivna utgående saldot fel."
+            + " Hela filen är stoppad och ingen rad har lästs in.",
+            sista["radnr"], utgaende_saldo_ore, sista["saldo_efter_ore"],
         )
 
 
-def las_bankfil(sokvag, ingaende_saldo_ore):
-    """Läser en bankfil och kör K1. Returnerar raderna bara om allt stämmer, annars BankfilFel."""
+def las_bankfil(sokvag, ingaende_saldo_ore, utgaende_saldo_ore):
+    """Läser en bankfil och kör K1. Returnerar raderna bara om allt stämmer, annars BankfilFel.
+
+    Ingående och utgående saldo är heltal i öre, till exempel från kontoutdraget.
+    """
     with open(sokvag, "rb") as fil:
         data = fil.read()
     rader = _tolka_rader(data)
-    kontrollera_k1(rader, ingaende_saldo_ore)
+    kontrollera_k1(rader, ingaende_saldo_ore, utgaende_saldo_ore)
     return rader
