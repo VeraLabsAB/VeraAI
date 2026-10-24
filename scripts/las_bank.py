@@ -290,8 +290,17 @@ def las_bankfil(sokvag, ingaende_saldo_ore, utgaende_saldo_ore):
 
     Ingående och utgående saldo är heltal i öre, till exempel från kontoutdraget.
     """
-    with open(sokvag, "rb") as fil:
-        data = fil.read()
+    try:
+        with open(sokvag, "rb") as fil:
+            data = fil.read()
+    except FileNotFoundError:
+        raise BankfilFel("Bankfilen stoppas: filen finns inte: " + str(sokvag) + ".") from None
+    except IsADirectoryError:
+        raise BankfilFel("Bankfilen stoppas: " + str(sokvag) + " är en mapp, inte en fil.") from None
+    except OSError as fel:
+        raise BankfilFel(
+            "Bankfilen stoppas: filen " + str(sokvag) + " går inte att läsa (" + (fel.strerror or str(fel)) + ")."
+        ) from None
     rader = _tolka_rader(data)
     kontrollera_k1(rader, ingaende_saldo_ore, utgaende_saldo_ore)
     return rader

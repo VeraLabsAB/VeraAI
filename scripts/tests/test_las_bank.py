@@ -6,6 +6,7 @@ Testdatan är SYNTETISK (Syntet Testbutik AB, 2025-Q1). Rätt svar står i facit
 import csv
 import io
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -343,3 +344,27 @@ def test_f9_skrap_efter_citerat_falt_stoppas(tmp_path):
         las_bankfil(fil, 0, 100)
     assert "rad 2 i filen" in str(fel.value)
     assert "citattecken i fel läge" in str(fel.value)
+
+
+def test_f7_saknad_fil_ger_bankfilfel(tmp_path):
+    """F7, fall 9m: gav FileNotFoundError."""
+    with pytest.raises(BankfilFel, match="filen finns inte"):
+        las_bankfil(tmp_path / "finns_inte.csv", 0, 0)
+
+
+def test_f7_mapp_ger_bankfilfel(tmp_path):
+    """F7, fall 9n: gav IsADirectoryError."""
+    with pytest.raises(BankfilFel, match="är en mapp"):
+        las_bankfil(tmp_path, 0, 0)
+
+
+def test_f7_fil_som_inte_gar_att_lasa_ger_bankfilfel(tmp_path):
+    fil = skriv(tmp_path, RUBRIK + "1,2025-01-02,2025-01-02,REF-1,M,1.00,1.00\n")
+    fil.chmod(0)
+    try:
+        if os.access(fil, os.R_OK):
+            pytest.skip("Filen går ändå att läsa (till exempel som administratör).")
+        with pytest.raises(BankfilFel, match="går inte att läsa"):
+            las_bankfil(fil, 0, 100)
+    finally:
+        fil.chmod(0o600)
