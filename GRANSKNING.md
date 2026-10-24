@@ -375,3 +375,50 @@ Kommandon som kördes i granskningen: Python i projektets `.venv` (provskript oc
 1. **G9:** var ska bankformatet och ingående/utgående saldo ligga så att agenten inte kan ändra dem, och varifrån kommer saldona i drift (kontoutdrag, föregående månad)? Hör till spärrsteget.
 2. **G1, G2, G4:** ska de rättas nu (små ändringar i `las_bank.py` med test) eller samlas till nästa byggsteg? Rekommendation: rätta G1 nu, eftersom det gäller samma skydd som F1.
 3. **G8:** ska testerna för kärnans generalitet och F11 byggas ut nu, eller när kontoplan och momssatser läggs till?
+
+## Åtgärder efter granskning 2
+
+Rättat 2026-10-25 i en egen session, i commit c6f84bf. Alla tester ligger i `scripts/tests/test_las_bank.py`.
+
+**Så bevisades testerna.** De nya testerna kördes i en kopia av projektet utanför projektmappen, där `las_bank.py` var den gamla versionen (commit 1d2c03f, samma kod som granskades i 8015dea). Där blev 23 nya tester röda av rätt skäl: 20 släpptes igenom (`DID NOT RAISE`), 2 kraschade med `RecursionError` och 1 gav granskarens missvisande meddelande "har 5 fält". Dessutom gjordes ett mutationstest på den nya koden: en kontroll i taget togs bort i en kopia, och hela sviten kördes.
+
+| Borttagen kontroll (i en kopia) | Röda tester |
+|---|---|
+| G1: kontrollen av styrtecken i bankfilen | 7 (`test_g1_…`) |
+| G2: fasta listan med avgränsare | 12 (`test_g2_avgransare_…`, `test_g8_mellanslag_…`, två fall i `test_f5_trasigt_bankformat_…`) |
+| G2: styrtecken och osynliga tecken i kolumnnamn | 5 (`test_g2_styrtecken_och_osynliga_…`) |
+| G4: fångsten av `RecursionError` | 2 (`test_g4_…`) |
+| G8 punkt 1: dubbla kolumner på rubrikraden | 1 (`test_g8_kolumn_flera_ganger_…`) |
+| G8 punkt 3: `True`/`False` som saldo | 4 (`test_g8_true_och_false_…`) |
+| G8 punkt 2, i den gamla koden: mellanslag bland förbjudna avgränsare | 1 (`test_g8_mellanslag_…`) |
+
+G8 punkt 1, 2 och 3 fungerade redan i den gamla koden, så de testerna är gröna även där. Det gäller också punkt 2 (mellanslag), som förbjöds redan innan.
+
+| Nr | Åtgärdad | Test |
+|---|---|---|
+| G1 | Ja. En bankfil som innehåller ett styrtecken (Unicode-kategori Cc) utom tabb, `\n` och `\r`, eller U+2028/U+2029, stoppas med `BankfilFel`, var tecknet än står: inuti eller mellan fält, med eller utan citattecken, även före rubrikraden | `test_g1_citattecken_som_slar_ihop_rader_med_styrtecken_stoppas` (fall 4g med `\x0b`, `\x0c`, `\x1c`, `\x1d`, `\x1e`, `\x85`), `test_g1_styrtecken_i_vanligt_falt_stoppas` (skyddstest: `test_g1_tabb_och_vanliga_radslut_ar_tillatna`) |
+| G2 | Ja. Bara komma, semikolon, tabb och lodstreck godtas som avgränsare. Kolumnnamn med styrtecken (Cc, även tabb) eller osynliga tecken (Cf) förkastas | `test_g2_avgransare_utanfor_fasta_listan_forkastas` (`\x0c`, `\x1e`, `\x85`, NUL, punkt, minus, siffra, bokstav, emoji), `test_g2_styrtecken_och_osynliga_tecken_i_kolumnnamn_forkastas` (`\x0c`, `\x85`, NUL, U+200B, tabb) (skyddstest: `test_g2_avgransarna_i_fasta_listan_godtas`) |
+| G3 | Nej, medvetet | Se nedan |
+| G4 | Ja. Djupt nästlad JSON i bankformat.json ger `BankfilFel` med tydligt meddelande | `test_g4_djupt_nastlat_bankformat_ger_bankfilfel` (100 000 hakparenteser, 100 000 klammerparenteser) |
+| G5 | Nej, medvetet | Se nedan |
+| G6 | Nej, medvetet | Se nedan |
+| G7 | Nej, medvetet | Se nedan |
+| G8 punkt 1 | Ja (test tillagt, koden var redan rätt) | `test_g8_kolumn_flera_ganger_pa_rubrikraden_stoppas` |
+| G8 punkt 2 | Ja (test tillagt, koden var redan rätt) | `test_g8_mellanslag_som_avgransare_forkastas` |
+| G8 punkt 3 | Ja (test tillagt, koden var redan rätt) | `test_g8_true_och_false_som_saldo_stoppas` (ingående och utgående, `True` och `False`) |
+| G8 punkt 4–6 | Nej, medvetet | Se nedan |
+| G9 | Nej, medvetet | Se nedan |
+
+**Varför resten inte är åtgärdat nu.** Uppgiften var att rätta G1, G2, G4 och G8 punkt 1–3. Övriga fynd släpper inte igenom någon felaktig rad idag, och flera kräver ett beslut först:
+
+- **G3** (saldo av fel typ ger `TypeError`): ett medvetet val som ett befintligt test (`test_k1_vagrar_float`) kräver. Om det ska bli `BankfilFel`, och om typen ska kontrolleras innan filen läses, är ett beslut om hur anropande kod ska fånga fel. Felaktiga saldon stoppas redan.
+- **G5** (två sätt att skriva "ö"): att normalisera namnen ändrar vad som räknas som samma kolumnnamn, och det bör bestämmas medvetet. Filen stoppas redan, bara meddelandet är otydligt.
+- **G6** (missvisande rubrikrad): filen stoppas redan. En bättre lösning kräver ändrad logik för hur rubrikraden väljs.
+- **G7** (ingen storleksgräns): en gräns är ett beslut om hur stor en bankfil får vara, och kanske per företag. 100 000 rader går på under 3 sekunder.
+- **G8 punkt 4** (tomma rader hoppas över): ett beteende, inte en rättelse, och ingick inte i uppgiften.
+- **G8 punkt 5–6** (regeltesterna för F11 och kärnans generalitet går att lura): granskningens beslut 3. Hör ihop med när kontoplan och momssatser läggs till. Obs: kärnan har nu konstanten `TILLATNA_AVGRANSARE` med komma, semikolon, tabb och lodstreck. Den är en allmän CSV-regel som gäller alla företag (företagets egna avgränsare står fortfarande i bankformat.json), men den är just en sådan konstant som granskaren visade att generalitetstestet inte skulle upptäcka.
+- **G9** (bankformat och saldon ligger inte skyddat): hör till spärrsteget och kräver beslut om var bankformatet och saldona ska ligga och varifrån saldona kommer i drift (granskningens beslut 1).
+
+**Övrigt som ändrats.** Ett befintligt testfall (`avgransare_i_kolumnnamn` i `test_f5_trasigt_bankformat_ger_bankfilfel`) hade tabb inuti ett kolumnnamn. Det stoppas nu av G2-kontrollen i stället, så testfallet använder lodstreck och prövar fortfarande samma sak. `foretag/README.md` och beskrivningen överst i `las_bank.py` har uppdaterats med de nya reglerna. SPEC.md är inte ändrad.
+
+Testsviten efter rättelserna: 190 passed, 0 misslyckade.
