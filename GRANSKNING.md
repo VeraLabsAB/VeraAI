@@ -163,3 +163,23 @@ Obs: SPEC avsnitt 7 kräver en fast lista med kommandon, men listan finns inte i
 1. **F2:** ska `las_bankfil` också få utgående saldo och stoppa filen om det inte stämmer? Var kommer det värdet ifrån?
 2. **F1/F4:** ska en fil stoppas om ett fält innehåller radbrytning, och om radnumren inte löper 1, 2, 3 …? (Rekommenderas.)
 3. **F5:** ska bankformatet flyttas till konfigurationen, och i så fall hur?
+
+## Åtgärder efter granskning
+
+Rättat 2026-10-25 i en egen session, en commit per fynd. Alla tester ligger i `scripts/tests/test_las_bank.py`. Varje test nedan har körts mot den gamla koden (commit b36ba6c) och misslyckats där, och lyckas på den nya. Den gamla koden fick bara ta emot det nya argumentet för utgående saldo (utan att använda det), så att testerna kunde anropa den.
+
+| Nr | Åtgärdad | Test |
+|---|---|---|
+| F1 | Ja. Ett fält med radbrytning (\n, \r, U+2028, U+2029) stoppar filen | `test_f1_citattecken_som_slar_ihop_rader_stoppas` (granskarens fall 4g), `test_f1_radbrytning_inuti_falt_stoppas` |
+| F2 | Ja. `las_bankfil` och `kontrollera_k1` kräver utgående saldo, och sista radens saldo måste vara lika med det | `test_f2_avklippt_fil_stoppas` |
+| F3 | Ja. NUL-tecken, UTF-16 och för långa fält ger `BankfilFel`. Övriga fel från csv-läsaren översätts också | `test_f3_nul_tecken_stoppas_med_bankfilfel`, `test_f3_nul_tecken_fore_rubrikraden_stoppas_med_bankfilfel`, `test_f3_utf16_stoppas_med_bankfilfel`, `test_f3_for_langt_falt_stoppas_med_bankfilfel` |
+| F4 | Ja. Radnumren måste vara 1, 2, 3 … i tur och ordning | `test_f4_radnummer_maste_vara_1_2_3_i_tur_och_ordning` (dubbla, osorterade, saknade) |
+| F5 | Nej. Tas i en egen uppgift | – |
+| F6 | Ja, genom rättelsen av F4: två identiska rader har samma radnummer och stoppas | `test_f6_identiska_rader_stoppas` |
+| F7 | Ja. Saknad fil, mapp och oläsbar fil ger `BankfilFel` | `test_f7_saknad_fil_ger_bankfilfel`, `test_f7_mapp_ger_bankfilfel`, `test_f7_fil_som_inte_gar_att_lasa_ger_bankfilfel` |
+| F8 | Ja. Meddelandet nämner teckenkodningen om filen inte är giltig UTF-8 | `test_f8_trasig_utf8_namner_teckenkodningen` (skyddstest som ska vara grönt även på gamla koden: `test_f8_giltig_utf8_utan_rubrikrad_namner_inte_teckenkodningen`) |
+| F9 | Ja. Csv-läsaren körs i strikt läge | `test_f9_skrap_efter_citerat_falt_stoppas` |
+| F10 | Ja. Den gamla andra delen av K1 är ersatt av jämförelsen med utgående saldo (F2) | `test_f2_avklippt_fil_stoppas` |
+| F11 | Nej. Tas i en egen uppgift | – |
+
+Testsviten efter rättelserna: 128 passed, 0 misslyckade.
