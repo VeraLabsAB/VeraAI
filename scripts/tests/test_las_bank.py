@@ -300,3 +300,37 @@ def test_f6_identiska_rader_stoppas(tmp_path):
     rad = "1,2025-01-02,2025-01-02,REF-1,M,0.00,0.00\n"
     with pytest.raises(BankfilFel, match="radnummer 1, men nästa radnummer ska vara 2"):
         las_bankfil(skriv(tmp_path, RUBRIK + rad + rad), 0, 0)
+
+
+def test_f3_nul_tecken_stoppas_med_bankfilfel(tmp_path):
+    """F3, fall 9a: NUL-tecken i en beskrivning gav csv.Error."""
+    fil = skriv(tmp_path, RUBRIK + "1,2025-01-02,2025-01-02,REF-1,M\x00X,1.00,1.00\n")
+    with pytest.raises(BankfilFel) as fel:
+        las_bankfil(fil, 0, 100)
+    assert "rad 2 i filen" in str(fel.value)
+    assert "NUL-tecken" in str(fel.value)
+
+
+def test_f3_nul_tecken_fore_rubrikraden_stoppas_med_bankfilfel(tmp_path):
+    """F3, fall 9b."""
+    fil = skriv(tmp_path, "X\x00Y\n" + RUBRIK + "1,2025-01-02,2025-01-02,REF-1,M,1.00,1.00\n")
+    with pytest.raises(BankfilFel, match="rad 1 i filen innehåller ett NUL-tecken"):
+        las_bankfil(fil, 0, 100)
+
+
+@pytest.mark.parametrize("kodning, bom", [("utf-16-le", b"\xff\xfe"), ("utf-16-be", b"\xfe\xff")])
+def test_f3_utf16_stoppas_med_bankfilfel(tmp_path, kodning, bom):
+    """F3, fall 9c: en fil sparad som UTF-16 gav csv.Error."""
+    fil = tmp_path / "bank.csv"
+    fil.write_bytes(bom + (RUBRIK + "1,2025-01-02,2025-01-02,REF-1,M,1.00,1.00\n").encode(kodning))
+    with pytest.raises(BankfilFel, match="UTF-16"):
+        las_bankfil(fil, 0, 100)
+
+
+def test_f3_for_langt_falt_stoppas_med_bankfilfel(tmp_path):
+    """F3, fall 9d: en beskrivning på 200 000 tecken gav csv.Error."""
+    fil = skriv(tmp_path, RUBRIK + "1,2025-01-02,2025-01-02,REF-1," + "M" * 200_000 + ",1.00,1.00\n")
+    with pytest.raises(BankfilFel) as fel:
+        las_bankfil(fil, 0, 100)
+    assert "rad 2 i filen" in str(fel.value)
+    assert "längre än" in str(fel.value)

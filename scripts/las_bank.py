@@ -11,6 +11,8 @@ Det här gör modulen:
 
 - Teckenkodningen upptäcks automatiskt: först UTF-8 (med eller utan BOM), annars Windows-1252.
   En fil som bara innehåller vanliga engelska tecken är giltig i båda och läses då som UTF-8.
+  En fil sparad som UTF-16 (börjar med BOM FF FE eller FE FF) stoppas med tydligt fel, liksom
+  en fil som innehåller NUL-tecken (tecken nummer 0).
 - Rader före rubrikraden hoppas över. Rubrikraden är den första raden som innehåller alla
   kolumnerna ovan.
 - Avgränsaren (komma eller semikolon) upptäcks automatiskt på rubrikraden.
@@ -81,6 +83,11 @@ def kronor(ore):
 
 def _avkoda(data):
     """Returnerar filens text. Provar UTF-8 först och Windows-1252 sedan."""
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        raise BankfilFel(
+            "Bankfilen stoppas: filen är sparad som UTF-16 (\"Unicode-text\"), som inte stöds."
+            " Exportera filen från banken igen, eller spara den som UTF-8 eller CSV."
+        )
     try:
         return data.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -97,7 +104,10 @@ def _hitta_rubrikrad(rader):
     """Returnerar (index för rubrikraden, avgränsare, kolumnernas plats, antal kolumner)."""
     for index, rad in enumerate(rader):
         for avgransare in AVGRANSARE:
-            falt = [f.strip() for f in next(csv.reader([rad], delimiter=avgransare), [])]
+            try:
+                falt = [f.strip() for f in next(csv.reader([rad], delimiter=avgransare), [])]
+            except csv.Error:
+                continue  # raden går inte att tolka, så den är ingen rubrikrad
             if all(namn in falt for namn in KOLUMNER.values()):
                 dubbletter = [namn for namn in KOLUMNER.values() if falt.count(namn) > 1]
                 if dubbletter:
@@ -130,6 +140,19 @@ def _tolka_ore(text, kolumn, plats):
         raise BankfilFel(plats + " har ett ogiltigt belopp i kolumnen " + repr(kolumn) + ": " + repr(text) + ".") from None
 
 
+def _csv_fel(fel, var):
+    """Översätter ett fel från csv-läsaren till ett BankfilFel med svenskt meddelande."""
+    if "field larger than field limit" in str(fel):
+        return BankfilFel(
+            var + " har ett fält som är längre än " + str(csv.field_size_limit())
+            + " tecken. Filen är troligen trasig."
+        )
+    return BankfilFel(
+        var + " kan inte tolkas som CSV, till exempel på grund av ett citattecken i fel läge."
+        + " Teknisk detalj: " + str(fel) + "."
+    )
+
+
 def _rad_id(rad):
     """Stabilt id som bara beror på radens innehåll, inte på filens kodning eller avgränsare."""
     delar = [
@@ -147,17 +170,29 @@ def _tolka_rader(data):
     """
     kalla_fil = hashlib.sha256(data).hexdigest()
     textrader = _avkoda(data).splitlines(keepends=True)
+    for index, rad in enumerate(textrader):
+        if "\x00" in rad:
+            raise BankfilFel(
+                "Bankfilen stoppas: rad " + str(index + 1) + " i filen innehåller ett NUL-tecken"
+                " (tecken nummer 0). Filen är troligen trasig eller sparad i fel format."
+            )
     rubrik_index, avgransare, plats, antal_kolumner = _hitta_rubrikrad(textrader)
 
     resultat = []
     lasare = csv.reader(textrader[rubrik_index + 1:], delimiter=avgransare)
     lasta_rader = 0  # antal textrader efter rubriken som läsaren har gått igenom
-    for falt in lasare:
+    while True:
         filrad = rubrik_index + 2 + lasta_rader  # raden i filen där posten börjar
+        var = "Bankfilen stoppas: rad " + str(filrad) + " i filen"
+        try:
+            falt = next(lasare)
+        except StopIteration:
+            break
+        except csv.Error as fel:
+            raise _csv_fel(fel, var) from None
         lasta_rader = lasare.line_num
         if not falt or all(not f.strip() for f in falt):
             continue  # tom rad
-        var = "Bankfilen stoppas: rad " + str(filrad) + " i filen"
         for index, text in enumerate(falt):
             if any(tecken in text for tecken in _RADBRYTNINGAR):
                 raise BankfilFel(
