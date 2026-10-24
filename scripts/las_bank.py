@@ -1,0 +1,229 @@
+"""Läser en bankfil (Swedbank-CSV) och kör kontroll K1, saldokedjan.
+
+OBS: Kolumnlayouten nedan är ANTAGEN och INTE verifierad mot en riktig fil från Swedbank.
+Den måste jämföras med en riktig export innan modulen används på riktiga underlag.
+
+Antagna kolumner (rubrikraden måste innehålla alla, i valfri ordning):
+
+    Radnummer, Bokföringsdag, Transaktionsdag, Referens, Beskrivning, Belopp, Bokfört saldo
+
+Det här gör modulen:
+
+- Teckenkodningen upptäcks automatiskt: först UTF-8 (med eller utan BOM), annars Windows-1252.
+  En fil som bara innehåller vanliga engelska tecken är giltig i båda och läses då som UTF-8.
+- Rader före rubrikraden hoppas över. Rubrikraden är den första raden som innehåller alla
+  kolumnerna ovan.
+- Avgränsaren (komma eller semikolon) upptäcks automatiskt på rubrikraden.
+- Belopp tolkas med belopp.tolka_belopp och blir heltal i öre, aldrig flyttal.
+- Varje rad får: id, bokforingsdag, transaktionsdag, referens, beskrivning, belopp_ore,
+  saldo_efter_ore, kalla_fil (SHA-256 av hela filen) och radnr (värdet i kolumnen Radnummer).
+
+K1 (saldokedjan): varje rads saldo ska vara föregående saldo plus radens belopp, där första
+raden räknas från ingående saldo. Ingående saldo plus summan av alla belopp ska vara lika med
+sista radens saldo.
+
+Vid minsta fel stoppas hela filen: inga rader returneras, och ett BankfilFel kastas.
+"""
+
+import csv
+import datetime as dt
+import hashlib
+import re
+
+from belopp import formatera_ore, tolka_belopp
+
+KOLUMNER = {
+    "radnr": "Radnummer",
+    "bokforingsdag": "Bokföringsdag",
+    "transaktionsdag": "Transaktionsdag",
+    "referens": "Referens",
+    "beskrivning": "Beskrivning",
+    "belopp": "Belopp",
+    "saldo": "Bokfört saldo",
+}
+
+AVGRANSARE = [",", ";"]
+
+_DATUM = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
+_HELTAL = re.compile(r"\d+", re.ASCII)
+
+
+class BankfilFel(Exception):
+    """Bankfilen kunde inte läsas in. Hela filen är stoppad."""
+
+
+class K1Fel(BankfilFel):
+    """Saldokedjan stämmer inte. Hela filen är stoppad."""
+
+    def __init__(self, meddelande, radnr, forvantat_ore, faktiskt_ore):
+        super().__init__(meddelande)
+        self.radnr = radnr
+        self.forvantat_ore = forvantat_ore
+        self.faktiskt_ore = faktiskt_ore
+        self.skillnad_ore = faktiskt_ore - forvantat_ore
+
+
+def kronor(ore):
+    """123456 -> "1234,56 kr"."""
+    return formatera_ore(ore) + " kr"
+
+
+# --- Inläsning ---
+
+def _avkoda(data):
+    """Returnerar filens text. Provar UTF-8 först och Windows-1252 sedan."""
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        pass
+    try:
+        return data.decode("cp1252")
+    except UnicodeDecodeError:
+        raise BankfilFel(
+            "Bankfilen stoppas: teckenkodningen är varken UTF-8 eller Windows-1252."
+        ) from None
+
+
+def _hitta_rubrikrad(rader):
+    """Returnerar (index för rubrikraden, avgränsare, kolumnernas plats, antal kolumner)."""
+    for index, rad in enumerate(rader):
+        for avgransare in AVGRANSARE:
+            falt = [f.strip() for f in next(csv.reader([rad], delimiter=avgransare), [])]
+            if all(namn in falt for namn in KOLUMNER.values()):
+                dubbletter = [namn for namn in KOLUMNER.values() if falt.count(namn) > 1]
+                if dubbletter:
+                    raise BankfilFel(
+                        "Bankfilen stoppas: rubrikraden (rad " + str(index + 1)
+                        + " i filen) har kolumnen " + repr(dubbletter[0]) + " flera gånger."
+                    )
+                plats = {nyckel: falt.index(namn) for nyckel, namn in KOLUMNER.items()}
+                return index, avgransare, plats, len(falt)
+    raise BankfilFel(
+        "Bankfilen stoppas: hittar ingen rubrikrad med kolumnerna "
+        + ", ".join(KOLUMNER.values()) + "."
+    )
+
+
+def _tolka_datum(text, kolumn, plats):
+    if not _DATUM.fullmatch(text):
+        raise BankfilFel(plats + " har ett ogiltigt datum i kolumnen " + repr(kolumn) + ": " + repr(text) + ".")
+    try:
+        dt.date.fromisoformat(text)
+    except ValueError:
+        raise BankfilFel(plats + " har ett ogiltigt datum i kolumnen " + repr(kolumn) + ": " + repr(text) + ".") from None
+    return text
+
+
+def _tolka_ore(text, kolumn, plats):
+    try:
+        return tolka_belopp(text)
+    except ValueError:
+        raise BankfilFel(plats + " har ett ogiltigt belopp i kolumnen " + repr(kolumn) + ": " + repr(text) + ".") from None
+
+
+def _rad_id(rad):
+    """Stabilt id som bara beror på radens innehåll, inte på filens kodning eller avgränsare."""
+    delar = [
+        str(rad["radnr"]), rad["bokforingsdag"], rad["transaktionsdag"], rad["referens"],
+        rad["beskrivning"], str(rad["belopp_ore"]), str(rad["saldo_efter_ore"]),
+    ]
+    return "BANK-" + hashlib.sha256("\x1f".join(delar).encode("utf-8")).hexdigest()[:16]
+
+
+def _tolka_rader(data):
+    """Tolkar bankfilens innehåll (bytes) till rader. Kör INTE K1.
+
+    Använd las_bankfil, som alltid kör K1. Den här funktionen finns separat bara för att
+    testerna ska kunna räkna rader i en fil som K1 stoppar.
+    """
+    kalla_fil = hashlib.sha256(data).hexdigest()
+    textrader = _avkoda(data).splitlines(keepends=True)
+    rubrik_index, avgransare, plats, antal_kolumner = _hitta_rubrikrad(textrader)
+
+    resultat = []
+    lasare = csv.reader(textrader[rubrik_index + 1:], delimiter=avgransare)
+    for falt in lasare:
+        filrad = rubrik_index + 1 + lasare.line_num
+        if not falt or all(not f.strip() for f in falt):
+            continue  # tom rad
+        var = "Bankfilen stoppas: rad " + str(filrad) + " i filen"
+        if len(falt) != antal_kolumner:
+            raise BankfilFel(
+                var + " har " + str(len(falt)) + " fält, men rubrikraden har " + str(antal_kolumner) + "."
+            )
+        varde = {nyckel: falt[index].strip() for nyckel, index in plats.items()}
+
+        if not _HELTAL.fullmatch(varde["radnr"]):
+            raise BankfilFel(var + " har ett ogiltigt radnummer: " + repr(varde["radnr"]) + ".")
+
+        rad = {
+            "radnr": int(varde["radnr"]),
+            "bokforingsdag": _tolka_datum(varde["bokforingsdag"], KOLUMNER["bokforingsdag"], var),
+            "transaktionsdag": _tolka_datum(varde["transaktionsdag"], KOLUMNER["transaktionsdag"], var),
+            "referens": varde["referens"],
+            "beskrivning": varde["beskrivning"],
+            "belopp_ore": _tolka_ore(varde["belopp"], KOLUMNER["belopp"], var),
+            "saldo_efter_ore": _tolka_ore(varde["saldo"], KOLUMNER["saldo"], var),
+            "kalla_fil": kalla_fil,
+        }
+        rad["id"] = _rad_id(rad)
+        resultat.append({nyckel: rad[nyckel] for nyckel in (
+            "id", "bokforingsdag", "transaktionsdag", "referens", "beskrivning",
+            "belopp_ore", "saldo_efter_ore", "kalla_fil", "radnr",
+        )})
+
+    if not resultat:
+        raise BankfilFel("Bankfilen stoppas: filen har en rubrikrad men inga transaktionsrader.")
+    return resultat
+
+
+# --- K1, saldokedjan ---
+
+def _kontrollera_heltal(varde, namn):
+    if isinstance(varde, bool) or not isinstance(varde, int):
+        raise TypeError(namn + " måste vara ett heltal i öre, inte " + type(varde).__name__ + ".")
+
+
+def kontrollera_k1(rader, ingaende_saldo_ore):
+    """Kontroll K1. Kastar K1Fel vid första felet. Returnerar inget om allt stämmer."""
+    _kontrollera_heltal(ingaende_saldo_ore, "Ingående saldo")
+    if not rader:
+        raise BankfilFel("Bankfilen stoppas: det finns inga rader att kontrollera.")
+
+    saldo = ingaende_saldo_ore
+    for rad in rader:
+        _kontrollera_heltal(rad["belopp_ore"], "Beloppet på radnummer " + str(rad["radnr"]))
+        _kontrollera_heltal(rad["saldo_efter_ore"], "Saldot på radnummer " + str(rad["radnr"]))
+        forvantat = saldo + rad["belopp_ore"]
+        faktiskt = rad["saldo_efter_ore"]
+        if faktiskt != forvantat:
+            raise K1Fel(
+                "K1 saldokedjan: fel på radnummer " + str(rad["radnr"])
+                + ". Förväntat saldo " + kronor(forvantat)
+                + ", faktiskt saldo " + kronor(faktiskt)
+                + ", skillnad " + kronor(faktiskt - forvantat)
+                + ". Hela filen är stoppad och ingen rad har lästs in.",
+                rad["radnr"], forvantat, faktiskt,
+            )
+        saldo = faktiskt
+
+    forvantat = ingaende_saldo_ore + sum(rad["belopp_ore"] for rad in rader)
+    faktiskt = rader[-1]["saldo_efter_ore"]
+    if faktiskt != forvantat:
+        raise K1Fel(
+            "K1 saldokedjan: ingående saldo plus summan av beloppen stämmer inte med sista radens saldo"
+            + " (radnummer " + str(rader[-1]["radnr"]) + "). Förväntat saldo " + kronor(forvantat)
+            + ", faktiskt saldo " + kronor(faktiskt)
+            + ", skillnad " + kronor(faktiskt - forvantat)
+            + ". Hela filen är stoppad och ingen rad har lästs in.",
+            rader[-1]["radnr"], forvantat, faktiskt,
+        )
+
+
+def las_bankfil(sokvag, ingaende_saldo_ore):
+    """Läser en bankfil och kör K1. Returnerar raderna bara om allt stämmer, annars BankfilFel."""
+    with open(sokvag, "rb") as fil:
+        data = fil.read()
+    rader = _tolka_rader(data)
+    kontrollera_k1(rader, ingaende_saldo_ore)
+    return rader
