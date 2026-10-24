@@ -1,0 +1,16 @@
+{
+  "id": "SYNT-U-2025-013",
+  "typ": "leverantorsfaktura",
+  "datum": "2025-02-03",
+  "motpart": "LEV-TELE",
+  "fakturanummer": "SYNT-TELE-714",
+  "belopp_ore": 74875,
+  "moms": [
+    {
+      "momssats": 25,
+      "underlag_ore": 59900,
+      "moms_ore": 14975
+    }
+  ],
+  "flaggor": []
+}

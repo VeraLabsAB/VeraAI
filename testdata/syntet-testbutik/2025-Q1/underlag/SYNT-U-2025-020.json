@@ -1,0 +1,21 @@
+{
+  "id": "SYNT-U-2025-020",
+  "typ": "leverantorsfaktura",
+  "datum": "2025-02-24",
+  "motpart": "LEV-KAFFE",
+  "fakturanummer": "SYNT-KAFFE-150",
+  "belopp_ore": 1262388,
+  "moms": [
+    {
+      "momssats": 12,
+      "underlag_ore": 1024900,
+      "moms_ore": 122988
+    },
+    {
+      "momssats": 25,
+      "underlag_ore": 91600,
+      "moms_ore": 22900
+    }
+  ],
+  "flaggor": []
+}

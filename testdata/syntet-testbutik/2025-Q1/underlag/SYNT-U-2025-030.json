@@ -1,0 +1,16 @@
+{
+  "id": "SYNT-U-2025-030",
+  "typ": "kvitto",
+  "datum": "2025-03-24",
+  "motpart": "BUTIK-STAD",
+  "fakturanummer": "SYNT-KV-62620",
+  "belopp_ore": 20000,
+  "moms": [
+    {
+      "momssats": 25,
+      "underlag_ore": 16000,
+      "moms_ore": 4000
+    }
+  ],
+  "flaggor": []
+}

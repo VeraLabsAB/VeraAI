@@ -1,0 +1,16 @@
+{
+  "id": "SYNT-U-2025-028",
+  "typ": "kvitto",
+  "datum": "2025-03-16",
+  "motpart": "RESTAURANG-1",
+  "fakturanummer": "SYNT-KV-31162",
+  "belopp_ore": 214600,
+  "moms": [
+    {
+      "momssats": 12,
+      "underlag_ore": 191607,
+      "moms_ore": 22993
+    }
+  ],
+  "flaggor": []
+}

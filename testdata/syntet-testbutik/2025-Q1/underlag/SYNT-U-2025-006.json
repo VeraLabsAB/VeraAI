@@ -1,0 +1,16 @@
+{
+  "id": "SYNT-U-2025-006",
+  "typ": "kvitto",
+  "datum": "2025-01-09",
+  "motpart": "BUTIK-FORBRUKNING",
+  "fakturanummer": "SYNT-KV-29165",
+  "belopp_ore": 40700,
+  "moms": [
+    {
+      "momssats": 25,
+      "underlag_ore": 32560,
+      "moms_ore": 8140
+    }
+  ],
+  "flaggor": []
+}

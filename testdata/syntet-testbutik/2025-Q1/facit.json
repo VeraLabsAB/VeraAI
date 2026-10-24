@@ -1,0 +1,132 @@
+{
+  "beskrivning": "SYNTETISKT facit för Syntet Testbutik AB, 2025-Q1. Allt är påhittat.",
+  "bank": {
+    "2025-01": {
+      "fil": "bank_2025-01.csv",
+      "antal_rader": 118,
+      "ingaende_saldo_ore": 8500000,
+      "utgaende_saldo_ore": 19276493
+    },
+    "2025-02": {
+      "fil": "bank_2025-02.csv",
+      "antal_rader": 130,
+      "ingaende_saldo_ore": 19276493,
+      "utgaende_saldo_ore": 24905579
+    },
+    "2025-03": {
+      "fil": "bank_2025-03.csv",
+      "antal_rader": 147,
+      "ingaende_saldo_ore": 24905579,
+      "utgaende_saldo_ore": 28476943
+    }
+  },
+  "forsaljning": {
+    "2025-01": {
+      "antal_z_rapporter": 24,
+      "per_momssats": {
+        "12": {
+          "brutto_ore": 8409900,
+          "moms_ore": 901063,
+          "netto_ore": 7508837
+        },
+        "25": {
+          "brutto_ore": 3252000,
+          "moms_ore": 650400,
+          "netto_ore": 2601600
+        }
+      }
+    },
+    "2025-02": {
+      "antal_z_rapporter": 24,
+      "per_momssats": {
+        "12": {
+          "brutto_ore": 9446800,
+          "moms_ore": 1012159,
+          "netto_ore": 8434641
+        },
+        "25": {
+          "brutto_ore": 3468000,
+          "moms_ore": 693600,
+          "netto_ore": 2774400
+        }
+      }
+    },
+    "2025-03": {
+      "antal_z_rapporter": 26,
+      "per_momssats": {
+        "12": {
+          "brutto_ore": 9726800,
+          "moms_ore": 1042158,
+          "netto_ore": 8684642
+        },
+        "25": {
+          "brutto_ore": 3881000,
+          "moms_ore": 776200,
+          "netto_ore": 3104800
+        }
+      }
+    }
+  },
+  "planterade_fel": [
+    {
+      "typ": "dubblett_leverantorsfaktura",
+      "manad": "2025-01",
+      "kontroll": "K4",
+      "filnamn": "underlag/SYNT-U-2025-004.json",
+      "id": "SYNT-U-2025-004",
+      "original_id": "SYNT-U-2025-003",
+      "original_filnamn": "underlag/SYNT-U-2025-003.json",
+      "beskrivning": "Samma leverantörsfaktura (LEV-TE, SYNT-TE-761) finns två gånger med olika id. Den betalas bara en gång på banken."
+    },
+    {
+      "typ": "lucka_i_z_serien",
+      "manad": "2025-01",
+      "kontroll": "inläsningskontroll",
+      "filnamn": "kassa/kassa_2025-01-15.csv",
+      "z_nummer": 1011,
+      "datum": "2025-01-15",
+      "saknad_forsaljning_brutto_ore": {
+        "12": 254900,
+        "25": 74700
+      },
+      "beskrivning": "Z-rapport 1011 saknas. Butiken hade öppet, och dagens kortavräkning, Swish och kontanter syns ändå på banken. Filen finns inte och dagens försäljning ingår inte i summan under \"forsaljning\"."
+    },
+    {
+      "typ": "fel_momssats_kvitto",
+      "manad": "2025-02",
+      "kontroll": "K5",
+      "filnamn": "underlag/SYNT-U-2025-019.json",
+      "id": "SYNT-U-2025-019",
+      "momssats_i_underlaget": 12,
+      "forvantad_momssats": 25,
+      "beskrivning": "Kvitto för städartiklar (BUTIK-STAD) med livsmedelssatsen 12 % i stället för 25 %."
+    },
+    {
+      "typ": "bankrad_utan_underlag",
+      "manad": "2025-02",
+      "kontroll": "K3",
+      "filnamn": "bank_2025-02.csv",
+      "rad": 85,
+      "belopp_ore": -35100,
+      "beskrivning": "Kortköp (KORTKOP BUTIK-FORBRUKNING) utan kvitto. Ska bli \"Saknat underlag\" efter 7 dagar."
+    },
+    {
+      "typ": "brott_i_saldokedjan",
+      "manad": "2025-03",
+      "kontroll": "K1",
+      "filnamn": "bank_2025-03.csv",
+      "rad": 74,
+      "visat_saldo_ore": 29001138,
+      "ratt_saldo_ore": 28991138,
+      "beskrivning": "Bokfört saldo på raden är 100,00 kr för högt. Alla andra rader stämmer med ingående saldo plus beloppen. Jämförs varje rad med raden före syns felet även på nästa rad, eftersom den räknas från det felaktiga saldot."
+    },
+    {
+      "typ": "restaurangkvitto_privat_karaktar",
+      "manad": "2025-03",
+      "kontroll": "K8",
+      "filnamn": "underlag/SYNT-U-2025-028.json",
+      "id": "SYNT-U-2025-028",
+      "beskrivning": "Restaurangkvitto (RESTAURANG-1) en söndag då butiken är stängd, betalt med företagets kort. Avdragsbegränsat eller privat, alltid ärende."
+    }
+  ]
+}

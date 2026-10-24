@@ -1,0 +1,9 @@
+datum,z_nummer,kassaregister_id,post,momssats,belopp
+2025-01-08,1005,TB-KASSA-1,forsaljning,12,2915.00
+2025-01-08,1005,TB-KASSA-1,forsaljning,25,1234.00
+2025-01-08,1005,TB-KASSA-1,moms,12,312.32
+2025-01-08,1005,TB-KASSA-1,moms,25,246.80
+2025-01-08,1005,TB-KASSA-1,betalsatt_kontant,,665.00
+2025-01-08,1005,TB-KASSA-1,betalsatt_kort,,2696.00
+2025-01-08,1005,TB-KASSA-1,betalsatt_swish,,788.00
+2025-01-08,1005,TB-KASSA-1,summa_brutto,,4149.00

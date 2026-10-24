@@ -1,0 +1,16 @@
+{
+  "id": "SYNT-U-2025-027",
+  "typ": "leverantorsfaktura",
+  "datum": "2025-03-14",
+  "motpart": "LEV-TILLBEHOR",
+  "fakturanummer": "SYNT-TILLB-340",
+  "belopp_ore": 1316375,
+  "moms": [
+    {
+      "momssats": 25,
+      "underlag_ore": 1053100,
+      "moms_ore": 263275
+    }
+  ],
+  "flaggor": []
+}

@@ -1,0 +1,16 @@
+{
+  "id": "SYNT-U-2025-021",
+  "typ": "leverantorsfaktura",
+  "datum": "2025-03-03",
+  "motpart": "HYRESVARD",
+  "fakturanummer": "SYNT-HYRA-2025-Q2",
+  "belopp_ore": 4500000,
+  "moms": [
+    {
+      "momssats": 25,
+      "underlag_ore": 3600000,
+      "moms_ore": 900000
+    }
+  ],
+  "flaggor": []
+}

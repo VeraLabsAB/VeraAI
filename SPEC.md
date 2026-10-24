@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Bolag | Vera Labs AB (produkt: Vera AI) |
-| Status | Utkast 1, 2026-10-24. Ska granskas av Hugo innan något byggs |
+| Status | Godkänd av Hugo 2026-10-24 (utkast 1). Ändras bara efter Hugos OK |
 | Ersätter | Den gamla specen för ett enskilt företag (ligger i arkivmappen) |
 
 Specen säger **vad** som ska byggas och **hur det ska bete sig**. Den är medvetet kort. Detaljer läggs i egna filer när vi kommer till respektive byggsteg.

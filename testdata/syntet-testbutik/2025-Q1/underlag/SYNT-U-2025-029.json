@@ -1,0 +1,16 @@
+{
+  "id": "SYNT-U-2025-029",
+  "typ": "leverantorsfaktura",
+  "datum": "2025-03-19",
+  "motpart": "LEV-TE",
+  "fakturanummer": "SYNT-TE-766",
+  "belopp_ore": 1058288,
+  "moms": [
+    {
+      "momssats": 12,
+      "underlag_ore": 944900,
+      "moms_ore": 113388
+    }
+  ],
+  "flaggor": []
+}
