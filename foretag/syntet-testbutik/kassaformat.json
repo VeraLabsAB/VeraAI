@@ -1,0 +1,20 @@
+{
+  "anteckning": "Kassans Z-rapport som den ser ut i testdatan (testdata/README.md). INTE jämförd med en riktig exportfil från något kassasystem (Ö5). Första raden är rubrikraden och måste innehålla alla kolumner, i valfri ordning. Momsavrundningen är utläst ur testdatan, inte kontrollerad mot Skatteverket eller en redovisningskonsult.",
+  "filnamn": "kassa_ÅÅÅÅ-MM-DD.csv",
+  "kolumner": {
+    "rapportdatum": "datum",
+    "znummer": "z_nummer",
+    "kassaregister": "kassaregister_id",
+    "postnamn": "post",
+    "sats": "momssats",
+    "belopp": "belopp"
+  },
+  "avgransare": [","],
+  "poster": {
+    "forsaljning_per_sats": "forsaljning",
+    "moms_per_sats": "moms",
+    "betalsatt": ["betalsatt_kontant", "betalsatt_kort", "betalsatt_swish"],
+    "totalsumma": "summa_brutto"
+  },
+  "momsavrundning": "narmaste_ore"
+}
