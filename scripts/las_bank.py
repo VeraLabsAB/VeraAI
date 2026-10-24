@@ -14,9 +14,13 @@ Det här gör modulen:
   En fil som bara innehåller vanliga engelska tecken är giltig i båda och läses då som UTF-8.
   En fil sparad som UTF-16 (börjar med BOM FF FE eller FE FF) stoppas med tydligt fel, liksom
   en fil som innehåller NUL-tecken (tecken nummer 0).
+- Andra styrtecken än tabb och vanliga radslut (\\n, \\r), samt de ovanliga radbrytningarna
+  U+2028 och U+2029, stoppar filen var de än står. Flera av dem kan annars få raderna att delas
+  fel så att flera transaktioner slås ihop till en.
 - Rader före rubrikraden hoppas över. Rubrikraden är den första raden som innehåller alla
   kolumnerna i bankformatet, i valfri ordning.
 - Avgränsaren upptäcks automatiskt på rubrikraden, bland dem som bankformatet tillåter.
+  Bankformatet får bara använda komma, semikolon, tabb och lodstreck.
 - Ett fält får inte innehålla radbrytning. CSV tillåter det inuti citattecken, men i en
   bankfil betyder det nästan alltid att ett citattecken i fel läge har slagit ihop flera
   transaktioner till en. Då stoppas filen.
@@ -39,6 +43,7 @@ import datetime as dt
 import hashlib
 import json
 import re
+import unicodedata
 
 from belopp import formatera_ore, tolka_belopp
 
@@ -57,6 +62,21 @@ _HELTAL = re.compile(r"\d+", re.ASCII)
 
 # Radbrytningar som inte får finnas inuti ett fält: \n, \r, U+2028 och U+2029.
 _RADBRYTNINGAR = "\n\r\u2028\u2029"
+
+# Styrtecken som får finnas i en bankfil: tabb, \n och \r. Alla andra styrtecken (Unicode-
+# kategori Cc), samt U+2028 och U+2029, stoppar filen (G1). Flera av dem räknas som radslut när
+# filen delas i rader, men inte av kontrollen mot radbrytning inuti fält, och kan då slå ihop
+# flera transaktioner till en.
+_TILLATNA_STYRTECKEN = "\t\n\r"
+# Kategori Cc omfattar bara U+0000–U+001F och U+007F–U+009F, och Unicode lovar att den aldrig ändras.
+_OTILLATNA_TECKEN = re.compile("[" + re.escape("".join(
+    chr(nummer) for nummer in range(0x100)
+    if unicodedata.category(chr(nummer)) == "Cc" and chr(nummer) not in _TILLATNA_STYRTECKEN
+) + "\u2028\u2029") + "]")
+_RADSLUT = re.compile(r"\r\n|\r|\n")
+
+# Avgränsare som ett bankformat får använda (G2): komma, semikolon, tabb och lodstreck.
+TILLATNA_AVGRANSARE = (",", ";", "\t", "|")
 
 
 class BankfilFel(Exception):
@@ -111,6 +131,13 @@ def _kontrollera_bankformat(data, var):
             raise BankfilFel(
                 var + ": kolumnnamnet för " + repr(nyckel) + " får inte innehålla radbrytning eller citattecken."
             )
+        osynliga = [tecken for tecken in namn if unicodedata.category(tecken) in ("Cc", "Cf")]
+        if osynliga:
+            raise BankfilFel(
+                var + ": kolumnnamnet för " + repr(nyckel) + " innehåller tecknet U+"
+                + format(ord(osynliga[0]), "04X") + ", som är ett styrtecken eller ett osynligt tecken."
+                + " Sådana tecken får inte finnas i ett kolumnnamn."
+            )
         kolumner[nyckel] = namn.strip()
     for nyckel, namn in kolumner.items():
         andra = [annan for annan, annat_namn in kolumner.items() if annat_namn == namn and annan != nyckel]
@@ -124,10 +151,10 @@ def _kontrollera_bankformat(data, var):
     if not isinstance(avgransare, list) or not avgransare:
         raise BankfilFel(var + ": 'avgransare' ska vara en lista med minst en avgränsare.")
     for tecken in avgransare:
-        if not isinstance(tecken, str) or len(tecken) != 1 or tecken in _RADBRYTNINGAR + '" ':
+        if not isinstance(tecken, str) or tecken not in TILLATNA_AVGRANSARE:
             raise BankfilFel(
-                var + ": avgränsaren " + repr(tecken) + " är ogiltig. Varje avgränsare ska vara ett"
-                " enda tecken, och inte mellanslag, citattecken eller radbrytning."
+                var + ": avgränsaren " + repr(tecken) + " är ogiltig. Tillåtna avgränsare är komma,"
+                " semikolon, tabb och lodstreck (" + ", ".join(map(repr, TILLATNA_AVGRANSARE)) + ")."
             )
     if len(set(avgransare)) != len(avgransare):
         raise BankfilFel(var + ": samma avgränsare står flera gånger i 'avgransare'.")
@@ -173,6 +200,11 @@ def ladda_bankformat(sokvag):
         ) from None
     except BankfilFel as fel:
         raise BankfilFel(var + ": " + str(fel) + ".") from None
+    except RecursionError:
+        raise BankfilFel(
+            var + " är inte giltigt: för många hakparenteser eller klammerparenteser inuti varandra."
+            " Ett bankformat har bara två nivåer. Filen är troligen trasig."
+        ) from None
     return _kontrollera_bankformat(innehall, var)
 
 
@@ -195,6 +227,23 @@ def _avkoda(data):
         raise BankfilFel(
             "Bankfilen stoppas: teckenkodningen är varken UTF-8 eller Windows-1252."
         ) from None
+
+
+def _inga_otillatna_tecken(text):
+    """Stoppar filen om den innehåller ett styrtecken utom tabb, \\n och \\r, eller U+2028/U+2029.
+
+    Radnumret i meddelandet räknas bara på \\n, \\r och \\r\\n, som i en vanlig textredigerare.
+    """
+    fynd = _OTILLATNA_TECKEN.search(text)
+    if fynd:
+        tecken = fynd.group()
+        filrad = len(_RADSLUT.findall(text, 0, fynd.start())) + 1
+        raise BankfilFel(
+            "Bankfilen stoppas: rad " + str(filrad) + " i filen innehåller tecknet U+"
+            + format(ord(tecken), "04X") + ", som är ett styrtecken eller en ovanlig radbrytning."
+            + " Sådana tecken finns inte i en vanlig bankfil, och de kan få raderna att delas"
+            + " fel så att flera transaktioner slås ihop till en."
+        )
 
 
 def _hitta_rubrikrad(rader, giltig_utf8, bankformat):
@@ -284,6 +333,7 @@ def _tolka_rader(data, bankformat):
                 "Bankfilen stoppas: rad " + str(index + 1) + " i filen innehåller ett NUL-tecken"
                 " (tecken nummer 0). Filen är troligen trasig eller sparad i fel format."
             )
+    _inga_otillatna_tecken(text)
     rubrik_index, avgransare, plats, antal_kolumner = _hitta_rubrikrad(textrader, giltig_utf8, bankformat)
 
     resultat = []

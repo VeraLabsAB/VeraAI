@@ -499,7 +499,7 @@ def med_kolumner(**andrat):
         (med_kolumner(referens="   "), "kolumnnamnet för 'referens' får inte vara tomt"),
         (med_kolumner(referens=None), "kolumnnamnet för 'referens' får inte vara tomt"),
         (med_kolumner(referens='Ref"'), "får inte innehålla radbrytning eller citattecken"),
-        (med_kolumner(referens="Ref\tnr"), "ett kolumnnamn innehåller en av avgränsarna"),
+        ({**med_kolumner(referens="Ref|nr"), "avgransare": ["\t", "|"]}, "ett kolumnnamn innehåller en av avgränsarna"),
         ({**ENGELSKT_FORMAT, "kolumner": ["Row"]}, "'kolumner', ska vara ett objekt"),
         ({**ENGELSKT_FORMAT, "avgransare": []}, "minst en avgränsare"),
         ({**ENGELSKT_FORMAT, "avgransare": ","}, "ska vara en lista"),
@@ -546,3 +546,132 @@ def test_f5_las_bankfil_kontrollerar_bankformatet_igen():
     with pytest.raises(BankfilFel, match="saknar nyckeln 'saldo'"):
         las_bankfil(bankfil("2025-01"), {**BANKFORMAT, "kolumner": utan("saldo", BANKFORMAT["kolumner"])},
                     *saldon("2025-01"))
+
+
+# --- Rättelser efter granskning 2 (GRANSKNING.md) ---
+
+# Styrtecken som Pythons splitlines räknar som radslut, men som F1-skyddet inte kände till.
+G1_STYRTECKEN = ["\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85"]
+
+
+@pytest.mark.parametrize("tecken", G1_STYRTECKEN, ids=lambda t: "U+" + format(ord(t), "04X"))
+def test_g1_citattecken_som_slar_ihop_rader_med_styrtecken_stoppas(tmp_path, tecken):
+    """G1: granskarens fall 4g, men med ett styrtecken mellan raderna i stället för \\n.
+    Före rättelsen godkändes filen med en enda rad i stället för tre."""
+    fil = skriv(tmp_path, RUBRIK
+                + '1,2025-01-03,2025-01-03,REF-1,"A,200.00,200.00' + tecken
+                + "2,2025-01-04,2025-01-04,REF-2,B,-200.00,0.00" + tecken
+                + '3,2025-01-28,2025-01-28,REF-3,C",75.00,75.00\n')
+    resultat = None
+    with pytest.raises(BankfilFel) as fel:
+        resultat = las_bankfil(fil, BANKFORMAT, 0, 7500)  # rätt ingående och utgående saldo
+    assert resultat is None
+    assert "rad 2 i filen" in str(fel.value)
+    assert "U+" + format(ord(tecken), "04X") in str(fel.value)
+    assert "styrtecken" in str(fel.value)
+
+
+def test_g1_styrtecken_i_vanligt_falt_stoppas(tmp_path):
+    """G1: ett ociterat fält med \\x0c inuti. Före rättelsen stoppades filen med det missvisande
+    meddelandet "har 5 fält"."""
+    fil = skriv(tmp_path, RUBRIK + "1,2025-01-02,2025-01-02,REF-1,MOT\x0cPART,1.00,1.00\n")
+    with pytest.raises(BankfilFel) as fel:
+        las_bankfil(fil, BANKFORMAT, 0, 100)
+    assert "rad 2 i filen innehåller tecknet U+000C" in str(fel.value)
+
+
+def test_g1_tabb_och_vanliga_radslut_ar_tillatna(tmp_path):
+    """Skydd: tabb, \\n och \\r\\n är fortfarande tillåtna."""
+    fil = skriv(tmp_path, RUBRIK.replace("\n", "\r\n") + "1,2025-01-02,2025-01-02,REF-1,M\tX,1.00,1.00\r\n")
+    assert las_bankfil(fil, BANKFORMAT, 0, 100)[0]["beskrivning"] == "M\tX"
+
+
+@pytest.mark.parametrize(
+    "avgransare",
+    ["\x0c", "\x1e", "\x85", "\x00", ".", "-", "0", "x", "\U0001F600"],
+    ids=["U+000C", "U+001E", "U+0085", "NUL", "punkt", "minus", "siffra", "bokstav", "emoji"],
+)
+def test_g2_avgransare_utanfor_fasta_listan_forkastas(tmp_path, avgransare):
+    """G2: bara komma, semikolon, tabb och lodstreck får vara avgränsare."""
+    with pytest.raises(BankfilFel) as fel:
+        ladda_bankformat(skriv_bankformat(tmp_path, {**ENGELSKT_FORMAT, "avgransare": [avgransare]}))
+    assert "avgränsaren " + repr(avgransare) + " är ogiltig" in str(fel.value)
+    assert "Tillåtna avgränsare är komma, semikolon, tabb och lodstreck" in str(fel.value)
+
+
+def test_g2_avgransarna_i_fasta_listan_godtas(tmp_path):
+    for avgransare in [",", ";", "\t", "|"]:
+        format_ = ladda_bankformat(skriv_bankformat(tmp_path, {**ENGELSKT_FORMAT, "avgransare": [avgransare]}))
+        assert format_["avgransare"] == [avgransare]
+
+
+@pytest.mark.parametrize(
+    "tecken",
+    ["\x0c", "\x85", "\x00", "\u200b", "\t"],
+    ids=["U+000C", "U+0085", "NUL", "U+200B", "tabb"],
+)
+def test_g2_styrtecken_och_osynliga_tecken_i_kolumnnamn_forkastas(tmp_path, tecken):
+    """G2: kolumnnamn med styrtecken (Cc) eller osynliga tecken (Cf) kan aldrig hittas i en
+    bankfil. U+200B är ett osynligt mellanslag. Tabb är också ett styrtecken. Avgränsaren är komma,
+    så att tabben inte stoppas av kontrollen av avgränsare i kolumnnamn i stället."""
+    format_ = {**med_kolumner(referens="Ref" + tecken + "nr"), "avgransare": [","]}
+    with pytest.raises(BankfilFel) as fel:
+        ladda_bankformat(skriv_bankformat(tmp_path, format_))
+    assert "kolumnnamnet för 'referens' innehåller tecknet U+" + format(ord(tecken), "04X") in str(fel.value)
+    assert "styrtecken eller ett osynligt tecken" in str(fel.value)
+
+
+@pytest.mark.parametrize(
+    "innehall",
+    ["[" * 100_000 + "]" * 100_000, '{"a":' * 100_000 + "1" + "}" * 100_000],
+    ids=["hakparenteser", "klammerparenteser"],
+)
+def test_g4_djupt_nastlat_bankformat_ger_bankfilfel(tmp_path, innehall):
+    """G4: 100 000 nivåer inuti varandra gav RecursionError i stället för BankfilFel."""
+    with pytest.raises(BankfilFel) as fel:
+        ladda_bankformat(skriv_bankformat(tmp_path, innehall))
+    assert "för många hakparenteser eller klammerparenteser inuti varandra" in str(fel.value)
+    assert str(tmp_path / "bankformat.json") in str(fel.value)
+
+
+def test_g8_kolumn_flera_ganger_pa_rubrikraden_stoppas(tmp_path):
+    """G8 punkt 1: utan kontrollen skulle den första av två kolumner med samma namn användas
+    utan varning. Raden nedan klarar K1 om den första kolumnen 'Belopp' används."""
+    fil = skriv(tmp_path, RUBRIK.replace("\n", ",Belopp\n") + "1,2025-01-02,2025-01-02,REF-1,M,1.00,1.00,99.00\n")
+    resultat = None
+    with pytest.raises(BankfilFel) as fel:
+        resultat = las_bankfil(fil, BANKFORMAT, 0, 100)
+    assert resultat is None
+    assert "rubrikraden (rad 1 i filen) har kolumnen 'Belopp' flera gånger" in str(fel.value)
+
+
+def test_g8_mellanslag_som_avgransare_forkastas(tmp_path):
+    """G8 punkt 2. Kolumnnamnen saknar mellanslag, så att det är avgränsarkontrollen som prövas
+    och inte kontrollen av avgränsare i kolumnnamn."""
+    format_ = {
+        "kolumner": {
+            "radnr": "Row", "bokforingsdag": "Booked", "transaktionsdag": "Date", "referens": "Reference",
+            "beskrivning": "Description", "belopp": "Amount", "saldo": "Balance",
+        },
+        "avgransare": [" "],
+    }
+    with pytest.raises(BankfilFel, match="avgränsaren ' ' är ogiltig"):
+        ladda_bankformat(skriv_bankformat(tmp_path, format_))
+
+
+@pytest.mark.parametrize(
+    "belopp, saldo, ingaende, utgaende",
+    [
+        ("0.01", "0.01", False, 1),  # False är lika med 0 i Python
+        ("0.01", "0.02", True, 2),  # True är lika med 1
+        ("0.01", "0.01", 0, True),
+        ("-0.01", "0.00", 1, False),
+    ],
+    ids=["ingaende_false", "ingaende_true", "utgaende_true", "utgaende_false"],
+)
+def test_g8_true_och_false_som_saldo_stoppas(tmp_path, belopp, saldo, ingaende, utgaende):
+    """G8 punkt 3: kedjan stämmer om True räknas som 1 och False som 0, men ett sanningsvärde är
+    inget saldo. Felet är TypeError (se G3, som inte är ändrat)."""
+    fil = skriv(tmp_path, RUBRIK + "1,2025-01-02,2025-01-02,REF-1,M," + belopp + "," + saldo + "\n")
+    with pytest.raises(TypeError, match="heltal i öre, inte bool"):
+        las_bankfil(fil, BANKFORMAT, ingaende, utgaende)
