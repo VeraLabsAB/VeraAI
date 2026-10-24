@@ -82,25 +82,25 @@ def kronor(ore):
 # --- Inläsning ---
 
 def _avkoda(data):
-    """Returnerar filens text. Provar UTF-8 först och Windows-1252 sedan."""
+    """Returnerar (filens text, True om den var giltig UTF-8). Provar UTF-8 först och Windows-1252 sedan."""
     if data.startswith((b"\xff\xfe", b"\xfe\xff")):
         raise BankfilFel(
             "Bankfilen stoppas: filen är sparad som UTF-16 (\"Unicode-text\"), som inte stöds."
             " Exportera filen från banken igen, eller spara den som UTF-8 eller CSV."
         )
     try:
-        return data.decode("utf-8-sig")
+        return data.decode("utf-8-sig"), True
     except UnicodeDecodeError:
         pass
     try:
-        return data.decode("cp1252")
+        return data.decode("cp1252"), False
     except UnicodeDecodeError:
         raise BankfilFel(
             "Bankfilen stoppas: teckenkodningen är varken UTF-8 eller Windows-1252."
         ) from None
 
 
-def _hitta_rubrikrad(rader):
+def _hitta_rubrikrad(rader, giltig_utf8):
     """Returnerar (index för rubrikraden, avgränsare, kolumnernas plats, antal kolumner)."""
     for index, rad in enumerate(rader):
         for avgransare in AVGRANSARE:
@@ -117,10 +117,17 @@ def _hitta_rubrikrad(rader):
                     )
                 plats = {nyckel: falt.index(namn) for nyckel, namn in KOLUMNER.items()}
                 return index, avgransare, plats, len(falt)
-    raise BankfilFel(
+    meddelande = (
         "Bankfilen stoppas: hittar ingen rubrikrad med kolumnerna "
         + ", ".join(KOLUMNER.values()) + "."
     )
+    if not giltig_utf8:
+        meddelande += (
+            " Filen är inte giltig UTF-8 och lästes därför som Windows-1252. Teckenkodningen kan"
+            " vara orsaken, till exempel en UTF-8-fil med en trasig byte, så att \"ö\" i"
+            " kolumnnamnen inte känns igen."
+        )
+    raise BankfilFel(meddelande)
 
 
 def _tolka_datum(text, kolumn, plats):
@@ -169,14 +176,15 @@ def _tolka_rader(data):
     testerna ska kunna räkna rader i en fil som K1 stoppar.
     """
     kalla_fil = hashlib.sha256(data).hexdigest()
-    textrader = _avkoda(data).splitlines(keepends=True)
+    text, giltig_utf8 = _avkoda(data)
+    textrader = text.splitlines(keepends=True)
     for index, rad in enumerate(textrader):
         if "\x00" in rad:
             raise BankfilFel(
                 "Bankfilen stoppas: rad " + str(index + 1) + " i filen innehåller ett NUL-tecken"
                 " (tecken nummer 0). Filen är troligen trasig eller sparad i fel format."
             )
-    rubrik_index, avgransare, plats, antal_kolumner = _hitta_rubrikrad(textrader)
+    rubrik_index, avgransare, plats, antal_kolumner = _hitta_rubrikrad(textrader, giltig_utf8)
 
     resultat = []
     # strict=True: text direkt efter ett citerat fält, som "REF"X, stoppar filen i stället för

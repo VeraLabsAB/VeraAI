@@ -368,3 +368,21 @@ def test_f7_fil_som_inte_gar_att_lasa_ger_bankfilfel(tmp_path):
             las_bankfil(fil, 0, 100)
     finally:
         fil.chmod(0o600)
+
+
+def test_f8_trasig_utf8_namner_teckenkodningen(tmp_path):
+    """F8, fall 9e: en UTF-8-fil med en trasig byte. Rubrikraden känns inte igen, och
+    meddelandet ska då nämna att teckenkodningen kan vara orsaken."""
+    fil = tmp_path / "bank.csv"
+    fil.write_bytes(RUBRIK.encode("utf-8") + b"1,2025-01-02,2025-01-02,REF-1,CAF\xe9,1.00,1.00\n")
+    with pytest.raises(BankfilFel) as fel:
+        las_bankfil(fil, 0, 100)
+    assert "ingen rubrikrad" in str(fel.value)
+    assert "Teckenkodningen kan vara orsaken" in str(fel.value)
+
+
+def test_f8_giltig_utf8_utan_rubrikrad_namner_inte_teckenkodningen(tmp_path):
+    fil = skriv(tmp_path, "1,2025-01-02,2025-01-02,REF-1,M,1.00,1.00\n")
+    with pytest.raises(BankfilFel) as fel:
+        las_bankfil(fil, 0, 100)
+    assert "teckenkodning" not in str(fel.value).lower()
