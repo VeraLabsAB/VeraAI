@@ -334,3 +334,12 @@ def test_f3_for_langt_falt_stoppas_med_bankfilfel(tmp_path):
         las_bankfil(fil, 0, 100)
     assert "rad 2 i filen" in str(fel.value)
     assert "längre än" in str(fel.value)
+
+
+def test_f9_skrap_efter_citerat_falt_stoppas(tmp_path):
+    """F9, fall 4i: fältet "REF"X lästes tyst som REFX."""
+    fil = skriv(tmp_path, RUBRIK + '1,2025-01-02,2025-01-02,"REF"X,M,1.00,1.00\n')
+    with pytest.raises(BankfilFel) as fel:
+        las_bankfil(fil, 0, 100)
+    assert "rad 2 i filen" in str(fel.value)
+    assert "citattecken i fel läge" in str(fel.value)

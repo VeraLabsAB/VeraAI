@@ -179,7 +179,9 @@ def _tolka_rader(data):
     rubrik_index, avgransare, plats, antal_kolumner = _hitta_rubrikrad(textrader)
 
     resultat = []
-    lasare = csv.reader(textrader[rubrik_index + 1:], delimiter=avgransare)
+    # strict=True: text direkt efter ett citerat fält, som "REF"X, stoppar filen i stället för
+    # att tyst läsas som REFX.
+    lasare = csv.reader(textrader[rubrik_index + 1:], delimiter=avgransare, strict=True)
     lasta_rader = 0  # antal textrader efter rubriken som läsaren har gått igenom
     while True:
         filrad = rubrik_index + 2 + lasta_rader  # raden i filen där posten börjar
