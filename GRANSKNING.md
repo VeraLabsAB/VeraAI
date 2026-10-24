@@ -174,12 +174,12 @@ Rättat 2026-10-25 i en egen session, en commit per fynd. Alla tester ligger i `
 | F2 | Ja. `las_bankfil` och `kontrollera_k1` kräver utgående saldo, och sista radens saldo måste vara lika med det | `test_f2_avklippt_fil_stoppas` |
 | F3 | Ja. NUL-tecken, UTF-16 och för långa fält ger `BankfilFel`. Övriga fel från csv-läsaren översätts också | `test_f3_nul_tecken_stoppas_med_bankfilfel`, `test_f3_nul_tecken_fore_rubrikraden_stoppas_med_bankfilfel`, `test_f3_utf16_stoppas_med_bankfilfel`, `test_f3_for_langt_falt_stoppas_med_bankfilfel` |
 | F4 | Ja. Radnumren måste vara 1, 2, 3 … i tur och ordning | `test_f4_radnummer_maste_vara_1_2_3_i_tur_och_ordning` (dubbla, osorterade, saknade) |
-| F5 | Nej. Tas i en egen uppgift | – |
+| F5 | Ja (egen uppgift). Kolumnnamn och avgränsare ligger i `foretag/<namn>/bankformat.json` och läses med `ladda_bankformat`. `las_bankfil` tar bankformatet som argument. `test_karnan_ar_generell.py` stoppar nu också "Swedbank" och bankformatens kolumnnamn i kärnan | `test_karnan_innehaller_inga_kolumnnamn_fran_bankformaten`, `test_karnan_innehaller_inget_foretagsspecifikt` ("Swedbank"), `test_f5_annat_bankformat_laser_samma_data`, `test_f5_trasigt_bankformat_ger_bankfilfel`, `test_f5_saknat_bankformat_ger_bankfilfel` |
 | F6 | Ja, genom rättelsen av F4: två identiska rader har samma radnummer och stoppas | `test_f6_identiska_rader_stoppas` |
 | F7 | Ja. Saknad fil, mapp och oläsbar fil ger `BankfilFel` | `test_f7_saknad_fil_ger_bankfilfel`, `test_f7_mapp_ger_bankfilfel`, `test_f7_fil_som_inte_gar_att_lasa_ger_bankfilfel` |
 | F8 | Ja. Meddelandet nämner teckenkodningen om filen inte är giltig UTF-8 | `test_f8_trasig_utf8_namner_teckenkodningen` (skyddstest som ska vara grönt även på gamla koden: `test_f8_giltig_utf8_utan_rubrikrad_namner_inte_teckenkodningen`) |
 | F9 | Ja. Csv-läsaren körs i strikt läge | `test_f9_skrap_efter_citerat_falt_stoppas` |
 | F10 | Ja. Den gamla andra delen av K1 är ersatt av jämförelsen med utgående saldo (F2) | `test_f2_avklippt_fil_stoppas` |
-| F11 | Nej. Tas i en egen uppgift | – |
+| F11 | Ja (egen uppgift). Ett test stoppar annan kod i `scripts/` (utom `tests/` och `las_bank.py`) från att använda `_tolka_rader` | `test_f11_ingen_annan_karnfil_anvander_tolka_rader` (skyddstest: `test_f11_kontrollen_hittar_en_fil_som_anvander_tolka_rader`) |
 
 Testsviten efter rättelserna: 128 passed, 0 misslyckade.
