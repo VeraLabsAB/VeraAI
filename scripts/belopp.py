@@ -1,4 +1,4 @@
-"""Belopp som heltal i öre.
+"""Hantering av belopp som heltal i öre.
 
 Alla belopp i kärnan är heltal i öre, aldrig flyttal (float).
 Här finns två funktioner:

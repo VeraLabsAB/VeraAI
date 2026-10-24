@@ -1,0 +1,13 @@
+{
+  "anteckning": "Antagen layout för Swedbank-CSV. INTE verifierad mot en riktig exportfil från banken (Ö5). Rubrikraden måste innehålla alla kolumner, i valfri ordning.",
+  "kolumner": {
+    "radnr": "Radnummer",
+    "bokforingsdag": "Bokföringsdag",
+    "transaktionsdag": "Transaktionsdag",
+    "referens": "Referens",
+    "beskrivning": "Beskrivning",
+    "belopp": "Belopp",
+    "saldo": "Bokfört saldo"
+  },
+  "avgransare": [",", ";"]
+}

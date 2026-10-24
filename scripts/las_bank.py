@@ -1,11 +1,12 @@
-"""Läser en bankfil (Swedbank-CSV) och kör kontroll K1, saldokedjan.
+"""Läser en bankfil (CSV) och kör kontroll K1, saldokedjan.
 
-OBS: Kolumnlayouten nedan är ANTAGEN och INTE verifierad mot en riktig fil från Swedbank.
-Den måste jämföras med en riktig export innan modulen används på riktiga underlag.
+Bankfilens format (kolumnnamn och tillåtna avgränsare) är inte inbyggt här. Det beskrivs per
+företag i foretag/<namn>/bankformat.json och läses med ladda_bankformat. Kärnan vet bara vilka
+uppgifter som behövs: radnummer, bokföringsdag, transaktionsdag, referens, beskrivning, belopp och
+saldo efter transaktionen. Bankformatet säger vad kolumnerna heter i just det företagets bankfil.
 
-Antagna kolumner (rubrikraden måste innehålla alla, i valfri ordning):
-
-    Radnummer, Bokföringsdag, Transaktionsdag, Referens, Beskrivning, Belopp, Bokfört saldo
+OBS: Formatet för testföretaget är ANTAGET och INTE verifierat mot en riktig exportfil från
+banken (Ö5). Det måste jämföras med en riktig export innan modulen används på riktiga underlag.
 
 Det här gör modulen:
 
@@ -14,16 +15,16 @@ Det här gör modulen:
   En fil sparad som UTF-16 (börjar med BOM FF FE eller FE FF) stoppas med tydligt fel, liksom
   en fil som innehåller NUL-tecken (tecken nummer 0).
 - Rader före rubrikraden hoppas över. Rubrikraden är den första raden som innehåller alla
-  kolumnerna ovan.
-- Avgränsaren (komma eller semikolon) upptäcks automatiskt på rubrikraden.
+  kolumnerna i bankformatet, i valfri ordning.
+- Avgränsaren upptäcks automatiskt på rubrikraden, bland dem som bankformatet tillåter.
 - Ett fält får inte innehålla radbrytning. CSV tillåter det inuti citattecken, men i en
   bankfil betyder det nästan alltid att ett citattecken i fel läge har slagit ihop flera
   transaktioner till en. Då stoppas filen.
 - Radnumren ska vara 1, 2, 3 … i tur och ordning. Dubbla, osorterade eller saknade
   radnummer betyder att filen är trasig, och då stoppas den.
-- Belopp tolkas med belopp.tolka_belopp och blir heltal i öre, aldrig flyttal.
+- Beloppen tolkas med belopp.tolka_belopp och blir heltal i öre, aldrig flyttal.
 - Varje rad får: id, bokforingsdag, transaktionsdag, referens, beskrivning, belopp_ore,
-  saldo_efter_ore, kalla_fil (SHA-256 av hela filen) och radnr (värdet i kolumnen Radnummer).
+  saldo_efter_ore, kalla_fil (SHA-256 av hela filen) och radnr (värdet i radnummerkolumnen).
 
 K1 (saldokedjan): varje rads saldo ska vara föregående saldo plus radens belopp, där första
 raden räknas från ingående saldo. Sista radens saldo ska dessutom vara lika med utgående saldo
@@ -36,21 +37,20 @@ Vid minsta fel stoppas hela filen: inga rader returneras, och ett BankfilFel kas
 import csv
 import datetime as dt
 import hashlib
+import json
 import re
 
 from belopp import formatera_ore, tolka_belopp
 
-KOLUMNER = {
-    "radnr": "Radnummer",
-    "bokforingsdag": "Bokföringsdag",
-    "transaktionsdag": "Transaktionsdag",
-    "referens": "Referens",
-    "beskrivning": "Beskrivning",
-    "belopp": "Belopp",
-    "saldo": "Bokfört saldo",
-}
+# Uppgifterna som kärnan behöver ur varje rad. Bankformatet anger vad kolumnen för varje
+# uppgift heter i bankfilen.
+KOLUMN_NYCKLAR = (
+    "radnr", "bokforingsdag", "transaktionsdag", "referens", "beskrivning", "belopp", "saldo",
+)
 
-AVGRANSARE = [",", ";"]
+# Nycklar i bankformat.json. "anteckning" är fri text för människor och används inte i koden.
+BANKFORMAT_NYCKLAR = ("kolumner", "avgransare")
+BANKFORMAT_VALFRIA_NYCKLAR = ("anteckning",)
 
 _DATUM = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
 _HELTAL = re.compile(r"\d+", re.ASCII)
@@ -79,6 +79,103 @@ def kronor(ore):
     return formatera_ore(ore) + " kr"
 
 
+# --- Bankformat ---
+
+def _kontrollera_nycklar(data, obligatoriska, valfria, var):
+    if not isinstance(data, dict):
+        raise BankfilFel(var + " ska vara ett objekt med nycklar, inte " + type(data).__name__ + ".")
+    saknas = [nyckel for nyckel in obligatoriska if nyckel not in data]
+    if saknas:
+        raise BankfilFel(var + " saknar nyckeln " + ", ".join(map(repr, saknas)) + ".")
+    okanda = sorted(nyckel for nyckel in data if nyckel not in obligatoriska + valfria)
+    if okanda:
+        raise BankfilFel(
+            var + " har en okänd nyckel: " + ", ".join(map(repr, okanda)) + ". Tillåtna nycklar är "
+            + ", ".join(map(repr, obligatoriska + valfria)) + "."
+        )
+
+
+def _kontrollera_bankformat(data, var):
+    """Kontrollerar ett bankformat och returnerar det i den form kärnan använder."""
+    _kontrollera_nycklar(data, BANKFORMAT_NYCKLAR, BANKFORMAT_VALFRIA_NYCKLAR, var)
+    if "anteckning" in data and not isinstance(data["anteckning"], str):
+        raise BankfilFel(var + ": 'anteckning' ska vara text.")
+
+    _kontrollera_nycklar(data["kolumner"], KOLUMN_NYCKLAR, (), var + ", 'kolumner',")
+    kolumner = {}
+    for nyckel in KOLUMN_NYCKLAR:
+        namn = data["kolumner"][nyckel]
+        if not isinstance(namn, str) or not namn.strip():
+            raise BankfilFel(var + ": kolumnnamnet för " + repr(nyckel) + " får inte vara tomt.")
+        if any(tecken in namn for tecken in _RADBRYTNINGAR + '"'):
+            raise BankfilFel(
+                var + ": kolumnnamnet för " + repr(nyckel) + " får inte innehålla radbrytning eller citattecken."
+            )
+        kolumner[nyckel] = namn.strip()
+    for nyckel, namn in kolumner.items():
+        andra = [annan for annan, annat_namn in kolumner.items() if annat_namn == namn and annan != nyckel]
+        if andra:
+            raise BankfilFel(
+                var + ": kolumnnamnet " + repr(namn) + " används för både " + repr(nyckel)
+                + " och " + repr(andra[0]) + ". Varje kolumn måste ha ett eget namn."
+            )
+
+    avgransare = data["avgransare"]
+    if not isinstance(avgransare, list) or not avgransare:
+        raise BankfilFel(var + ": 'avgransare' ska vara en lista med minst en avgränsare.")
+    for tecken in avgransare:
+        if not isinstance(tecken, str) or len(tecken) != 1 or tecken in _RADBRYTNINGAR + '" ':
+            raise BankfilFel(
+                var + ": avgränsaren " + repr(tecken) + " är ogiltig. Varje avgränsare ska vara ett"
+                " enda tecken, och inte mellanslag, citattecken eller radbrytning."
+            )
+    if len(set(avgransare)) != len(avgransare):
+        raise BankfilFel(var + ": samma avgränsare står flera gånger i 'avgransare'.")
+    if any(tecken in namn for tecken in avgransare for namn in kolumner.values()):
+        raise BankfilFel(var + ": ett kolumnnamn innehåller en av avgränsarna.")
+
+    return {"kolumner": kolumner, "avgransare": list(avgransare)}
+
+
+def _inga_dubbla_nycklar(par):
+    objekt = {}
+    for nyckel, varde in par:
+        if nyckel in objekt:
+            raise BankfilFel("nyckeln " + repr(nyckel) + " står flera gånger")
+        objekt[nyckel] = varde
+    return objekt
+
+
+def ladda_bankformat(sokvag):
+    """Läser och kontrollerar ett företags bankformat.json. Fel ger BankfilFel.
+
+    Returnerar {"kolumner": {nyckel: kolumnnamn}, "avgransare": [tecken, ...]}.
+    """
+    var = "Bankformatet i " + str(sokvag)
+    try:
+        with open(sokvag, "rb") as fil:
+            data = fil.read()
+    except FileNotFoundError:
+        raise BankfilFel("Bankformatet saknas: filen finns inte: " + str(sokvag) + ".") from None
+    except IsADirectoryError:
+        raise BankfilFel("Bankformatet saknas: " + str(sokvag) + " är en mapp, inte en fil.") from None
+    except OSError as fel:
+        raise BankfilFel(
+            "Bankformatet går inte att läsa: " + str(sokvag) + " (" + (fel.strerror or str(fel)) + ")."
+        ) from None
+    try:
+        innehall = json.loads(data.decode("utf-8-sig"), object_pairs_hook=_inga_dubbla_nycklar)
+    except UnicodeDecodeError:
+        raise BankfilFel(var + " är inte sparat som UTF-8.") from None
+    except json.JSONDecodeError as fel:
+        raise BankfilFel(
+            var + " är inte giltig JSON (rad " + str(fel.lineno) + ", tecken " + str(fel.colno) + ")."
+        ) from None
+    except BankfilFel as fel:
+        raise BankfilFel(var + ": " + str(fel) + ".") from None
+    return _kontrollera_bankformat(innehall, var)
+
+
 # --- Inläsning ---
 
 def _avkoda(data):
@@ -100,26 +197,27 @@ def _avkoda(data):
         ) from None
 
 
-def _hitta_rubrikrad(rader, giltig_utf8):
+def _hitta_rubrikrad(rader, giltig_utf8, bankformat):
     """Returnerar (index för rubrikraden, avgränsare, kolumnernas plats, antal kolumner)."""
+    kolumner = bankformat["kolumner"]
     for index, rad in enumerate(rader):
-        for avgransare in AVGRANSARE:
+        for avgransare in bankformat["avgransare"]:
             try:
                 falt = [f.strip() for f in next(csv.reader([rad], delimiter=avgransare), [])]
             except csv.Error:
                 continue  # raden går inte att tolka, så den är ingen rubrikrad
-            if all(namn in falt for namn in KOLUMNER.values()):
-                dubbletter = [namn for namn in KOLUMNER.values() if falt.count(namn) > 1]
+            if all(namn in falt for namn in kolumner.values()):
+                dubbletter = [namn for namn in kolumner.values() if falt.count(namn) > 1]
                 if dubbletter:
                     raise BankfilFel(
                         "Bankfilen stoppas: rubrikraden (rad " + str(index + 1)
                         + " i filen) har kolumnen " + repr(dubbletter[0]) + " flera gånger."
                     )
-                plats = {nyckel: falt.index(namn) for nyckel, namn in KOLUMNER.items()}
+                plats = {nyckel: falt.index(namn) for nyckel, namn in kolumner.items()}
                 return index, avgransare, plats, len(falt)
     meddelande = (
         "Bankfilen stoppas: hittar ingen rubrikrad med kolumnerna "
-        + ", ".join(KOLUMNER.values()) + "."
+        + ", ".join(kolumner.values()) + "."
     )
     if not giltig_utf8:
         meddelande += (
@@ -169,12 +267,14 @@ def _rad_id(rad):
     return "BANK-" + hashlib.sha256("\x1f".join(delar).encode("utf-8")).hexdigest()[:16]
 
 
-def _tolka_rader(data):
-    """Tolkar bankfilens innehåll (bytes) till rader. Kör INTE K1.
+def _tolka_rader(data, bankformat):
+    """Tolkar bankfilens innehåll (bytes) till rader enligt ett kontrollerat bankformat. Kör INTE K1.
 
     Använd las_bankfil, som alltid kör K1. Den här funktionen finns separat bara för att
-    testerna ska kunna räkna rader i en fil som K1 stoppar.
+    testerna ska kunna räkna rader i en fil som K1 stoppar. Ett test (F11) stoppar annan kod i
+    scripts/ från att använda den.
     """
+    kolumner = bankformat["kolumner"]
     kalla_fil = hashlib.sha256(data).hexdigest()
     text, giltig_utf8 = _avkoda(data)
     textrader = text.splitlines(keepends=True)
@@ -184,7 +284,7 @@ def _tolka_rader(data):
                 "Bankfilen stoppas: rad " + str(index + 1) + " i filen innehåller ett NUL-tecken"
                 " (tecken nummer 0). Filen är troligen trasig eller sparad i fel format."
             )
-    rubrik_index, avgransare, plats, antal_kolumner = _hitta_rubrikrad(textrader, giltig_utf8)
+    rubrik_index, avgransare, plats, antal_kolumner = _hitta_rubrikrad(textrader, giltig_utf8, bankformat)
 
     resultat = []
     # strict=True: text direkt efter ett citerat fält, som "REF"X, stoppar filen i stället för
@@ -228,12 +328,12 @@ def _tolka_rader(data):
 
         rad = {
             "radnr": int(varde["radnr"]),
-            "bokforingsdag": _tolka_datum(varde["bokforingsdag"], KOLUMNER["bokforingsdag"], var),
-            "transaktionsdag": _tolka_datum(varde["transaktionsdag"], KOLUMNER["transaktionsdag"], var),
+            "bokforingsdag": _tolka_datum(varde["bokforingsdag"], kolumner["bokforingsdag"], var),
+            "transaktionsdag": _tolka_datum(varde["transaktionsdag"], kolumner["transaktionsdag"], var),
             "referens": varde["referens"],
             "beskrivning": varde["beskrivning"],
-            "belopp_ore": _tolka_ore(varde["belopp"], KOLUMNER["belopp"], var),
-            "saldo_efter_ore": _tolka_ore(varde["saldo"], KOLUMNER["saldo"], var),
+            "belopp_ore": _tolka_ore(varde["belopp"], kolumner["belopp"], var),
+            "saldo_efter_ore": _tolka_ore(varde["saldo"], kolumner["saldo"], var),
             "kalla_fil": kalla_fil,
         }
         rad["id"] = _rad_id(rad)
@@ -293,11 +393,14 @@ def kontrollera_k1(rader, ingaende_saldo_ore, utgaende_saldo_ore):
         )
 
 
-def las_bankfil(sokvag, ingaende_saldo_ore, utgaende_saldo_ore):
+def las_bankfil(sokvag, bankformat, ingaende_saldo_ore, utgaende_saldo_ore):
     """Läser en bankfil och kör K1. Returnerar raderna bara om allt stämmer, annars BankfilFel.
 
-    Ingående och utgående saldo är heltal i öre, till exempel från kontoutdraget.
+    Bankformatet kommer från ladda_bankformat och kontrolleras igen här, så att ett trasigt
+    format aldrig används. Ingående och utgående saldo är heltal i öre, till exempel från
+    kontoutdraget.
     """
+    bankformat = _kontrollera_bankformat(bankformat, "Bankformatet")
     try:
         with open(sokvag, "rb") as fil:
             data = fil.read()
@@ -309,6 +412,6 @@ def las_bankfil(sokvag, ingaende_saldo_ore, utgaende_saldo_ore):
         raise BankfilFel(
             "Bankfilen stoppas: filen " + str(sokvag) + " går inte att läsa (" + (fel.strerror or str(fel)) + ")."
         ) from None
-    rader = _tolka_rader(data)
+    rader = _tolka_rader(data, bankformat)
     kontrollera_k1(rader, ingaende_saldo_ore, utgaende_saldo_ore)
     return rader
