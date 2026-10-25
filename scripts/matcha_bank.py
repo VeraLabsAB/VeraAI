@@ -46,7 +46,11 @@ Reglerna:
    - har minst _FAKTURANUMMER_MINST_TECKEN tecken efter normaliseringen, så att ett kort nummer
      som råkar stå i texten (till exempel ett antal) inte avgör,
    - inte är lika med eller en del av underlagets motpart, eftersom motparten alltid står i texten,
-   - inte är en del av en annan kandidats fakturanummer.
+   - inte är en del av en annan kandidats fakturanummer,
+   - inte hör till ett underlag med samma datum som en annan kandidat (L1, granskning 6). Två
+     underlag med samma belopp, motpart och datum liknar mer en dublett med ett förväxlat tecken i
+     fakturanumret (till exempel "F-l001" och "F-1001") än två månadsfakturor, och då ska en
+     människa se båda.
    Står fakturanumren för flera kandidater i texten avgör inget av dem, och raden blir "tvetydig".
 4. En bankrad med exakt en kandidat, som inte är kandidat för någon annan bankrad, matchas med den.
    Ett underlag matchas alltså högst en gång, och en bankrad högst en gång.
@@ -230,7 +234,10 @@ def _kan_avgora(post, kandidater):
     nummer = _jamforbar(post["fakturanummer"])
     if len(nummer) < _FAKTURANUMMER_MINST_TECKEN or nummer in _jamforbar(post["motpart"]):
         return False
-    return not any(nummer in _jamforbar(annan["fakturanummer"]) for annan in kandidater if annan["id"] != post["id"])
+    andra = [annan for annan in kandidater if annan["id"] != post["id"]]
+    if any(annan["datum"] == post["datum"] for annan in andra):
+        return False
+    return not any(nummer in _jamforbar(annan["fakturanummer"]) for annan in andra)
 
 
 def _kandidater(rad, underlag, tidsfonster):

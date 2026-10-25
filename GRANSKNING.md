@@ -1971,3 +1971,81 @@ Resultat: **1 346 passed**, 0 misslyckade, i projektet och i den rena kopian, f�
 4. **L4:** är det godtagbart att namn som blandar latinska bokstäver med till exempel japanska tecken stoppar perioden? Rekommendation: ja för version 1, eftersom det är den säkra riktningen.
 5. **J3 och rapporten:** de tre milda riktningsmärkena godtas nu. Kravet att de ska "visas synligt i rapporten" bör skrivas in bland det som ska byggas i rapportsteget, så att det inte glöms.
 6. **L5–L7:** små rättelser som kan samlas: tester för transaktionsdagen och K4a/K4b (L6), `chr(0x2212)`, kontrollerna som lista och samma normalisering för motparten i matchningen (L7). Ingen av dem är bråttom.
+
+## Åtgärder efter granskning 6
+
+Gjort i en egen session, i två commits: SPEC.md (del A, commit c4ba5e4) och koden (del B). Uppgiften kom från Hugo, som beslutade: "K4 ger ett ärende 'möjlig dublett' när belopp och datum är samma och motpart eller fakturanummer är samma, fakturanumret avgör inte mellan kandidater med samma datum, och normaliseringen tar bort de osynliga tecknen (L1 och L2)". Det beslutet är också OK:et för ändringen i SPEC. Ingen granskares text ovan är ändrad. Testdatan, facit, `foretag/` och `testforetag/` är inte ändrade.
+
+**Ord som används nedan.** En **dublett** är samma underlag inläst två gånger. En **möjlig dublett** är två underlag som är nästan lika, så att de kan vara samma underlag med ett förväxlat tecken, men inte säkert. Ett **förväxlingstecken** ser ut som ett annat tecken men är ett annat tecken i datorn, till exempel ett litet L i stället för en etta. **Normaliseringen** är `normalisera_for_jamforelse` i `normalisering.py`, som gör om en text till en fast form innan två texter jämförs. En **kandidat** är ett underlag som kan höra till en bankrad (samma belopp, motparten i bankradens text och rätt tidsfönster). Ett **oavstämt** underlag är ett som ingen bankrad har matchats mot, och ser ut som en obetald faktura. Ett **mutationstest** är att ta bort en kontroll i en kopia av koden och se att minst ett test slår larm.
+
+### Del A: SPEC.md (commit c4ba5e4)
+
+| Punkt | Ändring |
+|---|---|
+| L1 | Ny rad i SPEC 6: **K4c**, möjlig dublett. Samma belopp och datum, och samma motpart eller samma fakturanummer, men inte båda (då är det en dublett, K4). Motpart och fakturanummer jämförs efter samma normalisering som i K4. Blir ett ärende, "möjlig dublett", och båda underlagen behålls. En människa avgör |
+| Statusraden | "Efter granskning 6 (L1), med Hugos OK: K4c, möjlig dublett (6)." Inget annat i SPEC är ändrat |
+
+Namnet K4c följer K4a och K4b, eftersom det är samma sorts kontroll (dubbletter).
+
+### Del B: koden
+
+| Fynd | Rättelse | Test |
+|---|---|---|
+| L1 | **K4c** i `_kontroll_k4` (`las_underlag.py`): två underlag i perioden med samma `belopp_ore` och samma `datum`, och samma motpart eller samma fakturanummer efter normaliseringen, men inte båda. Underlaget med högre id får ärendet "möjlig dublett av <id>" med kontrollen K4c, och `jamfort_med` är det med lägst id. Båda underlagen behålls. Beskrivningen överst i filen är uppdaterad | `test_las_underlag.py`: `test_k4c_mojlig_dublett_med_forvaxlat_tecken` (9 fall: `F-l001`, `F1001`, `F-1OO1`, `F` + U+00AD + `1001`, `F` + U+1680 + `1001`, `LEV A`, `LEV-A AB`, cherokee `ᏞᎬᏙ-Ꭺ` och `LEV-` + U+200A + kyrilliskt А), `test_k4c_jamfor_med_lagsta_id`, `test_k4c_alla_mot_det_forsta`, `test_k4c_ger_inget_extra_arende_nar_k4b_redan_finns`, `test_k4c_ser_bara_underlag_i_perioden`. Skydd: `test_k4c_ger_inget_arende_for_olika_underlag` (6 fall: annat belopp eller datum ihop med annat nummer eller annan motpart, både annan motpart och annat nummer, och både motpart och nummer förväxlade) |
+| L1 | **Fakturanummerregeln** (`matcha_bank.py`, `_kan_avgora`): fakturanumret får inte avgöra om det hör till ett underlag med samma datum som en annan kandidat. Då blir raden "tvetydig". Regel 3 i beskrivningen överst i filen är uppdaterad | `test_matcha_bank.py`: `test_fakturanumret_avgor_inte_mellan_underlag_med_samma_datum` (3 referenser), `test_fakturanumret_avgor_bara_for_ett_underlag_utan_samma_datum_som_en_annan_kandidat` (tre kandidater, två med samma datum). Skydd: `test_manadsfakturor_med_olika_datum_avgors_fortfarande_av_fakturanumret` (datumen skiljer en dag före, en dag efter och tio dagar, åt båda hållen) |
+| L1, L2 | Granskning 6:s fall hela vägen genom inläsningen och matchningen. Inget av dem blir längre ett oavstämt underlag utan ärende | `test_granskning_6_dubbletterna_blir_aldrig_oavstamda_utan_arende` (13 fall). Fakturanumret förväxlat: K4c och "tvetydig". Motparten förväxlad: K4c, och U-2 är oavstämd men har ett ärende. Ett tecken som ser tomt ut i motparten (U+034F, U+FE0F, U+2800, mellanslag + U+3164): K4, vanlig dublett |
+| L2 | **Normaliseringen** (`normalisering.py`) tar också bort `_OSYNLIGA_ANDRA`: tecknen som `test_inga_dolda_tecken.py` räknar som osynliga (U+115F, U+1160, U+3164, U+FFA0, U+2800, U+FE00–U+FE0F och U+E0100–U+E01EF) och osynliga kombinerande tecken (U+034F och U+180B–U+180D, och U+180F). Alla skrivs som koder i koden, inga tecken som de är | `test_normaliseringen_tar_bort_tecken_som_ser_tomma_ut` (8 tecken, sist, inuti och som eget ord), `test_normaliseringen_tar_bort_allt_som_testet_for_dolda_tecken_raknar_som_dolt` (går igenom alla tecken i Unicode och kräver att allt som det testet räknar som dolt tas bort, så att listorna inte glider isär), `test_k4_dublett_med_tecken_som_ser_tomma_ut_i_motparten` (8), `test_tecken_som_ser_tomma_ut_i_fakturanumret` (8) |
+| L7 | `_MINUSTECKEN = chr(0x2212)` i stället för tecknet som det är | `test_minustecknet_skrivs_som_kod_i_normaliseringen` |
+| L6 | Ett test låser att bedömningsdatumet jämförs med **transaktionsdagen** (beslut 3 efter granskning 5). Koden är inte ändrad | `test_bedomningsdatumet_jamfors_med_transaktionsdagen_inte_bokforingsdagen`: transaktionsdag 2025-01-20, bokföringsdag 2025-01-22. Bedömningsdatum 2025-01-20 och 2025-01-21 godtas, 2025-01-19 stoppas |
+
+**Beslut som togs i uppgiften (bör bekräftas av Hugo).**
+
+1. **Ett ärende per underlag.** Ett underlag som redan har ett ärende från K4a eller K4b får inget extra ärende från K4c, även om det också är en möjlig dublett av ett tredje underlag. En människa ser underlaget ändå. Testet `test_k4c_ger_inget_extra_arende_nar_k4b_redan_finns` visar det.
+2. **K4c jämför med lägst id**, som K4.
+3. **Fakturanumret avgör inte heller för ett annat underlag när två kandidater har samma datum.** Har U-1 och U-2 samma datum och U-3 ett annat, avgör numret för U-3, men inte numret för U-1 eller U-2.
+4. **Tecknen som ser tomma ut godtas nu i ett fakturanummer.** Förut stoppades till exempel `F-1001` + U+2800, eftersom tecknet inte togs bort i normaliseringen. Nu räknas tecknet inte, som ett nollbreddsmellanslag redan gjorde, och underlaget blir en vanlig dublett om originalet finns. Utfyllnadstecknen (U+115F, U+1160, U+3164, U+FFA0) räknas som hangul-bokstäver, så intill latinska bokstäver stoppas de fortfarande som ett blandat ord.
+5. **U+180F togs med** bland de mongoliska variantväljarna, fast uppgiften nämnde U+180B–U+180D. Det är samma sorts tecken. Pythons Unicode-tabell (version 13) känner ännu inte till det, men det skadar inte.
+
+**Ändrade befintliga tester.** Alla ändringar beror på rättelserna:
+
+- `test_matcha_bank.py`: hjälpfunktionen `tva_fakturor` ger nu den andra fakturan datumet 2025-01-11 i stället för samma datum som den första. Annars avgör fakturanumret aldrig, och testerna för J2 skulle inte pröva det de ska. 10 fall berördes (alla i "J2: när fakturanumret får avgöra").
+- `test_las_underlag.py`: `test_k4_olika_motpart_eller_fakturanummer_ar_ingen_dublett` heter nu `test_k4_olika_motpart_eller_fakturanummer_ar_ingen_dublett_men_en_mojlig_dublett` och kräver ett K4c-ärende i stället för inget ärende. I `test_k17_instruktion_i_underlaget_ar_vanlig_text` har det andra underlaget datumet 2025-01-11, så att det inte blir en möjlig dublett av det första.
+
+**Medvetet inte rättat.** Inte med i uppgiften:
+
+- **Gränsen för K4c:** om både motparten och fakturanumret är förväxlade (till exempel cherokee-motparten och `F-l001` i samma underlag) ser K4c inget, och dubbletten kan bli oavstämd utan ärende. Testet `test_k4c_ger_inget_arende_for_olika_underlag[allt_forvaxlat]` visar gränsen. Att fånga det kräver en jämförelse på bara belopp och datum, vilket ger ärenden för många vanliga köp.
+- **Hårfint mellanslag i ett blandat ord** (`LEV-` + U+200A + kyrilliskt А): kontrollen av blandade ord delar fortfarande vid alla blanksteg, så ordet stoppas inte. Det fångas nu av K4c i stället (fakturanumret är samma).
+- **Mjukt bindestreck och U+1680** tas fortfarande bort i stället för att bli "-". `F` + U+00AD + `1001` blir alltså samma som `F1001`, inte som `F-1001`. Det fångas nu av K4c.
+- **Streckliknande tecken** i motparten (U+02D7, U+2796, U+2043) och kombinerande understrykning (U+0332) normaliseras inte. Det fångas av K4c när fakturanumret är samma.
+- **Helt osynliga motparter** (J9) och L3, L4, L5, resten av L6 (vilket underlag K4a/K4b jämför med) och resten av L7 (kontrollerna som lista, kassans normalisering i matchningens motpartsjämförelse).
+
+**Så bevisades testerna.** De nya testfilerna kördes mot koden från commit 7c5456a (före rättelserna) i en kopia utanför projektet: **53 röda och 1 357 gröna**. Jag läste felorsakerna: alla 13 av granskning 6:s fall gav "U-2 oavstämd utan ärende", K4c-testerna fick inget ärende där ett väntades, normaliseringen lämnade kvar tecknen (till exempel `'lev-a⠀' == 'lev-a'`), tecknen i fakturanumret stoppades, minustecknet stod som det är, och fakturanumret avgjorde mellan två kandidater med samma datum. Alla röda av rätt skäl. L6-testet är grönt mot den gamla koden, vilket är väntat, eftersom koden redan jämförde med transaktionsdagen. Det bevisas i stället av mutation m19. Under bygget rättades två fel i testerna, inte i koden: ett skyddsfall med bara ett annat belopp var K4a och inte "inget ärende", och utfyllnadstecknen direkt efter "LEV-A" stoppas som blandat ord och prövas därför bara som eget ord.
+
+**Mutationstest.** I 20 kopior utanför projektet ändrades en ny kontroll i taget, och hela sviten kördes (med 1 402 tester, innan de 8 fallen i `test_tecken_som_ser_tomma_ut_i_fakturanumret` lades till). Alla 20 gav minst ett rött test.
+
+| Nr | Borttagen eller svagare kontroll (i en kopia) | Röda tester |
+|---|---|---|
+| m01 | Normaliseringen: `_OSYNLIGA_ANDRA` används inte | 21 |
+| m02 | Normaliseringen: utan utfyllnadstecknen | 8 |
+| m03 | Normaliseringen: utan U+FE00–U+FE0F | 4 |
+| m04 | Normaliseringen: utan U+E0100–U+E01EF | 3 |
+| m05 | Normaliseringen: utan U+034F | 3 |
+| m06 | Normaliseringen: utan de mongoliska variantväljarna | 2 |
+| m07 | Normaliseringen: utan U+1160 (som NFKC gör U+3164 och U+FFA0 till) | 6 |
+| m08 | Minustecknet skrivet som tecknet igen (L7) | 1 |
+| m09 | K4c borttagen | 24 |
+| m10 | K4c bara för samma motpart | 9 |
+| m11 | K4c bara för samma fakturanummer | 14 |
+| m12 | K4c jämför inte beloppet | 2 |
+| m13 | K4c jämför inte datumet | 11 |
+| m14 | K4c jämför med högst id i stället för lägst | 2 |
+| m15 | K4c ger ett extra ärende när K4a eller K4b redan finns | 1 |
+| m16 | K4c heter K4 | 23 |
+| m17 | Fakturanumret avgör även mellan kandidater med samma datum | 7 |
+| m18 | Samma datum jämförs också med underlaget självt (numret avgör aldrig) | 21 |
+| m19 | Bedömningsdatumet jämförs med bokföringsdagen (L6, granskarens M1) | 1 |
+| m20 | Tvärtom: fakturanumret avgör bara när datumen är samma | 27 |
+
+**Kommandon utanför den fasta listan.** Av misstag, och bara för att läsa: `.venv/bin/python -B -c` två gånger (för att se Pythons version och Unicode-version, och namnen på cherokee-bokstäverna), `du -sh` en gång (för att se hur stora mapparna var innan de kopierades), `sed -e`/`sed -n`, `uniq -c` och `cut -c` för att korta och räkna felrader, och `echo` i mutationskörningen. `cd` användes till projektmappen, alltid för att köra listans kommandon där, samma misstag som i granskning 5 och 6. Kopiorna gjordes med `git archive`, `tar` och `cp -R` i den tillfälliga mappen, de 20 mutationskopiorna och körningarna med en `for`-slinga, och ändringarna i kopiorna gjordes med fil-verktygen. Inget av det ändrade något i projektet.
+
+Testsviten efter del B: **1 410 passed**, 0 misslyckade (1 346 före, alltså 64 fler).

@@ -437,9 +437,13 @@ def test_fakturanumret_avgor_bara_nar_det_pekar_ut_exakt_ett_underlag(tmp_path):
 # --- J2: när fakturanumret får avgöra ---
 
 def tva_fakturor(tmp_path, forsta, andra, motpart="LEV-A"):
-    """Två fakturor från samma motpart med samma belopp, som båda passar en betalning 2025-01-20."""
+    """Två fakturor från samma motpart med samma belopp, som båda passar en betalning 2025-01-20.
+
+    De har olika datum (2025-01-10 och 2025-01-11), eftersom fakturanumret aldrig avgör mellan
+    underlag med samma datum (L1, granskning 6).
+    """
     return period(tmp_path, underlag(fakturanummer=forsta, motpart=motpart),
-                  underlag(id="U-2", fakturanummer=andra, motpart=motpart))
+                  underlag(id="U-2", fakturanummer=andra, motpart=motpart, datum="2025-01-11"))
 
 
 TVETYDIG = tomt(arenden=[(1, "tvetydig", ("U-1", "U-2"))], oavstamda=["U-1", "U-2"])
@@ -561,6 +565,102 @@ def test_dublett_med_forvaxlingstecken_blir_aldrig_oavstamd_utan_arende(tmp_path
     assert [(a["kontroll"], a["id"], a["text"]) for a in underlagen.arenden] == [("K4", "U-2", "dublett av U-1")]
     resultat = matcha(rader, underlagen)
     assert sammanfattning(resultat) == tomt(matchningar=[(1, "U-1")])  # U-2 finns inte bland de oavstämda
+
+
+# --- L1 och L2 (granskning 6): fakturanumret avgör inte mellan underlag med samma datum ---
+
+L1_FAKTURANUMMER = {
+    "litet_l": "F-l001", "utan_bindestreck": "F1001", "stora_o": "F-1OO1",
+    "mjukt_bindestreck": "F" + chr(0x00AD) + "1001", "ogham_mellanslag": "F" + chr(0x1680) + "1001",
+}
+# Motparter som ser ut som "LEV-A" men är en annan text även efter normaliseringen: möjlig dublett (K4c).
+L2_MOTPART = {
+    "mellanslag": "LEV A", "med_ab": "LEV-A AB",
+    "cherokee": chr(0x13DE) + chr(0x13AC) + chr(0x13D9) + "-" + chr(0x13AA),  # ser ut som "LEV-A"
+    "harfint_mellanslag_kyrilliskt": "LEV-" + chr(0x200A) + KYRILLISKT_A,
+}
+# Motparter med ett tecken som ser tomt ut. Normaliseringen tar bort det (L2): en vanlig dublett (K4).
+L2_MOTPART_OSYNLIGT = {
+    "teckenbindare": "LEV-A" + chr(0x034F), "variantvaljare": "LEV-A" + chr(0xFE0F),
+    "blank_blindskrift": "LEV-A" + chr(0x2800), "utfyllnad_eget_ord": "LEV-A " + chr(0x3164),
+}
+
+
+def oavstamda_utan_arende(underlagen, resultat):
+    """Id:n för oavstämda underlag som varken har ett K4-ärende eller är kandidat i ett matchningsärende."""
+    med_arende = {a["id"] for a in underlagen.arenden}
+    med_arende |= {id_ for a in resultat.arenden for id_ in a["kandidater"]}
+    return [post["id"] for post in resultat.oavstamda_underlag if post["id"] not in med_arende]
+
+
+@pytest.mark.parametrize("andrat, kontroll, forvantat", [
+    *[({"fakturanummer": varde}, "K4c", TVETYDIG) for varde in L1_FAKTURANUMMER.values()],
+    *[({"motpart": varde}, "K4c", tomt(matchningar=[(1, "U-1")], oavstamda=["U-2"])) for varde in L2_MOTPART.values()],
+    *[({"motpart": varde}, "K4", tomt(matchningar=[(1, "U-1")])) for varde in L2_MOTPART_OSYNLIGT.values()],
+], ids=list(L1_FAKTURANUMMER) + ["motpart_" + namn for namn in [*L2_MOTPART, *L2_MOTPART_OSYNLIGT]])
+def test_granskning_6_dubbletterna_blir_aldrig_oavstamda_utan_arende(tmp_path, andrat, kontroll, forvantat):
+    # L1 och L2: U-2 är U-1 med ett förväxlat tecken i fakturanumret eller motparten. Förut matchade
+    # fakturanummerregeln U-1, och U-2 blev ett oavstämt underlag, som en obetald faktura, utan
+    # något ärende. Nu gäller:
+    # - fakturanumret förväxlat: möjlig dublett (K4c). Båda är kandidater, och fakturanumret avgör
+    #   inte, eftersom datumen är samma, så raden blir "tvetydig",
+    # - motparten förväxlad: möjlig dublett (K4c). Motparten står inte i bankradens text, så U-2 är
+    #   ingen kandidat och blir oavstämd, men med ett ärende,
+    # - ett tecken som ser tomt ut i motparten: normaliseringen tar bort det, så U-2 är en dublett (K4).
+    original = underlag(fakturanummer="F-1001")
+    underlagen = period(tmp_path, original, {**original, "id": "U-2", **andrat})
+    rader = bankrader(tmp_path, ("F-1001", "LEV-A", -12500, "2025-01-20"))
+    resultat = matcha(rader, underlagen)
+    assert oavstamda_utan_arende(underlagen, resultat) == []
+    assert [(a["kontroll"], a["id"], a["jamfort_med"]) for a in underlagen.arenden] == [(kontroll, "U-2", "U-1")]
+    assert sammanfattning(resultat) == forvantat
+
+
+def test_fakturanumret_avgor_inte_mellan_underlag_med_samma_datum(tmp_path):
+    # L1: två underlag med samma belopp, motpart och datum liknar mer en dublett än två
+    # månadsfakturor. Förut avgjorde fakturanumret, och det andra underlaget blev oavstämt.
+    underlagen = period(tmp_path, underlag(fakturanummer="F-1001"), underlag(id="U-2", fakturanummer="F-1002"))
+    for referens in ("F-1001", "F-1002", "BET F-1002"):
+        rader = bankrader(tmp_path, (referens, "LEV-A", -12500, "2025-01-20"))
+        assert sammanfattning(matcha(rader, underlagen)) == TVETYDIG, referens
+
+
+def test_fakturanumret_avgor_bara_for_ett_underlag_utan_samma_datum_som_en_annan_kandidat(tmp_path):
+    # U-1 och U-2 har samma datum, U-3 ett annat. Numret för U-3 avgör, men inte numret för U-1.
+    underlagen = period(tmp_path, underlag(fakturanummer="F-1001"), underlag(id="U-2", fakturanummer="F-1002"),
+                        underlag(id="U-3", fakturanummer="F-1003", datum="2025-01-11"))
+    alla_tre = tomt(arenden=[(1, "tvetydig", ("U-1", "U-2", "U-3"))], oavstamda=["U-1", "U-2", "U-3"])
+    for referens, forvantat in [
+        ("F-1003", tomt(matchningar=[(1, "U-3")], oavstamda=["U-1", "U-2"])),
+        ("F-1001", alla_tre),
+        ("F-1002", alla_tre),
+    ]:
+        rader = bankrader(tmp_path, (referens, "LEV-A", -12500, "2025-01-20"))
+        assert sammanfattning(matcha(rader, underlagen)) == forvantat, referens
+
+
+@pytest.mark.parametrize("andra_datum", ["2025-01-11", "2025-01-09", "2025-01-20"])
+def test_manadsfakturor_med_olika_datum_avgors_fortfarande_av_fakturanumret(tmp_path, andra_datum):
+    # Skydd: två fakturor med samma belopp och motpart men olika datum (till exempel ett abonnemang)
+    # avgörs fortfarande av fakturanumret, åt båda hållen, även när datumen bara skiljer en dag.
+    underlagen = period(tmp_path, underlag(fakturanummer="F-1001"),
+                        underlag(id="U-2", fakturanummer="F-1002", datum=andra_datum))
+    assert underlagen.arenden == []  # olika datum och fakturanummer: inte K4, K4b eller K4c
+    for referens, forvantat in [("F-1001", "U-1"), ("F-1002", "U-2")]:
+        rader = bankrader(tmp_path, (referens, "LEV-A", -12500, "2025-01-20"))
+        assert sammanfattning(matcha(rader, underlagen)) == betalar(forvantat), (andra_datum, referens)
+
+
+def test_bedomningsdatumet_jamfors_med_transaktionsdagen_inte_bokforingsdagen(tmp_path):
+    # L6 (beslut 3 i åtgärderna efter granskning 5): bankraden gjordes 2025-01-20 men bokfördes
+    # 2025-01-22. Ett bedömningsdatum mellan dagarna godtas, eftersom raden finns från
+    # transaktionsdagen. Ett bedömningsdatum före transaktionsdagen stoppas.
+    rader = bankrader(tmp_path, ("F-1", "LEV-A", -12500, "2025-01-20", "2025-01-22"))
+    underlagen = period(tmp_path, underlag())
+    for dag in ("2025-01-20", "2025-01-21"):
+        assert sammanfattning(matcha(rader, underlagen, dag)) == tomt(matchningar=[(1, "U-1")]), dag
+    with pytest.raises(MatchningFel, match="ligger före transaktionsdagen 2025-01-20"):
+        matcha_period(rader, underlagen, FORMAT, "2025-01-19")
 
 
 def test_fakturanumret_ensamt_racker_inte(tmp_path):

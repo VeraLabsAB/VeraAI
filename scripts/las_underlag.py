@@ -53,6 +53,12 @@ IGNORERADE_FILER hoppas över.
   K4a och K4b: samma motpart och fakturanummer med ett annat belopp (K4a) eller ett annat datum
   (K4b) är också ett ärende, eftersom det kan vara fel, men då behålls båda underlagen. Skiljer
   både beloppet och datumet är ärendet både K4a och K4b, och texten nämner båda.
+  K4c, möjlig dublett (L1, granskning 6): samma belopp_ore och datum, och samma motpart ELLER
+  samma fakturanummer (efter normaliseringen för jämförelser), men inte båda. Det kan vara samma
+  underlag med ett förväxlat tecken, till exempel "F-l001" (litet L) i stället för "F-1001", eller
+  en motpart i ett annat skriftsystem som ser likadan ut. Underlaget med högre id blir ett ärende,
+  "möjlig dublett av <id>", med kontrollen K4c. Båda underlagen behålls, och en människa avgör. Ett
+  underlag som redan har ett ärende från K4, K4a eller K4b får inget ärende från K4c.
 
 Resultatet är en Underlagsperiod, som inte går att ändra. Vid minsta fel i en fil stoppas hela
 perioden med ett UnderlagFilFel som pekar ut filen, och inget returneras.
@@ -94,6 +100,7 @@ _FAKTURANUMRETS_TECKEN = re.compile(r"[a-z0-9/._-]", re.ASCII)
 _K4 = "K4"     # dublett
 _K4A = "K4a"   # samma motpart och fakturanummer, olika belopp
 _K4B = "K4b"   # samma motpart och fakturanummer, olika datum
+_K4C = "K4c"   # möjlig dublett: samma belopp och datum, och samma motpart eller fakturanummer
 
 # Gränser som skyddar mot trasiga filer. De gäller alla företag och ligger därför här. Ett
 # underlag är några hundra byte, så 1 MB ger mycket god marginal. Femton siffror räcker till
@@ -498,22 +505,28 @@ def _arende(underlag, kontroll, text, jamfort_med):
 
 
 def _kontroll_k4(underlag):
-    """K4, K4a och K4b. underlag ska vara sorterade efter id. Returnerar (underlagen som behålls, ärenden).
+    """K4, K4a, K4b och K4c. underlag ska vara sorterade efter id. Returnerar (underlagen som behålls, ärenden).
 
     Samma motpart, fakturanummer, belopp och datum är en dublett (K4) av det första av dem (lägst
     id), och tas inte med. Samma motpart och fakturanummer men ett annat belopp (K4a) eller datum
-    (K4b) blir ett ärende, och båda underlagen behålls. Motpart och fakturanummer jämförs efter
-    normaliseringen för jämförelser (J1).
+    (K4b) blir ett ärende, och båda underlagen behålls. Samma belopp och datum och samma motpart
+    eller samma fakturanummer, men inte båda, är en möjlig dublett (K4c, L1): ett ärende, och båda
+    underlagen behålls. Motpart och fakturanummer jämförs efter normaliseringen för jämförelser (J1).
     """
     behallna, arenden = [], []
     per_faktura = {}  # (motpart, fakturanummer), normaliserade -> underlag som behålls
+    per_motpart_dag = {}  # (motpart, belopp, datum) -> underlag som behålls, för K4c
+    per_nummer_dag = {}  # (fakturanummer, belopp, datum) -> underlag som behålls, för K4c
     for post in underlag:
-        tidigare = per_faktura.setdefault((_jamforbar(post["motpart"]), _jamforbar(post["fakturanummer"])), [])
+        motpart, nummer = _jamforbar(post["motpart"]), _jamforbar(post["fakturanummer"])
+        tidigare = per_faktura.setdefault((motpart, nummer), [])
         original = [annan for annan in tidigare
                     if annan["belopp_ore"] == post["belopp_ore"] and annan["datum"] == post["datum"]]
         if original:
             arenden.append(_arende(post, _K4, "dublett av " + original[0]["id"], original[0]))
             continue
+        samma_motpart = per_motpart_dag.setdefault((motpart, post["belopp_ore"], post["datum"]), [])
+        samma_nummer = per_nummer_dag.setdefault((nummer, post["belopp_ore"], post["datum"]), [])
         if tidigare:
             forsta = tidigare[0]
             olika_belopp = forsta["belopp_ore"] != post["belopp_ore"]
@@ -524,7 +537,13 @@ def _kontroll_k4(underlag):
                 arenden.append(_arende(post, _K4A, "samma fakturanummer, olika belopp", forsta))
             else:
                 arenden.append(_arende(post, _K4B, "samma fakturanummer, olika datum", forsta))
+        elif samma_motpart or samma_nummer:
+            # Ingen av dem har både samma motpart och samma fakturanummer, för då vore det K4 ovan.
+            forsta = min(samma_motpart + samma_nummer, key=lambda annan: annan["id"])
+            arenden.append(_arende(post, _K4C, "möjlig dublett av " + forsta["id"], forsta))
         tidigare.append(post)
+        samma_motpart.append(post)
+        samma_nummer.append(post)
         behallna.append(post)
     return behallna, arenden
 
