@@ -1,0 +1,695 @@
+# DESIGN – regelbok och kontering
+
+| | |
+|---|---|
+| Status | **Förslag**, inte godkänt. Ingen kod finns. Ändrar inget i SPEC.md |
+| Gäller | Steg 4 i arbetsflödet (SPEC avsnitt 4): kontera enligt företagets regelbok, och kontrollerna K2, K5, K8 och K9 |
+| Exempel | Bara Syntet Testbutik AB och testdatan för 2025-Q1. **Allt är SYNTETISKT** |
+
+Det här dokumentet föreslår hur Vera ska gå från "bankrad och underlag hör ihop" (det som matchningen
+redan gör) till "så här ska det bokföras" (ett **konteringsförslag**). Det svarar på åtta frågor, en per
+avsnitt.
+
+---
+
+## Viktigt först: säkerhet
+
+Två saker rör säkerheten och ska vara kända innan något byggs.
+
+1. **Regelboken styr vad som bokförs, och agenten kan i dag skriva i mappen där den ska ligga.**
+   Enligt SPEC avsnitt 3 får agenten aldrig ändra regelboken. Men `foretag/<namn>/` är skrivbar för
+   agenten, precis som bankformatet och matchningsformatet (SPEC 7). Förslaget nedan har därför tre skydd
+   tills spärrsteget flyttar regelboken till en skyddad mapp:
+   - regelboken har en **kontrollsumma** (hash, ett "fingeravtryck" av filen som ändras om ett enda tecken
+     ändras), och den godkända kontrollsumman står i varje förslag,
+   - spärrtestet "ändrad regelbok" (SPEC 7) ska prövas mot just den här filen,
+   - agenten kan aldrig skapa eller ändra en regel. En ny motpart blir ett ärende, och svaret blir ett
+     **regelförslag** som en människa själv lägger in.
+2. **Ett konteringsförslag är aldrig en bokföring.** Förslaget är en datastruktur som visas för
+   godkännaren. Inget i det här steget skriver till kundens bokföringsprogram eller till SIE-filen. Det
+   sker först efter godkännande (SPEC avsnitt 4, steg 9).
+
+---
+
+## Ord som används
+
+| Ord | Betydelse |
+|---|---|
+| **Kontering** | Att bestämma på vilka konton en händelse ska bokföras och med vilka belopp |
+| **Konto** | En "låda" i bokföringen med ett nummer, till exempel bankkontot eller kontot för hyra |
+| **Kontoplan** | Listan över företagets konton. De flesta svenska företag utgår från **BAS**, en standardlista med kontonummer |
+| **Verifikation** | En bokförd händelse: ett datum, en text och minst två rader med konton och belopp. Varje verifikation ska kunna kopplas till sitt underlag |
+| **Debet och kredit** | De två sidorna i en verifikation. Det är bara namn på sidorna. Summan i debet ska alltid vara lika med summan i kredit. Pengar **in** på banken står i debet på bankkontot, pengar **ut** står i kredit |
+| **Ingående moms** | Moms som företaget har betalat på sina inköp och normalt får tillbaka (dras av) |
+| **Utgående moms** | Moms som företaget har tagit ut av sina kunder och ska betala in till Skatteverket |
+| **Varugrupp** | En grupp varor eller tjänster med samma momssats, till exempel "livsmedel" |
+| **Avräkningskonto** | Ett konto som pengar "står på" en kort tid, mellan två händelser. Till exempel kortförsäljningen mellan kassans dagsavslut och dagen då kortinlösaren sätter in pengarna. När allt stämmer går kontot jämnt ut, alltså blir noll |
+| **Periodisering** | Att fördela en kostnad över den tid den gäller, till exempel en helårsförsäkring över tolv månader |
+| **Faktureringsmetoden** | En faktura bokförs när den kommer, och betalningen bokförs senare för sig |
+| **Kontantmetoden** | En faktura bokförs först när den betalas. Vid räkenskapsårets slut bokförs obetalda fakturor ändå |
+| **Representation** | Till exempel mat och dryck med kunder eller personal. Där får företaget ofta bara dra av en del av kostnaden och momsen. Kallas **avdragsbegränsat** |
+| **Median** | Det mittersta värdet när beloppen ställs i ordning. Påverkas inte av ett enda extremt belopp, som ett medelvärde gör |
+
+---
+
+## 1. Regelbokens form
+
+### Vad en regel är
+
+En regel säger: **"när det här kommer in, föreslå den här konteringen, på den här nivån"**. En regel har
+fyra delar:
+
+| Del | Innehåll |
+|---|---|
+| **Vad regeln gäller** (`galler`) | Vilken källa (underlag, bankrad eller Z-rapport), vilken typ (kvitto eller leverantörsfaktura) och vilken motpart. För bankrader utan underlag: namnet på regeln i `matchning.json` (till exempel `bankavgift`) |
+| **Konteringen** (`kontering`) | Vilket konto kostnaden eller intäkten ska på, per **varugrupp**. Momsens konto bestäms inte här utan av momssatsen (avsnitt 2) |
+| **Villkor** (`villkor`) | Från och till vilket datum regeln gäller, högsta belopp, och om posten är avdragsbegränsad (K8) |
+| **Nivå** (`niva`) | Den lägsta nivån förslaget kan få: A, B, C eller D. Kontrollerna kan bara höja nivån, aldrig sänka den (avsnitt 5) |
+
+Varje regel har ett fast **regel-id** (till exempel `R-LEV-TE`). Id:t står i varje förslag, så att
+godkännaren ser vilken regel som användes (SPEC avsnitt 4, steg 4).
+
+### Regler för regelboken som helhet
+
+- Motparten jämförs efter samma **normalisering** som i K4 och matchningen (`normalisering.py`): stora
+  och små bokstäver, blanksteg och osynliga tecken räknas inte.
+- **Högst en regel får passa.** Två regler som kan passa samma underlag (samma källa, typ, motpart och
+  överlappande datum) stoppar regelboken redan när den läses in, som i `matchning.json`. Om ett underlag
+  ändå passar flera regler (till exempel för att motparten står två gånger i en bankrad) blir det ett
+  ärende, "flera regler". Det är det planterade felet i september.
+- **Ingen regel passar** betyder ny eller okänd motpart. Då gissar Vera inte ett konto. Det blir ett ärende
+  (avsnitt 5).
+- Varje konto i regelboken måste finnas i kontoplanen, och varje varugrupp i momsfilen. Annars stoppas
+  regelboken.
+- En regels beloppsgräns får bara vara **lägre** än företagets gräns, aldrig högre. En regel kan alltså
+  skärpa men inte lätta på.
+- Okända nycklar, saknade nycklar och flyttal stoppar filen med ett tydligt fel, som i de andra
+  formatfilerna.
+
+### Filformat: `foretag/<namn>/regelbok.json`
+
+Exemplet visar Syntet Testbutik med motparter ur testdatan. **Kontonumren är SYNTETISKA och inte
+verifierade** (avsnitt 2). Nivåerna och gränserna är exempel som Hugo bestämmer.
+
+```json
+{
+  "anteckning": "SYNTETISK regelbok för Syntet Testbutik AB. Konton, varugrupper och gränser är antagna och INTE verifierade av en redovisningskonsult.",
+  "foretag": "syntet-testbutik",
+  "version": 1,
+  "godkand": {"av": "Godkännare 1 (påhittad)", "datum": "2026-10-25"},
+  "granser": {
+    "a_hogst_ore": 2000000,
+    "b_hogst_ore": 4000000
+  },
+  "k9": {"minst_historik": 3, "hogst_procent_av_median": 300, "lagst_procent_av_median": 33},
+  "regler": [
+    {
+      "id": "R-LEV-TE",
+      "galler": {"kalla": "underlag", "typ": "leverantorsfaktura", "motpart": "LEV-TE"},
+      "kontering": {"livsmedel": "4010"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "A",
+      "anteckning": "Inköp av te för vidareförsäljning."
+    },
+    {
+      "id": "R-LEV-KAFFE",
+      "galler": {"kalla": "underlag", "typ": "leverantorsfaktura", "motpart": "LEV-KAFFE"},
+      "kontering": {"livsmedel": "4010", "ovrigt": "4010"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "A",
+      "anteckning": "Kaffe, och ibland tillbehör på samma faktura (SYNT-U-2025-020 har två momssatser)."
+    },
+    {
+      "id": "R-BUTIK-STAD",
+      "galler": {"kalla": "underlag", "typ": "kvitto", "motpart": "BUTIK-STAD"},
+      "kontering": {"ovrigt": "5460"},
+      "villkor": {"giltig_fran": "2025-01-01", "hogst_belopp_ore": 100000},
+      "niva": "B"
+    },
+    {
+      "id": "R-LEV-FORSAKRING",
+      "galler": {"kalla": "underlag", "typ": "leverantorsfaktura", "motpart": "LEV-FORSAKRING"},
+      "kontering": {"momsfritt": "6310"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "D",
+      "anteckning": "Nivå D tills konsulten har svarat på periodisering och moms (avsnitt 8)."
+    },
+    {
+      "id": "R-RESTAURANG-1",
+      "galler": {"kalla": "underlag", "typ": "kvitto", "motpart": "RESTAURANG-1"},
+      "kontering": {"livsmedel": "6071"},
+      "villkor": {"giltig_fran": "2025-01-01", "avdragsbegransad": true},
+      "niva": "D"
+    },
+    {
+      "id": "R-Z-TB-KASSA-1",
+      "galler": {"kalla": "z_rapport", "kassaregister": "TB-KASSA-1"},
+      "kontering": {
+        "forsaljning": {"livsmedel": "3002", "ovrigt": "3001"},
+        "betalsatt": {"betalsatt_kontant": "1910", "betalsatt_kort": "1580", "betalsatt_swish": "1581"}
+      },
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "B"
+    },
+    {
+      "id": "R-BANK-KORTINLOSEN",
+      "galler": {"kalla": "bankrad", "matchningsregel": "kortinlosen"},
+      "kontering": {"motkonto": "1580", "avgift": "6570"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "C",
+      "anteckning": "Nivå C tills kortinlösarens avgiftsspecifikation finns som underlag (avsnitt 4d)."
+    },
+    {
+      "id": "R-BANK-SWISH",
+      "galler": {"kalla": "bankrad", "matchningsregel": "swish"},
+      "kontering": {"motkonto": "1581"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "B"
+    },
+    {
+      "id": "R-BANK-KONTANT",
+      "galler": {"kalla": "bankrad", "matchningsregel": "kontantinsattning"},
+      "kontering": {"motkonto": "1910"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "B"
+    },
+    {
+      "id": "R-BANK-AVGIFT",
+      "galler": {"kalla": "bankrad", "matchningsregel": "bankavgift"},
+      "kontering": {"kostnad": "6570"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "B",
+      "anteckning": "Inget underlag finns än (Ö11). Därför aldrig nivå A."
+    }
+  ]
+}
+```
+
+Några saker att lägga märke till:
+
+- **Kontering per varugrupp, inte per momssats.** Underlaget säger bara momssatsen, till exempel 12 %.
+  Regeln säger vilka varugrupper motparten säljer. Kärnan slår upp vilken sats varugruppen har på
+  underlagets datum (avsnitt 2) och kontrollerar att de stämmer (K5, avsnitt 6). Det är så det planterade
+  felet SYNT-U-2025-019 (städartiklar med 12 %) fångas: BUTIK-STAD har bara varugruppen `ovrigt`.
+- **Regler för bankrader utan underlag** pekar på regelns namn i `matchning.json`. De två filerna hänger
+  alltså ihop: matchningen säger *att* raden inte kräver underlag, regelboken säger *hur* den bokförs.
+- `godkand` och `version` är till för människor och för loggen. Det som skyddar är kontrollsumman.
+- Ägartransaktioner (K7) har ingen regel som kan ge annat än D. En regel med motparten `AGARE-1` får bara
+  ha nivå D, annars stoppas regelboken.
+
+---
+
+## 2. Kontoplan och momssatser
+
+### `foretag/<namn>/kontoplan.json`
+
+Kontoplanen gör två saker: den listar kontona, och den säger vilka konton som har en **roll** som
+kärnan behöver känna till (till exempel "bankkontot" eller "utgående moms för en viss sats"). Rollerna
+behövs eftersom kärnan aldrig får ha ett kontonummer i sin kod (SPEC 2).
+
+```json
+{
+  "anteckning": "SYNTETISK kontoplan för Syntet Testbutik AB. Numren liknar BAS men är INTE verifierade. Ska kontrolleras av en redovisningskonsult och mot kundens bokföringsprogram.",
+  "status": "SYNTETISK",
+  "konton": [
+    {"nummer": "1580", "namn": "Avräkning kortinlösen"},
+    {"nummer": "1581", "namn": "Avräkning Swish"},
+    {"nummer": "1910", "namn": "Kassa"},
+    {"nummer": "1940", "namn": "Företagskonto"},
+    {"nummer": "2440", "namn": "Leverantörsskulder"},
+    {"nummer": "2611", "namn": "Utgående moms, sats 25"},
+    {"nummer": "2621", "namn": "Utgående moms, sats 12"},
+    {"nummer": "2641", "namn": "Ingående moms"},
+    {"nummer": "3001", "namn": "Försäljning, övrigt"},
+    {"nummer": "3002", "namn": "Försäljning, livsmedel"},
+    {"nummer": "4010", "namn": "Inköp av varor"},
+    {"nummer": "5460", "namn": "Förbrukningsmaterial"},
+    {"nummer": "6071", "namn": "Representation"},
+    {"nummer": "6310", "namn": "Företagsförsäkringar"},
+    {"nummer": "6570", "namn": "Bank- och kortavgifter"}
+  ],
+  "roller": {
+    "bank": "1940",
+    "leverantorsskulder": "2440",
+    "ingaende_moms": "2641",
+    "utgaende_moms_per_sats": {"25": "2611", "12": "2621"}
+  }
+}
+```
+
+- Ett konto är text, inte ett tal, så att ett konto som börjar med noll inte förlorar nollan.
+- Varje konto i `roller` och i regelboken måste finnas i `konton`. Annars stoppas filen.
+- I version 1 läses kontoplanen ur filen. Enligt SPEC 2.1 ska den senare läsas ur kundens program, och
+  då ska de två jämföras.
+- Vilket konto som ska användas för vad är ett **bokföringsmässigt val**. Hugo kan bestämma formatet, men
+  inte numren för en riktig kund (avsnitt 8).
+
+### `foretag/<namn>/momssatser.json`
+
+Momsfilen finns redan som beslut i SPEC 11 (för K5). Förslag på form:
+
+```json
+{
+  "anteckning": "SYNTETISKA momssatser för Syntet Testbutik AB, utlästa ur testdata/README.md. INTE verifierade mot Skatteverket eller en redovisningskonsult (Ö3, Ö-T2).",
+  "status": "SYNTETISK",
+  "varugrupper": {
+    "livsmedel": [
+      {"fran": "2025-01-01", "till": null, "sats": 12, "kalla": "SYNTETISK, testdata/README.md"}
+    ],
+    "ovrigt": [
+      {"fran": "2025-01-01", "till": null, "sats": 25, "kalla": "SYNTETISK, testdata/README.md"}
+    ],
+    "momsfritt": [
+      {"fran": "2025-01-01", "till": null, "sats": 0, "kalla": "SYNTETISK. Öppen fråga: moms på försäkring"}
+    ]
+  },
+  "moms_tolerans_ore_per_rad": 1
+}
+```
+
+- **Satser per datum.** En varugrupp har en lista med perioder. När en sats ändras läggs en ny period
+  till, och den gamla får ett slutdatum. Gamla rader ändras aldrig, så att en gammal faktura kontrolleras
+  mot satsen som gällde då.
+- Perioderna för en varugrupp får inte överlappa och inte ha glapp. Annars stoppas filen.
+- Satsen är ett heltal i procent, eftersom underlagets `momssats` redan är det. Behövs en sats som inte är
+  ett helt tal måste formatet ändras.
+- **Ingen sats i filen är en skatteregel.** Varje sats har fältet `kalla`, och för testföretaget står det
+  SYNTETISK. För en riktig kund ska `kalla` peka på ett beslut från en redovisningskonsult.
+- `moms_tolerans_ore_per_rad` är hur många öre momsen på en momsrad får skilja från sats × belopp.
+  Värdet 1 är ett antagande, se avsnitt 6 och 8.
+
+---
+
+## 3. Konteringsförslag
+
+### Datastrukturen
+
+Ett **konteringsförslag** är en verifikation som ännu inte är bokförd, plus allt som behövs för att en
+människa ska kunna förstå och godkänna den. Exempel: betalningen av leverantörsfakturan SYNT-U-2025-003.
+
+```json
+{
+  "forslag_id": "F-2025-02-0007",
+  "verifikation": {
+    "datum": "2025-02-06",
+    "text": "Betalning LEV-TE, faktura SYNT-TE-761",
+    "rader": [
+      {
+        "konto": "2440",
+        "debet_ore": 1673056,
+        "kredit_ore": 0,
+        "ursprung": {"berakning": "lika", "fran": [
+          {"kalla": "underlag", "id": "SYNT-U-2025-003", "falt": "belopp_ore"}
+        ]}
+      },
+      {
+        "konto": "1940",
+        "debet_ore": 0,
+        "kredit_ore": 1673056,
+        "ursprung": {"berakning": "lika", "fran": [
+          {"kalla": "bankrad", "fil": "bank_2025-02.csv", "radnr": 26, "falt": "belopp_ore"}
+        ]}
+      }
+    ]
+  },
+  "kopplingar": {
+    "underlag": [{"id": "SYNT-U-2025-003", "kontrollsumma": "…"}],
+    "bankrader": [{"fil": "bank_2025-02.csv", "radnr": 26, "filens_kontrollsumma": "…"}],
+    "z_rapporter": [],
+    "regel": {"id": "R-LEV-TE", "regelbokens_kontrollsumma": "…"}
+  },
+  "motivering": "Bankraden matchar fakturan SYNT-TE-761 (samma belopp, motpart LEV-TE, inom 40 dagar). Regeln R-LEV-TE.",
+  "kontroller": {"K2": "ok", "K3": "ok", "K5": "ej aktuell", "K8": "ok", "K9": "ok"},
+  "niva": "A",
+  "nivans_skal": ["regel R-LEV-TE har nivå A"],
+  "arenden": []
+}
+```
+
+- **Belopp är heltal i öre**, aldrig flyttal (SPEC 7). En rad har antingen debet eller kredit större än
+  noll, aldrig båda, och inget belopp är negativt. Minus visas genom att beloppet står på andra sidan.
+- **`kopplingar`** säger vilka underlag, bankrader, Z-rapporter och vilken regel förslaget bygger på, med
+  kontrollsumman för varje fil. Ändras en fil efteråt syns det.
+- **`ursprung`** finns på **varje rad**. Det säger vilka värden i källorna beloppet kommer ifrån och hur det
+  räknas fram. Bara tre sätt finns:
+  - `lika`: beloppet är exakt ett värde ur en källa,
+  - `summa`: beloppet är summan av flera värden,
+  - `skillnad`: det första värdet minus resten (till exempel kortavgiften: kortförsäljningen minus
+    insättningen, avsnitt 4d).
+  Ett negativt värde i källan (pengar ut på banken) räknas som positivt.
+- Verifikationsnumret sätts inte här. Det sätts först när verifikationen bokförs efter godkännande, i
+  kundens program eller i SIE-filen.
+- Förslaget kan inte ändras när det väl är skapat (som matchningens resultat). En kundinstruktion blir ett
+  **nytt** förslag (SPEC 4).
+
+### Kontrollen K2 (debet = kredit)
+
+K2 körs i Python på varje förslag, och ett förslag som inte klarar den skapas aldrig (det blir ett fel i
+kärnan, inte ett ärende, eftersom det betyder att koden räknat fel):
+
+1. Verifikationen har minst två rader.
+2. Varje belopp är ett heltal, inte ett sanningsvärde (True eller False räknas annars som 1 och 0 i
+   Python), och inte negativt.
+3. På varje rad är exakt ett av `debet_ore` och `kredit_ore` större än noll.
+4. Summan av all debet är lika med summan av all kredit.
+5. Varje konto finns i kontoplanen.
+
+### Kontrollen av ursprunget
+
+Körs direkt efter K2, också i Python:
+
+1. Varje rad har ett `ursprung` med minst ett värde i `fran`.
+2. Varje värde pekar på något som verkligen finns i den här körningen: ett underlag i
+   underlagsperioden, en bankrad i bankperioden, en post i en Z-rapport i kassaperioden. Funktionen tar
+   bara emot perioderna från de enda tillåtna inläsningsfunktionerna (SPEC 7), så att ingen källa kan ha
+   ändrats eller lagts till efter kontrollerna.
+3. Kontrollen räknar själv om beloppet från källorna med `berakning`, och det ska bli exakt radens belopp.
+4. Varje källa i `ursprung` står också i `kopplingar`, och tvärtom används varje underlag, bankrad och
+   Z-rapport i `kopplingar` av minst en rad.
+5. En rad på ett momskonto ska ha en momsrad (eller en momspost i Z-rapporten) som ursprung.
+
+Ett förslag som inte klarar ursprungskontrollen skapas inte heller. På så sätt bär varje rad sitt
+ursprung, och ingen siffra i en verifikation kan komma från modellen.
+
+---
+
+## 4. Flödena
+
+Exemplen visar hur verifikationerna skulle se ut **om** de val som står under "får inte gissas" görs på
+ett visst sätt. De valen är inte gjorda. Kontona är de SYNTETISKA ur avsnitt 2. Beloppen står i kronor
+för att vara lättare att läsa, men lagras i öre.
+
+### (a) Leverantörsfaktura och dess betalning
+
+**Exempel:** SYNT-U-2025-003, LEV-TE, faktura SYNT-TE-761, daterad 2025-01-07, att betala 16 730,56 kr
+(14 938,00 kr plus moms 12 % 1 792,56 kr). Betald 2025-02-06, `bank_2025-02.csv` radnummer 26.
+
+**Om faktureringsmetoden används** blir det två verifikationer:
+
+| Verifikation | Datum | Konto | Debet | Kredit | Ursprung |
+|---|---|---|---|---|---|
+| 1. Fakturan | 2025-01-07 | 4010 Inköp av varor | 14 938,00 | | momsraden, `underlag_ore` |
+| | | 2641 Ingående moms | 1 792,56 | | momsraden, `moms_ore` |
+| | | 2440 Leverantörsskulder | | 16 730,56 | `belopp_ore` |
+| 2. Betalningen | 2025-02-06 | 2440 Leverantörsskulder | 16 730,56 | | `belopp_ore` |
+| | | 1940 Företagskonto | | 16 730,56 | bankraden |
+
+**Om kontantmetoden används** blir det en verifikation på betaldagen: 4010 och 2641 i debet, 1940 i
+kredit. Fakturor som är obetalda när räkenskapsåret slutar bokförs då som i verifikation 1.
+
+**Fler exempel ur testdatan:**
+
+- **SYNT-U-2025-020**, LEV-KAFFE, två momssatser: en kostnadsrad och en momsrad per momsrad i underlaget
+  (12 % och 25 %). Regeln har båda varugrupperna.
+- **SYNT-U-2025-004** är en dublett av 003 (K4). Inget förslag skapas för den. Den finns redan som ärende.
+- **Fakturor som är obetalda 31 mars**: med faktureringsmetoden har de verifikation 1 men ingen betalning.
+  De är "oavstämda underlag" i matchningen och ska synas i K10 (leverantörsskulder).
+- **SYNT-U-2025-005**, LEV-FORSAKRING, helårspremie 9 600,00 kr utan moms, betald 2025-02-07: ska den
+  kostnadsföras direkt eller fördelas över året? Därför nivå D i exemplet.
+- **SYNT-U-2025-021**, HYRESVARD, hyra för **andra** kvartalet, avi 2025-03-03 och betald 2025-03-31:
+  samma fråga. Hyran gäller april–juni men betalas i mars.
+
+**Får inte gissas:** faktureringsmetod eller kontantmetod. Vilket konto varje motpart ska på. Om och hur
+försäkring och förskottsbetald hyra ska fördelas. Vilket datum verifikationen ska ha. Om momsen på hyran
+får dras av (Ö-T8) och om försäkringen har moms.
+
+### (b) Kvitto betalat med kort
+
+**Exempel:** SYNT-U-2025-015, BUTIK-FORBRUKNING, kvitto daterat 2025-02-10, 247,00 kr (197,60 kr plus moms
+25 % 49,40 kr). Företagets kort dras direkt från företagskontot: `bank_2025-02.csv` radnummer 50,
+`KORTKOP-20250210`, transaktionsdag 2025-02-10, bokföringsdag 2025-02-11.
+
+En verifikation:
+
+| Datum | Konto | Debet | Kredit | Ursprung |
+|---|---|---|---|---|
+| 2025-02-10 | 5460 Förbrukningsmaterial | 197,60 | | momsraden, `underlag_ore` |
+| | 2641 Ingående moms | 49,40 | | momsraden, `moms_ore` |
+| | 1940 Företagskonto | | 247,00 | bankraden |
+
+**Planterade fel som stoppar eller höjer förslaget:**
+
+- **SYNT-U-2025-019**, BUTIK-STAD med 12 %: regeln har bara varugruppen `ovrigt` (25 %). K5 ger ett
+  ärende, nivå D (avsnitt 6).
+- **SYNT-U-2025-028**, RESTAURANG-1, 2 146,00 kr en söndag: regeln är avdragsbegränsad. K8 ger ett ärende,
+  nivå D. Vera föreslår ingen fördelning mellan avdragsgill och icke avdragsgill del.
+- **`bank_2025-02.csv` radnummer 85**, kortköp 351,00 kr utan kvitto: inget förslag. Matchningen gör det
+  till "saknat underlag" efter 7 dagar (K3).
+
+**Får inte gissas:** vilket datum som gäller (kvittots datum, transaktionsdagen eller bankens
+bokföringsdag). Vilket konto. Hur ett restaurangkvitto eller ett privat köp ska bokföras. Om företagets kort
+skulle vara ett kreditkort med egen faktura ser flödet annorlunda ut, och det är inte med här.
+
+### (c) Kassans dagsavslut (Z-rapport)
+
+**Exempel:** `kassa_2025-01-02.csv`, Z-nummer 1001, kassa TB-KASSA-1:
+
+| Post | Sats | Belopp |
+|---|---|---|
+| Försäljning | 12 % | 4 242,00 (varav moms 454,50) |
+| Försäljning | 25 % | 1 723,00 (varav moms 344,60) |
+| Kontant | | 956,00 |
+| Kort | | 4 115,00 |
+| Swish | | 894,00 |
+| Totalsumma | | 5 965,00 |
+
+En verifikation per Z-rapport, där betalsätten går till avräkningskonton:
+
+| Datum | Konto | Debet | Kredit | Ursprung |
+|---|---|---|---|---|
+| 2025-01-02 | 1910 Kassa | 956,00 | | `betalsatt_kontant` |
+| | 1580 Avräkning kortinlösen | 4 115,00 | | `betalsatt_kort` |
+| | 1581 Avräkning Swish | 894,00 | | `betalsatt_swish` |
+| | 3002 Försäljning, livsmedel | | 3 787,50 | skillnad: försäljning 12 % minus moms 12 % |
+| | 2621 Utgående moms, sats 12 | | 454,50 | `moms`, 12 % |
+| | 3001 Försäljning, övrigt | | 1 378,40 | skillnad: försäljning 25 % minus moms 25 % |
+| | 2611 Utgående moms, sats 25 | | 344,60 | `moms`, 25 % |
+| | **Summa** | **5 965,00** | **5 965,00** | |
+
+Förslaget skapas bara från en `Kassaperiod` från `las_kassaperiod`, så att Z-kontrollerna (K11) och
+Z-serien (K12) redan har körts. Vilken försäljningsrad som går till vilket konto avgörs av satsen: satsen
+12 % slås upp i momsfilen och ska höra till exakt en av regelns varugrupper på datumet (K5 för kassan).
+Passar satsen två varugrupper med olika konton blir det ett ärende.
+
+**Varför avräkningskonton:** kortförsäljningen kommer till banken först nästa bankdag, Swish kommer som
+många små bankrader och kontanterna sätts in en gång i veckan. Med avräkningskonton får varje bankrad en
+egen verifikation (flöde d), och kontona ska gå jämnt ut. Ett konto som inte blir noll är en signal som
+K10 kan visa. Det är ett förslag, inte ett bokföringsbeslut.
+
+**Saknad Z-rapport:** Z 1011, 2025-01-15, saknas. Inget förslag skapas för dagen. Det är ett ärende på nivå
+D (SPEC 6.2). Bankraderna för den dagen (till exempel `AVR-20250115` och tre Swish-rader) har ingen
+försäljning att stämmas av mot och blir också ärenden.
+
+**Får inte gissas:** om kassan ska bokföras per dag eller samlat per vecka (Ö4, Ö-T24). Vilka konton.
+Avräkningskonton eller direkt mot banken. Hur skillnad mellan räknad kassa och Z-rapporten ska bokföras
+(Ö-T4). Presentkort och returer (från Q2, Ö-T14 och Ö-T22).
+
+### (d) Kortinlösens insättning, Swish och kontantinsättning
+
+De här bankraderna kräver inget underlag (`matchning.json`). De stäms i stället av mot Z-rapporterna.
+
+**Kortinlösen.** `bank_2025-01.csv` radnummer 3, 2025-01-03, `AVR-20250102`, 4 065,62 kr. Datumet i
+referensen pekar på Z-rapporten för 2025-01-02, där kortförsäljningen var 4 115,00 kr. Skillnaden 49,38 kr
+är kortinlösarens avgift (testdatan antar 1,2 %, SYNTETISKT).
+
+| Datum | Konto | Debet | Kredit | Ursprung |
+|---|---|---|---|---|
+| 2025-01-03 | 1940 Företagskonto | 4 065,62 | | bankraden |
+| | 6570 Bank- och kortavgifter | 49,38 | | skillnad: Z-rapportens kort minus bankraden |
+| | 1580 Avräkning kortinlösen | | 4 115,00 | Z-rapportens `betalsatt_kort` |
+
+Avgiften har i dag **inget eget underlag**: kortinlösarens specifikation finns inte i testdatan. Därför är
+regeln nivå C, och avgiften visas tydligt som "räknad som skillnad, utan specifikation". Är skillnaden
+negativ (mer in än kortförsäljningen) eller saknas Z-rapporten för datumet blir det ett ärende.
+
+**Swish.** `bank_2025-01.csv` radnummer 1 och 2, 323,00 och 571,00 kr. Varje rad blir en verifikation:
+1940 i debet, 1581 Avräkning Swish i kredit. Tillsammans är de 894,00 kr, lika med Swish i Z 1001.
+Lördagens Swish bokförs av banken på måndagen, så raderna kopplas till Z-rapporten via transaktionsdagen
+och referensen, inte via bokföringsdagen.
+
+**Kontantinsättning.** `bank_2025-01.csv` radnummer 20, 2025-01-07, `INS-20250107`, 3 719,00 kr: 1940 i
+debet, 1910 Kassa i kredit. Beloppet är kontanterna från 2 januari (956,00), 3 januari (1 832,00) och 4
+januari (931,00). Att insättningen stämmer mot Z-rapporterna sedan förra insättningen hör till K10.
+Kontanterna från 31 mars ligger kvar i kassan, så kassakontot har ett saldo vid kvartalets slut.
+
+**Får inte gissas:** om kortavgiften ska bokföras för sig (brutto) och om den har moms (Ö-T5). Om en
+avgift som räknats fram som skillnad räcker som underlag. Om Swish ska bokföras per bankrad eller per dag,
+och om Swish har avgifter. Hur kontantinsättningen och kassadifferenser bokförs (Ö-T4).
+
+### (e) Bankavgifter
+
+**Exempel:** `bank_2025-01.csv` radnummer 117 (`AVG-2025-01`, BANK AVGIFT FORETAGSKONTO, 125,00 kr) och
+radnummer 118 (BANK AVGIFT KORTINLOSEN, 199,00 kr). En verifikation per rad:
+
+| Datum | Konto | Debet | Kredit | Ursprung |
+|---|---|---|---|---|
+| 2025-01-31 | 6570 Bank- och kortavgifter | 125,00 | | bankraden |
+| | 1940 Företagskonto | | 125,00 | bankraden |
+
+Ingen momsrad, eftersom det inte finns något underlag som visar moms. Raderna ligger under gränsen 250 kr
+i `matchning.json`. En avgiftsrad över gränsen är redan ett ärende, "över gräns", och får inget förslag.
+När bankens specifikation blir ett riktigt underlag (Ö11) flyttas avgifterna till flöde (b), med underlag.
+
+**Får inte gissas:** om bankavgifterna har moms. Vilket konto. Om en avgift utan specifikation räcker
+som underlag.
+
+---
+
+## 5. Nivåerna A–D
+
+Nivån räknas fram i Python, i två steg:
+
+1. **Regelns nivå** är startpunkten.
+2. **Varje skäl till en högre nivå** höjer den. Den **högsta** nivån vinner. Ingenting kan sänka nivån.
+
+Alla skäl skrivs in i `nivans_skal`, så att godkännaren ser varför en post hamnade där.
+
+| Nivå | Förslag som hamnar här | Exempel ur testdatan |
+|---|---|---|
+| **A** | Regeln har nivå A, beloppet ligger under `a_hogst_ore`, regeln har godkänts minst `minst_historik` gånger förut, och alla kontroller är utan anmärkning. Bankrader utan underlag blir aldrig A | LEV-TE efter de första fakturorna |
+| **B** | Regeln har nivå B, eller ett A-förslag som inte klarar villkoren ovan. Beloppet ligger under `b_hogst_ore` och under regelns egen gräns | BUTIK-STAD, Swish, bankavgifter, Z-rapporter |
+| **C** | Belopp över `b_hogst_ore` eller över regelns gräns. Första gången en regel används. Ovanligt belopp (K9). Rättelse (motverifikation). Invändning från granskaren. Möjlig dublett eller samma fakturanummer med olika belopp eller datum (K4a, K4b, K4c). Bankrad med flera möjliga underlag ("tvetydig"). Avgift utan underlag (kortinlösen) | Hyran 45 000 kr ligger över B-gränsen 40 000 kr i exemplet. Kortavgiften |
+| **D** | Ägare och närstående (K7). Avdragsbegränsat (K8). Fel momssats eller sats som saknas för datumet (K5). Saknad Z-rapport (6.2). Fel period (K6). Bokslutspost och periodisering. Text som försöker styra agenten (K17). Oklar post | SYNT-U-2025-019 (K5), SYNT-U-2025-028 (K8), Z 1011 som saknas, försäkringen |
+
+**Ny motpart** (ingen regel passar): Vera har inget konto att föreslå och får inte gissa. Därför blir det
+inget förslag utan ett ärende på nivå C, där människan väljer konto. Svaret används för just den posten,
+och blir ett regelförslag som en människa kan lägga in i regelboken. Agenten lägger aldrig in det själv.
+
+Det som **stoppar** (K1 saldokedjan, K11 och K12 i kassan, K13 i underlaget, trasiga filer) ger inget
+förslag och ingen nivå alls. Hela filen eller perioden stoppas, som i dag.
+
+Nivån styr bara hur godkännandet visas i automatiskt läge. I granskat läge godkänns allt löpande ändå
+(SPEC 5).
+
+---
+
+## 6. Kontrollerna K5, K8 och K9
+
+### K5: momsen stämmer med underlaget och satsen finns för datumet
+
+**Definition.** För varje momsrad i ett underlag:
+
+1. **Satsen finns.** Det finns minst en varugrupp i momsfilen med just den satsen på underlagets datum.
+2. **Satsen passar regeln.** Satsen är satsen för en av varugrupperna i regelns `kontering` på datumet,
+   och för exakt en av dem (eller flera med samma konto). Annars kan kärnan inte veta vilket konto raden ska
+   till.
+3. **Momsen stämmer med satsen.** `moms_ore` skiljer högst `moms_tolerans_ore_per_rad` från
+   `underlag_ore × sats / 100`. Beräkningen görs med heltal: `abs(moms_ore × 100 − underlag_ore × sats)`
+   ska vara högst `tolerans × 100`.
+
+För en Z-rapport: punkt 1 och 2 gäller varje försäljningsrad, med regeln för kassan. Punkt 3 är redan
+Z-kontroll e i K11.
+
+**Resultat.** Ett ärende, "fel momssats" eller "moms stämmer inte med satsen", nivå D, med satsen i
+underlaget och satsen som momsfilen och regeln väntar sig. Fångar SYNT-U-2025-019 (12 % i stället för
+25 %) och det planterade felet i november ("moms mer än 20 % av bruttot", vilket betyder en sats över 25 %
+eller fel räknad moms).
+
+**Behöver i konfigurationen:** `momssatser.json` (varugrupper och satser per datum, toleransen) och
+regelbokens `kontering` per varugrupp.
+
+**Inte med:** omvänd moms vid EU-köp (från Q2, Ö-T7). Det kräver en egen sorts momsrad och är en
+expertfråga.
+
+### K8: avdragsbegränsat
+
+**Definition.** Ett förslag är avdragsbegränsat om regeln som används har `"avdragsbegransad": true`. Då
+blir det alltid ett ärende på nivå D, och Vera föreslår bara vilket underlag och vilken bankrad det gäller,
+aldrig hur stor del som får dras av.
+
+Dessutom en **varningssignal**, som inte själv avgör: ett kvitto daterat en dag då företaget har stängt
+får flaggan "köpt en dag då företaget har stängt" och visas i ärendet. Det är så SYNT-U-2025-028 (en
+söndag) blir extra tydligt. Signalen höjer bara till D om regeln också är avdragsbegränsad. Ett köp på en
+stängd dag kan ju vara helt i sin ordning.
+
+**Behöver i konfigurationen:** `avdragsbegransad` i regelboken, och en lista över företagets stängda
+dagar (veckodagar och datum), till exempel i en ny nyckel `oppettider` i regelboken. Vilka motparter och
+kostnader som är avdragsbegränsade bestäms av en människa, med stöd av en konsult.
+
+### K9: ovanliga belopp
+
+**Definition.** För ett förslag med en regel som har använts förut:
+
+1. Hämta beloppen i de tidigare **godkända** förslagen med samma regel.
+2. Finns färre än `minst_historik` stycken gör K9 inget. (Första gångerna blir ändå nivå C, avsnitt 5.)
+3. Räkna ut **medianen**.
+4. Beloppet är ovanligt om `belopp × 100 > median × hogst_procent_av_median` eller
+   `belopp × 100 < median × lagst_procent_av_median`. Bara heltal.
+
+**Resultat.** Ett ärende, "ovanligt belopp", nivå C, med beloppet, medianen och antalet tidigare
+belopp. Fångar det planterade felet i juli (belopp långt över snittet för en känd motpart).
+
+**Behöver i konfigurationen:** `k9` i regelboken (företagets värden) och, om det behövs, egna värden per
+regel. Värdena i exemplet (3, 300 %, 33 %) är påhittade och bestäms av Hugo.
+
+**Viktigt:** historiken får bara läsas från den skyddade loggen över godkända och bokförda poster, aldrig
+från en mapp agenten kan skriva i (SPEC 7). Annars skulle agenten kunna flytta medianen. Tills loggen
+finns kan K9 inte byggas fullt ut (avsnitt 7).
+
+---
+
+## 7. Byggordning
+
+Sex små uppgifter, en per session. De tre första kräver inga bokföringsbeslut. Uppgift 4 och 5 kräver
+att Hugo har bestämt hur testföretaget ska bokföras (avsnitt 8), eller att uppgiften byggs med ett
+SYNTETISKT val som tydligt står i konfigurationen och kan bytas utan att kärnan ändras.
+
+Innan uppgift 1: Hugo ska godkänna det här förslaget, och de nya filerna i `foretag/syntet-testbutik/`.
+Regelboken räknas som något agenten inte får ändra utan Hugos ord (CLAUDE.md).
+
+| # | Uppgift | Ska bevisa |
+|---|---|---|
+| 1 | **Läsa kontoplan och momsfil** (`kontoplan.json`, `momssatser.json`) med samma stränga kontroller som de andra formatfilerna, och en funktion som slår upp satsen för en varugrupp på ett datum | Trasiga filer stoppas (okänd nyckel, flyttal, konto som saknas, perioder som överlappar eller har glapp). Satsen på ett datum före och efter en ändring blir rätt. Inget kontonummer eller momssats finns i kärnan (testet i `test_karnan_ar_generell.py` utökas) |
+| 2 | **Läsa regelboken** och slå upp regeln för ett underlag, en bankrad eller en Z-rapport | Två regler som kan passa samma sak stoppar filen. Konto eller varugrupp som saknas stoppar filen. En regel kan inte ha högre gräns än företaget. En regel för `AGARE-1` som inte är D stoppas. En ändrad regelbok får en ny kontrollsumma (förberedelse för spärrtestet) |
+| 3 | **Konteringsförslaget som datastruktur**, med K2 och ursprungskontrollen, utan några flöden | Obalans stoppas. En rad med både debet och kredit, ett negativt belopp, ett flyttal eller True stoppas. En rad utan ursprung, eller vars belopp inte går att räkna fram ur ursprunget, stoppas. Förslaget går inte att ändra |
+| 4 | **Flöde a, b och e**: leverantörsfakturor, kvitton och bankavgifter, med K5 och K8 | Mot testdatan Q1: SYNT-U-2025-003 och dess betalning ger exakt verifikationerna i avsnitt 4a. SYNT-U-2025-019 blir K5, nivå D. SYNT-U-2025-028 blir K8, nivå D. SYNT-U-2025-004 får inget förslag. Summan av ingående moms stämmer med summan av underlagens moms |
+| 5 | **Flöde c och d**: Z-rapporter, kortinlösen, Swish och kontantinsättningar | Försäljningen per sats och månad stämmer på öret med `facit.json`. Avräkningskontona går jämnt ut för varje hel dag. Z 1011 som saknas ger ett D-ärende, och dagens bankrader blir ärenden. Kortavgiften är skillnaden och visas som "utan specifikation" |
+| 6 | **Nivåerna A–D och K9** | Varje skäl i avsnitt 5 ger rätt nivå. Den högsta nivån vinner, och inget sänker den. K9 läser bara historik från den skyddade platsen och gör inget med för lite historik. Kräver att loggen över godkända poster finns. Annars byggs nivåerna utan K9, och K9 skjuts upp och sägs till |
+
+Varje uppgift avslutas med full testsvit och slutrapportrutan. Oberoende granskning i en ny session efter
+uppgift 3 och efter uppgift 6.
+
+---
+
+## 8. Öppna frågor
+
+Ingen av frågorna nedan är besvarad här. Där det står ett värde i exemplen ovan är det ett antagande som
+ska **verifieras**, inte ett svar. Numren D1–D21 är nya. Där en fråga redan finns i SPEC (Ö) eller i
+FIKTIVT_FORETAG.md (Ö-T) står det.
+
+### Kräver en redovisningskonsult eller Skatteverket
+
+| # | Fråga |
+|---|---|
+| D1 | **Faktureringsmetoden eller kontantmetoden?** Får testföretaget och första kunderna använda kontantmetoden, och vad krävs för det? Avgör om flöde (a) ger en eller två verifikationer |
+| D2 | **Kontoplan.** Vilka BAS-konton ska användas för varje händelse i flödena? Alla nummer i avsnitt 2 är SYNTETISKA |
+| D3 | **Momssatser 2025** för te och kaffe, tillbehör och blandade presentförpackningar, och hur en satsändring under året ska hanteras (Ö3, Ö-T2) |
+| D4 | **Momsavrundning på leverantörsfakturor och kvitton.** Hur många öre får momsen på en rad skilja från sats × belopp? Räknar leverantörer momsen per rad eller på totalen? (Toleransen 1 öre är ett antagande. Ö3 för kassan) |
+| D5 | **Kassans dag.** Ska Z-rapporten bokföras per dag eller samlat per vecka (Ö4, Ö-T24)? På vilket datum? Avräkningskonton eller direkt mot banken? |
+| D6 | **Kassadifferens och kontantinsättning:** hur bokförs skillnad mellan räknad kassa och Z-rapporten, och insättningen till banken (Ö-T4)? |
+| D7 | **Kortinlösen:** brutto eller netto, har avgiften moms, och räcker en avgift räknad som skillnad som underlag, eller krävs kortinlösarens specifikation (Ö-T5)? |
+| D8 | **Swish:** en verifikation per bankrad eller per dag? Har Swish avgifter som ska bokföras för sig? |
+| D9 | **Moms på försäkring.** Fakturan i testdatan har ingen moms. Hur ska försäkringspremien behandlas momsmässigt? |
+| D10 | **Periodisering av försäkring och hyra.** Ska helårspremien (SYNT-U-2025-005) och hyran för Q2 som betalas i mars (SYNT-U-2025-021) fördelas över tiden de gäller, eller kostnadsföras direkt? Finns en beloppsgräns där det inte behövs? (Ö-T9, Ö-T20) |
+| D11 | **Moms på hyran** med frivillig skattskyldighet: vad krävs av hyresavin för avdrag (Ö-T8)? |
+| D12 | **Restaurangkvitto och representation:** hur stor del av kostnaden och momsen får dras av, vilket underlag krävs (till exempel vilka som deltog och syftet), och hur bokförs ett köp av privat karaktär (som fordran på ägaren eller på annat sätt, K7)? |
+| D13 | **Bankavgifter:** har de moms, och räcker bankraden som underlag tills specifikationen finns (Ö11)? |
+| D14 | **Datum på verifikationen:** fakturadatum, kvittodatum, transaktionsdag eller bankens bokföringsdag, för varje flöde |
+| D15 | **Vad en verifikation måste innehålla** enligt bokföringslagen, och om Veras förslag plus underlaget och bankraden räcker, när den importeras som SIE-fil till kundens program |
+| D16 | **Kreditnotor** (Ö8, Ö-T21): hur bokförs de och kopplas till originalfakturan? Formatet för dem bestämmer Hugo, bokföringen kräver en expert |
+
+### Hugo kan bestämma själv
+
+De här är produkt- och riskval, inte skatteregler. Hugo bestämmer, och svaren skrivs i SPEC eller i
+konfigurationen.
+
+| # | Fråga | Förslag |
+|---|---|---|
+| D17 | Filformaten i avsnitt 1–3: nycklarnas namn, regel-id, förslagens id | Som i exemplen |
+| D18 | Beloppsgränserna för nivå A och B (`a_hogst_ore`, `b_hogst_ore`), och hur många godkända gånger en regel behöver innan den kan ge A | Lågt i början (SPEC 5), till exempel 20 000 kr, 40 000 kr och 3 gånger |
+| D19 | Värdena för K9 (`minst_historik`, procentgränserna) | 3, 300 %, 33 % |
+| D20 | Att en ny motpart alltid blir ett ärende, att en regel bara kan skärpa företagets gränser, och att bankrader utan underlag aldrig blir nivå A | Ja på alla tre |
+| D21 | Om listan över stängda dagar ska finnas för K8:s varningssignal, och var den ligger | I regelboken, nyckeln `oppettider` |
+
+Det som Hugo bestämmer gäller bara testföretaget och produktens beteende. För en riktig kund ska varje
+konto, sats och metod komma från kunden och dess redovisningskonsult, och stå som källa i konfigurationen.
