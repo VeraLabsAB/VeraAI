@@ -27,7 +27,8 @@
       "riktning": "ut",
       "referens_borjar_med": "AVG-",
       "beskrivning_borjar_med": "BANK AVGIFT",
-      "anteckning": "Bankens egna avgifter. Det finns inget underlag för dem än: bankens specifikation av avgifterna saknas i testdatan (testdata/README.md). Hugo har bestämt att raderna hör hit tills specifikationen finns. När den finns ska den här regeln tas bort, så att avgifterna matchas mot den som andra underlag. Obs: regeln undantar varje utgående rad som börjar med AVG- och BANK AVGIFT, oavsett belopp."
+      "hogst_belopp_ore": 25000,
+      "anteckning": "Bankens egna avgifter. Det finns inget underlag för dem än: bankens specifikation av avgifterna saknas i testdatan (testdata/README.md). Hugo har bestämt att raderna hör hit tills specifikationen finns. När den finns ska den här regeln tas bort, så att avgifterna matchas mot den som andra underlag. Gränsen 250 kr per bankrad (25000 öre) bestämde Hugo 2026-10-25, så att regeln aldrig undantar en stor betalning bara för att texten börjar som en avgift. Avgifterna i testdatan är 125 och 199 kr. En rad över 250 kr blir ett ärende, 'över gräns'."
     }
   ],
   "tidsfonster_dagar": {

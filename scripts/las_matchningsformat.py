@@ -12,6 +12,15 @@ Matchningsformatet säger hur bankrader matchas mot underlag för just det före
                                                          (pengar ut, negativt belopp)
                                  referens_borjar_med     text som bankradens referens ska börja med
                                  beskrivning_borjar_med  text som bankradens beskrivning ska börja med
+                                 hogst_belopp_ore        den högsta summan i öre (räknad som positiv) som
+                                                         en bankrad får ha för att regeln ska gälla. Ett
+                                                         heltal större än 0, med högst
+                                                         HELTAL_HOGST_SIFFROR siffror (som talen i
+                                                         underlagen). Krävs för en regel med riktning
+                                                         "ut", så att en regel för pengar ut aldrig gäller
+                                                         obegränsat. Får inte finnas i en regel med
+                                                         riktning "in": där används den inte, och en gräns
+                                                         som inte gör något ska inte se ut som ett skydd
                                  anteckning              fri text för människor, till exempel varför
                                                          raden inte kräver underlag
                                Minst en av referens_borjar_med och beskrivning_borjar_med krävs.
@@ -36,12 +45,12 @@ nästling och för långa tal), på samma sätt som bankformat.json och kassafor
 from inlasning_skydd import (
     _Filsort, _kontrollera_anteckning, _kontrollera_namn, _kontrollera_nycklar, _ladda_json,
 )
-from las_underlag import TYPER
+from las_underlag import HELTAL_HOGST_SIFFROR, TYPER
 
 MATCHNINGSFORMAT_NYCKLAR = ("kraver_inte_underlag", "tidsfonster_dagar", "saknat_underlag_efter_dagar")
 MATCHNINGSFORMAT_VALFRIA_NYCKLAR = ("anteckning",)
 REGEL_NYCKLAR = ("namn", "riktning")
-REGEL_VALFRIA_NYCKLAR = ("referens_borjar_med", "beskrivning_borjar_med", "anteckning")
+REGEL_VALFRIA_NYCKLAR = ("referens_borjar_med", "beskrivning_borjar_med", "hogst_belopp_ore", "anteckning")
 MONSTER_NYCKLAR = ("referens_borjar_med", "beskrivning_borjar_med")
 RIKTNINGAR = ("in", "ut")
 
@@ -96,6 +105,39 @@ def _kontrollera_dagar(varde, vad, var):
     return varde
 
 
+def _kontrollera_grans(regel, vad):
+    """Regelns hogst_belopp_ore: krävs för riktning "ut", får inte finnas för "in".
+
+    Ett heltal större än 0 med högst HELTAL_HOGST_SIFFROR siffror. true/false och decimaltal stoppas.
+    Returnerar gränsen, eller None för en regel för pengar in.
+    """
+    if regel["riktning"] == "in":
+        if "hogst_belopp_ore" in regel:
+            raise MatchningsformatFel(
+                vad + " har 'hogst_belopp_ore', men gäller pengar in. En gräns gäller bara regler med riktning"
+                " 'ut', och en gräns som inte används ska inte se ut som ett skydd."
+            )
+        return None
+    if "hogst_belopp_ore" not in regel:
+        raise MatchningsformatFel(
+            vad + " saknar 'hogst_belopp_ore'. En regel för pengar ut ska ha en högsta summa i öre per bankrad,"
+            " så att den aldrig gäller obegränsat."
+        )
+    varde = regel["hogst_belopp_ore"]
+    # type() i stället för isinstance(), eftersom True och False räknas som heltal i Python.
+    if type(varde) is not int or not 0 < varde < 10 ** HELTAL_HOGST_SIFFROR:
+        # Ett mycket långt tal visas inte, eftersom det tar lång tid att skriva ut.
+        if type(varde) is int and abs(varde) >= 10 ** HELTAL_HOGST_SIFFROR:
+            visas = "ett heltal med fler än " + str(HELTAL_HOGST_SIFFROR) + " siffror"
+        else:
+            visas = _visa(varde)
+        raise MatchningsformatFel(
+            vad + ": 'hogst_belopp_ore' ska vara ett heltal i öre, större än 0 och med högst "
+            + str(HELTAL_HOGST_SIFFROR) + " siffror, inte " + visas + "."
+        )
+    return varde
+
+
 def _kontrollera_regel(regel, nummer, var):
     """En regel i kraver_inte_underlag. Returnerar den som ett nytt objekt, utan anteckningen."""
     vad = var + ", regel nummer " + str(nummer) + " i 'kraver_inte_underlag'"
@@ -105,6 +147,9 @@ def _kontrollera_regel(regel, nummer, var):
     if not isinstance(regel["riktning"], str) or regel["riktning"] not in RIKTNINGAR:
         raise MatchningsformatFel(vad + ": 'riktning' ska vara en av " + ", ".join(map(repr, RIKTNINGAR)) + ".")
     ny["riktning"] = regel["riktning"]
+    grans = _kontrollera_grans(regel, vad)
+    if grans is not None:
+        ny["hogst_belopp_ore"] = grans
     if not any(nyckel in regel for nyckel in MONSTER_NYCKLAR):
         raise MatchningsformatFel(
             vad + " ska ha minst en av " + " och ".join(map(repr, MONSTER_NYCKLAR)) + ", annars passar den alla"

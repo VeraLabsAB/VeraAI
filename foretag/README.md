@@ -48,3 +48,42 @@ Listan säger vilka kassor företaget har. Den finns för att samma Z-rapport in
 Kassalistan ligger i samma fil som resten av kassaformatet och är lika oskyddad (granskning 3, H11). Den hör till spärrsteget.
 
 Formatet i `syntet-testbutik/` är **antaget** och inte jämfört med en riktig exportfil från något kassasystem (Ö5). Momsavrundningen är utläst ur testdatan och inte kontrollerad mot Skatteverket eller en redovisningskonsult.
+
+## matchning.json
+
+Beskriver hur företagets bankrader **matchas** (paras ihop) med underlagen, till exempel en betalning med fakturan den betalar. Läses och kontrolleras av `ladda_matchningsformat` i `scripts/las_matchningsformat.py`, och används av `matcha_period` i `scripts/matcha_bank.py` (kontroll K3, varje förslag har underlag).
+
+| Nyckel | Krävs | Innehåll |
+|---|---|---|
+| `kraver_inte_underlag` | Ja | Lista med regler för bankrader som inte ska ha ett underlag, till exempel kortinlösarens insättning av kortförsäljningen. Se reglerna nedan. Listan får vara tom |
+| `tidsfonster_dagar` | Ja | För varje underlagstyp (`leverantorsfaktura` och `kvitto`): hur många dagar efter underlagets datum betalningen får ligga på banken. Heltal från 0 till och med 366 |
+| `saknat_underlag_efter_dagar` | Ja | Hur många dagar efter bankradens transaktionsdag en bankrad utan underlag får vänta innan den blir ett ärende. Heltal från 0 till och med 366 |
+| `anteckning` | Nej | Fri text för människor. Används inte av koden |
+
+### Reglerna i `kraver_inte_underlag`
+
+| Nyckel | Krävs | Innehåll |
+|---|---|---|
+| `namn` | Ja | Regelns namn. Visas i resultatet och i ärenden. Varje namn får bara finnas en gång |
+| `riktning` | Ja | `"in"` (pengar in, positivt belopp) eller `"ut"` (pengar ut, negativt belopp) |
+| `referens_borjar_med` | Minst en av de två | Text som bankradens referens ska börja med |
+| `beskrivning_borjar_med` | Minst en av de två | Text som bankradens beskrivning ska börja med |
+| `hogst_belopp_ore` | Ja för `"ut"`, får inte finnas för `"in"` | Den högsta summan per bankrad, i **öre** (100 öre är 1 krona), som regeln gäller för. Beloppet räknas som positivt, så gränsen 25000 gäller en utgående rad på −250,00 kr. Ett heltal större än 0, med högst 15 siffror. Se nedan |
+| `anteckning` | Nej | Fri text för människor, till exempel varför raden inte kräver underlag |
+
+Finns båda textmönstren ska båda stämma. Texten jämförs exakt, med stora och små bokstäver och utan att osynliga tecken tas bort, så att en rad med en annan stavning aldrig undantas av misstag. Två regler med samma riktning som kan passa samma bankrad stoppas, så att varje bankrad hör till högst en regel.
+
+### Gränsen för pengar ut (`hogst_belopp_ore`)
+
+En regel för pengar ut får aldrig gälla obegränsat (Hugos beslut 2026-10-25). Annars kunde en stor betalning slippa underlag bara för att texten börjar som till exempel en bankavgift.
+
+- En utgående rad som passar regeln och ligger **på eller under** gränsen kräver inget underlag.
+- En utgående rad som passar regeln men ligger **över** gränsen blir direkt ett ärende av typen `"över gräns"` (K3), med regelns namn och gränsen. Den matchas inte mot underlag och räknas inte som en rad utan krav på underlag. En människa avgör vad den är.
+- Saknas gränsen i en regel för pengar ut, eller är den inte ett heltal större än 0 med högst 15 siffror, stoppas formatet.
+- En regel för pengar in får inte ha en gräns. Den skulle inte användas, och en gräns som inte gör något ska inte se ut som ett skydd. Om insättningar också ska ha en gräns är inte bestämt.
+
+För Syntet Testbutik har regeln `bankavgift` gränsen 25000 öre (250 kr), som Hugo har bestämt. Avgifterna i testdatan är 125 och 199 kr.
+
+Saknas en nyckel, finns en okänd nyckel eller är ett värde fel, stoppas inläsningen med ett tydligt fel (`MatchningsformatFel`).
+
+Formatet i `syntet-testbutik/` är **antaget** utifrån testdatan och inte jämfört med en riktig bankfil (Ö5). Det ligger där agenten kan skriva, som bank- och kassaformatet. Flytten till en skyddad mapp hör till spärrsteget (SPEC 7).

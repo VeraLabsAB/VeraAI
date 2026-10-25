@@ -21,6 +21,11 @@ Reglerna:
    kortinlösens insättning, Swish-betalningar och kontantinsättningar. De stäms av mot
    Z-rapporterna i K10 i ett senare steg. Bankens egna avgifter hör också hit så länge det inte
    finns något underlag för dem. Vilka rader det gäller står i företagets matchning.json, aldrig här.
+   En regel för pengar ut har alltid en högsta summa per bankrad, hogst_belopp_ore. En utgående
+   rad som passar regeln men vars belopp (räknat som positivt) är större än summan blir direkt ett
+   ärende, "över gräns", med regelns namn och gränsen. Den matchas inte mot underlag och räknas inte
+   som en rad som inte kräver underlag. En rad exakt på gränsen räknas som inom gränsen. Regler för
+   pengar in har ingen gräns.
 2. Varje annan bankrad ska ha ett underlag. Ett underlag är en kandidat för bankraden om
    - beloppen är lika stora: bankradens belopp är negativt (pengar ut) och underlagets positivt,
    - motparten står i bankradens beskrivning eller referens, som ett eller flera hela ord, efter
@@ -56,6 +61,7 @@ import re
 from types import MappingProxyType
 from typing import NamedTuple
 
+from belopp import formatera_ore as _kronor
 from las_bank import Bankperiod
 from las_kassa import normalisera_kassaregister as _normalisera
 from las_matchningsformat import MatchningsformatFel, kontrollera_matchningsformat
@@ -67,6 +73,7 @@ _DATUMFORM = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
 _KONTROLL = "K3"
 _SAKNAT = "saknat underlag"
 _TVETYDIG = "tvetydig"
+_OVER_GRANS = "över gräns"
 
 
 class MatchningFel(Exception):
@@ -79,7 +86,8 @@ class Matchningsresultat(NamedTuple):
     matchningar           en post per matchning: {"bankrad": ..., "underlag": ...}
     arenden               en post per bankrad som en människa måste titta på: {"kontroll", "typ",
                           "text", "bankrad", "kandidater"}, där kandidater är id:n för underlagen
-                          som passade
+                          som passade. Ett ärende "över gräns" har också "regel" (regelns namn) och
+                          "hogst_belopp_ore" (regelns gräns)
     oavstamda_underlag    underlagen som inte har matchats, till exempel obetalda fakturor
     kraver_inte_underlag  en post per bankrad som inte ska ha underlag: {"bankrad": ..., "regel": namn}
     vantande              en post per bankrad utan underlag som ännu inte är ett ärende:
@@ -131,18 +139,26 @@ def _sort(varde):
 # --- Reglerna ---
 
 def _regel_for(rad, regler):
-    """Namnet på regeln i kraver_inte_underlag som bankraden passar, eller None.
+    """Regeln i kraver_inte_underlag som bankraden passar, eller None.
 
     Riktningen ska stämma och referensen och beskrivningen ska börja exakt med regelns text.
-    Formatet ser till att högst en regel kan passa.
+    Formatet ser till att högst en regel kan passa. Beloppsgränsen prövas inte här.
     """
     riktning = "in" if rad["belopp_ore"] > 0 else "ut" if rad["belopp_ore"] < 0 else None
     for regel in regler:
         if (regel["riktning"] == riktning
                 and rad["referens"].startswith(regel.get("referens_borjar_med", ""))
                 and rad["beskrivning"].startswith(regel.get("beskrivning_borjar_med", ""))):
-            return regel["namn"]
+            return regel
     return None
+
+
+def _over_grans(rad, regel):
+    """True om bankraden är större än regelns gräns. Exakt på gränsen räknas som inom.
+
+    Bara regler för pengar ut har en gräns. Bankradens belopp är då negativt, så det räknas som positivt.
+    """
+    return "hogst_belopp_ore" in regel and -rad["belopp_ore"] > regel["hogst_belopp_ore"]
 
 
 def _star_som_hela_ord(namn, text):
@@ -189,8 +205,8 @@ def _kandidater(rad, underlag, tidsfonster):
     return kandidater
 
 
-def _arende(typ, text, rad, kandidater):
-    return {"kontroll": _KONTROLL, "typ": typ, "text": text, "bankrad": rad, "kandidater": kandidater}
+def _arende(typ, text, rad, kandidater, **mer):
+    return {"kontroll": _KONTROLL, "typ": typ, "text": text, "bankrad": rad, "kandidater": kandidater, **mer}
 
 
 def matcha_period(bankperiod, underlagsperiod, matchningsformat, bedomningsdatum):
@@ -217,20 +233,28 @@ def matcha_period(bankperiod, underlagsperiod, matchningsformat, bedomningsdatum
     underlag = underlagsperiod.underlag  # en ny kopia, sorterad efter id
 
     behover = []  # (rad, kandidaterna) för raderna som ska ha underlag
-    kraver_inte = []
+    kraver_inte, arenden = [], []
     for rad in rader:
         regel = _regel_for(rad, format_["kraver_inte_underlag"])
-        if regel is not None:
-            kraver_inte.append({"bankrad": rad, "regel": regel})
-        else:
+        if regel is None:
             behover.append((rad, _kandidater(rad, underlag, format_["tidsfonster_dagar"])))
+        elif _over_grans(rad, regel):
+            # Matchas inte mot underlag: en människa avgör vad en så stor rad är.
+            arenden.append(_arende(
+                _OVER_GRANS,
+                "Bankraden passar regeln " + repr(regel["namn"]) + " för rader som inte kräver underlag, men"
+                " beloppet är större än regelns gräns, " + _kronor(regel["hogst_belopp_ore"]) + " kr per bankrad."
+                " En människa behöver avgöra vad raden är och vilket underlag den ska ha.",
+                rad, [], regel=regel["namn"], hogst_belopp_ore=regel["hogst_belopp_ore"]))
+        else:
+            kraver_inte.append({"bankrad": rad, "regel": regel["namn"]})
 
     antal_rader = {}  # underlagets id -> hur många bankrader det är kandidat för
     for _, kandidater in behover:
         for post in kandidater:
             antal_rader[post["id"]] = antal_rader.get(post["id"], 0) + 1
 
-    matchningar, arenden, vantande, matchade = [], [], [], set()
+    matchningar, vantande, matchade = [], [], set()
     sista_dag = dt.date.max.toordinal()
     for rad, kandidater in behover:
         if len(kandidater) == 1 and antal_rader[kandidater[0]["id"]] == 1:

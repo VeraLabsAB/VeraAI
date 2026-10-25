@@ -1357,3 +1357,68 @@ Gjort i en egen session, efter Hugos beslut ovan ("En borttagen bankrad syns int
 **Kommandon utanför den fasta listan.** Jag läste några filer med `sed -n` och mätte `.venv` med `du -sh` (båda bara läser). De står inte på listan i SPEC 7.1. Kopiorna gjordes med `git archive` och `tar` (för den gamla koden) och `cp -R` (för mutationerna), alla i den tillfälliga mappen, och ändringarna i kopiorna gjordes med fil-verktygen.
 
 Testsviten: **1 209 passed**, 0 misslyckade (1 203 före).
+
+## Åtgärd 2026-10-25: gräns för regler för pengar ut (bankens avgifter)
+
+Gjort i en egen session, efter Hugos beslut ovan ("Bankens avgifter slipper underlag oavsett belopp"), och efter Bankperiod-åtgärden (commit e3a618c), som den bygger på. Ingen granskares text ovan är ändrad. SPEC.md, testdatan och facit är inte ändrade.
+
+**Ord som används nedan.** En **regel för pengar ut** är en regel i `kraver_inte_underlag` med `"riktning": "ut"`, till exempel `bankavgift`. En **gräns** är den högsta summan per bankrad som regeln gäller för. **Öre** är hundradels kronor: 25000 öre är 250 kr.
+
+**Felet som rättas.** Regeln `bankavgift` undantog varje utgående bankrad som började med `AVG-` och `BANK AVGIFT` från underlag, oavsett belopp. En betalning på 50 000 kr med en sådan text hade alltså slunkit igenom utan underlag och utan ärende.
+
+**Vad som är byggt.**
+
+| Ändring | Test |
+|---|---|
+| Ny nyckel `hogst_belopp_ore` i reglerna i `matchning.json`, kontrollerad i `las_matchningsformat.py` (`_kontrollera_grans`). Den **krävs** för en regel för pengar ut. Saknas den: "… saknar 'hogst_belopp_ore'. En regel för pengar ut ska ha en högsta summa i öre per bankrad, så att den aldrig gäller obegränsat." | `test_las_matchningsformat.py`: `test_regel_for_pengar_ut_utan_grans_stoppas`, `test_testforetagets_regel_utan_grans_stoppas` |
+| Gränsen ska vara ett heltal i öre, större än 0 och med högst 15 siffror (samma gräns som talen i underlagen, `HELTAL_HOGST_SIFFROR` i `las_underlag.py`). true/false, decimaltal, text, null, listor och objekt stoppas: "… 'hogst_belopp_ore' ska vara ett heltal i öre, större än 0 och med högst 15 siffror, inte …". Ett tal med fler än 15 siffror skrivs inte ut i meddelandet (det tar lång tid för mycket långa tal), utan visas som "ett heltal med fler än 15 siffror". I filen stoppas ett så långt tal redan när JSON läses, av skyddet från del B | `test_gransen_av_fel_typ_stoppas` (8 fall), `test_gransen_0_eller_negativ_stoppas` (4), `test_gransen_med_fler_an_15_siffror_stoppas_nar_formatet_kommer_direkt` (5, även 10^5000), `test_gransen_med_fler_an_15_siffror_stoppas_i_filen`, skydd: `test_gransvarden_for_gransen_godtas` (1, 25000 och 999 999 999 999 999) |
+| **Beslut i den här uppgiften:** en regel för pengar in får **inte** ha en gräns. Den skulle inte användas av matchningen, och en gräns som inte gör något ska inte se ut som ett skydd: "… har 'hogst_belopp_ore', men gäller pengar in. En gräns gäller bara regler med riktning 'ut', …". Om insättningar också ska ha en gräns är inte bestämt (se Beslut nedan) | `test_regel_for_pengar_in_far_inte_ha_en_grans` (3 värden, och skyddet att samma regel utan gräns godtas) |
+| `matcha_bank.py`: en utgående rad som passar en regel men vars belopp, räknat som positivt, är **större** än gränsen blir direkt ett ärende (K3) av typen `"över gräns"`. Ärendet har, utöver de vanliga uppgifterna, `"regel"` (regelns namn) och `"hogst_belopp_ore"` (gränsen), och texten "Bankraden passar regeln 'avgift' för rader som inte kräver underlag, men beloppet är större än regelns gräns, 2,00 kr per bankrad. En människa behöver avgöra vad raden är och vilket underlag den ska ha." Texten har inga texter ur bankraden. Raden väntar inte 7 dagar, matchas inte mot underlag och hamnar inte i `kraver_inte_underlag`. **Exakt på gränsen räknas som inom.** Varje rad prövas för sig. Beskrivningen överst i filen och i `Matchningsresultat` är uppdaterad | `test_matcha_bank.py`: `test_utgaende_rad_under_pa_och_over_gransen` (6 belopp: 1 och 199 öre under, 200 på, 201, 12 500 och 10^12 över), `test_over_gransen_ger_ett_arende_med_regeln_och_gransen`, `test_over_gransen_matchas_inte_mot_underlag` (med skyddet att samma rad matchas utan regeln), `test_inkommande_rad_paverkas_inte_av_gransen`, `test_gransen_galler_varje_bankrad_for_sig`, 3 nya fall i `test_trasigt_format_stoppas_aven_nar_det_skickas_direkt` |
+| `foretag/syntet-testbutik/matchning.json`: `bankavgift` har `"hogst_belopp_ore": 25000` (250 kr, Hugos beslut). Anteckningen säger varför, och den gamla varningen "oavsett belopp" är borttagen | `test_testforetagets_format_laddas`, `test_varfor_bankens_avgifter_har_gransen_250_kr_star_i_formatet` |
+| `foretag/README.md`: nytt avsnitt om `matchning.json`, med alla nycklar och gränsen | – |
+
+**Testdatan.** Avgifterna i kvartalet är tre på 125 kr och tre på 199 kr, alla under 250 kr. Testdatan ger därför fortfarande exakt det planterade ärendet (februari, bankrad 85, "saknat underlag"), och de befintliga testerna för kvartalet är oförändrade och gröna. Det nya testet `test_testdatans_avgifter_ligger_inom_gransen` visar att gränsen verkligen prövas på testdatans rader: med gränsen 198,99 kr blir de tre avgifterna på 199 kr ärenden "över gräns", och med exakt 199,00 kr blir det inga nya ärenden.
+
+**Fuzz.** `test_fuzz_skadade_indata_ger_ratt_resultat_eller_matchningfel` skadar nu också gränsen: tar bort den, byter den mot gränser kring testdatans och de små fallens avgifter, mot för stora, 0, negativa och värden av fel typ, och lägger till nya regler med och utan gräns. Varje resultat kontrolleras mot de nya reglerna: ett ärende "över gräns" gäller en utgående rad som passar regeln och är större än gränsen, och varje rad i `kraver_inte_underlag` för en regel för pengar ut ligger på eller under gränsen. Antalet körningar är höjt från 600 till 800, eftersom de nya skadorna stoppar fler format och testets skydd kräver minst 100 resultat. Skyddet kräver också minst 10 ärenden "över gräns", så att fuzzen verkligen prövar dem.
+
+**Så bevisades testerna.** I en kopia utanför projektet med koden och `matchning.json` från commit e3a618c (före ändringen) och de nya testfilerna blev 123 tester röda och 1 125 gröna. Felen beror på att den gamla koden inte känner till nyckeln ("har en okänd nyckel: 'hogst_belopp_ore'"), att den inte har något ärende "över gräns" och att testföretagets format saknar gränsen, alltså av rätt skäl.
+
+**Mutationstest.** I 19 kopior utanför projektet togs en ny kontroll bort eller gjordes svagare, och hela sviten kördes. Alla 19 gav minst ett rött test.
+
+| Nr | Borttagen eller svagare kontroll (i en kopia) | Röda tester |
+|---|---|---|
+| g01 | Formatet: regel för pengar ut utan gräns godtas | 4 |
+| g02 | Formatet: true/false godtas som gräns (`isinstance`) | 1 |
+| g03 | Formatet: decimaltal godtas som gräns | 2 |
+| g04 | Formatet: 0 godtas | 2 |
+| g05 | Formatet: negativ gräns godtas | 4 |
+| g06 | Formatet: ingen övre gräns (15 siffror) | 4 |
+| g07 | Formatet: övre gränsen ett för hög (16 siffror godtas) | 1 |
+| g08 | Formatet: regel för pengar in med gräns godtas | 2 |
+| g09 | Formatet: gränsen följer inte med i det kontrollerade formatet | 20 |
+| g10 | Formatet: ett mycket långt tal skrivs ut i meddelandet | 5 |
+| g11 | Matchningen: gränsen prövas inte | 8 |
+| g12 | Matchningen: exakt på gränsen blir ett ärende (`>=`) | 4 |
+| g13 | Matchningen: beloppets tecken vänds inte (pengar ut är aldrig över gränsen) | 8 |
+| g14 | Matchningen: en rad över gränsen matchas mot underlag i stället | 8 |
+| g15 | Matchningen: ärendet saknar regelns namn och gränsen | 3 |
+| g16 | Matchningen: ärendets text saknar gränsen | 1 |
+| g17 | `matchning.json`: gränsen 300 kr i stället för 250 kr | 3 |
+| g18 | `matchning.json`: anteckningen säger inte varför | 1 |
+| g19 | `matchning.json`: gränsen borttagen | hela `test_matcha_bank.py` går inte att läsa in (formatet stoppas), 1 fel |
+
+**Att tänka på.**
+
+- Ärendena "över gräns" står först bland ärendena, i bankfilernas ordning. Efter dem kommer "tvetydig" och "saknat underlag", också i bankfilernas ordning, som förut.
+- Gränsen gäller varje bankrad för sig. Många små avgifter under gränsen ger inget ärende, hur många de än är. Det fångas först i månadsavstämningen (K10) eller av en kontroll av ovanliga belopp (K9), som inte är byggda.
+- `matchning.json` ligger fortfarande där agenten kan skriva. Gränsen skyddar mot en stor rad med avgiftstext, inte mot att någon höjer gränsen i filen. Det hör till spärrsteget.
+- Bankens avgiftsspecifikation som riktigt underlag ingår inte. Den kräver en ny dokumenttyp i SPEC och tas senare, som Hugo har bestämt.
+
+**Beslut som behövs från Hugo.**
+
+- Ska regler för pengar in (kortinlösen, Swish, kontantinsättningar) också ha en gräns? Idag stoppas en sådan gräns, eftersom den inte skulle användas.
+- Den föreslagna öppna frågan om bankens avgiftsspecifikation som ny dokumenttyp är inte inskriven i SPEC 11 (SPEC ändras inte i den här uppgiften).
+
+**Kommandon utanför den fasta listan.** Kopiorna för mutationstestet skapades och testsviten kördes i dem med en `for`-slinga, med `printf` för att skriva ut kopians namn, och en gång med `echo`. Testsvitens tid mättes en gång med `time`. Inget av det står på listan i SPEC 7.1, och inget ändrade något i projektet. Kopiorna gjordes med `cp -R`, `git archive` och `tar` i den tillfälliga mappen, och ändringarna i kopiorna gjordes med fil-verktygen.
+
+Testsviten: **1 248 passed**, 0 misslyckade (1 209 före, alltså 39 nya tester i `test_las_matchningsformat.py` och `test_matcha_bank.py`).

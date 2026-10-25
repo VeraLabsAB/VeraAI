@@ -206,7 +206,7 @@ def test_utan_underlagen_fran_januari_blir_februaris_betalningar_arenden(kvartal
 FORMAT = {
     "kraver_inte_underlag": [
         {"namn": "insattning", "riktning": "in", "referens_borjar_med": "IN-"},
-        {"namn": "avgift", "riktning": "ut", "beskrivning_borjar_med": "AVGIFT"},
+        {"namn": "avgift", "riktning": "ut", "beskrivning_borjar_med": "AVGIFT", "hogst_belopp_ore": 200},
         {"namn": "kort", "riktning": "in", "referens_borjar_med": "K-", "beskrivning_borjar_med": "KORT IN"},
     ],
     "tidsfonster_dagar": {"leverantorsfaktura": 30, "kvitto": 2},
@@ -470,6 +470,90 @@ def test_rad_som_inte_kraver_underlag_matchas_inte_mot_ett_underlag(tmp_path):
         kraver_inte=[(1, "insattning")], oavstamda=["U-1"])
 
 
+# --- Gränsen för regler för pengar ut (hogst_belopp_ore), Hugos beslut 2026-10-25 ---
+
+def over_grans(radnr):
+    return (radnr, "över gräns", ())
+
+
+@pytest.mark.parametrize("belopp, ar_inom", [
+    (-1, True), (-199, True),             # under gränsen 200 öre
+    (-200, True),                         # exakt på gränsen räknas som inom
+    (-201, False), (-12500, False), (-10 ** 12, False),  # över gränsen
+])
+def test_utgaende_rad_under_pa_och_over_gransen(tmp_path, belopp, ar_inom):
+    rader = bankrader(tmp_path, ("X", "AVGIFT FOR KONTOT", belopp, "2025-01-20"))
+    resultat = sammanfattning(matcha(rader, period(tmp_path)))
+    if ar_inom:
+        assert resultat == tomt(kraver_inte=[(1, "avgift")])
+    else:
+        assert resultat == tomt(arenden=[over_grans(1)])
+
+
+def test_over_gransen_ger_ett_arende_med_regeln_och_gransen(tmp_path):
+    rader = bankrader(tmp_path, ("GOR SA HAR", "AVGIFT GOR SA HAR", -201, "2025-01-20"))
+    resultat = matcha(rader, period(tmp_path), "2025-01-20")  # direkt, utan att vänta 7 dagar
+    assert resultat.vantande == () and resultat.kraver_inte_underlag == ()
+    arende = resultat.arenden[0]
+    assert dict(arende, bankrad=None) == {
+        "kontroll": "K3", "typ": "över gräns", "regel": "avgift", "hogst_belopp_ore": 200, "kandidater": (),
+        "bankrad": None,
+        "text": "Bankraden passar regeln 'avgift' för rader som inte kräver underlag, men beloppet är större än"
+                " regelns gräns, 2,00 kr per bankrad. En människa behöver avgöra vad raden är och vilket underlag"
+                " den ska ha.",
+    }
+    assert "GOR SA HAR" not in arende["text"]  # inga texter ur bankraden
+    assert dict(arende["bankrad"]) == rader.rader[0]
+
+
+def test_over_gransen_matchas_inte_mot_underlag(tmp_path):
+    # En rad över gränsen med samma belopp, motpart och datum som ett underlag matchas inte med det.
+    # En människa ska se den, eftersom en så stor rad inte ser ut som det regeln är till för.
+    rader = bankrader(tmp_path, ("F-1", "AVGIFT LEV-A", -12500, "2025-01-20"))
+    underlagen = period(tmp_path, underlag())
+    assert sammanfattning(matcha(rader, underlagen)) == tomt(arenden=[over_grans(1)], oavstamda=["U-1"])
+    # Skydd: utan regeln matchas samma rad med underlaget.
+    utan_regel = {**FORMAT, "kraver_inte_underlag": [r for r in FORMAT["kraver_inte_underlag"] if r["namn"] != "avgift"]}
+    assert sammanfattning(matcha(rader, underlagen, format_=utan_regel)) == tomt(matchningar=[(1, "U-1")])
+
+
+def test_inkommande_rad_paverkas_inte_av_gransen(tmp_path):
+    # Regler för pengar in har ingen gräns. En stor insättning kräver fortfarande inget underlag, och
+    # en stor inkommande rad som börjar som en avgift passar inte regeln för pengar ut.
+    rader = bankrader(tmp_path, ("IN-1", "X", 10 ** 12, "2025-01-20"), ("K-1", "KORT IN", 201, "2025-01-20"),
+                      ("X", "AVGIFT FOR KONTOT", 201, "2025-01-20"))
+    assert sammanfattning(matcha(rader, period(tmp_path))) == tomt(
+        kraver_inte=[(1, "insattning"), (2, "kort")], arenden=[(3, "saknat underlag", ())])
+
+
+def test_gransen_galler_varje_bankrad_for_sig(tmp_path):
+    # Två avgifter som tillsammans är över gränsen, men var för sig inom: inget ärende.
+    rader = bankrader(tmp_path, ("X", "AVGIFT A", -200, "2025-01-20"), ("X", "AVGIFT B", -200, "2025-01-20"),
+                      ("X", "AVGIFT C", -201, "2025-01-20"))
+    assert sammanfattning(matcha(rader, period(tmp_path))) == tomt(
+        kraver_inte=[(1, "avgift"), (2, "avgift")], arenden=[over_grans(3)])
+
+
+def test_testdatans_avgifter_ligger_inom_gransen(kvartalet):
+    # Avgifterna i testdatan är 125 och 199 kr, under gränsen 250 kr. Med en gräns på 198,99 kr blir
+    # de tre avgifterna på 199 kr ärenden, så gränsen prövas verkligen på testdatans rader.
+    avgifter = sorted(-rad["belopp_ore"] for rad in kvartalet["rader"] if rad["referens"].startswith("AVG-"))
+    assert avgifter == [12500] * 3 + [19900] * 3
+    bankavgift = [r for r in MATCHNINGSFORMAT["kraver_inte_underlag"] if r["namn"] == "bankavgift"][0]
+    assert bankavgift["hogst_belopp_ore"] == 25000
+    lagre = copy.deepcopy(MATCHNINGSFORMAT)
+    [r for r in lagre["kraver_inte_underlag"] if r["namn"] == "bankavgift"][0]["hogst_belopp_ore"] = 19899
+    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], lagre, "2025-04-30")
+    over = [a for a in resultat.arenden if a["typ"] == "över gräns"]
+    assert [(a["regel"], a["bankrad"]["belopp_ore"]) for a in over] == [("bankavgift", -19900)] * 3
+    assert len(resultat.arenden) == 4  # och det planterade ärendet
+    kontrollera_grupperna(resultat, kvartalet["bankperiod"], kvartalet["period"])
+    # Exakt på 199 kr: inom gränsen, inga nya ärenden.
+    [r for r in lagre["kraver_inte_underlag"] if r["namn"] == "bankavgift"][0]["hogst_belopp_ore"] = 19900
+    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], lagre, "2025-04-30")
+    assert [a["typ"] for a in resultat.arenden] == ["saknat underlag"]
+
+
 def test_flera_bankfiler(tmp_path):
     # Två bankfiler i en kedja, ihopsatta med sla_ihop_bankperioder.
     forsta = bankrader(tmp_path, ("F-1", "LEV-A", -12500, "2025-01-20"), namn="a.csv")
@@ -575,6 +659,9 @@ def test_datumets_form_kontrolleras_aven_med_nyare_python(tmp_path, monkeypatch)
     (lambda f: f["tidsfonster_dagar"].update(kvitto=True), "tidsfönstret för 'kvitto' ska vara ett heltal"),
     (lambda f: f["kraver_inte_underlag"][0].update(riktning="IN"), "'riktning' ska vara en av 'in', 'ut'"),
     (lambda f: f.update({7: 7}), "har en nyckel som inte är text"),
+    (lambda f: f["kraver_inte_underlag"][1].pop("hogst_belopp_ore"), "saknar 'hogst_belopp_ore'"),
+    (lambda f: f["kraver_inte_underlag"][1].update(hogst_belopp_ore=0), "'hogst_belopp_ore' ska vara ett heltal"),
+    (lambda f: f["kraver_inte_underlag"][0].update(hogst_belopp_ore=1), "har 'hogst_belopp_ore', men gäller pengar in"),
 ])
 def test_trasigt_format_stoppas_aven_nar_det_skickas_direkt(tmp_path, andring, text):
     # Formatet kontrolleras igen i matcha_period, så att ett format som har ändrats efter
@@ -691,9 +778,20 @@ def ogonblick(varde):
     return copy.deepcopy(varde)
 
 
+# Gränser för regler för pengar ut: kring testdatans avgifter (12500 och 19900) och de små fallens
+# (125), utanför gränserna, och av fel typ.
+GODA_GRANSER = [1, 124, 125, 126, 199, 200, 12499, 12500, 19899, 19900, 25000, 10 ** 15 - 1]
+TRASIGA_GRANSER = [10 ** 15, 0, -1, True, 125.0, "125", None]
+
+
+def grans(rng):
+    """Oftast en giltig gräns, så att fuzzen ger resultat och inte bara stopp."""
+    return rng.choice(GODA_GRANSER if rng.random() < 0.8 else TRASIGA_GRANSER)
+
+
 def skada_format(rng, format_):
     format_ = copy.deepcopy(format_)
-    sort = rng.randrange(7)
+    sort = rng.randrange(8)
     if sort == 0:  # byt ut ett värde överst
         format_[rng.choice(sorted(format_))] = rng.choice(FARLIGA_VARDEN)
     elif sort == 1:  # byt ut ett tidsfönster eller antalet dagar
@@ -705,11 +803,20 @@ def skada_format(rng, format_):
     elif sort == 2 and format_["kraver_inte_underlag"]:  # byt ut ett värde i en regel
         regel = rng.choice(format_["kraver_inte_underlag"])
         regel[rng.choice(["namn", "riktning", "referens_borjar_med", "beskrivning_borjar_med", "anteckning",
-                          "okand"])] = rng.choice(FARLIGA_VARDEN + ["in", "ut"])
-    elif sort == 3:  # en regel till, som kan krocka med en annan
-        format_["kraver_inte_underlag"].append(
-            {"namn": rng.choice(["ny", "insattning"]), "riktning": rng.choice(["in", "ut"]),
-             rng.choice(["referens_borjar_med", "beskrivning_borjar_med"]): rng.choice(["IN-1", "Q", "K", "AVG"])})
+                          "hogst_belopp_ore", "okand"])] = rng.choice(FARLIGA_VARDEN + ["in", "ut"])
+    elif sort == 3:  # en regel till, som kan krocka med en annan, med eller utan gräns
+        ny = {"namn": rng.choice(["ny", "insattning"]), "riktning": rng.choice(["in", "ut"]),
+              rng.choice(["referens_borjar_med", "beskrivning_borjar_med"]): rng.choice(["IN-1", "Q", "K", "AVG"])}
+        if rng.random() < (0.9 if ny["riktning"] == "ut" else 0.1):
+            ny["hogst_belopp_ore"] = grans(rng)
+        format_["kraver_inte_underlag"].append(ny)
+    elif sort == 6 and format_["kraver_inte_underlag"]:  # ändra eller ta bort gränsen i en regel för pengar ut
+        ut = [regel for regel in format_["kraver_inte_underlag"] if regel.get("riktning") == "ut"]
+        regel = rng.choice(ut or format_["kraver_inte_underlag"])
+        if rng.random() < 0.15:
+            regel.pop("hogst_belopp_ore", None)
+        else:
+            regel["hogst_belopp_ore"] = grans(rng)
     elif sort == 4:  # ta bort en nyckel, eller en regel
         if rng.random() < 0.5:
             del format_[rng.choice(sorted(format_))]
@@ -752,15 +859,36 @@ def ar_giltigt(resultat, bankperiod, underlagen, format_, bedomning):
             post["typ"]]
         assert normalisera_kassaregister(post["motpart"]) in (normalisera_kassaregister(rad["beskrivning"])
                                                               + normalisera_kassaregister(rad["referens"]))
+    regler = {regel["namn"]: regel for regel in format_["kraver_inte_underlag"]}
     for arende in resultat.arenden:
         assert (arende["typ"] == "tvetydig") == bool(arende["kandidater"])
+        assert arende["typ"] in ("tvetydig", "saknat underlag", "över gräns")
         if arende["typ"] == "saknat underlag":
             assert (dag - dt.date.fromisoformat(arende["bankrad"]["transaktionsdag"])).days > format_[
                 "saknat_underlag_efter_dagar"]
+        if arende["typ"] == "över gräns":  # en utgående rad som passar regeln, över regelns gräns
+            regel, rad = regler[arende["regel"]], arende["bankrad"]
+            assert regel["riktning"] == "ut" and arende["hogst_belopp_ore"] == regel["hogst_belopp_ore"]
+            assert passar(rad, regel) and -rad["belopp_ore"] > regel["hogst_belopp_ore"]
+        else:
+            assert "regel" not in arende and "hogst_belopp_ore" not in arende
     for post in resultat.vantande:
         assert bedomning <= post["arende_efter"]
-    namn = {regel["namn"] for regel in format_["kraver_inte_underlag"]}
-    assert all(post["regel"] in namn for post in resultat.kraver_inte_underlag)
+    for post in resultat.kraver_inte_underlag:  # rätt regel, och inom gränsen för pengar ut
+        regel, rad = regler[post["regel"]], post["bankrad"]
+        assert passar(rad, regel)
+        if regel["riktning"] == "ut":
+            assert 0 < -rad["belopp_ore"] <= regel["hogst_belopp_ore"]
+        else:
+            assert "hogst_belopp_ore" not in regel and rad["belopp_ore"] > 0
+    return len([a for a in resultat.arenden if a["typ"] == "över gräns"])
+
+
+def passar(rad, regel):
+    """True om bankraden har regelns riktning och börjar med regelns mönster."""
+    return (("in" if rad["belopp_ore"] > 0 else "ut") == regel["riktning"]
+            and rad["referens"].startswith(regel.get("referens_borjar_med", ""))
+            and rad["beskrivning"].startswith(regel.get("beskrivning_borjar_med", "")))
 
 
 def test_fuzz_skadade_indata_ger_ratt_resultat_eller_matchningfel(tmp_path, kvartalet):
@@ -772,8 +900,8 @@ def test_fuzz_skadade_indata_ger_ratt_resultat_eller_matchningfel(tmp_path, kvar
                                          typ="kvitto", datum="2025-01-20"),
                     underlag(id="U-3", fakturanummer="F-3", belopp_ore=999)]
     motparter = ["LEV-A", "LEV-B", "lev-a", "LEV-TE", "KORTKOP BUTIK-STAD"]
-    resultat_antal = stoppade = 0
-    for nummer in range(600):
+    resultat_antal = stoppade = over_grans_antal = 0
+    for nummer in range(800):
         if nummer % 2:  # testdatans kvartal eller februari, med skadat format
             bankperiod = rng.choice([kvartalet["bankperiod"], kvartalet["februari"]])
             underlagen, format_ = kvartalet["period"], MATCHNINGSFORMAT
@@ -809,11 +937,12 @@ def test_fuzz_skadade_indata_ger_ratt_resultat_eller_matchningfel(tmp_path, kvar
             stoppade += 1
         else:
             assert type(bankperiod) is Bankperiod  # allt annat än en Bankperiod ska ge MatchningFel
-            ar_giltigt(resultat, bankperiod, underlagen, format_, bedomning)
+            over_grans_antal += ar_giltigt(resultat, bankperiod, underlagen, format_, bedomning)
             resultat_antal += 1
         assert (ogonblick(bankperiod), copy.deepcopy(format_)) == fore  # indatan är oförändrad
-    # Skydd: fuzzen ska ge både resultat och stopp, annars prövar den inte mycket.
-    assert resultat_antal > 100 and stoppade > 150, (resultat_antal, stoppade)
+    # Skydd: fuzzen ska ge både resultat och stopp, och ibland rader över en gräns, annars prövar den inte mycket.
+    assert resultat_antal > 100 and stoppade > 150 and over_grans_antal > 10, (resultat_antal, stoppade,
+                                                                                over_grans_antal)
 
 
 def test_fuzz_skadad_matchningsfil_laddas_ratt_eller_stoppas(tmp_path):

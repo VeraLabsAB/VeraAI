@@ -30,7 +30,7 @@ def format_(**andrat):
         "anteckning": "påhittat",
         "kraver_inte_underlag": [
             {"namn": "insattning", "riktning": "in", "referens_borjar_med": "IN-", "anteckning": "x"},
-            {"namn": "avgift", "riktning": "ut", "beskrivning_borjar_med": "AVGIFT"},
+            {"namn": "avgift", "riktning": "ut", "beskrivning_borjar_med": "AVGIFT", "hogst_belopp_ore": 5000},
         ],
         "tidsfonster_dagar": {"leverantorsfaktura": 30, "kvitto": 2},
         "saknat_underlag_efter_dagar": 7,
@@ -75,7 +75,7 @@ def test_testforetagets_format_laddas():
             {"namn": "kontantinsattning", "riktning": "in", "referens_borjar_med": "INS-",
              "beskrivning_borjar_med": "KONTANTINSATTNING"},
             {"namn": "bankavgift", "riktning": "ut", "referens_borjar_med": "AVG-",
-             "beskrivning_borjar_med": "BANK AVGIFT"},
+             "beskrivning_borjar_med": "BANK AVGIFT", "hogst_belopp_ore": 25000},
         ],
         "tidsfonster_dagar": {"leverantorsfaktura": 40, "kvitto": 3},
         "saknat_underlag_efter_dagar": 7,
@@ -91,6 +91,16 @@ def test_varfor_bankens_avgifter_inte_kraver_underlag_star_i_formatet():
     avgift = [regel for regel in data["kraver_inte_underlag"] if regel["namn"] == "bankavgift"][0]
     assert "inget underlag" in avgift["anteckning"] and "testdata/README.md" in avgift["anteckning"]
     assert "ska den här regeln tas bort" in avgift["anteckning"]
+
+
+def test_varfor_bankens_avgifter_har_gransen_250_kr_star_i_formatet():
+    # Hugos beslut 2026-10-25: gränsen för bankavgift är 250 kr, och anteckningen säger varför.
+    data = json.loads(MATCHNING_FIL.read_text(encoding="utf-8"))
+    avgift = [regel for regel in data["kraver_inte_underlag"] if regel["namn"] == "bankavgift"][0]
+    assert avgift["hogst_belopp_ore"] == 25000
+    for text in ("250 kr", "Hugo", "aldrig undantar en stor betalning", "125 och 199 kr", "'över gräns'"):
+        assert text in avgift["anteckning"], text
+    assert "oavsett belopp" not in avgift["anteckning"]  # den gamla varningen gäller inte längre
 
 
 def test_kontrollen_ger_en_ny_kopia_utan_anteckningar():
@@ -168,7 +178,7 @@ def test_trasiga_regler_stoppas(tmp_path, regel, text):
 
 def test_samma_regelnamn_tva_ganger_stoppas(tmp_path):
     stoppas(tmp_path, regler({"namn": "a", "riktning": "in", "referens_borjar_med": "A"},
-                             {"namn": "a", "riktning": "ut", "referens_borjar_med": "B"}),
+                             {"namn": "a", "riktning": "ut", "referens_borjar_med": "B", "hogst_belopp_ore": 1}),
             "regelnamnet 'a' står flera gånger")
 
 
@@ -187,7 +197,8 @@ def test_regler_som_kan_passa_samma_bankrad_stoppas(tmp_path, forsta, andra):
 
 
 @pytest.mark.parametrize("forsta, andra", [
-    ({"riktning": "in", "referens_borjar_med": "IN-"}, {"riktning": "ut", "referens_borjar_med": "IN-"}),
+    ({"riktning": "in", "referens_borjar_med": "IN-"}, {"riktning": "ut", "referens_borjar_med": "IN-",
+                                                        "hogst_belopp_ore": 1}),
     ({"riktning": "in", "referens_borjar_med": "IN-"}, {"riktning": "in", "referens_borjar_med": "UT-"}),
     ({"riktning": "in", "referens_borjar_med": "A", "beskrivning_borjar_med": "X"},
      {"riktning": "in", "referens_borjar_med": "A", "beskrivning_borjar_med": "Y"}),
@@ -196,6 +207,75 @@ def test_regler_som_kan_passa_samma_bankrad_stoppas(tmp_path, forsta, andra):
 def test_regler_som_aldrig_passar_samma_bankrad_godtas(tmp_path, forsta, andra):
     data = regler({"namn": "a", **forsta}, {"namn": "b", **andra})
     assert len(ladda_matchningsformat(skriv(tmp_path, data))["kraver_inte_underlag"]) == 2
+
+
+# --- Gränsen för regler för pengar ut (hogst_belopp_ore), Hugos beslut 2026-10-25 ---
+
+UT = {"namn": "a", "riktning": "ut", "beskrivning_borjar_med": "AVGIFT"}
+GRANSEN_TEXT = "'hogst_belopp_ore' ska vara ett heltal i öre, större än 0 och med högst 15 siffror, inte "
+
+
+def test_regel_for_pengar_ut_utan_grans_stoppas(tmp_path):
+    stoppas(tmp_path, regler(UT),
+            "regel nummer 1 i 'kraver_inte_underlag' saknar 'hogst_belopp_ore'. En regel för pengar ut ska ha en"
+            " högsta summa i öre per bankrad, så att den aldrig gäller obegränsat.")
+
+
+def test_testforetagets_regel_utan_grans_stoppas(tmp_path):
+    # Samma sak i testföretagets eget format: utan gränsen går det inte att läsa.
+    data = json.loads(MATCHNING_FIL.read_text(encoding="utf-8"))
+    del [regel for regel in data["kraver_inte_underlag"] if regel["namn"] == "bankavgift"][0]["hogst_belopp_ore"]
+    stoppas(tmp_path, data, "regel nummer 4 i 'kraver_inte_underlag' saknar 'hogst_belopp_ore'")
+
+
+@pytest.mark.parametrize("varde, visas", [
+    (True, "true eller false"), (False, "true eller false"), (1.5, "decimaltal"), (25000.0, "decimaltal"),
+    ("25000", "text"), (None, "null"), ([25000], "en lista"), ({"ore": 1}, "ett objekt"),
+])
+def test_gransen_av_fel_typ_stoppas(tmp_path, varde, visas):
+    stoppas(tmp_path, regler({**UT, "hogst_belopp_ore": varde}), GRANSEN_TEXT + visas + ".")
+
+
+@pytest.mark.parametrize("varde", [0, -1, -25000, -(10 ** 15 - 1)])
+def test_gransen_0_eller_negativ_stoppas(tmp_path, varde):
+    stoppas(tmp_path, regler({**UT, "hogst_belopp_ore": varde}), GRANSEN_TEXT + str(varde) + ".")
+
+
+@pytest.mark.parametrize("varde", [10 ** 15, 10 ** 15 + 1, 10 ** 30, 10 ** 5000, -10 ** 15])
+def test_gransen_med_fler_an_15_siffror_stoppas_nar_formatet_kommer_direkt(varde):
+    # Från filen stoppas ett så långt tal redan när JSON läses (nästa test). Ett format kan också
+    # skickas direkt till matcha_period, och då stoppar kontrollen av gränsen det. Talet skrivs inte ut.
+    with pytest.raises(MatchningsformatFel) as fel:
+        kontrollera_matchningsformat(regler({**UT, "hogst_belopp_ore": varde}))
+    assert str(fel.value) == ("Matchningsformatet, regel nummer 1 i 'kraver_inte_underlag': " + GRANSEN_TEXT
+                              + "ett heltal med fler än 15 siffror.")
+
+
+def test_gransen_med_fler_an_15_siffror_stoppas_i_filen(tmp_path):
+    fil = tmp_path / "matchning.json"
+    fil.write_text(json.dumps(regler({**UT, "hogst_belopp_ore": 1})).replace(
+        '"hogst_belopp_ore": 1', '"hogst_belopp_ore": ' + "9" * 16), encoding="utf-8")
+    with pytest.raises(MatchningsformatFel, match="innehåller ett heltal med 16 siffror"):
+        ladda_matchningsformat(fil)
+
+
+@pytest.mark.parametrize("varde", [1, 25000, 10 ** 15 - 1])
+def test_gransvarden_for_gransen_godtas(tmp_path, varde):
+    resultat = ladda_matchningsformat(skriv(tmp_path, regler({**UT, "hogst_belopp_ore": varde})))
+    assert resultat["kraver_inte_underlag"] == [{**UT, "hogst_belopp_ore": varde}]
+    assert type(resultat["kraver_inte_underlag"][0]["hogst_belopp_ore"]) is int
+
+
+def test_regel_for_pengar_in_far_inte_ha_en_grans(tmp_path):
+    # Bestämt i den här uppgiften: en gräns för pengar in används inte, och ska inte se ut som ett skydd.
+    for varde in (25000, 0, "x"):
+        stoppas(tmp_path, regler({"namn": "a", "riktning": "in", "referens_borjar_med": "IN-",
+                                  "hogst_belopp_ore": varde}),
+                "regel nummer 1 i 'kraver_inte_underlag' har 'hogst_belopp_ore', men gäller pengar in. En gräns"
+                " gäller bara regler med riktning 'ut'")
+    # Skydd: utan gränsen godtas samma regel.
+    assert ladda_matchningsformat(skriv(tmp_path, regler({"namn": "a", "riktning": "in",
+                                                          "referens_borjar_med": "IN-"})))["kraver_inte_underlag"]
 
 
 def test_nycklar_som_inte_ar_text_stoppas_nar_formatet_kommer_direkt():
