@@ -21,6 +21,15 @@ högst HELTAL_HOGST_SIFFROR siffror långa. Negativa tal stoppas: hur kreditnoto
 inte bestämt. En text får vara högst TEXT_HOGST_TECKEN tecken. En text som bara består av
 blanksteg och osynliga tecken räknas som tom.
 
+Förväxlingstecken (J1) är tecken som ser ut som andra tecken, till exempel ett kyrilliskt "А" som
+ser ut som ett latinskt "A". De kan dölja att två underlag är samma. Därför stoppas:
+
+- ett ord i motpart eller fakturanummer som blandar latinska bokstäver med bokstäver från ett
+  annat skriftsystem (till exempel kyrilliska eller grekiska). Ord helt på ett annat språk godtas,
+- ett fakturanummer med andra tecken än a–z, siffror, bindestreck, snedstreck, punkt och
+  understreck, efter normaliseringen för jämförelser (normalisering.py: blanksteg och osynliga
+  tecken räknas inte, alla sorters bindestreck räknas som "-", stora och små bokstäver är samma).
+
 Intern kontroll (K13): summan av underlag_ore och moms_ore över alla momsrader ska vara lika med
 belopp_ore. Eftersom varje underlag har minst en momsrad kontrolleras alla underlag så.
 
@@ -33,13 +42,17 @@ stoppas också, eftersom de blir riktiga tecken när filen har lästs.
 
 las_underlagsperiod är den enda offentliga funktionen. Den läser alla underlag i en mapp, var och
 en med alla kontroller ovan, stoppar perioden om två filer har samma id, och kör sedan K4 på
-underlagen med datum i perioden:
+underlagen med datum i perioden. Mappen får bara innehålla underlag, vanliga filer vars namn slutar
+på exakt FILANDELSE (J6). Allt annat stoppar perioden, till exempel en undermapp, en fil som heter
+".JSON", en symbolisk länk (länkar följs aldrig) eller en rörledning. Bara filerna i
+IGNORERADE_FILER hoppas över.
 
   K4: två underlag med samma motpart, fakturanummer, belopp_ore och datum är dubbletter. Motpart
-  och fakturanummer jämförs efter samma normalisering som kassans namn (stora och små bokstäver,
-  blanksteg och osynliga tecken räknas inte). Underlaget med lägst id behålls. De andra blir
-  ärenden, "dublett av <id>". Samma motpart och fakturanummer med ett annat belopp eller ett
-  annat datum är också ett ärende, eftersom det kan vara fel, men då behålls båda underlagen.
+  och fakturanummer jämförs efter normaliseringen för jämförelser (normalisering.py). Underlaget
+  med lägst id behålls. De andra blir ärenden, "dublett av <id>", med kontrollen K4.
+  K4a och K4b: samma motpart och fakturanummer med ett annat belopp (K4a) eller ett annat datum
+  (K4b) är också ett ärende, eftersom det kan vara fel, men då behålls båda underlagen. Skiljer
+  både beloppet och datumet är ärendet både K4a och K4b, och texten nämner båda.
 
 Resultatet är en Underlagsperiod, som inte går att ändra. Vid minsta fel i en fil stoppas hela
 perioden med ett UnderlagFilFel som pekar ut filen, och inget returneras.
@@ -51,6 +64,8 @@ och lämnar dem vidare oförändrade.
 import datetime as dt
 import hashlib
 import json
+import re
+import stat
 import unicodedata
 from pathlib import Path
 from types import MappingProxyType
@@ -61,12 +76,24 @@ from inlasning_skydd import (
 )
 from las_bank import kronor as _kronor
 from las_kassa import normalisera_kassaregister as _normalisera
+from normalisering import normalisera_for_jamforelse as _jamforbar
 
 # Underlagets form. Gemensam för alla företag.
 NYCKLAR = ("id", "typ", "datum", "motpart", "fakturanummer", "belopp_ore", "moms", "flaggor")
 MOMSRAD_NYCKLAR = ("momssats", "underlag_ore", "moms_ore")
 TYPER = ("leverantorsfaktura", "kvitto")
 FILANDELSE = ".json"
+# Filer i underlagsmappen som inte är underlag och hoppas över. macOS lägger .DS_Store i mappar som
+# har öppnats i Finder.
+IGNORERADE_FILER = (".DS_Store",)
+
+# Ett tecken som ett fakturanummer får innehålla efter normaliseringen för jämförelser (J1).
+_FAKTURANUMRETS_TECKEN = re.compile(r"[a-z0-9/._-]", re.ASCII)
+
+# Kontrollernas namn i K4:s ärenden (SPEC avsnitt 6).
+_K4 = "K4"     # dublett
+_K4A = "K4a"   # samma motpart och fakturanummer, olika belopp
+_K4B = "K4b"   # samma motpart och fakturanummer, olika datum
 
 # Gränser som skyddar mot trasiga filer. De gäller alla företag och ligger därför här. Ett
 # underlag är några hundra byte, så 1 MB ger mycket god marginal. Femton siffror räcker till
@@ -221,6 +248,48 @@ def _kontrollera_text(varde, vad, var, filsort):
     return varde
 
 
+def _tecken_med_namn(tecken):
+    """Ett tecken för ett felmeddelande: koden och namnet, till exempel "U+0410 (CYRILLIC CAPITAL LETTER A)"."""
+    return "U+" + format(ord(tecken), "04X") + " (" + unicodedata.name(tecken, "utan namn") + ")"
+
+
+def _skriftsystem(bokstav):
+    """Skriftsystemet för en bokstav, ur tecknets namn i Unicode: till exempel LATIN, CYRILLIC eller GREEK.
+
+    Python har inget eget sätt att slå upp skriftsystemet. Namnets första ord räcker här: en bokstav
+    vars namn inte börjar med LATIN räknas som ett annat skriftsystem.
+    """
+    return unicodedata.name(bokstav, "").split(" ")[0]
+
+
+def _inga_blandade_ord(text, vad, var, filsort):
+    """Inget ord i texten får blanda latinska bokstäver med bokstäver från ett annat skriftsystem (J1).
+
+    Texten Unicode-normaliseras först (NFKC), så att till exempel fullbreddsbokstäver räknas som latinska.
+    """
+    for ord_ in unicodedata.normalize("NFKC", text).split():
+        bokstaver = [tecken for tecken in ord_ if unicodedata.category(tecken).startswith("L")]
+        andra = [tecken for tecken in bokstaver if _skriftsystem(tecken) != "LATIN"]
+        if andra and len(andra) < len(bokstaver):
+            raise filsort.fel(
+                var + ": " + vad + " har ordet " + _visa(ord_) + ", som blandar latinska bokstäver med bokstaven "
+                + _tecken_med_namn(andra[0]) + " från ett annat skriftsystem. En sådan bokstav kan se ut precis som"
+                " en latinsk bokstav och dölja att två underlag är samma (en dublett)."
+            )
+
+
+def _kontrollera_fakturanumrets_tecken(fakturanummer, var, filsort):
+    """Efter normaliseringen för jämförelser får fakturanumret bara ha a–z, siffror, -, /, . och _ (J1)."""
+    for tecken in fakturanummer:
+        if not all(_FAKTURANUMRETS_TECKEN.fullmatch(del_) for del_ in _jamforbar(tecken)):
+            raise filsort.fel(
+                var + ": 'fakturanummer' innehåller tecknet " + _tecken_med_namn(tecken) + ". Ett fakturanummer får"
+                " bara innehålla bokstäverna a–z, siffror, bindestreck, snedstreck, punkt och understreck."
+                " Blanksteg och osynliga tecken räknas inte, och alla sorters bindestreck räknas som '-'. Andra"
+                " tecken kan se ut som vanliga tecken och dölja att två underlag är samma (en dublett)."
+            )
+
+
 def _kontrollera_heltal(varde, vad, var, filsort):
     """Ett heltal i JSON som inte är negativt. Decimaltal, text, true/false och null stoppas."""
     # type() i stället för isinstance(), eftersom True och False räknas som heltal i Python.
@@ -305,6 +374,9 @@ def _kontrollera_underlag(data, var, filsort):
         "moms": _kontrollera_momsrader(data["moms"], var, filsort),
         "flaggor": _kontrollera_flaggor(data["flaggor"], var, filsort),
     }
+    _inga_blandade_ord(underlag["motpart"], "'motpart'", var, filsort)
+    _inga_blandade_ord(underlag["fakturanummer"], "'fakturanummer'", var, filsort)
+    _kontrollera_fakturanumrets_tecken(underlag["fakturanummer"], var, filsort)
     _kontroll_summa(underlag, var, filsort)
     return underlag
 
@@ -339,8 +411,27 @@ def _las_underlagsfil(sokvag):
 
 # --- En hel period ---
 
+def _vad_det_ar(lage):
+    """Vad något i underlagsmappen är, för felmeddelandet. lage är st_mode från lstat."""
+    if stat.S_ISDIR(lage):
+        return "är en mapp, inte en fil"
+    if stat.S_ISLNK(lage):
+        return "är en symbolisk länk (en genväg till en annan fil eller mapp). Länkar följs aldrig"
+    if stat.S_ISFIFO(lage):
+        return "är en rörledning (FIFO), inte en vanlig fil"
+    if stat.S_ISREG(lage):
+        return "slutar inte på exakt " + repr(FILANDELSE) + " (stora och små bokstäver räknas)"
+    return "är inte en vanlig fil"
+
+
 def _underlagsfiler(mapp):
-    """Sökvägarna till alla .json-filer direkt i mappen, i namnordning. Undermappar gås inte igenom."""
+    """Sökvägarna till underlagen direkt i mappen, i namnordning.
+
+    Mappen får bara innehålla vanliga filer vars namn slutar på exakt FILANDELSE, utom
+    IGNORERADE_FILER. Allt annat stoppar perioden (J6). Varje sak i mappen undersöks med lstat, som
+    inte följer symboliska länkar och inte öppnar något, så att en rörledning inte får inläsningen
+    att stanna.
+    """
     if not _ar_sokvag(mapp):
         raise UnderlagFilFel("Underlagsperioden: " + _sokvagens_typ(mapp))
     mapp = Path(mapp)
@@ -354,7 +445,25 @@ def _underlagsfiler(mapp):
         raise UnderlagFilFel(
             "Underlagsperioden: mappen " + str(mapp) + " går inte att läsa (" + (fel.strerror or str(fel)) + ")."
         ) from None
-    return [mapp / filnamn for filnamn in sorted(namn) if filnamn.endswith(FILANDELSE)]
+    sokvagar = []
+    for filnamn in sorted(namn):
+        if filnamn in IGNORERADE_FILER:
+            continue
+        try:
+            lage = (mapp / filnamn).lstat().st_mode
+        except OSError as fel:
+            raise UnderlagFilFel(
+                "Underlagsperioden stoppas: " + repr(filnamn) + " i mappen " + str(mapp) + " går inte att undersöka ("
+                + (fel.strerror or str(fel)) + ")."
+            ) from None
+        if not (stat.S_ISREG(lage) and filnamn.endswith(FILANDELSE)):
+            raise UnderlagFilFel(
+                "Underlagsperioden stoppas: " + repr(filnamn) + " i mappen " + str(mapp) + " " + _vad_det_ar(lage)
+                + ". Mappen får bara innehålla underlag: vanliga filer vars namn slutar på exakt " + repr(FILANDELSE)
+                + ". Flytta det andra till en annan mapp, så att inget underlag hoppas över utan att det märks."
+            )
+        sokvagar.append(mapp / filnamn)
+    return sokvagar
 
 
 def _periodens_datum(datum, namn):
@@ -384,31 +493,37 @@ def _inga_dubbla_id(alla):
         sedda[normaliserat] = underlag["id"]
 
 
-def _arende(underlag, text, jamfort_med):
-    return {"kontroll": "K4", "id": underlag["id"], "text": text, "jamfort_med": jamfort_med["id"]}
+def _arende(underlag, kontroll, text, jamfort_med):
+    return {"kontroll": kontroll, "id": underlag["id"], "text": text, "jamfort_med": jamfort_med["id"]}
 
 
 def _kontroll_k4(underlag):
-    """K4: dubbletter. underlag ska vara sorterade efter id. Returnerar (underlagen som behålls, ärenden).
+    """K4, K4a och K4b. underlag ska vara sorterade efter id. Returnerar (underlagen som behålls, ärenden).
 
-    Samma motpart, fakturanummer, belopp och datum är en dublett av det första av dem (lägst id),
-    och tas inte med. Samma motpart och fakturanummer men ett annat belopp eller datum blir ett
-    ärende, och båda underlagen behålls.
+    Samma motpart, fakturanummer, belopp och datum är en dublett (K4) av det första av dem (lägst
+    id), och tas inte med. Samma motpart och fakturanummer men ett annat belopp (K4a) eller datum
+    (K4b) blir ett ärende, och båda underlagen behålls. Motpart och fakturanummer jämförs efter
+    normaliseringen för jämförelser (J1).
     """
     behallna, arenden = [], []
     per_faktura = {}  # (motpart, fakturanummer), normaliserade -> underlag som behålls
     for post in underlag:
-        tidigare = per_faktura.setdefault((_normalisera(post["motpart"]), _normalisera(post["fakturanummer"])), [])
+        tidigare = per_faktura.setdefault((_jamforbar(post["motpart"]), _jamforbar(post["fakturanummer"])), [])
         original = [annan for annan in tidigare
                     if annan["belopp_ore"] == post["belopp_ore"] and annan["datum"] == post["datum"]]
         if original:
-            arenden.append(_arende(post, "dublett av " + original[0]["id"], original[0]))
+            arenden.append(_arende(post, _K4, "dublett av " + original[0]["id"], original[0]))
             continue
         if tidigare:
-            if tidigare[0]["belopp_ore"] != post["belopp_ore"]:
-                arenden.append(_arende(post, "samma fakturanummer, olika belopp", tidigare[0]))
+            forsta = tidigare[0]
+            olika_belopp = forsta["belopp_ore"] != post["belopp_ore"]
+            if olika_belopp and forsta["datum"] != post["datum"]:
+                arenden.append(_arende(post, _K4A + " och " + _K4B, "samma fakturanummer, olika belopp och datum",
+                                       forsta))
+            elif olika_belopp:
+                arenden.append(_arende(post, _K4A, "samma fakturanummer, olika belopp", forsta))
             else:
-                arenden.append(_arende(post, "samma fakturanummer, olika datum", tidigare[0]))
+                arenden.append(_arende(post, _K4B, "samma fakturanummer, olika datum", forsta))
         tidigare.append(post)
         behallna.append(post)
     return behallna, arenden
@@ -490,8 +605,10 @@ class Underlagsperiod:
 def las_underlagsperiod(mapp, fran_datum, till_datum):
     """Läser underlagen i mappen med datum från fran_datum till till_datum, gränserna medräknade.
 
-    Alla .json-filer direkt i mappen läses, var och en med alla kontroller, även de med datum utanför
-    perioden: datumet står i filen, och en trasig fil kan inte ha ett datum som går att lita på. Två
+    Mappen får bara innehålla underlag, vanliga filer som slutar på exakt FILANDELSE (utom
+    IGNORERADE_FILER). Annat stoppar perioden. Alla underlag i mappen läses, var och en med alla
+    kontroller, även de med datum utanför perioden: datumet står i filen, och en trasig fil kan inte
+    ha ett datum som går att lita på. Två
     filer med samma id stoppar perioden. Sedan körs K4 på underlagen i perioden. Minsta fel stoppar
     hela perioden med UnderlagFilFel, och inget returneras.
 

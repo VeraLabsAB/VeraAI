@@ -35,6 +35,12 @@ GRUPPER_FOR_BANKRADER = ("matchningar", "arenden", "kraver_inte_underlag", "vant
 # Osynliga tecken byggs med chr(), så att de syns i koden (test_inga_dolda_tecken.py).
 OSYNLIGT_MELLANSLAG = chr(0x200B)
 HOGER_TILL_VANSTER = chr(0x202E)
+# Förväxlingstecken (J1), också med chr(), så att det syns vilket tecken som används.
+BINDESTRECK = chr(0x2010)
+TANKSTRECK = chr(0x2013)
+MINUSTECKEN = chr(0x2212)
+KYRILLISKT_A = chr(0x0410)
+KYRILLISKT_GHE = chr(0x0492)  # liknar F
 
 
 def facit():
@@ -109,17 +115,37 @@ def test_kvartalet_ger_exakt_det_planterade_felet_som_saknat_underlag(kvartalet)
     assert planterat("bankrad_utan_underlag")["kontroll"] == arende["kontroll"]
 
 
-def test_kvartalet_fore_sju_dagar_ger_inget_arende_bara_att_raden_vantar(kvartalet):
+def februari_till_och_med_rad(kvartalet, mapp, radnr):
+    """Februarifilen fram till och med raden radnr, som om bedömningen görs innan resten av månaden
+    finns på banken. Läses med las_bankfil: ingående saldo som februari, utgående saldo efter raden."""
+    rader = (DATAMAPP / "bank_2025-02.csv").read_text(encoding="utf-8").split("\n")
+    assert rader[radnr].startswith(str(radnr) + ",") and rader[radnr + 1].startswith(str(radnr + 1) + ",")
+    fil = mapp / "bank_2025-02_del.csv"
+    fil.write_text("\n".join(rader[:radnr + 1]) + "\n", encoding="utf-8")
+    februari = kvartalet["februari"]
+    return las_bankfil(fil, BANKFORMAT, februari.ingaende_saldo_ore, februari.rader[radnr - 1]["saldo_efter_ore"])
+
+
+def test_kvartalet_fore_sju_dagar_ger_inget_arende_bara_att_raden_vantar(kvartalet, tmp_path):
     rad = bankrad_utan_underlag(kvartalet)
+    # Ett bedömningsdatum före en bankrad stoppas (J9). Därför används februari fram till och med
+    # rad 85, så som banken såg ut då. Den sista transaktionsdagen i den delen är 2025-02-19.
+    del_ = februari_till_och_med_rad(kvartalet, tmp_path, rad["radnr"])
+    assert max(r["transaktionsdag"] for r in del_.rader) == "2025-02-19"
     # 7 dagar efter transaktionsdagen 2025-02-18: inte mer än 7 dagar, så raden väntar.
-    for dag in ("2025-02-18", "2025-02-20", "2025-02-25"):
-        resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], MATCHNINGSFORMAT, dag)
+    for dag in ("2025-02-19", "2025-02-20", "2025-02-25"):
+        resultat = matcha_period(del_, kvartalet["period"], MATCHNINGSFORMAT, dag)
         assert resultat.arenden == (), dag
-        assert [(dict(post["bankrad"]), post["arende_efter"]) for post in resultat.vantande] == [(rad, "2025-02-25")]
+        # Samma rad (id:t beror bara på radens innehåll), men ur en annan fil, så kalla_fil skiljer.
+        assert [(post["bankrad"]["id"], post["bankrad"]["radnr"], post["arende_efter"]) for post in resultat.vantande
+                ] == [(rad["id"], 85, "2025-02-25")]
     # Dagen efter blir den ett ärende.
-    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], MATCHNINGSFORMAT, "2025-02-26")
+    resultat = matcha_period(del_, kvartalet["period"], MATCHNINGSFORMAT, "2025-02-26")
     assert [(a["typ"], a["bankrad"]["id"]) for a in resultat.arenden] == [("saknat underlag", rad["id"])]
     assert resultat.vantande == ()
+    # Hela kvartalet med samma bedömningsdatum stoppas: där finns bankrader efter 2025-02-26.
+    with pytest.raises(MatchningFel, match="^Bedömningsdatumet 2025-02-26 ligger före transaktionsdagen"):
+        matcha_period(kvartalet["bankperiod"], kvartalet["period"], MATCHNINGSFORMAT, "2025-02-26")
 
 
 def test_dubbletten_kommer_fran_k4_och_inte_fran_matchningen(kvartalet):
@@ -178,7 +204,8 @@ def kontrollera_grupperna(resultat, bankperiod, period):
 
 def test_varje_bankrad_i_testdatan_finns_i_exakt_en_grupp(kvartalet):
     assert len(kvartalet["rader"]) == sum(manad["antal_rader"] for manad in facit()["bank"].values()) == 395
-    for dag in ("2025-01-01", "2025-02-25", "2025-02-26", "2025-03-31", "2025-04-30"):
+    # Bedömningsdatumen ligger på eller efter den sista bankraden (2025-03-31), annars stoppas de (J9).
+    for dag in ("2025-03-31", "2025-04-07", "2025-04-08", "2025-04-30", "9999-12-31"):
         resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], MATCHNINGSFORMAT, dag)
         kontrollera_grupperna(resultat, kvartalet["bankperiod"], kvartalet["period"])
 
@@ -345,7 +372,7 @@ def test_tidsfonstret_galler_transaktionsdagen_inte_bokforingsdagen(tmp_path):
 def test_saknat_underlag_blir_arende_forst_efter_antalet_dagar_i_formatet(tmp_path):
     rader = bankrader(tmp_path, ("X-1", "OKAND", -100, "2025-03-01"))
     underlagen = period(tmp_path)
-    for dag in ("2025-02-01", "2025-03-01", "2025-03-08"):  # 2025-03-08 är 7 dagar efter
+    for dag in ("2025-03-01", "2025-03-08"):  # 2025-03-08 är 7 dagar efter
         assert sammanfattning(matcha(rader, underlagen, dag)) == tomt(vantande=[(1, "2025-03-08")]), dag
     assert sammanfattning(matcha(rader, underlagen, "2025-03-09")) == tomt(arenden=[(1, "saknat underlag", ())])
     # Med 0 dagar i formatet blir raden ett ärende redan dagen efter.
@@ -384,13 +411,14 @@ def test_tvetydigt_tva_lika_underlag_och_en_bankrad(tmp_path):
 def test_fakturanumret_avgor_nar_flera_underlag_passar(tmp_path):
     # Som telefonfakturorna i testdatan: samma belopp varje månad, och betalningen ligger i båda
     # fakturornas tidsfönster. Fakturanumret i referensen säger vilken som betalas.
-    underlagen = period(tmp_path, underlag(), underlag(id="U-2", fakturanummer="F-2", datum="2025-02-09"))
+    underlagen = period(tmp_path, underlag(fakturanummer="F-1001"),
+                        underlag(id="U-2", fakturanummer="F-1002", datum="2025-02-09"))
     for referens, resultat in [
-        ("F-2", tomt(matchningar=[(1, "U-2")], oavstamda=["U-1"])),
-        ("f-2", tomt(matchningar=[(1, "U-2")], oavstamda=["U-1"])),            # normaliseras som motparten
-        ("F-1", tomt(matchningar=[(1, "U-1")], oavstamda=["U-2"])),
-        ("F-2X", tomt(arenden=[(1, "tvetydig", ("U-1", "U-2"))], oavstamda=["U-1", "U-2"])),  # inte hela ord
-        ("F-1 F-2", tomt(arenden=[(1, "tvetydig", ("U-1", "U-2"))], oavstamda=["U-1", "U-2"])),
+        ("F-1002", tomt(matchningar=[(1, "U-2")], oavstamda=["U-1"])),
+        ("f-1002", tomt(matchningar=[(1, "U-2")], oavstamda=["U-1"])),        # stora och små bokstäver
+        ("F-1001", tomt(matchningar=[(1, "U-1")], oavstamda=["U-2"])),
+        ("F-1002X", tomt(arenden=[(1, "tvetydig", ("U-1", "U-2"))], oavstamda=["U-1", "U-2"])),  # inte hela ord
+        ("F-1001 F-1002", tomt(arenden=[(1, "tvetydig", ("U-1", "U-2"))], oavstamda=["U-1", "U-2"])),
     ]:
         rader = bankrader(tmp_path, (referens, "LEV-A", -12500, "2025-02-09"))
         assert sammanfattning(matcha(rader, underlagen)) == resultat, referens
@@ -399,11 +427,140 @@ def test_fakturanumret_avgor_nar_flera_underlag_passar(tmp_path):
 def test_fakturanumret_avgor_bara_nar_det_pekar_ut_exakt_ett_underlag(tmp_path):
     # Tre kandidater, och två fakturanummer står i texten. Fakturanumret avgör inte, och människan
     # får se alla tre kandidaterna i ärendet.
-    underlagen = period(tmp_path, underlag(), underlag(id="U-2", fakturanummer="F-2"),
-                        underlag(id="U-3", fakturanummer="F-3"))
-    rader = bankrader(tmp_path, ("F-1 F-2", "LEV-A", -12500, "2025-01-20"))
+    underlagen = period(tmp_path, underlag(fakturanummer="F-1001"), underlag(id="U-2", fakturanummer="F-1002"),
+                        underlag(id="U-3", fakturanummer="F-1003"))
+    rader = bankrader(tmp_path, ("F-1001 F-1002", "LEV-A", -12500, "2025-01-20"))
     assert sammanfattning(matcha(rader, underlagen)) == tomt(
         arenden=[(1, "tvetydig", ("U-1", "U-2", "U-3"))], oavstamda=["U-1", "U-2", "U-3"])
+
+
+# --- J2: när fakturanumret får avgöra ---
+
+def tva_fakturor(tmp_path, forsta, andra, motpart="LEV-A"):
+    """Två fakturor från samma motpart med samma belopp, som båda passar en betalning 2025-01-20."""
+    return period(tmp_path, underlag(fakturanummer=forsta, motpart=motpart),
+                  underlag(id="U-2", fakturanummer=andra, motpart=motpart))
+
+
+TVETYDIG = tomt(arenden=[(1, "tvetydig", ("U-1", "U-2"))], oavstamda=["U-1", "U-2"])
+
+
+def betalar(id_):
+    """Resultatet när bankraden matchas med underlaget id_ och det andra är oavstämt."""
+    return tomt(matchningar=[(1, id_)], oavstamda=[{"U-1": "U-2", "U-2": "U-1"}[id_]])
+
+
+@pytest.mark.parametrize("referens, beskrivning, forvantat", [
+    ("F-1001", "LEV-A", "U-1"),
+    ("BET F-1001", "LEV-A", "U-1"),                    # ett ord av flera
+    ("f" + TANKSTRECK + "1001", "LEV-A", "U-1"),       # annat bindestreck och små bokstäver (J1)
+    ("F" + MINUSTECKEN + "1001", "LEV-A", "U-1"),
+    ("BETALNING", "LEV-A F-1002", "U-2"),              # i beskrivningen (J8)
+    ("F-1001X", "LEV-A", None),                        # en del av ett längre ord
+    ("XF-1001", "LEV-A", None),
+    ("F-10011", "LEV-A", None),                        # en del av ett längre nummer
+    ("F-1001/2", "LEV-A", None),
+    ("F-1001.", "LEV-A", None),
+    ("F - 1001", "LEV-A", None),                       # uppdelat på flera ord
+    ("F-10 01", "LEV-A", None),
+])
+def test_fakturanumret_avgor_bara_som_ett_helt_ord(tmp_path, referens, beskrivning, forvantat):
+    # J2: fakturanumret ska stå som ett eget ord i bankradens referens eller beskrivning, inte som en
+    # del av ett längre ord eller nummer och inte uppdelat på flera ord.
+    underlagen = tva_fakturor(tmp_path, "F-1001", "F-1002")
+    rader = bankrader(tmp_path, (referens, beskrivning, -12500, "2025-01-20"))
+    assert sammanfattning(matcha(rader, underlagen)) == (betalar(forvantat) if forvantat else TVETYDIG)
+
+
+def test_fakturanumret_i_beskrivningen_avgor(tmp_path):
+    # J8: förut prövade inget test att fakturanumret också söks i beskrivningen.
+    underlagen = tva_fakturor(tmp_path, "F-1001", "F-1002")
+    for beskrivning, forvantat in [("LEV-A F-1002", "U-2"), ("F-1001 LEV-A", "U-1"), ("LEV-A", None)]:
+        rader = bankrader(tmp_path, ("BETALNING 5555", beskrivning, -12500, "2025-01-20"))
+        assert sammanfattning(matcha(rader, underlagen)) == (betalar(forvantat) if forvantat else TVETYDIG), beskrivning
+
+
+def test_kort_fakturanummer_avgor_inte(tmp_path):
+    # J2, granskarens fall: fakturorna 10 och 11, och bankradens beskrivning råkar innehålla "10".
+    underlagen = tva_fakturor(tmp_path, "10", "11")
+    rader = bankrader(tmp_path, ("BETALNING", "LEV-A 10 ST", -12500, "2025-01-20"))
+    assert sammanfattning(matcha(rader, underlagen)) == TVETYDIG
+
+
+@pytest.mark.parametrize("forsta, andra, forvantat", [
+    ("F-12", "F-13", None),        # fyra tecken: avgör inte
+    ("F-123", "F-124", "U-1"),     # fem tecken: avgör
+    ("F" + chr(0x00AD) + "-12", "F-13", None),  # ett osynligt tecken räknas inte
+])
+def test_fakturanumret_ska_ha_minst_fem_tecken(tmp_path, forsta, andra, forvantat):
+    underlagen = tva_fakturor(tmp_path, forsta, andra)
+    rader = bankrader(tmp_path, (forsta, "LEV-A", -12500, "2025-01-20"))
+    assert sammanfattning(matcha(rader, underlagen)) == (betalar(forvantat) if forvantat else TVETYDIG)
+
+
+@pytest.mark.parametrize("forsta, motpart, forvantat", [
+    ("LEV-A", "LEV-A", None),                          # fakturanumret är motpartens namn (granskarens fall)
+    ("V-ALFA", "LEV-ALFA", None),                      # en del av motpartens namn
+    ("lev" + TANKSTRECK + "alfa", "LEV-ALFA", None),   # samma som namnet efter normaliseringen
+    ("V-BETA", "LEV-ALFA", "U-1"),                     # skydd: ett annat ord avgör
+])
+def test_fakturanummer_som_ar_motpartens_namn_avgor_inte(tmp_path, forsta, motpart, forvantat):
+    # J2: motpartens namn står alltid i bankradens text, så ett fakturanummer som är (en del av)
+    # namnet säger inget om vilken faktura som betalas.
+    underlagen = tva_fakturor(tmp_path, forsta, "F-2002", motpart=motpart)
+    rader = bankrader(tmp_path, (forsta, motpart, -12500, "2025-01-20"))
+    assert sammanfattning(matcha(rader, underlagen)) == (betalar(forvantat) if forvantat else TVETYDIG)
+
+
+@pytest.mark.parametrize("forsta, andra, referens, forvantat", [
+    ("4711", "ABC-DE-4711", "ABC DE 4711", None),        # granskarens fall
+    ("DE-4711", "ABC-DE-4711", "BET DE-4711", None),     # en del av det andra numret
+    ("DE-4711", "ABC-DE-4711", "ABC-DE-4711", "U-2"),    # det längre numret avgör
+    ("DE-4711", "XY-4712", "BET DE-4711", "U-1"),        # skydd: inte en del av det andra
+])
+def test_fakturanummer_som_ar_en_del_av_ett_annat_avgor_inte(tmp_path, forsta, andra, referens, forvantat):
+    # J2: ett nummer som står inuti en annan kandidats nummer kan vara en del av det numret.
+    underlagen = tva_fakturor(tmp_path, forsta, andra)
+    rader = bankrader(tmp_path, (referens, "LEV-A", -12500, "2025-01-20"))
+    assert sammanfattning(matcha(rader, underlagen)) == (betalar(forvantat) if forvantat else TVETYDIG)
+
+
+def test_samma_fakturanummer_pa_tva_kandidater_avgor_inte(tmp_path):
+    # Som K4b: samma fakturanummer två gånger, med olika datum. Numret pekar inte ut en av dem.
+    underlagen = period(tmp_path, underlag(fakturanummer="F-1001"),
+                        underlag(id="U-2", fakturanummer="F-1001", datum="2025-01-11"))
+    assert [a["kontroll"] for a in underlagen.arenden] == ["K4b"]
+    rader = bankrader(tmp_path, ("F-1001", "LEV-A", -12500, "2025-01-20"))
+    assert sammanfattning(matcha(rader, underlagen)) == TVETYDIG
+
+
+# --- J1: en dubblett med förväxlingstecken blir aldrig ett oavstämt underlag utan ärende ---
+
+@pytest.mark.parametrize("andrat, stoppas", [
+    ({"fakturanummer": "F" + BINDESTRECK + "1"}, False),
+    ({"fakturanummer": "F" + TANKSTRECK + "1"}, False),
+    ({"fakturanummer": "F" + MINUSTECKEN + "1"}, False),
+    ({"fakturanummer": " F  -  1"}, False),
+    ({"fakturanummer": "F-1" + OSYNLIGT_MELLANSLAG}, False),
+    ({"motpart": "LEV" + TANKSTRECK + "A"}, False),
+    ({"motpart": "LEV-" + KYRILLISKT_A}, True),
+    ({"fakturanummer": KYRILLISKT_GHE + "-1"}, True),
+    ({"fakturanummer": "F-" + KYRILLISKT_A}, True),
+], ids=["bindestreck", "tankstreck", "minustecken", "blanksteg", "osynligt", "motpart_tankstreck",
+        "motpart_kyrilliskt_a", "fakturanummer_kyrilliskt", "fakturanummer_blandat"])
+def test_dublett_med_forvaxlingstecken_blir_aldrig_oavstamd_utan_arende(tmp_path, andrat, stoppas):
+    # J1 (hög): förut fångades dubbletten varken av K4 eller av matchningen. Fakturanummerregeln
+    # matchade originalet, och dubbletten blev ett oavstämt underlag, som en obetald faktura, utan
+    # något ärende. Nu blir den ett K4-ärende, eller så stoppas underlaget med ett tydligt fel.
+    rader = bankrader(tmp_path, ("F-1", "LEV-A", -12500, "2025-01-20"))
+    if stoppas:
+        with pytest.raises(UnderlagFilFel, match="Underlaget 'U-2.json' stoppas: 'motpart|Underlaget 'U-2.json' stoppas: 'fakturanummer"):
+            period(tmp_path, underlag(), underlag(id="U-2", **andrat))
+        return
+    underlagen = period(tmp_path, underlag(), underlag(id="U-2", **andrat))
+    assert [(a["kontroll"], a["id"], a["text"]) for a in underlagen.arenden] == [("K4", "U-2", "dublett av U-1")]
+    resultat = matcha(rader, underlagen)
+    assert sammanfattning(resultat) == tomt(matchningar=[(1, "U-1")])  # U-2 finns inte bland de oavstämda
 
 
 def test_fakturanumret_ensamt_racker_inte(tmp_path):
@@ -635,6 +792,65 @@ def test_bedomningsdatum_ska_vara_ett_giltigt_datum(tmp_path, varde):
         matcha_period(en_rad(tmp_path), period(tmp_path), FORMAT, varde)
 
 
+def test_bedomningsdatum_fore_en_bankrad_stoppas(tmp_path):
+    # J9: en bedömning kan inte göras innan bankraden finns. Förut godtogs det, och raden väntade.
+    rader = bankrader(tmp_path, ("F-1", "LEV-A", -12500, "2025-01-20"), ("X-1", "GOR SA HAR", -100, "2025-03-01"))
+    underlagen = period(tmp_path, underlag())
+    for dag in ("2025-02-28", "2025-01-19", "0001-01-01"):
+        with pytest.raises(MatchningFel) as fel:
+            matcha_period(rader, underlagen, FORMAT, dag)
+        assert str(fel.value).startswith(
+            "Bedömningsdatumet " + dag + " ligger före transaktionsdagen 2025-03-01 för bankraden med radnummer 2"
+            if dag == "2025-02-28" else "Bedömningsdatumet " + dag + " ligger före transaktionsdagen 2025-01-20 för"
+            " bankraden med radnummer 1"), str(fel.value)
+        assert "GOR SA HAR" not in str(fel.value)  # inga texter ur bankraden
+    # Skydd: samma dag som den sista bankraden godtas.
+    assert sammanfattning(matcha(rader, underlagen, "2025-03-01")) == tomt(
+        matchningar=[(1, "U-1")], vantande=[(2, "2025-03-08")])
+
+
+def test_fler_an_20_000_bankrader_stoppas(tmp_path):
+    # J5: matchningen tar tid som växer med antalet i kvadrat. Tills den har gjorts snabbare tar den
+    # högst 20 000 bankrader och 20 000 underlag åt gången.
+    rader = [("IN-" + str(nummer), "X", 1, "2025-01-20") for nummer in range(20_001)]
+    for_manga = bankrader(tmp_path, *rader)
+    with pytest.raises(MatchningFel, match="^Matchningen stoppas: det finns 20 001 bankrader, men matchningen tar"
+                                           " högst 20 000 åt gången"):
+        matcha_period(for_manga, period(tmp_path), FORMAT, "2025-12-31")
+    precis = bankrader(tmp_path, *rader[:20_000])
+    assert len(matcha_period(precis, period(tmp_path), FORMAT, "2025-12-31").kraver_inte_underlag) == 20_000
+    assert matcha_bank._HOGST_ANTAL == 20_000  # samma gräns gäller underlagen (nästa test)
+
+
+def test_fler_underlag_an_gransen_stoppas(tmp_path, monkeypatch):
+    # J5 för underlagen, med en lägre gräns så att testet går fort. Gränsen själv prövas ovan.
+    # raising=False: testet ska kunna köras mot koden före rättelsen, där gränsen inte finns.
+    monkeypatch.setattr(matcha_bank, "_HOGST_ANTAL", 3, raising=False)
+    rader = bankrader(tmp_path, ("IN-1", "X", 1, "2025-01-20"))
+    poster = [underlag(id="U-" + str(nummer), fakturanummer="F-" + str(nummer)) for nummer in range(1, 5)]
+    with pytest.raises(MatchningFel, match="^Matchningen stoppas: det finns 4 underlag, men matchningen tar högst 3"):
+        matcha_period(rader, period(tmp_path, *poster), FORMAT, "2025-12-31")
+    tre = tmp_path / "tre"
+    tre.mkdir()
+    assert len(matcha(rader, period(tre, *poster[:3])).oavstamda_underlag) == 3  # exakt på gränsen godtas
+    fyra_rader = bankrader(tmp_path, *[("IN-" + str(nummer), "X", 1, "2025-01-20") for nummer in range(4)])
+    with pytest.raises(MatchningFel, match="^Matchningen stoppas: det finns 4 bankrader"):
+        matcha_period(fyra_rader, period(tre), FORMAT, "2025-12-31")
+
+
+def test_tom_bankperiod_eller_underlagsperiod_ger_matchningfel(tmp_path):
+    # J7: en period som skapas med __new__, utan las_bankfil eller las_underlagsperiod, saknar sitt
+    # innehåll. Förut gav det AttributeError i stället för MatchningFel.
+    rader = en_rad(tmp_path)
+    underlagen = period(tmp_path, underlag())
+    with pytest.raises(MatchningFel, match="^Bankperioden är tom eller trasig: den har inte skapats av las_bankfil"
+                                           " eller sla_ihop_bankperioder"):
+        matcha_period(Bankperiod.__new__(Bankperiod), underlagen, FORMAT, "2025-12-31")
+    with pytest.raises(MatchningFel, match="^Underlagsperioden är tom eller trasig: den har inte skapats av"
+                                           " las_underlagsperiod"):
+        matcha_period(rader, Underlagsperiod.__new__(Underlagsperiod), FORMAT, "2025-12-31")
+
+
 def test_datumets_form_kontrolleras_aven_med_nyare_python(tmp_path, monkeypatch):
     # Python 3.9 godtar bara ÅÅÅÅ-MM-DD i date.fromisoformat. Python 3.11 och senare godtar fler
     # skrivsätt, till exempel 20251231. Här efterliknas det, så att testet visar att formen
@@ -850,6 +1066,7 @@ def ar_giltigt(resultat, bankperiod, underlagen, format_, bedomning):
     """Ett resultat ska alltid följa reglerna i matcha_bank.py."""
     format_ = kontrollera_matchningsformat(format_)
     kontrollera_grupperna(resultat, bankperiod, underlagen)
+    assert all(rad["transaktionsdag"] <= bedomning for rad in bankperiod.rader)  # annars stoppas den (J9)
     dag = dt.date.fromisoformat(bedomning)
     for matchning in resultat.matchningar:
         rad, post = matchning["bankrad"], matchning["underlag"]
@@ -928,7 +1145,9 @@ def test_fuzz_skadade_indata_ger_ratt_resultat_eller_matchningfel(tmp_path, kvar
             elif val < 0.85 and isinstance(format_, dict) and isinstance(format_.get("kraver_inte_underlag"), list) \
                     and isinstance(format_.get("tidsfonster_dagar"), dict):
                 format_ = skada_format(rng, format_)
-        bedomning = rng.choice(["2025-01-25", "2025-02-28", "2025-04-30", "9999-12-31", "2025-13-01", None])
+        # Ett bedömningsdatum före en bankrad stoppas (J9), så de flesta datum ligger efter raderna.
+        bedomning = rng.choice(["2025-01-25", "2025-02-28", "2025-03-31", "2025-04-30", "2025-04-30", "9999-12-31",
+                                "2025-13-01", None])
         fore = (ogonblick(bankperiod), copy.deepcopy(format_))
         try:
             resultat = matcha_period(bankperiod, underlagen, format_, bedomning)

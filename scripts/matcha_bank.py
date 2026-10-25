@@ -12,7 +12,9 @@ matcha_period är den enda offentliga funktionen. Den tar emot:
 Bankraderna tas bara emot som en Bankperiod, aldrig som en lista: en Bankperiod går inte att
 ändra, så ingen bankrad kan ha tagits bort efter inläsningen. Allt som skickas in kontrolleras och
 kopieras först. Det som skickades in ändras aldrig. Fel i indatan stoppar matchningen med ett
-MatchningFel, och inget resultat returneras.
+MatchningFel, och inget resultat returneras. Det gäller också en period som inte har skapats av
+sin inläsningsfunktion och därför saknar sitt innehåll (J7), fler än _HOGST_ANTAL bankrader eller
+underlag (J5), och ett bedömningsdatum före någon bankrads transaktionsdag (J9).
 
 Reglerna:
 
@@ -35,9 +37,17 @@ Reglerna:
    - bankradens transaktionsdag ligger från underlagets datum till och med så många dagar efter
      som matchningsformatets tidsfönster säger för underlagets typ.
 3. Har bankraden flera kandidater, och står fakturanumret för exakt en av dem i bankradens
-   beskrivning eller referens (som hela ord, på samma sätt som motparten), är det den enda
-   kandidaten. Det behövs för fakturor med samma belopp varje månad, till exempel ett abonnemang,
-   där en betalning annars passar två fakturor i tidsfönstret.
+   beskrivning eller referens, är det den enda kandidaten. Det behövs för fakturor med samma
+   belopp varje månad, till exempel ett abonnemang, där en betalning annars passar två fakturor i
+   tidsfönstret. Fakturanumret får bara avgöra (J2) om det
+   - står som ett helt ord i texten: ett ord, mellan blanksteg, som efter normaliseringen för
+     jämförelser (normalisering.py) är exakt fakturanumret, inte en del av ett längre ord eller
+     nummer och inte uppdelat på flera ord,
+   - har minst _FAKTURANUMMER_MINST_TECKEN tecken efter normaliseringen, så att ett kort nummer
+     som råkar stå i texten (till exempel ett antal) inte avgör,
+   - inte är lika med eller en del av underlagets motpart, eftersom motparten alltid står i texten,
+   - inte är en del av en annan kandidats fakturanummer.
+   Står fakturanumren för flera kandidater i texten avgör inget av dem, och raden blir "tvetydig".
 4. En bankrad med exakt en kandidat, som inte är kandidat för någon annan bankrad, matchas med den.
    Ett underlag matchas alltså högst en gång, och en bankrad högst en gång.
 5. En bankrad med flera kandidater, eller vars kandidat också passar en annan bankrad, blir ett
@@ -66,8 +76,18 @@ from las_bank import Bankperiod
 from las_kassa import normalisera_kassaregister as _normalisera
 from las_matchningsformat import MatchningsformatFel, kontrollera_matchningsformat
 from las_underlag import Underlagsperiod
+from normalisering import normalisera_for_jamforelse as _jamforbar
 
 _DATUMFORM = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
+
+# Ett kortare fakturanummer avgör aldrig en matchning (regel 3, J2).
+_FAKTURANUMMER_MINST_TECKEN = 5
+
+# Högst så många bankrader och lika många underlag åt gången (J5). Matchningen går igenom alla
+# underlag för varje bankrad, så tiden växer med antalet i kvadrat: 100 000 av varje tar ungefär en
+# kvart. Gränsen ska tas bort när matchningen har gjorts snabbare, till exempel genom att underlagen
+# delas upp efter belopp en gång i stället för att alla gås igenom för varje bankrad.
+_HOGST_ANTAL = 20_000
 
 # Ärendenas typ och kontroll. K3: varje förslag har underlag.
 _KONTROLL = "K3"
@@ -125,6 +145,11 @@ def _datum(varde, vad):
 
 _SORTER = {str: "text", float: "ett decimaltal", bool: "ett sanningsvärde (True eller False)", type(None): "None",
            list: "en lista", tuple: "en tupel", dict: "ett objekt", bytes: "bytes"}
+
+
+def _med_mellanrum(antal):
+    """Ett antal med mellanrum mellan tusentalen, till exempel 20 001."""
+    return format(antal, ",").replace(",", " ")
 
 
 def _sort(varde):
@@ -195,13 +220,27 @@ def _ar_kandidat(rad, post, tidsfonster):
     return forsta <= _datum(rad["transaktionsdag"], "Bankradens transaktionsdag") <= forsta + tidsfonster[post["typ"]]
 
 
+def _orden_i_raden(rad):
+    """Orden i bankradens beskrivning och referens, delade vid blanksteg och normaliserade för jämförelser."""
+    return {_jamforbar(ord_) for text in (rad["beskrivning"], rad["referens"]) for ord_ in text.split()}
+
+
+def _kan_avgora(post, kandidater):
+    """True om underlagets fakturanummer får avgöra mellan kandidaterna (regel 3 ovan, J2)."""
+    nummer = _jamforbar(post["fakturanummer"])
+    if len(nummer) < _FAKTURANUMMER_MINST_TECKEN or nummer in _jamforbar(post["motpart"]):
+        return False
+    return not any(nummer in _jamforbar(annan["fakturanummer"]) for annan in kandidater if annan["id"] != post["id"])
+
+
 def _kandidater(rad, underlag, tidsfonster):
     """Underlagen som kan höra till bankraden (regel 2 och 3 ovan)."""
     kandidater = [post for post in underlag if _ar_kandidat(rad, post, tidsfonster)]
     if len(kandidater) > 1:
-        med_fakturanummer = [post for post in kandidater if _star_i_raden(post["fakturanummer"], rad)]
-        if len(med_fakturanummer) == 1:
-            return med_fakturanummer
+        orden = _orden_i_raden(rad)
+        i_texten = [post for post in kandidater if _jamforbar(post["fakturanummer"]) in orden]
+        if len(i_texten) == 1 and _kan_avgora(i_texten[0], kandidater):
+            return i_texten
     return kandidater
 
 
@@ -220,17 +259,43 @@ def matcha_period(bankperiod, underlagsperiod, matchningsformat, bedomningsdatum
             "Bankraderna ska vara en Bankperiod från las_bankfil eller sla_ihop_bankperioder, inte "
             + _sort(bankperiod) + "."
         )
-    rader = bankperiod.rader  # nya kopior, i filernas ordning
+    # En period som inte har skapats av sin inläsningsfunktion, till exempel med __new__, saknar sitt
+    # innehåll, och då ger Python ett AttributeError (J7).
+    try:
+        rader = bankperiod.rader  # nya kopior, i filernas ordning
+    except AttributeError:
+        raise MatchningFel(
+            "Bankperioden är tom eller trasig: den har inte skapats av las_bankfil eller sla_ihop_bankperioder."
+        ) from None
     if type(underlagsperiod) is not Underlagsperiod:
         raise MatchningFel(
             "Underlagen ska vara en Underlagsperiod från las_underlagsperiod, inte " + _sort(underlagsperiod) + "."
         )
     try:
+        underlag = underlagsperiod.underlag  # en ny kopia, sorterad efter id
+    except AttributeError:
+        raise MatchningFel(
+            "Underlagsperioden är tom eller trasig: den har inte skapats av las_underlagsperiod."
+        ) from None
+    for antal, vad in ((len(rader), "bankrader"), (len(underlag), "underlag")):
+        if antal > _HOGST_ANTAL:
+            raise MatchningFel(
+                "Matchningen stoppas: det finns " + _med_mellanrum(antal) + " " + vad + ", men matchningen tar högst "
+                + _med_mellanrum(_HOGST_ANTAL) + " åt gången, eftersom den annars tar för lång tid. Dela upp"
+                " perioden i kortare perioder."
+            )
+    try:
         format_ = kontrollera_matchningsformat(matchningsformat)
     except MatchningsformatFel as fel:
         raise MatchningFel(str(fel)) from None
     bedomning = _datum(bedomningsdatum, "Bedömningsdatumet")
-    underlag = underlagsperiod.underlag  # en ny kopia, sorterad efter id
+    for rad in rader:
+        if _datum(rad["transaktionsdag"], "Bankradens transaktionsdag") > bedomning:
+            raise MatchningFel(
+                "Bedömningsdatumet " + bedomningsdatum + " ligger före transaktionsdagen " + rad["transaktionsdag"]
+                + " för bankraden med radnummer " + str(rad["radnr"]) + ". En bedömning kan inte göras innan"
+                " bankraden finns, så bedömningsdatumet är troligen fel."
+            )
 
     behover = []  # (rad, kandidaterna) för raderna som ska ha underlag
     kraver_inte, arenden = [], []
