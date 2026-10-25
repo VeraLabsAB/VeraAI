@@ -8,12 +8,15 @@ En genväg är en funktion som läser en fil men hoppar över en kontroll:
   var och måste anropas i rätt ordning. Ensamma hoppar de över de andra skydden. Alla deras namn
   börjar med understreck, så att de inte är en del av något offentligt gränssnitt,
 - las_kassa._PERIODNYCKEL skapar en Kassaperiod med vilka rader som helst, utan Z-kontroll a–e och
-  seriekontrollen, och Kassaperiodens inre (_rapporter m.fl.) är raderna som summeras.
+  seriekontrollen, och Kassaperiodens inre (_rapporter m.fl.) är raderna som summeras,
+- las_underlag._las_underlagsfil hoppar över kontrollen av dubbla id och K4 (dubbletter), och
+  las_underlag._PERIODNYCKEL skapar en Underlagsperiod med vilka underlag som helst. Periodens inre
+  (_underlag, _arenden) är underlagen och ärendena.
 
-All annan kod ska läsa filer med las_bankfil, las_kassafil och las_kassaperiod, som alltid kör
-alla kontroller, och summera med summa_per_momssats, som bara tar emot en Kassaperiod.
-Bara inläsningsmodulerna själva (UNDANTAGNA) och testerna får använda genvägarna. En ny
-inläsningsmodul (till exempel för kvitton) måste läggas till i UNDANTAGNA med flit.
+All annan kod ska läsa filer med las_bankfil, las_kassafil, las_kassaperiod och
+las_underlagsperiod, som alltid kör alla kontroller, och summera med summa_per_momssats, som bara
+tar emot en Kassaperiod. Bara inläsningsmodulerna själva (UNDANTAGNA) och testerna får använda
+genvägarna. En ny inläsningsmodul måste läggas till i UNDANTAGNA med flit.
 
 Kontrollen läser koden med Pythons ast-modul, alltså som Python själv ser den, och inte som text.
 Den klarar därför alias (import ... as, x = las_bank) och kod som bygger ihop namn medan
@@ -32,12 +35,12 @@ SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 
 # Filer i scripts/ som får använda genvägarna: inläsningsmodulerna själva.
-UNDANTAGNA = ("las_bank.py", "las_kassa.py", "inlasning_skydd.py")
+UNDANTAGNA = ("las_bank.py", "las_kassa.py", "las_underlag.py", "inlasning_skydd.py")
 SKYDDSMODUL = "inlasning_skydd"
-INLASNINGSMODULER = ("las_bank", "las_kassa")
-GENVAGAR = ("_tolka_rader", "_tolka_kassarader")
-# Det inre i en Kassaperiod: nyckeln som skapar en och raderna som summeras.
-PERIODENS_INRE = ("_PERIODNYCKEL", "_rapporter", "_fran_datum", "_till_datum")
+INLASNINGSMODULER = ("las_bank", "las_kassa", "las_underlag")
+GENVAGAR = ("_tolka_rader", "_tolka_kassarader", "_las_underlagsfil")
+# Det inre i en Kassaperiod och en Underlagsperiod: nyckeln som skapar en, och det som ligger i den.
+PERIODENS_INRE = ("_PERIODNYCKEL", "_rapporter", "_fran_datum", "_till_datum", "_underlag", "_arenden")
 
 # Sätt att nå ett namn som byggs ihop medan programmet kör. Ett sådant namn går inte att granska i
 # koden, så det får inte användas i kärnan alls. Först fristående namn och moduler, sedan
@@ -197,13 +200,24 @@ def test_i1_de_forbjudna_namnen_hittas():
                  "_rubrikens_falt", "_inga_otillatna_tecken", "_nul_fel", "_csv_fel", "_ladda_json",
                  "_kontrollera_namn", "_tolka_datum", "_tolka_ore", "_Filsort", "_OTILLATNA_TECKEN",
                  "_TILLATNA_AVGRANSARE", "_HELTAL", "_RADBRYTNINGAR", "_RIKTNINGSTECKEN", "_ar_sokvag", "_DATUM",
-                 "_sokvagens_typ", "_PERIODNYCKEL", "_rapporter"]:
+                 "_sokvagens_typ", "_PERIODNYCKEL", "_rapporter", "_las_underlagsfil", "_underlag", "_arenden",
+                 "_DubbelNyckel", "_inga_dubbla_nycklar", "_UNDERLAGSFIL"]:
         assert namn in forbjudna, namn
     # Det som annan kod ska använda är inte förbjudet.
     for namn in ["las_bankfil", "las_kassafil", "las_kassaperiod", "Kassaperiod", "ladda_bankformat",
                  "ladda_kassaformat", "kontrollera_k1", "kontrollera_z_serien", "summa_per_momssats", "kronor",
-                 "BankfilFel", "KassafilFel", "rapporter", "fran_datum", "till_datum"]:
+                 "BankfilFel", "KassafilFel", "rapporter", "fran_datum", "till_datum", "las_underlagsperiod",
+                 "Underlagsperiod", "UnderlagFilFel", "underlag", "arenden"]:
         assert namn not in forbjudna, namn
+
+
+def test_i1_underlagets_genvagar_finns_i_modulen():
+    # Skydd: de förbjudna namnen för underlaget ska verkligen finnas i las_underlag.py. Annars
+    # förbjuder testerna nedan namn som ingen använder, medan den verkliga genvägen heter något annat.
+    import las_underlag
+
+    assert {"_las_underlagsfil", "_PERIODNYCKEL"} <= toppnamn(SCRIPTS / "las_underlag.py")
+    assert {"_underlag", "_arenden", "_fran_datum", "_till_datum"} == set(las_underlag.Underlagsperiod.__slots__)
 
 
 # --- Byggstenarna är interna ---
@@ -259,8 +273,9 @@ def test_inlasningsmodulerna_har_inga_byggstenar_under_offentligt_namn():
     # byggsten. Det fångar även namn som läggs till på något annat sätt än i koden ovan.
     import las_bank
     import las_kassa
+    import las_underlag
 
-    assert offentliga_namn_for_byggstenar([las_bank, las_kassa]) == []
+    assert offentliga_namn_for_byggstenar([las_bank, las_kassa, las_underlag]) == []
 
 
 def test_kontrollen_hittar_byggstenar_under_offentligt_namn_nar_programmet_kor():
@@ -311,11 +326,15 @@ def projekt(tmp_path):
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_x.py").write_text(
         "import inlasning_skydd\nfrom las_bank import _tolka_rader, _csv_rader\n"
-        "from las_kassa import _tolka_kassarader\n", encoding="utf-8")
+        "from las_kassa import _tolka_kassarader\nfrom las_underlag import _las_underlagsfil, _PERIODNYCKEL\n",
+        encoding="utf-8")
     (tmp_path / "las_bank.py").write_text(
         "from inlasning_skydd import _avkoda, _csv_rader\ndef _tolka_rader(data, bankformat): ...\n", encoding="utf-8")
     (tmp_path / "las_kassa.py").write_text(
         "from inlasning_skydd import _las_fil\ndef _tolka_kassarader(data, kassaformat): ...\n", encoding="utf-8")
+    (tmp_path / "las_underlag.py").write_text(
+        "from inlasning_skydd import _las_fil, _nul_fel\nfrom las_kassa import normalisera_kassaregister as _n\n"
+        "def _las_underlagsfil(sokvag): ...\n_PERIODNYCKEL = object()\n", encoding="utf-8")
     (tmp_path / "inlasning_skydd.py").write_text("def _las_fil(sokvag, filsort): ...\n", encoding="utf-8")
     (tmp_path / "belopp.py").write_text("def tolka_belopp(text): ...\n", encoding="utf-8")
     return tmp_path
@@ -398,6 +417,36 @@ def test_i1_kontrollen_hittar_en_fil_som_anvander_en_genvag(projekt, kod):
     assert fynd and all(rad.startswith("rapport.py:") for rad in fynd), fynd
 
 
+# Genvägar förbi underlagets kontroller. las_underlag.py är undantagen, men förbudet gäller alla andra kärnfiler.
+UNDERLAGETS_GENVAGSKOD = {
+    "underlagets_genvag": "from las_underlag import _las_underlagsfil\n",
+    "underlagets_genvag_alias": "from las_underlag import _las_underlagsfil as las\n",
+    "underlagets_genvag_attribut": "import las_underlag\nu = las_underlag._las_underlagsfil('U-1.json')\n",
+    "underlagets_genvag_modulalias": "import las_underlag as u\nx = u._las_underlagsfil('U-1.json')\n",
+    "underlagets_genvag_getattr_hopsatt": "import las_underlag\nf = getattr(las_underlag, '_las_' + 'underlagsfil')\n",
+    "underlagets_genvag_paketnamn": "from scripts.las_underlag import _las_underlagsfil\n",
+    "underlagets_periodnyckel": "from las_underlag import _PERIODNYCKEL\n",
+    "underlagets_periodnyckel_attribut": ("import las_underlag\np = las_underlag.Underlagsperiod("
+                                          "las_underlag._PERIODNYCKEL, [], [], 'a', 'b')\n"),
+    "underlagsperiodens_underlag": "def f(period):\n    return period._underlag\n",
+    "underlagsperiodens_arenden": "def f(period):\n    return period._arenden\n",
+    "underlagsperiodens_setattr": "def f(period):\n    object.__setattr__(period, '_arenden', ())\n",
+    "byggsten_via_underlag": "from las_underlag import _las_fil, _nul_fel\n",
+    "byggsten_via_underlag_attribut": "import las_underlag\nd = las_underlag._las_fil('x', None)\n",
+    "byggsten_via_underlag_stjarna": "from las_underlag import *\n",
+}
+
+
+@pytest.mark.parametrize("kod", UNDERLAGETS_GENVAGSKOD.values(), ids=UNDERLAGETS_GENVAGSKOD.keys())
+def test_i1_kontrollen_hittar_genvagar_forbi_underlagets_kontroller(projekt, kod):
+    # Skydd: namnen finns verkligen i den riktiga modulen, så att förbudet gäller den verkliga genvägen.
+    assert {"_las_underlagsfil", "_PERIODNYCKEL", "_las_fil", "_nul_fel"} <= (
+        toppnamn(SCRIPTS / "las_underlag.py") | namn_som_leder_till_genvagar(SCRIPTS / "las_underlag.py", set()))
+    (projekt / "rapport.py").write_text(kod, encoding="utf-8")
+    fynd = genvagar_i(projekt)
+    assert fynd and all(rad.startswith("rapport.py:") for rad in fynd), fynd
+
+
 def test_i1_kontrollen_hittar_en_genvag_i_en_undermapp(projekt):
     (projekt / "matchning").mkdir()
     (projekt / "matchning" / "las_bank.py").write_text("from las_kassa import _tolka_kassarader\n", encoding="utf-8")
@@ -424,6 +473,9 @@ VANLIG_KOD = {
                        "period = las_kassaperiod('kassa', {}, '2025-01-01', '2025-01-31')\n"
                        "summor = summa_per_momssats(period)\nrader = period.rapporter\n",
     "modulalias": "import las_kassa as k\nk.kontrollera_z_serien([])\n",
+    "las_underlagsperiod": "from las_underlag import las_underlagsperiod, UnderlagFilFel\n"
+                           "period = las_underlagsperiod('underlag', '2025-01-01', '2025-01-31')\n"
+                           "poster = period.underlag + period.arenden\n",
     "getattr_med_vanlig_text": "f = getattr(object(), 'namn', None)\n",
     "beskrivning": '"""Läser bankfilen med las_bankfil, som använder inlasning_skydd och kör K1."""\n',
     "egen_funktion": "def tolka(rader):\n    return [rad for rad in rader]\n",

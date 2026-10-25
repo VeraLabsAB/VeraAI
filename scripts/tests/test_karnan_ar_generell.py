@@ -77,6 +77,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 import las_bank  # noqa: E402
 import las_kassa  # noqa: E402
+import las_underlag  # noqa: E402
 
 # Ord som är både kärnans egen nyckel (i bankformat.json eller kassaformat.json) och ett
 # kolumnnamn i ett kassaformat. Testdatans kassafil har kolumnen "belopp", och kärnan använder
@@ -113,7 +114,7 @@ def strangar_i_koden(kalla):
     ]
 
 
-def kassanamn_i_filer(filer, namnlista):
+def kassanamn_i_filer(filer, namnlista, egna_ord=KARNANS_EGNA_ORD):
     """Var kassaformatens namn står i filerna.
 
     - En textsträng i koden som är exakt ett namn ger träff, till exempel "forsaljning".
@@ -126,7 +127,7 @@ def kassanamn_i_filer(filer, namnlista):
     for fil in filer:
         kalla = fil.read_text(encoding="utf-8")
         for radnummer, text in strangar_i_koden(kalla):
-            if text.strip() in namnlista and text.strip() not in KARNANS_EGNA_ORD:
+            if text.strip() in namnlista and text.strip() not in egna_ord:
                 fynd.append(fil.name + ":" + str(radnummer) + " har textsträngen " + repr(text))
         for radnummer, rad in enumerate(kalla.splitlines(), start=1):
             for namn in kodlika:
@@ -146,10 +147,78 @@ def test_karnans_egna_ord_ar_verkligen_karnans_nycklar():
     assert KARNANS_EGNA_ORD <= set(las_bank.KOLUMN_NYCKLAR) | set(las_kassa.KOLUMN_NYCKLAR)
 
 
+# Underlagets nycklar är kärnans egen form för underlag (las_underlag.py), gemensam för alla
+# företag. Några av dem ("datum", "moms", "momssats") råkar också vara namn i testbutikens
+# kassaformat. De godtas som textsträngar bara i las_underlag.py, där formen beskrivs. Alla andra
+# kärnfiler prövas som förut.
+UNDERLAGSMODULEN = SCRIPTS / "las_underlag.py"
+UNDERLAGETS_EGNA_ORD = set(las_underlag.NYCKLAR) | set(las_underlag.MOMSRAD_NYCKLAR)
+
+
 def test_karnan_innehaller_inga_namn_fran_kassaformaten():
     """Kassaformatet hör till företagets konfiguration, inte till kärnan."""
-    fynd = kassanamn_i_filer(karnans_filer(), namn_i_kassaformaten())
+    namn = namn_i_kassaformaten()
+    fynd = kassanamn_i_filer([fil for fil in karnans_filer() if fil != UNDERLAGSMODULEN], namn)
+    fynd += kassanamn_i_filer([UNDERLAGSMODULEN], namn, KARNANS_EGNA_ORD | UNDERLAGETS_EGNA_ORD)
     assert not fynd, "Kolumnnamn, postnamn eller kassaregister från kassaformatet i kärnan:\n" + "\n".join(fynd)
+
+
+def test_underlagets_undantag_galler_bara_underlagets_nycklar(tmp_path):
+    # Skydd: undantaget släpper bara igenom underlagets egna nycklar, inte andra namn ur kassaformatet.
+    assert UNDERLAGSMODULEN in karnans_filer()
+    assert {"datum", "moms", "momssats"} <= UNDERLAGETS_EGNA_ORD
+    fil = tmp_path / "x.py"
+    fil.write_text('a = "moms"\nb = "forsaljning"\nc = "summa_brutto"\n', encoding="utf-8")
+    assert kassanamn_i_filer([fil], namn_i_kassaformaten()) == [
+        "x.py:1 har textsträngen 'moms'", "x.py:2 har textsträngen 'forsaljning'",
+        "x.py:3 har textsträngen 'summa_brutto'", "x.py:3 innehåller 'summa_brutto'"]
+    assert kassanamn_i_filer([fil], namn_i_kassaformaten(), KARNANS_EGNA_ORD | UNDERLAGETS_EGNA_ORD) == [
+        "x.py:2 har textsträngen 'forsaljning'", "x.py:3 har textsträngen 'summa_brutto'",
+        "x.py:3 innehåller 'summa_brutto'"]
+
+
+# --- Testdatans underlag ---
+
+def namn_i_testdatans_underlag():
+    """Alla id, motparter och fakturanummer i testdatans underlag, för alla testföretag och perioder."""
+    namn = set()
+    for fil in sorted((SCRIPTS.parent / "testdata").glob("*/*/underlag/*.json")):
+        data = json.loads(fil.read_text(encoding="utf-8"))
+        namn.update([data["id"], data["motpart"], data["fakturanummer"]])
+    return sorted(namn)
+
+
+def namn_ur_testdatan_i_filer(filer, namnlista):
+    """Var testdatans namn står i filerna, som hela ord, även i kommentarer och förklarande text."""
+    monster = re.compile(r"(?<![\w-])(" + "|".join(map(re.escape, namnlista)) + r")(?![\w-])")
+    fynd = []
+    for fil in filer:
+        for radnummer, rad in enumerate(fil.read_text(encoding="utf-8").splitlines(), start=1):
+            fynd += [fil.name + ":" + str(radnummer) + " innehåller " + repr(traff.group(1))
+                     for traff in monster.finditer(rad)]
+    return fynd
+
+
+def test_testdatans_underlag_har_namn_att_soka_efter():
+    # Skydd mot att testet nedan blir grönt för att det inte hittar några underlag alls.
+    namn = namn_i_testdatans_underlag()
+    assert len(namn) > 60
+    assert {"LEV-TE", "BUTIK-STAD", "SYNT-U-2025-004", "SYNT-TE-761"} <= set(namn)
+
+
+def test_karnan_innehaller_inga_namn_fran_testdatans_underlag():
+    """Motparter, fakturanummer och id hör till underlagen, inte till kärnan (gäller även las_underlag.py)."""
+    assert UNDERLAGSMODULEN in karnans_filer()
+    fynd = namn_ur_testdatan_i_filer(karnans_filer(), namn_i_testdatans_underlag())
+    assert not fynd, "Namn från testdatans underlag i kärnan:\n" + "\n".join(fynd)
+
+
+def test_testdatanamn_kontrollen_hittar_inbyggda_namn(tmp_path):
+    fil = tmp_path / "x.py"
+    fil.write_text('# dublett av SYNT-U-2025-003\nif motpart == "LEV-TE":\n    pass\nx = "LEV-TELE-2"\n',
+                   encoding="utf-8")
+    assert namn_ur_testdatan_i_filer([fil], namn_i_testdatans_underlag()) == [
+        "x.py:1 innehåller 'SYNT-U-2025-003'", "x.py:2 innehåller 'LEV-TE'"]
 
 
 def test_kassanamn_kontrollen_hittar_inbyggda_namn(tmp_path):

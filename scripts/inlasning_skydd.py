@@ -214,13 +214,18 @@ def _kontrollera_avgransare(avgransare, kolumner, var, filsort):
 
 # --- Filen: teckenkodning och styrtecken ---
 
-def _las_fil(sokvag, filsort):
-    """Filens innehåll som bytes. En fil som saknas eller inte går att läsa stoppas."""
+def _las_fil(sokvag, filsort, hogst=None):
+    """Filens innehåll som bytes. En fil som saknas eller inte går att läsa stoppas.
+
+    Med hogst läses högst hogst + 1 byte, så att anroparen ser att filen är för stor utan att
+    hela filen läses in. En fil som aldrig tar slut (till exempel en länk till en enhet) blir då
+    inget problem.
+    """
     if not _ar_sokvag(sokvag):
         raise filsort.fel(filsort.filen + " stoppas: " + _sokvagens_typ(sokvag))
     try:
         with open(sokvag, "rb") as fil:
-            return fil.read()
+            return fil.read() if hogst is None else fil.read(hogst + 1)
     except FileNotFoundError:
         raise filsort.fel(filsort.filen + " stoppas: filen finns inte: " + str(sokvag) + ".") from None
     except IsADirectoryError:
