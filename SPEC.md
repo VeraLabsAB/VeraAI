@@ -166,6 +166,8 @@ En saknad Z-rapport blir ett ärende på nivå D (avsnitt 5). Månaden summeras 
 
 ### 7.1 Fast kommandolista
 
+Listan gäller byggarbetet i Claude Code, inklusive granskningar. Veras egen lista med vad hon får köra hos en kund skrivs när hennes skript finns.
+
 **Godkänd av Hugo 2026-10-25.** Listan bygger på de kommandon som faktiskt används i projektet. Allt körs inifrån projektmappen.
 
 | Kommando | Till vad |
@@ -177,6 +179,18 @@ En saknad Z-rapport blir ett ärende på nivå D (avsnitt 5). Månaden summeras 
 | `git add` | Välja ut ändrade filer inför en commit |
 | `git commit` | Spara ändringarna i projektets historik (en **commit**) |
 | `ls`, `cat`, `head`, `tail`, `grep` | Läsa och söka i filer i projektet, utan att ändra något |
+| `git show` | Visa en tidigare commit, eller en fil som den såg ut då |
+| `git archive` | Ta ut en ren kopia av projektet ur historiken, till exempel inför en granskning |
+| `diff` | Jämföra två filer eller mappar rad för rad |
+| `find` | Leta upp filer efter namn eller typ |
+| `wc` | Räkna rader, ord eller tecken i en fil |
+| `sort` | Sortera rader, till exempel för att jämföra två listor |
+| `mkdir` | Skapa en mapp, bara i en tillfällig mapp utanför projektet (se nedan) |
+| `cp -R` | Kopiera filer och mappar, bara till en tillfällig mapp utanför projektet (se nedan) |
+
+- `mkdir` och `cp -R` får bara ha mål i en tillfällig mapp utanför projektet (till exempel scratchpad-mappen), aldrig inne i projektmappen.
+- Testsviten (pytest-kommandot ovan) får också köras mot en sådan kopia.
+- Nya filer i projektet skapas med Claudes fil-verktyg (Write och Edit), inte med skalkommandon (kommandon i terminalen).
 
 ---
 
