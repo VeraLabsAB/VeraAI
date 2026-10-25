@@ -41,9 +41,17 @@ Skydden för teckenkodning, styrtecken, CSV-läsning och bankformat.json är gem
 filer och ligger i inlasning_skydd.py. Felmeddelandena är bankfilens egna (BANKFIL).
 
 Vid minsta fel stoppas hela filen: inga rader returneras, och ett BankfilFel kastas.
+
+Resultatet är en Bankperiod, som inte går att ändra: raderna och periodens ingående och utgående
+saldo. Den kan bara skapas av las_bankfil och sla_ihop_bankperioder (en nyckel som bara de har),
+och raderna ges som nya kopior varje gång de läses. Annars skulle annan kod kunna ta bort en rad
+efter inläsningen, och raden skulle aldrig bli ett ärende i matchningen. sla_ihop_bankperioder
+sätter ihop flera månader till en Bankperiod, och kontrollerar då att varje månads ingående saldo
+är förra månadens utgående och att ingen bankrad finns två gånger.
 """
 
 import hashlib
+from types import MappingProxyType
 
 from belopp import formatera_ore
 from inlasning_skydd import (
@@ -264,8 +272,61 @@ def kontrollera_k1(rader, ingaende_saldo_ore, utgaende_saldo_ore):
         )
 
 
+# --- Bankperiod ---
+
+# Nyckeln som bara las_bankfil och sla_ihop_bankperioder har. Utan den går det inte att skapa en
+# Bankperiod med rader som inte har gått igenom K1. Ett test (test_inga_genvagar.py) stoppar annan
+# kärnkod från att använda den.
+_PERIODNYCKEL = object()
+
+
+class Bankperiod:
+    """Bankraderna för en period, från las_bankfil. Kan bara skapas där och kan inte ändras.
+
+    rader är raderna i filens ordning, i den form som beskrivs överst i filen. Varje gång de läses
+    ges nya kopior, så att en ändring i dem aldrig når perioden. ingaende_saldo_ore och
+    utgaende_saldo_ore är saldot när perioden börjar och slutar, heltal i öre.
+    """
+
+    __slots__ = ("_rader", "_ingaende_saldo_ore", "_utgaende_saldo_ore")
+
+    def __init__(self, nyckel, rader, ingaende_saldo_ore, utgaende_saldo_ore):
+        if nyckel is not _PERIODNYCKEL:
+            raise BankfilFel(
+                "En Bankperiod kan bara skapas av las_bankfil eller sla_ihop_bankperioder, som kör alla kontroller"
+                " först."
+            )
+        # Raderna sparas som oföränderliga kopior. object.__setattr__ behövs eftersom vanlig
+        # tilldelning är spärrad nedan.
+        object.__setattr__(self, "_rader", tuple(MappingProxyType(dict(rad)) for rad in rader))
+        object.__setattr__(self, "_ingaende_saldo_ore", ingaende_saldo_ore)
+        object.__setattr__(self, "_utgaende_saldo_ore", utgaende_saldo_ore)
+
+    def __setattr__(self, namn, varde):
+        raise AttributeError("En Bankperiod kan inte ändras.")
+
+    def __delattr__(self, namn):
+        raise AttributeError("En Bankperiod kan inte ändras.")
+
+    @property
+    def rader(self):
+        return [dict(rad) for rad in self._rader]
+
+    @property
+    def ingaende_saldo_ore(self):
+        return self._ingaende_saldo_ore
+
+    @property
+    def utgaende_saldo_ore(self):
+        return self._utgaende_saldo_ore
+
+    def __repr__(self):
+        return ("Bankperiod(" + str(len(self._rader)) + " rader, ingående saldo " + kronor(self._ingaende_saldo_ore)
+                + ", utgående saldo " + kronor(self._utgaende_saldo_ore) + ")")
+
+
 def las_bankfil(sokvag, bankformat, ingaende_saldo_ore, utgaende_saldo_ore):
-    """Läser en bankfil och kör K1. Returnerar raderna bara om allt stämmer, annars BankfilFel.
+    """Läser en bankfil och kör K1. Returnerar en Bankperiod bara om allt stämmer, annars BankfilFel.
 
     Bankformatet kommer från ladda_bankformat och kontrolleras igen här, så att ett trasigt
     format aldrig används. Ingående och utgående saldo är heltal i öre, till exempel från
@@ -275,4 +336,47 @@ def las_bankfil(sokvag, bankformat, ingaende_saldo_ore, utgaende_saldo_ore):
     data = _las_fil(sokvag, BANKFIL)
     rader = _tolka_rader(data, bankformat)
     kontrollera_k1(rader, ingaende_saldo_ore, utgaende_saldo_ore)
-    return rader
+    return Bankperiod(_PERIODNYCKEL, rader, ingaende_saldo_ore, utgaende_saldo_ore)
+
+
+def sla_ihop_bankperioder(perioder):
+    """Sätter ihop flera Bankperioder, till exempel tre månader, till en. Annat ger BankfilFel.
+
+    perioder är en lista eller tupel med Bankperioder i tidsordning, minst en. Varje periods
+    ingående saldo ska vara lika med förra periodens utgående, så att inga rader saknas mellan
+    dem, och ingen bankrad får finnas två gånger, till exempel om samma bankfil har lästs in två
+    gånger. Den nya perioden har den första periodens ingående saldo och den sistas utgående.
+    """
+    if not isinstance(perioder, (list, tuple)):
+        raise BankfilFel(
+            "Bankperioderna ska vara en lista med Bankperioder från las_bankfil, inte " + type(perioder).__name__ + "."
+        )
+    if not perioder:
+        raise BankfilFel("Det finns inga Bankperioder att sätta ihop.")
+    for nummer, period in enumerate(perioder, start=1):
+        # type() i stället för isinstance(), så att en underklass med andra regler inte godtas.
+        if type(period) is not Bankperiod:
+            raise BankfilFel(
+                "Bankperiod nummer " + str(nummer) + " ska vara en Bankperiod från las_bankfil, inte "
+                + type(period).__name__ + "."
+            )
+    for nummer in range(1, len(perioder)):
+        forra, nasta = perioder[nummer - 1], perioder[nummer]
+        if nasta.ingaende_saldo_ore != forra.utgaende_saldo_ore:
+            raise BankfilFel(
+                "Bankperioderna hänger inte ihop: Bankperiod nummer " + str(nummer + 1) + " har ingående saldo "
+                + kronor(nasta.ingaende_saldo_ore) + ", men Bankperiod nummer " + str(nummer) + " har utgående saldo "
+                + kronor(forra.utgaende_saldo_ore) + ", skillnad "
+                + kronor(nasta.ingaende_saldo_ore - forra.utgaende_saldo_ore)
+                + ". Det kan saknas rader mellan dem, eller så är de i fel ordning."
+            )
+    rader = [rad for period in perioder for rad in period.rader]
+    sedda = set()
+    for rad in rader:
+        if rad["id"] in sedda:
+            raise BankfilFel(
+                "Bankraden med id " + repr(rad["id"]) + " (radnummer " + str(rad["radnr"]) + ") finns i flera"
+                " Bankperioder. Samma bankfil kan vara inläst två gånger. Varje bankrad ska finnas en gång."
+            )
+        sedda.add(rad["id"])
+    return Bankperiod(_PERIODNYCKEL, rader, perioder[0].ingaende_saldo_ore, perioder[-1].utgaende_saldo_ore)

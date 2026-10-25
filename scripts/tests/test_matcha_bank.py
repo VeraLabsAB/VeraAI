@@ -22,7 +22,7 @@ FORETAG = AGENT / "foretag" / "syntet-testbutik"
 sys.path.insert(0, str(AGENT / "scripts"))
 
 import matcha_bank  # noqa: E402
-from las_bank import BankfilFel, ladda_bankformat, las_bankfil  # noqa: E402
+from las_bank import Bankperiod, BankfilFel, ladda_bankformat, las_bankfil, sla_ihop_bankperioder  # noqa: E402
 from las_kassa import normalisera_kassaregister  # noqa: E402
 from las_matchningsformat import MatchningsformatFel, kontrollera_matchningsformat, ladda_matchningsformat  # noqa: E402
 from las_underlag import UnderlagFilFel, Underlagsperiod, las_underlagsperiod  # noqa: E402
@@ -56,7 +56,7 @@ def kr(ore):
 
 def las_kvartalets_bankrader(mapp):
     """Januari, februari och mars med las_bankfil, i en kedja: varje månads ingående saldo är förra
-    månadens utgående, som i test_las_bank.py. Saldona kommer från facit.
+    månadens utgående, som i test_las_bank.py. Saldona kommer från facit. Ger tre Bankperioder.
 
     Mars stoppas av K1 på den planterade raden (100,00 kr för högt saldo). Därför rättas raden i en
     kopia: saldot byts mot det rätta enligt facit. Inget annat i filen ändras.
@@ -64,7 +64,7 @@ def las_kvartalets_bankrader(mapp):
     bank = facit()["bank"]
     januari = las_bankfil(DATAMAPP / "bank_2025-01.csv", BANKFORMAT, bank["2025-01"]["ingaende_saldo_ore"],
                           bank["2025-01"]["utgaende_saldo_ore"])
-    februari = las_bankfil(DATAMAPP / "bank_2025-02.csv", BANKFORMAT, januari[-1]["saldo_efter_ore"],
+    februari = las_bankfil(DATAMAPP / "bank_2025-02.csv", BANKFORMAT, januari.utgaende_saldo_ore,
                            bank["2025-02"]["utgaende_saldo_ore"])
     fel = planterat("brott_i_saldokedjan")
     rader = (DATAMAPP / fel["filnamn"]).read_text(encoding="utf-8").split("\n")
@@ -73,7 +73,7 @@ def las_kvartalets_bankrader(mapp):
     rader[felrad[0]] = rader[felrad[0]][:-len(kr(fel["visat_saldo_ore"]))] + kr(fel["ratt_saldo_ore"])
     rattad = mapp / fel["filnamn"]
     rattad.write_text("\n".join(rader), encoding="utf-8")
-    mars = las_bankfil(rattad, BANKFORMAT, februari[-1]["saldo_efter_ore"], bank["2025-03"]["utgaende_saldo_ore"])
+    mars = las_bankfil(rattad, BANKFORMAT, februari.utgaende_saldo_ore, bank["2025-03"]["utgaende_saldo_ore"])
     return januari, februari, mars
 
 
@@ -81,14 +81,15 @@ def las_kvartalets_bankrader(mapp):
 def kvartalet(tmp_path_factory):
     januari, februari, mars = las_kvartalets_bankrader(tmp_path_factory.mktemp("bank"))
     period = las_underlagsperiod(DATAMAPP / "underlag", "2025-01-01", "2025-03-31")
-    return {"rader": januari + februari + mars, "februari": februari, "period": period}
+    bankperiod = sla_ihop_bankperioder([januari, februari, mars])
+    return {"bankperiod": bankperiod, "rader": bankperiod.rader, "februari": februari, "period": period}
 
 
 def bankrad_utan_underlag(kvartalet):
     """Den planterade bankraden utan underlag, ur februarifilen."""
     fel = planterat("bankrad_utan_underlag")
     assert fel["manad"] == "2025-02" and fel["filnamn"] == "bank_2025-02.csv"
-    rad = kvartalet["februari"][fel["rad"] - 1]
+    rad = kvartalet["februari"].rader[fel["rad"] - 1]
     assert (rad["radnr"], rad["belopp_ore"]) == (fel["rad"], fel["belopp_ore"]) == (85, -35100)
     assert rad["beskrivning"] == "KORTKOP BUTIK-FORBRUKNING" and rad["transaktionsdag"] == "2025-02-18"
     return rad
@@ -97,12 +98,12 @@ def bankrad_utan_underlag(kvartalet):
 def test_kvartalet_ger_exakt_det_planterade_felet_som_saknat_underlag(kvartalet):
     rad = bankrad_utan_underlag(kvartalet)
     # Mer än 7 dagar efter alla bankrader i kvartalet.
-    resultat = matcha_period(kvartalet["rader"], kvartalet["period"], MATCHNINGSFORMAT, "2025-04-30")
+    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], MATCHNINGSFORMAT, "2025-04-30")
     assert len(resultat.arenden) == 1
     arende = resultat.arenden[0]
     assert (arende["kontroll"], arende["typ"], arende["kandidater"]) == ("K3", "saknat underlag", ())
     assert dict(arende["bankrad"]) == rad
-    assert arende["bankrad"]["kalla_fil"] == kvartalet["februari"][0]["kalla_fil"]  # februarifilen
+    assert arende["bankrad"]["kalla_fil"] == kvartalet["februari"].rader[0]["kalla_fil"]  # februarifilen
     assert resultat.vantande == ()
     # Facit säger att felet fångas av K3.
     assert planterat("bankrad_utan_underlag")["kontroll"] == arende["kontroll"]
@@ -112,11 +113,11 @@ def test_kvartalet_fore_sju_dagar_ger_inget_arende_bara_att_raden_vantar(kvartal
     rad = bankrad_utan_underlag(kvartalet)
     # 7 dagar efter transaktionsdagen 2025-02-18: inte mer än 7 dagar, så raden väntar.
     for dag in ("2025-02-18", "2025-02-20", "2025-02-25"):
-        resultat = matcha_period(kvartalet["rader"], kvartalet["period"], MATCHNINGSFORMAT, dag)
+        resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], MATCHNINGSFORMAT, dag)
         assert resultat.arenden == (), dag
         assert [(dict(post["bankrad"]), post["arende_efter"]) for post in resultat.vantande] == [(rad, "2025-02-25")]
     # Dagen efter blir den ett ärende.
-    resultat = matcha_period(kvartalet["rader"], kvartalet["period"], MATCHNINGSFORMAT, "2025-02-26")
+    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], MATCHNINGSFORMAT, "2025-02-26")
     assert [(a["typ"], a["bankrad"]["id"]) for a in resultat.arenden] == [("saknat underlag", rad["id"])]
     assert resultat.vantande == ()
 
@@ -125,7 +126,7 @@ def test_dubbletten_kommer_fran_k4_och_inte_fran_matchningen(kvartalet):
     fel = planterat("dubblett_leverantorsfaktura")
     period = kvartalet["period"]
     assert [(a["kontroll"], a["id"]) for a in period.arenden] == [("K4", fel["id"])]
-    resultat = matcha_period(kvartalet["rader"], period, MATCHNINGSFORMAT, "2025-04-30")
+    resultat = matcha_period(kvartalet["bankperiod"], period, MATCHNINGSFORMAT, "2025-04-30")
     alla_id = json.dumps([list(map(dict, grupp)) for grupp in resultat], default=dict)
     assert fel["id"] not in alla_id  # dubbletten finns inte i matchningen alls
     # Originalet matchas med den enda betalningen.
@@ -135,7 +136,7 @@ def test_dubbletten_kommer_fran_k4_och_inte_fran_matchningen(kvartalet):
 
 
 def test_kvartalets_matchningar_ar_ratt(kvartalet):
-    resultat = matcha_period(kvartalet["rader"], kvartalet["period"], MATCHNINGSFORMAT, "2025-04-30")
+    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], MATCHNINGSFORMAT, "2025-04-30")
     leverantorsbetalningar = [rad for rad in kvartalet["rader"] if rad["referens"].startswith("SYNT-")]
     kortkop = [rad for rad in kvartalet["rader"] if rad["referens"].startswith("KORTKOP-")]
     assert (len(leverantorsbetalningar), len(kortkop)) == (16, 8)
@@ -164,11 +165,11 @@ def test_kvartalets_matchningar_ar_ratt(kvartalet):
         assert dt.date.fromisoformat(post["datum"]) + dt.timedelta(days=30) > dt.date(2025, 3, 31)
 
 
-def kontrollera_grupperna(resultat, bankrader, period):
-    """Varje bankrad finns i exakt en grupp. Varje underlag i perioden finns i exakt en matchning eller
-    bland de oavstämda, och aldrig i två matchningar."""
+def kontrollera_grupperna(resultat, bankperiod, period):
+    """Varje bankrad i bankperioden finns i exakt en grupp. Varje underlag i perioden finns i exakt en
+    matchning eller bland de oavstämda, och aldrig i två matchningar."""
     id_per_grupp = [post["bankrad"]["id"] for grupp in GRUPPER_FOR_BANKRADER for post in getattr(resultat, grupp)]
-    assert sorted(id_per_grupp) == sorted(rad["id"] for rad in bankrader)
+    assert sorted(id_per_grupp) == sorted(rad["id"] for rad in bankperiod.rader)
     matchade = [m["underlag"]["id"] for m in resultat.matchningar]
     assert len(matchade) == len(set(matchade))
     oavstamda = [post["id"] for post in resultat.oavstamda_underlag]
@@ -178,8 +179,8 @@ def kontrollera_grupperna(resultat, bankrader, period):
 def test_varje_bankrad_i_testdatan_finns_i_exakt_en_grupp(kvartalet):
     assert len(kvartalet["rader"]) == sum(manad["antal_rader"] for manad in facit()["bank"].values()) == 395
     for dag in ("2025-01-01", "2025-02-25", "2025-02-26", "2025-03-31", "2025-04-30"):
-        resultat = matcha_period(kvartalet["rader"], kvartalet["period"], MATCHNINGSFORMAT, dag)
-        kontrollera_grupperna(resultat, kvartalet["rader"], kvartalet["period"])
+        resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], MATCHNINGSFORMAT, dag)
+        kontrollera_grupperna(resultat, kvartalet["bankperiod"], kvartalet["period"])
 
 
 def test_en_manad_i_taget_ger_samma_planterade_fel(kvartalet):
@@ -214,10 +215,11 @@ FORMAT = {
 RUBRIK = "Radnummer,Bokföringsdag,Transaktionsdag,Referens,Beskrivning,Belopp,Bokfört saldo"
 
 
-def bankrader(mapp, *rader, namn="bank.csv"):
-    """Skriver en bankfil och läser den med las_bankfil. Varje rad är (referens, beskrivning,
-    belopp_ore, transaktionsdag) eller med bokforingsdag sist. Saldot börjar på 0."""
-    saldo, text = 0, [RUBRIK]
+def bankrader(mapp, *rader, namn="bank.csv", ingaende=0):
+    """Skriver en bankfil och läser den med las_bankfil, som ger en Bankperiod. Varje rad är
+    (referens, beskrivning, belopp_ore, transaktionsdag) eller med bokforingsdag sist. Saldot börjar
+    på ingaende."""
+    saldo, text = ingaende, [RUBRIK]
     for nummer, rad in enumerate(rader, start=1):
         referens, beskrivning, belopp, transaktionsdag = rad[:4]
         bokforingsdag = rad[4] if len(rad) > 4 else transaktionsdag
@@ -226,7 +228,7 @@ def bankrader(mapp, *rader, namn="bank.csv"):
                               kr(saldo)]))
     fil = mapp / namn
     fil.write_text("\n".join(text) + "\n", encoding="utf-8")
-    return las_bankfil(fil, BANKFORMAT, 0, saldo)
+    return las_bankfil(fil, BANKFORMAT, ingaende, saldo)
 
 
 def underlag(**andrat):
@@ -468,14 +470,14 @@ def test_rad_som_inte_kraver_underlag_matchas_inte_mot_ett_underlag(tmp_path):
         kraver_inte=[(1, "insattning")], oavstamda=["U-1"])
 
 
-def test_flera_bankfiler_och_tom_lista(tmp_path):
+def test_flera_bankfiler(tmp_path):
+    # Två bankfiler i en kedja, ihopsatta med sla_ihop_bankperioder.
     forsta = bankrader(tmp_path, ("F-1", "LEV-A", -12500, "2025-01-20"), namn="a.csv")
-    andra = bankrader(tmp_path, ("IN-1", "X", 100, "2025-02-01"), namn="b.csv")
+    andra = bankrader(tmp_path, ("IN-1", "X", 100, "2025-02-01"), namn="b.csv", ingaende=-12500)
     underlagen = period(tmp_path, underlag())
-    assert sammanfattning(matcha(forsta + andra, underlagen)) == tomt(
+    assert sammanfattning(matcha(sla_ihop_bankperioder([forsta, andra]), underlagen)) == tomt(
         matchningar=[(1, "U-1")], kraver_inte=[(1, "insattning")])
-    assert sammanfattning(matcha(tuple(forsta), underlagen)) == tomt(matchningar=[(1, "U-1")])
-    assert sammanfattning(matcha([], underlagen)) == tomt(oavstamda=["U-1"])
+    assert sammanfattning(matcha(andra, underlagen)) == tomt(kraver_inte=[(1, "insattning")], oavstamda=["U-1"])
 
 
 # --- Indatan kontrolleras ---
@@ -484,52 +486,48 @@ def en_rad(tmp_path):
     return bankrader(tmp_path, ("F-1", "LEV-A", -12500, "2025-01-20"))
 
 
-@pytest.mark.parametrize("varde, text", [
-    (None, "Bankraderna ska vara en lista med rader från las_bankfil, inte None"),
-    ({"id": "x"}, "Bankraderna ska vara en lista med rader från las_bankfil, inte ett objekt"),
-    ("bankrader", "Bankraderna ska vara en lista med rader från las_bankfil, inte 'bankrader'"),
-    (iter([]), "Bankraderna ska vara en lista med rader från las_bankfil, inte list_iterator"),
-    ([None], "Bankrad nummer 1 i listan ska vara en rad från las_bankfil, inte None"),
-    ([["id"]], "Bankrad nummer 1 i listan ska vara en rad från las_bankfil, inte en lista"),
-])
-def test_bankrader_av_fel_typ_stoppas(tmp_path, varde, text):
-    with pytest.raises(MatchningFel, match="^" + text):
-        matcha_period(varde, period(tmp_path), FORMAT, "2025-12-31")
+def test_bankraderna_ska_vara_en_bankperiod(tmp_path):
+    # Bankraderna tas bara emot som en Bankperiod från las_bankfil, aldrig som en lista. Inte heller
+    # raderna från en riktig Bankperiod, eftersom de kan ha ändrats efter inläsningen.
+    bankperiod = bankrader(tmp_path, ("F-1", "LEV-A", -12500, "2025-01-20"), ("IN-1", "X", 100, "2025-01-20"))
+    underlagen = period(tmp_path, underlag())
+
+    class Underklass(Bankperiod):
+        __slots__ = ()
+
+    for varde, text in [
+        (None, "None"), ({"id": "x"}, "ett objekt"), ("bankrader", "'bankrader'"), (iter([]), "list_iterator"),
+        ([], "en lista"), ((), "en tupel"), ([None], "en lista"), (bankperiod.rader, "en lista"),
+        (tuple(bankperiod.rader), "en tupel"), (bankperiod.rader[:1], "en lista"), (underlagen, "Underlagsperiod"),
+        (Underklass.__new__(Underklass), "Underklass"),
+    ]:
+        with pytest.raises(MatchningFel, match="^Bankraderna ska vara en Bankperiod från las_bankfil eller"
+                                               " sla_ihop_bankperioder, inte " + text + r"\.$"):
+            matcha_period(varde, underlagen, FORMAT, "2025-12-31")
+    # Skydd: samma Bankperiod godtas.
+    assert sammanfattning(matcha(bankperiod, underlagen)) == tomt(matchningar=[(1, "U-1")], kraver_inte=[(2, "insattning")])
 
 
-@pytest.mark.parametrize("andring, text", [
-    (lambda rad: rad.pop("radnr"), "har inte uppgifterna som las_bankfil ger"),
-    (lambda rad: rad.update(extra=1), "har inte uppgifterna som las_bankfil ger"),
-    (lambda rad: rad.update({1: 1}), "har inte uppgifterna som las_bankfil ger"),
-    (lambda rad: rad.update(belopp_ore=-125.0), "'belopp_ore' ska vara ett heltal, inte ett decimaltal"),
-    (lambda rad: rad.update(belopp_ore="-12500"), "'belopp_ore' ska vara ett heltal, inte '-12500'"),
-    (lambda rad: rad.update(saldo_efter_ore=True), "'saldo_efter_ore' ska vara ett heltal, inte ett sanningsvärde"),
-    (lambda rad: rad.update(radnr=None), "'radnr' ska vara ett heltal, inte None"),
-    (lambda rad: rad.update(id=""), "'id' får inte vara tomt"),
-    (lambda rad: rad.update(id=5), "'id' ska vara text, inte 5"),
-    (lambda rad: rad.update(referens=None), "'referens' ska vara text, inte None"),
-    (lambda rad: rad.update(beskrivning=b"LEV-A"), "'beskrivning' ska vara text, inte bytes"),
-    (lambda rad: rad.update(kalla_fil=["x"]), "'kalla_fil' ska vara text, inte en lista"),
-    (lambda rad: rad.update(transaktionsdag="2025-02-30"),
-     "'transaktionsdag' ska vara ett giltigt datum som text, ÅÅÅÅ-MM-DD, inte '2025-02-30'"),
-    (lambda rad: rad.update(bokforingsdag="20250120"), "'bokforingsdag' ska vara ett giltigt datum"),
-    (lambda rad: rad.update(bokforingsdag=dt.date(2025, 1, 20)), "'bokforingsdag' ska vara ett giltigt datum"),
-])
-def test_trasiga_bankrader_stoppas(tmp_path, andring, text):
-    rader = en_rad(tmp_path)
-    andring(rader[0])
-    with pytest.raises(MatchningFel) as fel:
-        matcha_period(rader, period(tmp_path), FORMAT, "2025-12-31")
-    assert str(fel.value).startswith("Bankrad nummer 1 i listan") and text in str(fel.value), str(fel.value)
+def test_en_bankrad_som_tas_bort_efter_inlasningen_blir_anda_ett_arende(tmp_path):
+    # Hugos beslut 2026-10-25: en bankrad som tas bort efter inläsningen får inte försvinna ur
+    # matchningen. Raderna som läses ut ur en Bankperiod är kopior, så att ta bort eller ändra en rad
+    # i dem når inte perioden.
+    bankperiod = bankrader(tmp_path, ("F-1", "LEV-A", -12500, "2025-01-20"), ("X-1", "OKAND", -100, "2025-01-20"))
+    underlagen = period(tmp_path, underlag())
+    rader = bankperiod.rader
+    del rader[1]
+    rader[0]["belopp_ore"] = -1
+    with pytest.raises(MatchningFel, match="^Bankraderna ska vara en Bankperiod"):
+        matcha_period(rader, underlagen, FORMAT, "2025-12-31")
+    assert sammanfattning(matcha(bankperiod, underlagen)) == tomt(
+        matchningar=[(1, "U-1")], arenden=[(2, "saknat underlag", ())])
 
 
-def test_samma_bankrad_tva_ganger_stoppas(tmp_path):
-    # Till exempel samma bankfil inläst två gånger.
-    rader = en_rad(tmp_path)
-    with pytest.raises(MatchningFel, match="Bankraden med id '" + rader[0]["id"] + "' finns flera gånger"):
-        matcha_period(rader + rader, period(tmp_path), FORMAT, "2025-12-31")
-    with pytest.raises(MatchningFel, match="finns flera gånger"):
-        matcha_period(rader + [dict(rader[0], radnr=2)], period(tmp_path), FORMAT, "2025-12-31")
+def test_samma_bankfil_tva_ganger_stoppas_redan_nar_perioderna_satts_ihop(tmp_path):
+    # Samma bankfil inläst två gånger kan inte nå matchningen: sla_ihop_bankperioder stoppar den.
+    noll = bankrader(tmp_path, ("F-1", "LEV-A", -12500, "2025-01-20"), ("IN-1", "X", 12500, "2025-01-21"))
+    with pytest.raises(BankfilFel, match="finns i flera Bankperioder"):
+        sla_ihop_bankperioder([noll, noll])
 
 
 def test_underlagen_ska_vara_en_underlagsperiod(tmp_path):
@@ -569,10 +567,6 @@ def test_datumets_form_kontrolleras_aven_med_nyare_python(tmp_path, monkeypatch)
     assert Slapp.fromisoformat("20251231") == dt.date(2025, 12, 31)  # skydd: efterliknandet fungerar
     with pytest.raises(MatchningFel, match="^Bedömningsdatumet ska vara ett giltigt datum"):
         matcha_period(en_rad(tmp_path), period(tmp_path), FORMAT, "20251231")
-    rader = en_rad(tmp_path)
-    rader[0]["transaktionsdag"] = "20250120"
-    with pytest.raises(MatchningFel, match="'transaktionsdag' ska vara ett giltigt datum"):
-        matcha_period(rader, period(tmp_path), FORMAT, "2025-12-31")
 
 
 @pytest.mark.parametrize("andring, text", [
@@ -599,14 +593,11 @@ def test_indatan_andras_aldrig(tmp_path):
                       ("X-1", "OKAND", -1, "2025-01-20"))
     underlagen = period(tmp_path, underlag(), underlag(id="U-2", fakturanummer="F-2", belopp_ore=1))
     format_ = copy.deepcopy(FORMAT)
-    fore = (copy.deepcopy(rader), underlagen.underlag, underlagen.arenden, copy.deepcopy(format_))
-    lista = rader
+    fore = (rader.rader, underlagen.underlag, underlagen.arenden, copy.deepcopy(format_))
     resultat = matcha_period(rader, underlagen, format_, "2025-12-31")
-    assert (rader, underlagen.underlag, underlagen.arenden, format_) == fore
-    assert rader is lista and all(type(rad) is dict for rad in rader)
+    assert (rader.rader, underlagen.underlag, underlagen.arenden, format_) == fore
     # Resultatet är en kopia: att ändra indatan efteråt ändrar inte resultatet.
-    rader[0]["belopp_ore"] = 1
-    rader.append({})
+    format_["kraver_inte_underlag"].clear()
     assert resultat.matchningar[0]["bankrad"]["belopp_ore"] == -12500
     assert len([post for grupp in GRUPPER_FOR_BANKRADER for post in getattr(resultat, grupp)]) == 3
 
@@ -658,41 +649,46 @@ FARLIGA_VARDEN = [None, True, False, 0, -1, 1.5, 10 ** 30, -10 ** 30, "", " ", "
 
 
 def skada_rader(rng, rader, motparter):
-    rader = copy.deepcopy(rader)
-    sort = rng.randrange(9)
-    if sort == 0 and rader:  # byt ut ett värde
-        rad = rng.choice(rader)
-        rad[rng.choice(sorted(rad))] = rng.choice(FARLIGA_VARDEN)
-    elif sort == 1 and rader:  # ta bort eller lägg till en nyckel
-        rad = rng.choice(rader)
-        if rng.random() < 0.5:
-            del rad[rng.choice(sorted(rad))]
-        else:
-            rad[rng.choice(["extra", "Id", 1, None])] = 1
-    elif sort == 2 and rader:  # samma rad två gånger
-        rader.insert(rng.randrange(len(rader) + 1), copy.deepcopy(rng.choice(rader)))
-    elif sort == 3 and rader:  # en rad som inte är en rad
-        rader[rng.randrange(len(rader))] = rng.choice(FARLIGA_VARDEN)
-    elif sort == 4:  # hela listan byts ut
-        return rng.choice([None, {}, "rader", 5, tuple(rader), rader[:1], []])
-    elif sort == 5 and rader:  # en giltig ändring: belopp, datum, motpart eller mönster
-        rad = rng.choice(rader)
+    """Ändringar i en liten bankfils rader, (referens, beskrivning, belopp_ore, transaktionsdag). Bankfilen
+    skrivs sedan och läses med las_bankfil, så att matchningen bara får en Bankperiod."""
+    rader = list(rader)
+    sort = rng.randrange(5)
+    if sort == 0 and rader:  # belopp, datum, motpart eller mönster
+        nummer = rng.randrange(len(rader))
+        referens, beskrivning, belopp, dag = rader[nummer]
         val = rng.randrange(4)
         if val == 0:
-            rad["belopp_ore"] = rng.choice([-rad["belopp_ore"], rad["belopp_ore"] + 1, 0, -12500, 100])
+            belopp = rng.choice([-belopp, belopp + 1, 0, -12500, 100])
         elif val == 1:
-            rad["transaktionsdag"] = rng.choice(["2025-01-01", "2025-01-10", "2025-02-09", "9999-12-31", "0001-01-01"])
+            dag = rng.choice(["2025-01-01", "2025-01-10", "2025-02-09", "9999-12-31", "0001-01-01"])
         elif val == 2:
-            rad["beskrivning"] = rng.choice(motparter + ["X " + rng.choice(motparter), "AVGIFT X", "KORT IN"])
+            beskrivning = rng.choice(motparter + ["X " + rng.choice(motparter), "AVGIFT X", "KORT IN"])
         else:
-            rad["referens"] = rng.choice(["IN-1", "K-1", "F-1", "", rng.choice(motparter)])
-        rad["id"] = rad["id"] + "-" + str(rng.randrange(10 ** 6))  # ett nytt id, som efter en ändring i filen
-    elif sort == 6 and rader:  # byt plats på två rader
+            referens = rng.choice(["IN-1", "K-1", "F-1", "", rng.choice(motparter)])
+        rader[nummer] = (referens, beskrivning, belopp, dag)
+    elif sort == 1 and rader:  # samma rad två gånger (med ett nytt radnummer i filen)
+        rader.insert(rng.randrange(len(rader) + 1), rng.choice(rader))
+    elif sort == 2 and rader:  # byt plats på två rader
         a, b = rng.randrange(len(rader)), rng.randrange(len(rader))
         rader[a], rader[b] = rader[b], rader[a]
-    elif sort == 7 and rader:  # ta bort en rad
+    elif sort == 3 and len(rader) > 1:  # ta bort en rad
         del rader[rng.randrange(len(rader))]
     return rader
+
+
+def inte_en_bankperiod(rng, bankperiod):
+    """Något annat än en Bankperiod, till exempel periodens rader som en lista. Ska alltid ge MatchningFel."""
+    rader = bankperiod.rader
+    return rng.choice([None, {}, "rader", 5, [], (), rader, tuple(rader), rader[1:], rader + rader[:1],
+                       rader[:1] + [{"id": "x"}], dt.date(2025, 1, 1)])
+
+
+def ogonblick(varde):
+    """En jämförbar kopia av indatan. En Bankperiod kopieras med sina rader och saldon, eftersom den
+    inte går att kopiera med deepcopy (den kan inte ändras, inte ens av deepcopy)."""
+    if type(varde) is Bankperiod:
+        return ("Bankperiod", varde.rader, varde.ingaende_saldo_ore, varde.utgaende_saldo_ore)
+    return copy.deepcopy(varde)
 
 
 def skada_format(rng, format_):
@@ -743,10 +739,10 @@ def skada_underlag(rng, poster):
     return poster
 
 
-def ar_giltigt(resultat, rader, underlagen, format_, bedomning):
+def ar_giltigt(resultat, bankperiod, underlagen, format_, bedomning):
     """Ett resultat ska alltid följa reglerna i matcha_bank.py."""
     format_ = kontrollera_matchningsformat(format_)
-    kontrollera_grupperna(resultat, rader, underlagen)
+    kontrollera_grupperna(resultat, bankperiod, underlagen)
     dag = dt.date.fromisoformat(bedomning)
     for matchning in resultat.matchningar:
         rad, post = matchning["bankrad"], matchning["underlag"]
@@ -769,47 +765,53 @@ def ar_giltigt(resultat, rader, underlagen, format_, bedomning):
 
 def test_fuzz_skadade_indata_ger_ratt_resultat_eller_matchningfel(tmp_path, kvartalet):
     rng = random.Random(20251025)
-    sma_rader = bankrader(tmp_path, ("F-1", "LEV-A", -12500, "2025-01-20"), ("F-2", "LEV-B", -500, "2025-01-21"),
-                          ("IN-1", "X", 100, "2025-01-21"), ("X-1", "AVGIFT KONTO", -125, "2025-01-31"),
-                          ("K-1", "KORT IN 2025-01-21", 300, "2025-01-22"), ("Z-1", "OKAND", -77, "2025-01-25"))
+    sma_rader = [("F-1", "LEV-A", -12500, "2025-01-20"), ("F-2", "LEV-B", -500, "2025-01-21"),
+                 ("IN-1", "X", 100, "2025-01-21"), ("X-1", "AVGIFT KONTO", -125, "2025-01-31"),
+                 ("K-1", "KORT IN 2025-01-21", 300, "2025-01-22"), ("Z-1", "OKAND", -77, "2025-01-25")]
     sma_underlag = [underlag(), underlag(id="U-2", motpart="LEV-B", fakturanummer="F-2", belopp_ore=500,
                                          typ="kvitto", datum="2025-01-20"),
                     underlag(id="U-3", fakturanummer="F-3", belopp_ore=999)]
     motparter = ["LEV-A", "LEV-B", "lev-a", "LEV-TE", "KORTKOP BUTIK-STAD"]
     resultat_antal = stoppade = 0
     for nummer in range(600):
-        if nummer % 2:  # testdatans kvartal, med skadade bankrader eller skadat format
-            rader, underlagen, format_ = kvartalet["rader"], kvartalet["period"], MATCHNINGSFORMAT
-        else:  # små påhittade fall, där även underlagen skadas och läses in igen
-            rader, format_ = sma_rader, FORMAT
+        if nummer % 2:  # testdatans kvartal eller februari, med skadat format
+            bankperiod = rng.choice([kvartalet["bankperiod"], kvartalet["februari"]])
+            underlagen, format_ = kvartalet["period"], MATCHNINGSFORMAT
+        else:  # små påhittade fall, där bankfilen och underlagen ändras och läses in igen
+            format_ = FORMAT
             mapp = tmp_path / str(nummer)
             mapp.mkdir()
             poster = sma_underlag
             for _ in range(rng.choice([0, 1, 2])):
                 poster = skada_underlag(rng, poster)
+            rader = sma_rader
+            for _ in range(rng.choice([0, 1, 2, 3])):
+                rader = skada_rader(rng, rader, motparter)
             try:
                 underlagen = period(mapp, *poster)
-            except UnderlagFilFel:
+                bankperiod = bankrader(mapp, *rader)
+            except (UnderlagFilFel, BankfilFel):
                 stoppade += 1
                 continue
         for _ in range(rng.choice([1, 1, 2, 3])):
             val = rng.random()
-            if val < 0.5 and isinstance(rader, list):
-                rader = skada_rader(rng, rader, motparter)
+            if val < 0.15 and type(bankperiod) is Bankperiod:
+                bankperiod = inte_en_bankperiod(rng, bankperiod)
             elif val < 0.85 and isinstance(format_, dict) and isinstance(format_.get("kraver_inte_underlag"), list) \
                     and isinstance(format_.get("tidsfonster_dagar"), dict):
                 format_ = skada_format(rng, format_)
         bedomning = rng.choice(["2025-01-25", "2025-02-28", "2025-04-30", "9999-12-31", "2025-13-01", None])
-        fore = copy.deepcopy((rader, format_))
+        fore = (ogonblick(bankperiod), copy.deepcopy(format_))
         try:
-            resultat = matcha_period(rader, underlagen, format_, bedomning)
+            resultat = matcha_period(bankperiod, underlagen, format_, bedomning)
         except MatchningFel as fel:
             assert str(fel) and not str(fel).startswith(("Traceback", "'")), str(fel)
             stoppade += 1
         else:
-            ar_giltigt(resultat, rader, underlagen, format_, bedomning)
+            assert type(bankperiod) is Bankperiod  # allt annat än en Bankperiod ska ge MatchningFel
+            ar_giltigt(resultat, bankperiod, underlagen, format_, bedomning)
             resultat_antal += 1
-        assert copy.deepcopy((rader, format_)) == fore  # indatan är oförändrad
+        assert (ogonblick(bankperiod), copy.deepcopy(format_)) == fore  # indatan är oförändrad
     # Skydd: fuzzen ska ge både resultat och stopp, annars prövar den inte mycket.
     assert resultat_antal > 100 and stoppade > 150, (resultat_antal, stoppade)
 

@@ -55,7 +55,7 @@ KASSA_RADER = [
 def las_bank(mapp, rader):
     fil = mapp / "bank.csv"
     fil.write_bytes(("\n".join(rader) + "\n").encode("utf-8"))
-    return las_bankfil(fil, BANKFORMAT, 0, 300)
+    return las_bankfil(fil, BANKFORMAT, 0, 300).rader
 
 
 def las_kassa(mapp, rader):
@@ -237,7 +237,7 @@ def test_i4_text_och_path_godtas(tmp_path):
     fil = tmp_path / "bank.csv"
     fil.write_text("\n".join([BANK_RUBRIK] + BANK_RADER) + "\n", encoding="utf-8")
     for sokvag in (fil, str(fil), Text(str(fil))):
-        assert len(las_bankfil(sokvag, BANKFORMAT, 0, 300)) == 2
+        assert len(las_bankfil(sokvag, BANKFORMAT, 0, 300).rader) == 2
     for sokvag in (BANKFORMAT_FIL, str(BANKFORMAT_FIL)):
         assert ladda_bankformat(sokvag) == BANKFORMAT
     for sokvag in (KASSAFORMAT_FIL, str(KASSAFORMAT_FIL)):

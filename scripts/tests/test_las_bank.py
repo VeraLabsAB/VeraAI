@@ -17,7 +17,10 @@ DATAMAPP = AGENT / "testdata" / "syntet-testbutik" / "2025-Q1"
 
 sys.path.insert(0, str(AGENT / "scripts"))
 
-from las_bank import BankfilFel, K1Fel, _tolka_rader, kontrollera_k1, ladda_bankformat, las_bankfil
+import las_bank
+from las_bank import (
+    Bankperiod, BankfilFel, K1Fel, _tolka_rader, kontrollera_k1, ladda_bankformat, las_bankfil, sla_ihop_bankperioder,
+)
 
 BANKFORMAT_FIL = AGENT / "foretag" / "syntet-testbutik" / "bankformat.json"
 BANKFORMAT = ladda_bankformat(BANKFORMAT_FIL)
@@ -49,18 +52,18 @@ def utan_kalla_fil(rader):
 
 def test_januari_och_februari_klarar_k1():
     bank = facit()["bank"]
-    januari = las_bankfil(bankfil("2025-01"), BANKFORMAT, *saldon("2025-01"))
+    januari = las_bankfil(bankfil("2025-01"), BANKFORMAT, *saldon("2025-01")).rader
     assert januari[-1]["saldo_efter_ore"] == bank["2025-01"]["utgaende_saldo_ore"]
 
     # Februaris ingående saldo är januaris utgående, både i facit och i filen.
     assert bank["2025-02"]["ingaende_saldo_ore"] == bank["2025-01"]["utgaende_saldo_ore"]
     februari = las_bankfil(bankfil("2025-02"), BANKFORMAT, januari[-1]["saldo_efter_ore"],
-                           bank["2025-02"]["utgaende_saldo_ore"])
+                           bank["2025-02"]["utgaende_saldo_ore"]).rader
     assert februari[-1]["saldo_efter_ore"] == bank["2025-02"]["utgaende_saldo_ore"]
 
 
 def test_raderna_har_ratt_falt():
-    rader = las_bankfil(bankfil("2025-01"), BANKFORMAT, *saldon("2025-01"))
+    rader = las_bankfil(bankfil("2025-01"), BANKFORMAT, *saldon("2025-01")).rader
     assert all(list(rad) == FALT for rad in rader)
     assert rader[0]["radnr"] == 1
     assert rader[0]["bokforingsdag"] == "2025-01-02"
@@ -136,8 +139,8 @@ def test_windows_1252_ger_samma_resultat(tmp_path):
     kopia.write_bytes(original.read_text(encoding="utf-8").encode("cp1252"))
     assert kopia.read_bytes() != original.read_bytes()
 
-    fran_original = las_bankfil(original, BANKFORMAT, *saldon("2025-01"))
-    fran_kopia = las_bankfil(kopia, BANKFORMAT, *saldon("2025-01"))
+    fran_original = las_bankfil(original, BANKFORMAT, *saldon("2025-01")).rader
+    fran_kopia = las_bankfil(kopia, BANKFORMAT, *saldon("2025-01")).rader
     # Allt är lika utom kontrollsumman av filen, eftersom filerna har olika bytes.
     assert utan_kalla_fil(fran_kopia) == utan_kalla_fil(fran_original)
     assert fran_kopia[0]["kalla_fil"] != fran_original[0]["kalla_fil"]
@@ -155,8 +158,8 @@ def test_semikolon_och_rader_fore_rubriken_ger_samma_resultat(tmp_path):
     kopia.write_bytes(text.getvalue().encode("utf-8"))
     assert kopia.read_text(encoding="utf-8").splitlines()[2].startswith("Radnummer;")
 
-    fran_original = las_bankfil(original, BANKFORMAT, *saldon("2025-01"))
-    fran_kopia = las_bankfil(kopia, BANKFORMAT, *saldon("2025-01"))
+    fran_original = las_bankfil(original, BANKFORMAT, *saldon("2025-01")).rader
+    fran_kopia = las_bankfil(kopia, BANKFORMAT, *saldon("2025-01")).rader
     assert utan_kalla_fil(fran_kopia) == utan_kalla_fil(fran_original)
     assert fran_kopia[0]["kalla_fil"] != fran_original[0]["kalla_fil"]
 
@@ -164,7 +167,7 @@ def test_semikolon_och_rader_fore_rubriken_ger_samma_resultat(tmp_path):
 # --- (e) Beloppen är heltal ---
 
 def test_beloppen_ar_heltal_aldrig_float():
-    rader = las_bankfil(bankfil("2025-01"), BANKFORMAT, *saldon("2025-01"))
+    rader = las_bankfil(bankfil("2025-01"), BANKFORMAT, *saldon("2025-01")).rader
     for rad in rader:
         for falt in ("belopp_ore", "saldo_efter_ore", "radnr"):
             assert type(rad[falt]) is int, (rad["radnr"], falt)
@@ -460,8 +463,8 @@ def test_f5_annat_bankformat_laser_samma_data(tmp_path):
     assert kopia.read_text(encoding="utf-8").startswith("Balance\tAmount\t")
 
     engelskt = ladda_bankformat(skriv_bankformat(tmp_path, ENGELSKT_FORMAT))
-    fran_original = las_bankfil(bankfil("2025-01"), BANKFORMAT, *saldon("2025-01"))
-    fran_kopia = las_bankfil(kopia, engelskt, *saldon("2025-01"))
+    fran_original = las_bankfil(bankfil("2025-01"), BANKFORMAT, *saldon("2025-01")).rader
+    fran_kopia = las_bankfil(kopia, engelskt, *saldon("2025-01")).rader
     assert utan_kalla_fil(fran_kopia) == utan_kalla_fil(fran_original)
 
     # Formatet styr verkligen: fel format för filen hittar ingen rubrikrad, åt båda hållen.
@@ -583,7 +586,7 @@ def test_g1_styrtecken_i_vanligt_falt_stoppas(tmp_path):
 def test_g1_tabb_och_vanliga_radslut_ar_tillatna(tmp_path):
     """Skydd: tabb, \\n och \\r\\n är fortfarande tillåtna."""
     fil = skriv(tmp_path, RUBRIK.replace("\n", "\r\n") + "1,2025-01-02,2025-01-02,REF-1,M\tX,1.00,1.00\r\n")
-    assert las_bankfil(fil, BANKFORMAT, 0, 100)[0]["beskrivning"] == "M\tX"
+    assert las_bankfil(fil, BANKFORMAT, 0, 100).rader[0]["beskrivning"] == "M\tX"
 
 
 @pytest.mark.parametrize(
@@ -675,3 +678,154 @@ def test_g8_true_och_false_som_saldo_stoppas(tmp_path, belopp, saldo, ingaende, 
     fil = skriv(tmp_path, RUBRIK + "1,2025-01-02,2025-01-02,REF-1,M," + belopp + "," + saldo + "\n")
     with pytest.raises(TypeError, match="heltal i öre, inte bool"):
         las_bankfil(fil, BANKFORMAT, ingaende, utgaende)
+
+
+# --- Bankperiod: resultatet går inte att ändra (Hugos beslut 2026-10-25) ---
+
+def liten_period(mapp, namn, ingaende, *belopp):
+    """Skriver en liten bankfil med beloppen (i öre) och läser den med las_bankfil."""
+    saldo, rader = ingaende, []
+    for nummer, ore in enumerate(belopp, start=1):
+        saldo += ore
+        rader.append(str(nummer) + ",2025-01-02,2025-01-02,REF-" + str(nummer) + ",M," + formatera(ore) + ","
+                     + formatera(saldo) + "\n")
+    fil = mapp / namn
+    fil.write_text(RUBRIK + "".join(rader), encoding="utf-8")
+    return las_bankfil(fil, BANKFORMAT, ingaende, saldo)
+
+
+def formatera(ore):
+    return ("-" if ore < 0 else "") + str(abs(ore) // 100) + "." + str(abs(ore) % 100).zfill(2)
+
+
+def test_bankperiod_bar_raderna_och_saldona():
+    ingaende, utgaende = saldon("2025-01")
+    period = las_bankfil(bankfil("2025-01"), BANKFORMAT, ingaende, utgaende)
+    assert type(period) is Bankperiod
+    assert period.rader == _tolka_rader(bankfil("2025-01").read_bytes(), BANKFORMAT)
+    assert (period.ingaende_saldo_ore, period.utgaende_saldo_ore) == (ingaende, utgaende)
+    assert all(type(rad) is dict for rad in period.rader)
+    assert (len(period.rader), ingaende, utgaende) == (118, 8500000, 19276493)  # enligt facit
+    assert repr(period) == "Bankperiod(118 rader, ingående saldo 85000,00 kr, utgående saldo 192764,93 kr)"
+
+
+def test_bankperiod_kan_inte_andras_utifran(tmp_path):
+    period = liten_period(tmp_path, "bank.csv", 0, 100, -40)
+    fore = period.rader
+    # Raderna som läses ut är kopior. Att ta bort eller ändra en rad i dem når inte perioden.
+    utlast = period.rader
+    del utlast[0]
+    utlast[0]["belopp_ore"] = 99999900
+    utlast.append(dict(utlast[0]))
+    period.rader.clear()
+    assert period.rader == fore and len(fore) == 2
+    assert period.rader is not period.rader and period.rader[0] is not period.rader[0]
+    # Perioden själv går inte att ändra.
+    for namn in ("_rader", "_ingaende_saldo_ore", "_utgaende_saldo_ore", "rader", "ingaende_saldo_ore", "ny"):
+        with pytest.raises(AttributeError):
+            setattr(period, namn, [])
+        with pytest.raises(AttributeError):
+            delattr(period, namn)
+    with pytest.raises(TypeError):
+        period._rader[0]["belopp_ore"] = 1
+    with pytest.raises(AttributeError):
+        period._rader.append({})
+    assert period.rader == fore
+
+
+def test_bankperiod_kan_bara_skapas_av_las_bankfil(tmp_path):
+    rader = liten_period(tmp_path, "bank.csv", 0, 100).rader
+    for nyckel in (None, object(), "nyckel", Bankperiod):
+        with pytest.raises(BankfilFel, match="En Bankperiod kan bara skapas av las_bankfil eller sla_ihop_bankperioder"):
+            Bankperiod(nyckel, rader, 0, 100)
+    with pytest.raises(TypeError):
+        Bankperiod(rader, 0, 100)
+    # Skydd: med nyckeln går det (bara las_bank.py själv och testerna får använda den, test_inga_genvagar.py).
+    assert Bankperiod(las_bank._PERIODNYCKEL, rader, 0, 100).rader == rader
+
+
+def test_sla_ihop_januari_och_februari():
+    bank = facit()["bank"]
+    januari = las_bankfil(bankfil("2025-01"), BANKFORMAT, *saldon("2025-01"))
+    februari = las_bankfil(bankfil("2025-02"), BANKFORMAT, januari.utgaende_saldo_ore,
+                           bank["2025-02"]["utgaende_saldo_ore"])
+    ihop = sla_ihop_bankperioder([januari, februari])
+    assert type(ihop) is Bankperiod
+    assert ihop.rader == januari.rader + februari.rader
+    assert len(ihop.rader) == bank["2025-01"]["antal_rader"] + bank["2025-02"]["antal_rader"]
+    assert (ihop.ingaende_saldo_ore, ihop.utgaende_saldo_ore) == (
+        bank["2025-01"]["ingaende_saldo_ore"], bank["2025-02"]["utgaende_saldo_ore"])
+    assert sla_ihop_bankperioder((januari,)).rader == januari.rader  # en tupel med en period går också
+
+
+def test_sla_ihop_stoppar_perioder_som_inte_hanger_ihop(tmp_path):
+    forsta = liten_period(tmp_path, "a.csv", 0, 100)          # 0,00 kr till 1,00 kr
+    andra = liten_period(tmp_path, "b.csv", 100, 50)          # 1,00 kr till 1,50 kr
+    tredje = liten_period(tmp_path, "c.csv", 150, -25)        # 1,50 kr till 1,25 kr
+    assert sla_ihop_bankperioder([forsta, andra, tredje]).utgaende_saldo_ore == 125  # skydd: de hänger ihop
+    with pytest.raises(BankfilFel) as fel:
+        sla_ihop_bankperioder([forsta, tredje])                 # andra saknas
+    assert str(fel.value) == (
+        "Bankperioderna hänger inte ihop: Bankperiod nummer 2 har ingående saldo 1,50 kr, men Bankperiod nummer 1"
+        " har utgående saldo 1,00 kr, skillnad 0,50 kr. Det kan saknas rader mellan dem, eller så är de i fel"
+        " ordning.")
+    with pytest.raises(BankfilFel, match="^Bankperioderna hänger inte ihop: Bankperiod nummer 3 har ingående saldo"
+                                         " 1,00 kr, men Bankperiod nummer 2 har utgående saldo 1,25 kr"):
+        sla_ihop_bankperioder([andra, tredje, andra])          # andra två gånger, och inte i ordning
+    with pytest.raises(BankfilFel, match="^Bankperioderna hänger inte ihop: Bankperiod nummer 2"):
+        sla_ihop_bankperioder([andra, forsta])                  # fel ordning
+
+
+def test_sla_ihop_stoppar_samma_bankrad_tva_ganger(tmp_path):
+    # En bankfil där pengarna in och ut tar ut varandra hänger ihop med sig själv. Samma fil två
+    # gånger stoppas ändå, eftersom raderna finns två gånger.
+    noll = liten_period(tmp_path, "noll.csv", 0, 100, -100)
+    with pytest.raises(BankfilFel) as fel:
+        sla_ihop_bankperioder([noll, noll])
+    rad = noll.rader[0]
+    assert str(fel.value) == (
+        "Bankraden med id " + repr(rad["id"]) + " (radnummer 1) finns i flera Bankperioder. Samma bankfil kan vara"
+        " inläst två gånger. Varje bankrad ska finnas en gång.")
+    # Samma rad i två olika filer, till exempel en export som överlappar en annan.
+    kopia = liten_period(tmp_path, "kopia.csv", 0, 100, -100)
+    assert kopia.rader[0]["kalla_fil"] == noll.rader[0]["kalla_fil"]  # filerna har samma innehåll
+    with pytest.raises(BankfilFel, match="finns i flera Bankperioder"):
+        sla_ihop_bankperioder([noll, kopia])
+    # Skydd: två olika filer som båda börjar och slutar på 0 kr går att sätta ihop.
+    annan = liten_period(tmp_path, "annan.csv", 0, 200, -200)
+    assert len(sla_ihop_bankperioder([noll, annan]).rader) == 4
+
+
+def test_sla_ihop_tar_bara_emot_bankperioder(tmp_path):
+    period = liten_period(tmp_path, "bank.csv", 0, 100)
+
+    class Underklass(Bankperiod):
+        __slots__ = ()
+
+    for varde, text in [(None, "NoneType"), (period, "Bankperiod"), (iter([period]), "list_iterator"),
+                        ({1: period}, "dict"), (period.rader, None)]:
+        if text is None:  # en lista med rader i stället för perioder
+            with pytest.raises(BankfilFel, match="^Bankperiod nummer 1 ska vara en Bankperiod från las_bankfil,"
+                                                 " inte dict"):
+                sla_ihop_bankperioder(varde)
+            continue
+        with pytest.raises(BankfilFel, match="^Bankperioderna ska vara en lista med Bankperioder från las_bankfil,"
+                                             " inte " + text + r"\."):
+            sla_ihop_bankperioder(varde)
+    for tomt in ([], ()):
+        with pytest.raises(BankfilFel, match="^Det finns inga Bankperioder att sätta ihop"):
+            sla_ihop_bankperioder(tomt)
+    for annat, text in [(period.rader, "list"), (None, "NoneType"), (Underklass.__new__(Underklass), "Underklass")]:
+        with pytest.raises(BankfilFel, match="^Bankperiod nummer 2 ska vara en Bankperiod från las_bankfil, inte "
+                                             + text + r"\."):
+            sla_ihop_bankperioder([period, annat])
+
+
+def test_sla_ihop_ger_en_ny_period_som_inte_delar_nagot_med_de_gamla(tmp_path):
+    forsta = liten_period(tmp_path, "a.csv", 0, 100)
+    andra = liten_period(tmp_path, "b.csv", 100, 50)
+    ihop = sla_ihop_bankperioder([forsta, andra])
+    ihop.rader[0]["belopp_ore"] = 1
+    assert forsta.rader[0]["belopp_ore"] == 100 and ihop.rader[0]["belopp_ore"] == 100
+    with pytest.raises(AttributeError):
+        ihop.ingaende_saldo_ore = 0

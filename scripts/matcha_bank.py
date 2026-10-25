@@ -2,14 +2,17 @@
 
 matcha_period är den enda offentliga funktionen. Den tar emot:
 
-  bankrader         raderna från las_bankfil (las_bank.py), från en eller flera bankfiler
+  bankperiod        en Bankperiod från las_bankfil (las_bank.py), eller från sla_ihop_bankperioder
+                    för flera bankfiler. Där har K1 redan kontrollerat raderna
   underlagsperiod   en Underlagsperiod från las_underlagsperiod (las_underlag.py), där K4 redan har
                     tagit bort dubbletterna
   matchningsformat  företagets matchningsformat från ladda_matchningsformat (las_matchningsformat.py)
   bedomningsdatum   dagen då bedömningen görs, som text ÅÅÅÅ-MM-DD
 
-Allt som skickas in kontrolleras och kopieras först. Det som skickades in ändras aldrig. Fel i
-indatan stoppar matchningen med ett MatchningFel, och inget resultat returneras.
+Bankraderna tas bara emot som en Bankperiod, aldrig som en lista: en Bankperiod går inte att
+ändra, så ingen bankrad kan ha tagits bort efter inläsningen. Allt som skickas in kontrolleras och
+kopieras först. Det som skickades in ändras aldrig. Fel i indatan stoppar matchningen med ett
+MatchningFel, och inget resultat returneras.
 
 Reglerna:
 
@@ -53,16 +56,11 @@ import re
 from types import MappingProxyType
 from typing import NamedTuple
 
+from las_bank import Bankperiod
 from las_kassa import normalisera_kassaregister as _normalisera
 from las_matchningsformat import MatchningsformatFel, kontrollera_matchningsformat
 from las_underlag import Underlagsperiod
 
-# Uppgifterna i en bankrad från las_bankfil.
-_BANKRAD_NYCKLAR = ("id", "bokforingsdag", "transaktionsdag", "referens", "beskrivning", "belopp_ore",
-                    "saldo_efter_ore", "kalla_fil", "radnr")
-_TEXTER = ("id", "referens", "beskrivning", "kalla_fil")
-_DATUM = ("bokforingsdag", "transaktionsdag")
-_HELTAL = ("belopp_ore", "saldo_efter_ore", "radnr")
 _DATUMFORM = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
 
 # Ärendenas typ och kontroll. K3: varje förslag har underlag.
@@ -130,45 +128,6 @@ def _sort(varde):
     return _SORTER.get(type(varde), type(varde).__name__)
 
 
-def _kontrollera_bankrad(rad, nummer):
-    """En bankrad från las_bankfil. Returnerar en ny rad."""
-    vad = "Bankrad nummer " + str(nummer) + " i listan"
-    if not isinstance(rad, dict):
-        raise MatchningFel(vad + " ska vara en rad från las_bankfil, inte " + _sort(rad) + ".")
-    if set(rad) != set(_BANKRAD_NYCKLAR):
-        raise MatchningFel(
-            vad + " har inte uppgifterna som las_bankfil ger: " + ", ".join(map(repr, _BANKRAD_NYCKLAR)) + "."
-        )
-    for nyckel in _TEXTER:
-        if not isinstance(rad[nyckel], str):
-            raise MatchningFel(vad + ": " + repr(nyckel) + " ska vara text, inte " + _sort(rad[nyckel]) + ".")
-    if not rad["id"]:
-        raise MatchningFel(vad + ": 'id' får inte vara tomt.")
-    for nyckel in _DATUM:
-        _datum(rad[nyckel], vad + ": " + repr(nyckel))
-    for nyckel in _HELTAL:
-        # type() i stället för isinstance(), eftersom True och False räknas som heltal i Python.
-        if type(rad[nyckel]) is not int:
-            raise MatchningFel(vad + ": " + repr(nyckel) + " ska vara ett heltal, inte " + _sort(rad[nyckel]) + ".")
-    return {nyckel: rad[nyckel] for nyckel in _BANKRAD_NYCKLAR}
-
-
-def _kontrollera_bankrader(bankrader):
-    """Bankraderna som nya rader. Varje rad ska ha ett eget id."""
-    if not isinstance(bankrader, (list, tuple)):
-        raise MatchningFel("Bankraderna ska vara en lista med rader från las_bankfil, inte " + _sort(bankrader) + ".")
-    rader = [_kontrollera_bankrad(rad, nummer) for nummer, rad in enumerate(bankrader, start=1)]
-    sedda = set()
-    for rad in rader:
-        if rad["id"] in sedda:
-            raise MatchningFel(
-                "Bankraden med id " + repr(rad["id"]) + " finns flera gånger. Samma bankfil kan vara inläst två"
-                " gånger. Varje bankrad ska ha ett eget id."
-            )
-        sedda.add(rad["id"])
-    return rader
-
-
 # --- Reglerna ---
 
 def _regel_for(rad, regler):
@@ -234,13 +193,18 @@ def _arende(typ, text, rad, kandidater):
     return {"kontroll": _KONTROLL, "typ": typ, "text": text, "bankrad": rad, "kandidater": kandidater}
 
 
-def matcha_period(bankrader, underlagsperiod, matchningsformat, bedomningsdatum):
-    """Matchar bankraderna mot underlagen i perioden. Returnerar ett Matchningsresultat.
+def matcha_period(bankperiod, underlagsperiod, matchningsformat, bedomningsdatum):
+    """Matchar bankraderna i bankperioden mot underlagen i perioden. Returnerar ett Matchningsresultat.
 
     Se reglerna överst i filen. Fel i indatan ger MatchningFel.
     """
-    rader = _kontrollera_bankrader(bankrader)
     # type() i stället för isinstance(), så att en underklass med andra regler inte godtas.
+    if type(bankperiod) is not Bankperiod:
+        raise MatchningFel(
+            "Bankraderna ska vara en Bankperiod från las_bankfil eller sla_ihop_bankperioder, inte "
+            + _sort(bankperiod) + "."
+        )
+    rader = bankperiod.rader  # nya kopior, i filernas ordning
     if type(underlagsperiod) is not Underlagsperiod:
         raise MatchningFel(
             "Underlagen ska vara en Underlagsperiod från las_underlagsperiod, inte " + _sort(underlagsperiod) + "."

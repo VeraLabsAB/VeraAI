@@ -1292,3 +1292,68 @@ Beslutade 2026-10-25, efter del C. Ingen kod är ändrad av besluten än.
 | Bankens avgifter slipper underlag oavsett belopp | Nytt krav i konfigurationen: varje regel i `kraver_inte_underlag` för utgående rader måste ha en högsta summa per bankrad. En rad som passar regeln men ligger över summan blir ett ärende direkt, med en egen typ (till exempel "över gräns för regeln bankavgift"), och matchas inte först mot underlag. För Syntet Testbutik är gränsen för `bankavgift` 250 kr (avgifterna i testdatan är 125 och 199 kr) | Egen uppgift, nu. Bankens avgiftsspecifikation som riktigt underlag kommer senare: den kräver en ny dokumenttyp i SPEC (förslag till ny öppen fråga) |
 | `matchning.json` ligger där agenten kan skriva | Matchningsformatet skrivs in i SPEC avsnitt 7 bland filerna som ska ligga där agenten inte kan skriva | Gjort i SPEC.md (samma commit som det här avsnittet). Själva flytten görs i spärrsteget, som för bank- och kassaformatet |
 | Ett `Matchningsresultat` kan skapas av annan kod | **Krav på rapportsteget:** rapporten kör `matcha_period` själv och tar aldrig emot ett färdigt `Matchningsresultat`. När rapportsteget byggs får resultatet samma nyckelskydd som `Underlagsperiod`, och genvägstestet får ett undantag för det, med flit | Regeln gäller nu. Skyddet byggs i rapportsteget |
+
+## Åtgärd 2026-10-25: bankfilens resultat går inte att ändra (Bankperiod)
+
+Gjort i en egen session, efter Hugos beslut ovan ("En borttagen bankrad syns inte"), före granskningen av del B och C. Ingen granskares text ovan är ändrad. SPEC.md, testdatan, facit och `foretag/` är inte ändrade.
+
+**Ord som används nedan.** En **Bankperiod** är det `las_bankfil` nu returnerar: bankraderna plus periodens ingående och utgående saldo, i ett objekt som inte går att ändra. En **nyckel** är ett hemligt värde som bara inläsningsmodulen har. Utan den går det inte att skapa en Bankperiod, så den kan bara komma från en funktion som har kört alla kontroller.
+
+**Felet som rättas.** `las_bankfil` returnerade en vanlig lista. Annan kod kunde ta bort en rad ur listan efter inläsningen, och `matcha_period` kunde inte se det: raden blev aldrig ett ärende. Det bevisades i en kopia av den gamla koden (commit a7cb12f): en bankfil med två rader, där rad 2 saknar underlag, gav ärendet för rad 2. Efter `del rader[1]` gav samma matchning inget ärende alls (`assert [] == ['X-1']`).
+
+**Vad som är byggt.**
+
+| Ändring | Test |
+|---|---|
+| `las_bankfil` returnerar en `Bankperiod` i stället för en lista. Den bär `rader` (i filens ordning, samma form som förut), `ingaende_saldo_ore` och `utgaende_saldo_ore`. Raderna sparas som oföränderliga kopior (`MappingProxyType`, en sorts objekt som bara går att läsa) och `rader` ger nya vanliga kopior varje gång, så att en ändring i dem aldrig når perioden. Tilldelning och borttagning är spärrade. Mönstret är detsamma som `Kassaperiod` och `Underlagsperiod` | `test_las_bank.py`: `test_bankperiod_bar_raderna_och_saldona`, `test_bankperiod_kan_inte_andras_utifran` |
+| En `Bankperiod` kan bara skapas med nyckeln `_PERIODNYCKEL` i `las_bank.py`, som bara `las_bankfil` och `sla_ihop_bankperioder` använder. Utan den: "En Bankperiod kan bara skapas av las_bankfil eller sla_ihop_bankperioder, som kör alla kontroller först." | `test_bankperiod_kan_bara_skapas_av_las_bankfil` |
+| Ny funktion `sla_ihop_bankperioder(perioder)` sätter ihop flera Bankperioder (till exempel januari, februari och mars) till en. Den tar bara en lista eller tupel med minst en Bankperiod (inte en underklass). Varje periods ingående saldo ska vara lika med förra periodens utgående ("Bankperioderna hänger inte ihop: …"), och ingen bankrad (samma id) får finnas två gånger ("… finns i flera Bankperioder. Samma bankfil kan vara inläst två gånger."). Den nya perioden har den första periodens ingående saldo och den sistas utgående | `test_sla_ihop_januari_och_februari`, `test_sla_ihop_stoppar_perioder_som_inte_hanger_ihop` (en saknad period, fel ordning, samma period två gånger), `test_sla_ihop_stoppar_samma_bankrad_tva_ganger` (samma fil två gånger, en kopia av filen, och skyddet att två olika filer på 0 kr går ihop), `test_sla_ihop_tar_bara_emot_bankperioder`, `test_sla_ihop_ger_en_ny_period_som_inte_delar_nagot_med_de_gamla` |
+| `matcha_period(bankperiod, …)` tar bara emot en `Bankperiod` (kontrollen är `type(...) is Bankperiod`, som för `Underlagsperiod`), aldrig en lista eller tupel, inte heller raderna ur en riktig Bankperiod. Annat ger `MatchningFel`: "Bankraderna ska vara en Bankperiod från las_bankfil eller sla_ihop_bankperioder, inte …" | `test_matcha_bank.py`: `test_bankraderna_ska_vara_en_bankperiod` (12 sorters fel värde, även en underklass), `test_en_bankrad_som_tas_bort_efter_inlasningen_blir_anda_ett_arende` (Hugos fall: en rad som tas bort ur de utlästa raderna blir ändå ett ärende), `test_samma_bankfil_tva_ganger_stoppas_redan_nar_perioderna_satts_ihop` |
+| Genvägstestet förbjuder Bankperiodens inre (`_rader`, `_ingaende_saldo_ore`, `_utgaende_saldo_ore`) i all annan kärnkod. Nyckeln heter `_PERIODNYCKEL` som i kassan och underlagen och var därför redan förbjuden | `test_inga_genvagar.py`: `test_i1_bankperiodens_inre_finns_i_modulen_och_ar_forbjudet` (skydd: namnen finns verkligen i `las_bank.py`), 13 fall i `test_i1_kontrollen_hittar_genvagar_forbi_bankperiodens_skydd`, 2 nya fall i `test_i1_kontrollen_hittar_genvagar_i_matchningen`, 1 nytt fall i `test_i1_vanlig_kod_slaps_igenom` |
+
+**Kontroller som togs bort ur `matcha_bank.py`.** Kontrollen av varje bankrad (att raden är ett objekt med exakt uppgifterna från `las_bankfil`, med rätt typer, ett id som inte är tomt och inga dubbla id) är borttagen. Den kan inte längre nås: raderna kommer bara ur en Bankperiod, och de har redan gått igenom inläsningen och K1. Dubbla id stoppas nu i `sla_ihop_bankperioder` i stället. Kvar i matchningen hade de varit kontroller som inget test kan bevisa, eftersom mutationstestet inte kan göra dem röda. Det gäller m01–m09 i del C:s tabell ovan, som därmed inte längre finns i koden.
+
+**Ändrade befintliga tester.** Alla rör att resultatet nu är en Bankperiod och inte en lista:
+
+- `test_las_bank.py` och `test_bank_och_kassa.py`: raderna läses med `.rader` där testerna använder dem. Inget annat i testerna är ändrat.
+- `test_matcha_bank.py`: kvartalet sätts ihop med `sla_ihop_bankperioder` (förut med `+` mellan listorna), och varje månads ingående saldo tas från förra Bankperiodens `utgaende_saldo_ore`. Hjälpfunktionen `bankrader` ger en Bankperiod och kan börja på ett annat saldo. `test_bankrader_av_fel_typ_stoppas` (6 fall), `test_trasiga_bankrader_stoppas` (15 fall) och `test_samma_bankrad_tva_ganger_stoppas` är ersatta av de tre nya testerna i tabellen, eftersom trasiga rader inte längre kan skickas in. `test_flera_bankfiler_och_tom_lista` heter nu `test_flera_bankfiler`: en tom lista eller en tupel kan inte längre skickas in, och en Bankperiod kan inte vara tom (`las_bankfil` stoppar en fil utan rader). I `test_datumets_form_kontrolleras_aven_med_nyare_python` är delen som ändrade en bankrads transaktionsdag borttagen, av samma skäl; delen om bedömningsdatumet är kvar. `test_indatan_andras_aldrig` jämför Bankperiodens rader före och efter.
+- Fuzzen (`test_fuzz_skadade_indata_ger_ratt_resultat_eller_matchningfel`): skadorna med värden av fel typ i bankraderna, borttagna nycklar och rader som inte är rader är borttagna, eftersom de inte längre kan nå matchningen. I stället ändras den lilla bankfilens rader (belopp, datum, motpart, referens, dubblerade, omkastade och borttagna rader), filen skrivs och läses med `las_bankfil`, och ibland byts Bankperioden mot något annat (bland annat dess egna rader som lista), vilket alltid ska ge `MatchningFel`. För testdatans del väljs hela kvartalet eller februari.
+
+**Så bevisades testerna.** I en kopia utanför projektet med koden från commit a7cb12f och de nya testfilerna gick `test_las_bank.py` och `test_matcha_bank.py` inte att läsa in ("cannot import name 'Bankperiod' from 'las_bank'"), alltså av rätt skäl: typen och funktionen finns inte i den gamla koden. Med bara de nya `test_inga_genvagar.py` och `test_bank_och_kassa.py` blev 8 röda: `test_i1_bankperiodens_inre_finns_i_modulen_och_ar_forbjudet` (nyckeln och typen finns inte) och 7 i `test_bank_och_kassa.py` som läser `.rader` (den gamla listan har inget sådant). Felet självt visades med ett eget test i kopian (se "Felet som rättas" ovan).
+
+**Mutationstest.** I 22 kopior utanför projektet togs en ny kontroll bort eller gjordes svagare, och hela sviten kördes. Alla 22 gav minst ett rött test.
+
+| Nr | Borttagen eller svagare kontroll (i en kopia) | Röda tester |
+|---|---|---|
+| b01 | Bankperiod: nyckeln kontrolleras inte | 1 |
+| b02 | Bankperiod: raderna sparas inte som oföränderliga | 1 |
+| b03 | Bankperiod: `rader` ger inte nya kopior | 6 |
+| b04 | Bankperiod: tilldelning inte spärrad | 1 |
+| b05 | Bankperiod: borttagning inte spärrad | 1 |
+| b06 | `las_bankfil` returnerar listan som förut | 92 och 8 fel |
+| b07 | Ihopsättning: perioderna behöver inte vara en lista eller tupel | 1 |
+| b08 | Ihopsättning: tom lista stoppas inte | 1 |
+| b09 | Ihopsättning: typkontrollen borttagen | 1 |
+| b10 | Ihopsättning: underklass godtas (`isinstance`) | 1 |
+| b11 | Ihopsättning: saldokedjan mellan perioderna kontrolleras inte | 1 |
+| b12 | Ihopsättning: samma bankrad två gånger stoppas inte | 2 |
+| b13 | Ihopsättning: fel ingående och utgående saldo i den nya perioden | 2 |
+| b14 | Matchningen: typkontrollen borttagen | 3 |
+| b15 | Matchningen: underklass godtas (`isinstance`) | 1 |
+| b16 | Matchningen: listor och tupler godtas igen | 3 |
+| b17 | Genvägstestet: `_rader` inte förbjudet | 5 |
+| b18 | Genvägstestet: `_ingaende_saldo_ore` inte förbjudet | 3 |
+| b19 | Genvägstestet: `_utgaende_saldo_ore` inte förbjudet | 4 |
+| b20 | `matcha_bank.py` läser `bankperiod._rader` | 2 |
+| b21 | `matcha_bank.py` importerar `_PERIODNYCKEL` | 2 |
+| b22 | Bankperiod: raderna varken frysta eller kopierade (samma lista som `las_bankfil` gjorde) | 3, bland dem Hugos fall |
+
+**Att tänka på.**
+
+- `las_bank.py` har nu två offentliga funktioner som ger bankrader: `las_bankfil` och `sla_ihop_bankperioder`. Den andra läser ingen fil och tar bara emot Bankperioder, så den är ingen väg förbi K1. SPEC 7 nämner bara `las_bankfil`, och SPEC är inte ändrad.
+- `sla_ihop_bankperioder` kontrollerar inte att perioderna ligger i datumordning, bara att saldona hänger ihop. Saldokedjan räcker för att se en saknad eller omkastad månad i testdatan, men två månader med samma ingående och utgående saldo kan byta plats utan att det märks.
+- Skyddet kan kringgås med flit, som för `Kassaperiod` och `Underlagsperiod`: genvägstestet stoppar de enkla sätten men kan inte bevisa att inget annat sätt finns.
+
+**Kommandon utanför den fasta listan.** Jag läste några filer med `sed -n` och mätte `.venv` med `du -sh` (båda bara läser). De står inte på listan i SPEC 7.1. Kopiorna gjordes med `git archive` och `tar` (för den gamla koden) och `cp -R` (för mutationerna), alla i den tillfälliga mappen, och ändringarna i kopiorna gjordes med fil-verktygen.
+
+Testsviten: **1 209 passed**, 0 misslyckade (1 203 före).
