@@ -422,3 +422,220 @@ G8 punkt 1, 2 och 3 fungerade redan i den gamla koden, så de testerna är grön
 **Övrigt som ändrats.** Ett befintligt testfall (`avgransare_i_kolumnnamn` i `test_f5_trasigt_bankformat_ger_bankfilfel`) hade tabb inuti ett kolumnnamn. Det stoppas nu av G2-kontrollen i stället, så testfallet använder lodstreck och prövar fortfarande samma sak. `foretag/README.md` och beskrivningen överst i `las_bank.py` har uppdaterats med de nya reglerna. SPEC.md är inte ändrad.
 
 Testsviten efter rättelserna: 190 passed, 0 misslyckade.
+
+## Granskning 3: rättelser efter granskning 2 och kassainläsningen
+
+| | |
+|---|---|
+| Datum | 2026-10-25 |
+| Granskad version | commit a2d1540 ("Kassans Z-rapporter: inläsning, Z-kontroll a–e och kontroll av Z-serien") |
+| Granskare | Oberoende session som inte sett rättelserna efter granskning 2 eller kassainläsningen byggas. Ingen kod eller befintlig fil har ändrats, bara det här avsnittet har lagts till |
+| Underlag | CLAUDE.md, SPEC.md (avsnitt 2, 5, 6, 7, 8), foretag/README.md, foretag/syntet-testbutik/bankformat.json och kassaformat.json, scripts/belopp.py, scripts/las_bank.py, scripts/las_kassa.py, alla filer i scripts/tests/, testdata/README.md, facit.json, Z-filerna för 2025-01-02 och 2025-03-31, tidigare granskningar ovan |
+
+### Så gick granskningen till
+
+Egna provskript i en temporär mapp utanför projektet (inte i `testdata/`) skapade små bankfiler, Z-filer och kassaformat, körde `las_bankfil`, `ladda_bankformat`, `las_kassafil` och `kontrollera_z_serien` och skrev ut utfallet: **STOPPAD** (tydligt `BankfilFel`/`KassafilFel` eller underklass), **GODKÄND** (raderna släpptes igenom) eller **KRASCH** (annat, oförklarat fel). Mutationstesterna gjordes i en kopia av projektet i samma temporära mapp. Den temporära mappen är borttagen efteråt.
+
+Ord som används nedan: en **Z-rapport** är kassans dagsavslut. **Z-numret** är rapportens löpnummer. **Kassaregistret** är id för den kassa rapporten kommer från. En **mutation** är en avsiktligt borttagen kontroll i en kopia, för att se om testerna märker det.
+
+Allvar: **hög** = kan ge fel bokföring, **medel** = onödig krasch eller otydligt fel, **låg** = kosmetiskt.
+
+### Uppgift A: är G1, G2, G4 och G8 punkt 1–3 rättade?
+
+Ja. Alla ursprungliga felfall stoppas nu med ett tydligt fel.
+
+| Fynd | Vad jag körde | Utfall nu |
+|---|---|---|
+| G1 | Granskarens F1-fall 4g (citattecken slår ihop tre rader) med `\x0b`, `\x0c`, `\x1c`, `\x1d`, `\x1e` och `\x85` som radslut. Samma tecken inuti ett citerat fält och på en rad före rubrikraden | STOPPAD i alla 18 fall: "rad N i filen innehåller tecknet U+000C, som är ett styrtecken eller en ovanlig radbrytning …". Skydd: tabb i ett fält och CRLF-radslut GODKÄNDES som förut |
+| G2 | Bankformat med avgränsarna `\x0c`, `\x1e`, `\x85`, NUL, punkt, minus, `0`, `x`, emoji, mellanslag, bakåtsnedstreck, apostrof, citattecken, `\n`, tom text och två tecken. Kolumnnamn med `\x0c`, `\x85`, NUL, U+200B, tabb, U+FEFF och U+202E | STOPPAD i alla fall, med "avgränsaren … är ogiltig. Tillåtna avgränsare är komma, semikolon, tabb och lodstreck" respektive "innehåller tecknet U+…" |
+| G4 | bankformat.json med 100 000 hakparenteser, 100 000 klammerparenteser och 1 000 000 hakparenteser | STOPPAD: "för många hakparenteser eller klammerparenteser inuti varandra" |
+| G8 punkt 1 | Rubrikrad med kolumnen `Belopp` två gånger | STOPPAD: "rubrikraden (rad 1 i filen) har kolumnen 'Belopp' flera gånger" |
+| G8 punkt 2 | Mellanslag som avgränsare | STOPPAD (se G2) |
+| G8 punkt 3 | `True` och `False` som ingående och utgående saldo | STOPPAD med `TypeError` ("… måste vara ett heltal i öre, inte bool"). `TypeError` i stället för `BankfilFel` är det medvetna valet från G3 |
+
+Kassainläsningen har samma skydd: styrtecken, U+2028, NUL, avgränsare utanför fasta listan och djup JSON i kassaformat.json stoppas (provat och testat i `test_las_kassa.py`).
+
+### Sammanfattning av nya fynd
+
+Inga fynd med allvar hög. Ingen av proverna fick en Z-fil med fel siffror att godkännas: Z-kontroll a–e stoppade alla filer där försäljning, betalsätt, moms eller datum inte gick ihop.
+
+| Nr | Fynd | Allvar |
+|---|---|---|
+| H1 | Ett mycket stort Z-nummer får seriekontrollen att krascha eller ta slut på minne | Medel |
+| H2 | Samma Z-rapport räknas två gånger om kassaregistrets namn skiljer sig lite (stor bokstav, osynligt tecken) | Medel |
+| H3 | En UTF-8-fil med ett enda felkodat tecken läses som Windows-1252 utan varning, och kassaregistrets namn blir förvanskat | Låg |
+| H4 | Z-nummer som börjar om (till exempel vid årsskifte) ger ett missvisande meddelande. Om det är tillåtet är en öppen fråga | Låg (plus Öppen fråga) |
+| H5 | Filnamnsmönstret har bara datum, så två kassaregister eller två Z-rapporter samma dag kan inte ligga i samma mapp | Låg (observation, hör till Ö5) |
+| H6 | Seriekontrollen godkänner en tom lista | Låg |
+| H7 | Z-kontrollerna godtar vilken momssats som helst och en fil med bara totalsumman 0 | Observation inför K5 och K10 |
+| H8 | Små brister i hjälpfunktioner som bara anropas inifrån kärnan | Låg |
+| H9 | Långsam kontroll av kassaformat med tiotusentals betalsätt, och obegränsat långa felmeddelanden | Låg |
+| H10 | Generalitetstestet går fortfarande att lura (G8 punkt 5–6 är inte åtgärdat, medvetet). Undantaget "belopp" är däremot smalt | Låg (testlucka) |
+| H11 | kassaformat.json ligger lika oskyddat som bankformatet (fortsättning på G9) | Observation inför spärrsteget |
+
+### Fynd i detalj
+
+#### H1. Mycket stort Z-nummer kraschar seriekontrollen. Allvar: medel
+
+**Vad jag körde:** två giltiga Z-filer för samma kassaregister med Z-nummer 1 och 10 000 000, 1 och 10¹² (en etta med tolv nollor), 1 och 10²⁰, samt 1 och ett tal med 5 000 siffror. Inläsningen godkänner alla dessa Z-nummer (även 5 000 siffror), eftersom ett Z-nummer bara måste bestå av siffror.
+
+**Vad som hände:** med 10 000 000 STOPPADES serien rätt ("Z-rapport 2–9999999 (9999998 st) saknas"), men programmet byggde en lista med tio miljoner tal. Med 10¹² försökte det bygga en lista med en biljon tal: minnet tog slut och processen dödades av operativsystemet (avslutskod 137). Med 10²⁰ och 5 000 siffror blev det KRASCH med `OverflowError`.
+
+**Varför:** `kontrollera_z_serien` sparar varje saknat Z-nummer i en lista (`saknade = list(range(z_fore + 1, z_efter))`), oavsett hur många de är.
+
+**Vad som borde hända:** `ZSerieFel` av typen "lucka" med ett tydligt meddelande, utan krasch. Förslag (inte genomfört): spara bara första och sista saknade numret och antalet när luckan är stor, och/eller sätt en övre gräns för hur många siffror ett Z-nummer får ha. Inget släpps igenom, men en trasig fil kan stoppa hela körningen.
+
+#### H2. Samma Z-rapport kan räknas två gånger. Allvar: medel
+
+**Vad jag körde:** två Z-filer i olika mappar, med samma datum, samma Z-nummer (1001) och samma belopp, där kassaregistret heter `TB-1` i den ena och `tb-1`, `TB-1` + osynligt mellanslag (U+200B) respektive `TB-1 X` i den andra. Sedan `kontrollera_z_serien` och `summa_per_momssats` på båda.
+
+**Vad som hände:** båda filerna GODKÄNDES, seriekontrollen GODKÄNDE, och försäljningen med 12 % blev 224,00 kr i stället för 112,00 kr. Samma sak med två helt identiska filer där registret skiljer sig stoppas däremot som dubblett.
+
+**Varför:** seriekontrollen letar dubbletter bara inom samma kassaregister, och registrets namn jämförs exakt. Ett namn med osynliga tecken (Unicode-kategori Cf, till exempel U+200B och U+202E som vänder text) släpps igenom i Z-filens data, eftersom skyddet mot ovanliga tecken bara gäller styrtecken (Cc). Det finns ingen lista över vilka kassaregister företaget har.
+
+**Varför allvaret är medel och inte hög:** det kräver en fil där registrets namn har ändrats för hand eller av ett fel, och samma Z-rapport finns kvar i originalskick. Ett kassasystem byter inte namn på sin kassa mellan två exporter. Konsekvensen om det ändå händer är däremot hög (dubbel försäljning), och seriekontrollen är idag det enda skyddet mot dubbla Z-rapporter (K4 och K10 är inte byggda).
+
+**Vad som borde hända:** filen stoppas. Förslag (inte genomfört): lägg en lista över företagets kassaregister i kassaformat.json (det är företagsspecifikt) och stoppa Z-filer från okända register, och stoppa osynliga tecken (Cf) i Z-filens fält på samma sätt som styrtecken.
+
+#### H3. Förvanskat kassaregister vid blandad teckenkodning. Allvar: låg
+
+**Vad jag körde:** (a) en UTF-8-fil med kassaregistret `KASSA-Ö` och en extra kolumn där ett enda tecken var sparat som Windows-1252 (`café`). (b) En UTF-8-fil med BOM (ett osynligt märke först i filen som säger att den är UTF-8) och en trasig byte på sista raden.
+
+**Vad som hände:** (a) GODKÄND, men kassaregistret blev `KASSA-Ã–`. Det räknas då som ett annat register än `KASSA-Ö` i seriekontrollen, så Z-numret saknas i rätt registers serie (missvisande lucka, eller ingen varning alls om filen är periodens första eller sista). (b) STOPPAD med "första raden i filen ska vara en rubrikrad med kolumnerna …", utan att teckenkodningen nämns.
+
+**Varför:** filen läses som UTF-8 om det går, annars som Windows-1252, och ett enda felaktigt tecken räcker för att hela filen läses på det andra sättet. I `las_bank.py` nämner felmeddelandet teckenkodningen i det läget (F8). Det tillägget finns inte i `las_kassa.py`.
+
+**Vad som borde hända:** samma hjälpande meddelande som i bankinläsningen. Överväg också att stoppa en fil som börjar med UTF-8-BOM men inte är giltig UTF-8.
+
+#### H4. Z-nummer som börjar om ger missvisande meddelande. Allvar: låg. Öppen fråga
+
+**Vad jag körde:** serierna 1001, 1002, 1, 2 (nollställd mitt i), 1300 (2025-12-31) följd av 1 (2026-01-02), och 1300 följd av 1301 över årsskiftet.
+
+**Vad som hände:** 1300 → 1301 GODKÄNDES (rätt). De nollställda serierna STOPPADES, men med till exempel "Z-rapport 2–1299 (1298 st) saknas mellan Z-rapport 1 (2026-01-02) och Z-rapport 1300 (2025-12-31). Den saknade rapporten är från 2026-01-02 eller 2025-12-31". Datumen står i omvänd ordning och antalet saknade rapporter är fel.
+
+**Öppen fråga:** om ett kassaregisters Z-nummer får börja om (vid årsskifte, vid byte av kassa, eller när räknaren slår runt) har jag inte kontrollerat. Det ska verifieras med Skatteverket eller en redovisningskonsult innan kontrollen ändras. Om det är tillåtet måste kärnan kunna ta emot en ny serie, annars stoppas varje januari.
+
+**Vad som borde hända oavsett svar:** när Z-numret går ner medan datumet går fram bör meddelandet säga att serien verkar ha börjat om, inte att över tusen rapporter saknas.
+
+#### H5. Filnamnet rymmer bara datum. Allvar: låg (observation)
+
+Filnamnsmönstret (`kassa_ÅÅÅÅ-MM-DD.csv`) har bara datumet. Två kassaregister, eller två Z-rapporter från samma kassa samma dag, får då samma filnamn och kan inte ligga i samma mapp. Kontrollen klarar fallet om filerna ligger i olika mappar (provat: två register samma dag med samma Z-nummer, och två Z-rapporter samma dag, GODKÄNDES rätt). Ett företag med flera kassor kommer ändå att behöva ett mönster med kassans id. Hör till Ö5 (vilka kassasystem som ska stödjas).
+
+#### H6. Tom lista godkänns av seriekontrollen. Allvar: låg
+
+`kontrollera_z_serien([])` GODKÄNDES utan meddelande. En period helt utan Z-rapporter ser alltså likadan ut som en felfri period. Det stämmer med beskrivningen i koden (bara luckor mellan rapporterna som finns syns), men bör fångas: antingen här (stoppa en tom lista) eller i K10 (kassan mot banken), som också måste upptäcka att periodens första eller sista Z-rapport saknas.
+
+#### H7. Z-kontrollerna godtar vilken momssats som helst. Observation inför K5 och K10
+
+**Vad jag körde:** Z-filer med momssats 0, 99 och 200 000 påhittade satser (en rad per sats, 1,4 sekunder), en fil med bara totalsumman 0, en fil med +1 000 kr i en sats och −1 000 kr i en annan, och en fil med bara en moms-rad på 0.
+
+**Vad som hände:** alla GODKÄNDES, eftersom siffrorna går ihop inbördes. Z-kontroll a–e prövar bara att filen är konsekvent med sig själv, inte att satsen finns för datumet. En fil med bara totalsumman 0 och rätt Z-nummer fyller också en lucka i serien.
+
+**Varför det spelar roll:** det är rätt för en inläsningskontroll, men K5 ("satsen finns för datumet", mot företagets momssatser i konfigurationen) och K10 (kassan mot banken) måste byggas innan försäljningen bokförs. Negativa belopp (returer) och noll i alla poster GODKÄNDES också, vilket är rätt beteende.
+
+#### H8. Hjälpfunktioner. Allvar: låg
+
+- `momsen_i_brutto` är en publik funktion utan typkontroll: satsen 12,5 (flyttal) ger flyttalet `11.0`, `True` räknas som 1, och satsen −100 ger `ZeroDivisionError`. Kärnan själv anropar den bara med heltal från filen, så inget fel når bokföringen idag.
+- `kontrollera_z_serien` kraschar med `TypeError` om anroparen har ändrat ett Z-nummer till text i raderna. Raderna ska komma från `las_kassafil`, så det kräver ett programmeringsfel.
+- En fil som heter `x\kassa_2025-01-02.csv` (bakåtsnedstreck är tillåtet i filnamn på Mac och Linux) läses som `kassa_2025-01-02.csv`. Datumkontrollen fungerar ändå.
+
+#### H9. Stora kassaformat och långa meddelanden. Allvar: låg
+
+Ett kassaformat med 20 000 betalsätt tog 2,6 sekunder att kontrollera, eftersom dubblettkontrollen jämför alla namn med alla. 200 000 skulle ta flera minuter. Det kräver en trasig eller manipulerad konfiguration. Ett belopp med 100 000 siffror gav ett felmeddelande på 200 179 tecken (samma som G7). Övrigt om storlek fungerade: fält över 131 072 tecken STOPPADES, ett kassaregister på 130 000 tecken GODKÄNDES, och 5 000 000 tomma rader efter posterna gick på en sekund.
+
+#### H10. Generalitetstestet går att lura. Allvar: låg (testlucka)
+
+**Vad jag körde:** i en kopia lade jag till rader i `las_kassa.py` och körde `test_karnan_ar_generell.py`.
+
+| Tillägg i kärnan | Utfall |
+|---|---|
+| `MOMSSATSER = (12, 25)`, `KONTO_KASSA = 1910`, `GRANS_ORE = 500000` | Grönt (lurat) |
+| `"forsalj" + "ning"`, `"FORSALJNING".lower()`, `"summa_" + "brutto"` | Grönt (lurat) |
+| `"syntet testbutik ab"` (små bokstäver), organisationsnummer utan bindestreck, `"Nordea"` | Grönt (lurat) |
+| Postnamnen i en fil `scripts/namn.json` (testet söker bara i `.py`-filer) | Grönt (lurat) |
+| Kontrollfall: `POST = "forsaljning"` | Rött (rätt) |
+
+Det mesta är G8 punkt 5–6, som medvetet inte åtgärdats (beslut 3 i granskning 2). SPEC avsnitt 2 säger att konto, momssats och belopp ska kontrolleras med ett test, och det gör testet fortfarande inte. Idag finns inga sådana tal i kärnan: de enda talen i `las_kassa.py` är 0, 1, 2, 16 (längd på id) och 100 (procent i momsformeln).
+
+**Undantaget "belopp" är smalt.** Det gäller bara textsträngar som är exakt `belopp`, och ett test (`test_karnans_egna_ord_ar_verkligen_karnans_nycklar`) kräver att ordet är en av kärnans egna nycklar. Jag provade att missbruka det: i en kopia byggde jag in kolumnnamnet `"belopp"` i rubrikläsningen. Då blev `test_annat_kassaformat_laser_samma_data` och `test_annat_kassaformat_kor_samma_kontroller` röda, eftersom det andra formatet kallar kolumnen `Summa`. Undantaget kan alltså inte dölja att kassans kolumnnamn byggs in på riktigt.
+
+#### H11. kassaformat.json ligger oskyddat. Observation inför spärrsteget
+
+Samma som G9: `ladda_kassaformat` läser vilken sökväg som helst, och `foretag/` går att skriva i. Kassaformatet styr vilka poster som räknas som betalsätt, vilken post som är totalsumman och hur momsen avrundas. Jag provade omkastade kolumn- och postnamn: alla omkastningar som ger fel siffror STOPPADES (datum ↔ Z-nummer, sats ↔ belopp, kassaregister ↔ post, sats ↔ Z-nummer, försäljning ↔ moms, totalsumma ↔ kort). Kärnan vet däremot inte vilket betalsätt som är kontant, kort eller Swish, bara att de är betalsätt. Den kopplingen måste komma från skyddad konfiguration när matchningen mot banken byggs.
+
+### Uppgift B: övrigt som provades och fungerade
+
+| Prov | Utfall |
+|---|---|
+| Retur: alla belopp negativa. Allt noll. Moms med fel tecken | GODKÄND / GODKÄND / STOPPAD (e) |
+| Negativ momssats, negativt Z-nummer, Z-nummer som text eller med fullbreddssiffror | STOPPAD: "ogiltigt heltal" |
+| Z-nummer med inledande nollor (`0001001`), med blanksteg runt, och 0 | GODKÄND som 1001 / 1001 / 0. Två filer med `1001` och `01001` blir dubbletter i serien |
+| Två kassaregister med blandade Z-nummer i oordning, samma Z-nummer i två register | GODKÄND (rätt, serien kontrolleras per register) |
+| Samma fil två gånger, samma innehåll i två mappar, samma innehåll med CRLF | STOPPAD som dubblett ("samma fil är inläst två gånger" / "två olika filer har samma Z-nummer") |
+| Filnamn med 2025-02-29, månad 00, stora bokstäver, blanksteg sist, utan `.csv`, med prefix, med fullbreddssiffror | STOPPAD (ogiltigt datum eller Z-kontroll a). 2024-02-29 (skottår) GODKÄND |
+| Datum i filen skiljer sig från filnamnet | STOPPAD (Z-kontroll a) |
+| Momssats `12`, `012`, ` 12`, `12` + hårt mellanslag | GODKÄND som 12. `12,0`, `12.00`, tom, `12 %`, `+12`, `1e1` STOPPAD. `12` och `012` för samma post blir dubblett |
+| Momssats på betalsätt (`0`) / bara mellanslag | STOPPAD / GODKÄND (blanksteg tas bort) |
+| Avrundning: 100,38 kr med 12 % ger exakt 10,755 kr. 10,75 och 10,76 godtas, 10,74 och 10,77 stoppas. Samma med minustecken. 4 242,00 kr ger exakt 454,50 kr: 454,49 och 454,51 stoppas | Rätt. Med 25 % kan momsen aldrig hamna på exakt ett halvt öre |
+| Kassaformat: betalsätt som heter som försäljningen, krockar efter blanksteg, osynligt tecken, okänd nyckel, okänd posttyp, tuple i stället för lista, momsavrundning som lista, `ÅÅÅÅ` skrivet i NFD-form, punkt först | STOPPAD med tydligt fel |
+| Postnamn som heter som en kolumn, postnamn med komma i (citerat i filen) | GODKÄND, läses rätt |
+| Postnamn som bara skiljer i stor bokstav | Formatet godtas, filen stoppas ("okänd post") eftersom jämförelsen är exakt |
+| Rubrikrad med citattecken eller blanksteg runt namnen | GODKÄND (rätt) |
+| Rad med färre fält, datum med klockslag, fil med bara BOM, bara rubrikrad | STOPPAD |
+| Kassaregister med en "instruktion" i texten | GODKÄND som vanlig text. Kärnan tolkar den inte |
+
+### Uppgift C: kontroll mot reglerna
+
+| Kontroll | Resultat |
+|---|---|
+| Företagsspecifika uppgifter i `scripts/` (utom `tests/`) | Inga företagsnamn, kassaregister, kolumnnamn, postnamn, konton, momssatser eller belopp. Talen är 0, 1, 2, 16, 100 (och 256 i `las_bank.py`, gränsen för tecken som prövas som styrtecken) |
+| Flyttal | Inga. `momsen_i_brutto` räknar med heltal (`divmod`), se H8 om vad som händer om någon skickar in ett flyttal |
+| Nätverksanrop | Inga (ingen `socket`, `urllib`, `http`, `requests`) |
+| Körning av kommandon | Ingen (ingen `subprocess`, `os.system`, `eval`, `exec`) |
+| Filåtkomst | Bara läsning (`open(sokvag, "rb")`) av sökvägar som anroparen anger. Inget skrivs. `kassaformat.json` läses från `foretag/`, som agenten kan skriva i (H11, G9) |
+| Har SPEC.md ändrats sedan 7823bd8? | Nej. `git diff 7823bd8 HEAD -- SPEC.md CLAUDE.md` är tom |
+| Slutrapportens påståenden för kassabygget | Stämmer. Commit a2d1540 ändrar bara `foretag/README.md`, `kassaformat.json`, `las_kassa.py`, `test_karnan_ar_generell.py` och `test_las_kassa.py`. `git diff f8d39ee a2d1540 -- scripts/las_bank.py SPEC.md testdata` är tom. Testdatan är oförändrad sedan commit f150652, före bankinläsningen |
+| Undantaget "belopp" | Smalt, se H10 |
+| Fast lista med kommandon (SPEC avsnitt 7) | Finns fortfarande inte i SPEC.md |
+
+### Uppgift D: stickprov på mutationstesterna
+
+I en kopia av projektet i den temporära mappen togs en kontroll i taget bort ur `las_kassa.py`, och hela testsviten kördes. Uppgiften bad om fem. Jag gjorde arton, eftersom varje körning tar under en sekund.
+
+| Borttagen kontroll | Röda tester |
+|---|---|
+| Z-kontroll b: jämförelsen av kassaregister | `test_b_olika_kassaregister_i_samma_fil` |
+| Serien: dubblettkontrollen | 2 (`test_serien_samma_fil_…`, `test_serien_tva_filer_…`) |
+| Serien: datum som går bakåt | `test_serien_datum_som_gar_bakat_stoppas` |
+| Serien: sorteringen | `test_serien_samma_fil_inlast_tva_ganger_ar_en_dubblett` |
+| Momssats på betalsätt eller totalsumma | `test_trasig_z_fil_stoppas[sats_pa_betalsatt]` |
+| Samma post två gånger | 2 (`dubbel_post`, `dubbel_totalsumma`) |
+| Tomt kassaregister | `test_trasig_z_fil_stoppas` |
+| Z-kontroll e: moms för en sats utan försäljning | `test_e_moms_for_en_sats_utan_forsaljning` |
+| Z-kontroll a: radernas datum | 2 (`test_a_…`) |
+| `las_kassafil` kontrollerar formatet igen | `test_las_kassafil_kontrollerar_kassaformatet_igen` |
+| Dubbla postnamn i formatet | 3 (`test_trasigt_kassaformat_…`) |
+| Styrtecken i Z-filen | `test_trasig_z_fil_stoppas` (styrtecken-fallen) |
+| Serien: rader från olika filer i samma rapport | `test_serien_med_rader_fran_olika_filer_…` |
+| Momsen: minustecknet | `test_momsen_i_brutto` |
+| Z-kontroll c | 2 (`test_c_…`, `test_annat_kassaformat_kor_samma_kontroller`) |
+| Kontrollen att totalsumman finns | `test_trasig_z_fil_stoppas` |
+| Halvt öre: bara nedåt | `test_momsen_i_brutto` |
+| Z-kontroll d jämför med försäljningen i stället för totalsumman | Inga röda. Det är rätt: Z-kontroll c har redan krävt att försäljningen är lika med totalsumman, så ändringen gör ingen skillnad (en så kallad likvärdig mutation, ingen testlucka) |
+
+Alla verkliga borttagningar gav minst ett rött test. Ingen testlucka hittades i stickprovet.
+
+### Testsviten
+
+Kommando: `.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests`
+
+Resultat: **313 passed**, 0 misslyckade, både före och efter granskningen. `git status` visade bara den här filen som ändrad.
+
+Kommandon som kördes i granskningen: Python i projektets `.venv` (provskript och pytest), `git log`, `git show`, `git diff`, `git status`, samt `ls`, `cat`, `head`, `tail`, `grep`, `sed`, `cut`, `wc`, `od`, `md5`, `mkdir`, `rm` och `/usr/bin/time` (de två sista bara i den temporära mappen). Provskripten skrev bara i den temporära mappen.
+
+### Beslut som behövs från Hugo
+
+1. **H1 och H2:** ska de rättas nu, innan nästa byggsteg? Rekommendation: ja. H1 är en liten ändring. H2 kräver ett beslut om att kassaformat.json ska innehålla en lista över företagets kassaregister.
+2. **H4 (Öppen fråga):** får ett kassaregisters Z-nummer börja om, till exempel vid årsskifte? Ska verifieras med Skatteverket eller en redovisningskonsult.
+3. **H10 / G8 punkt 5–6:** när ska generalitetstestet byggas ut så att det också fångar konton, momssatser och belopp? Senast när kontoplan och momssatser läggs till.
+4. **H11 / G9:** var ska bankformat och kassaformat ligga så att agenten inte kan ändra dem? Hör till spärrsteget.
