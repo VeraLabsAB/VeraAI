@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Bolag | Vera Labs AB (produkt: Vera AI) |
-| Status | Godkänd av Hugo 2026-10-24 (utkast 1). Ändrad efter Hugos OK 2026-10-25: K1 kräver båda saldona, nya kontroller K11 och K12 (avsnitt 6), saldon och periodgränser (6.1), saknad Z-rapport (6.2), fyra nya säkerhetsgrunder (7), utkast till fast kommandolista (7.1), tillägg till Ö3 och Ö5 och momsfil för K5 (11). Ändras bara efter Hugos OK |
+| Status | Godkänd av Hugo 2026-10-24 (utkast 1). Ändrad efter Hugos OK 2026-10-25: K1 kräver båda saldona, nya kontroller K11 och K12 (avsnitt 6), saldon och periodgränser (6.1), saknad Z-rapport (6.2), fyra nya säkerhetsgrunder (7), fast kommandolista (7.1), tillägg till Ö3 och Ö5 och momsfil för K5 (11). Ändras bara efter Hugos OK |
 | Ersätter | Den gamla specen för ett enskilt företag (ligger i arkivmappen) |
 
 Specen säger **vad** som ska byggas och **hur det ska bete sig**. Den är medvetet kort. Detaljer läggs i egna filer när vi kommer till respektive byggsteg.
@@ -166,7 +166,7 @@ En saknad Z-rapport blir ett ärende på nivå D (avsnitt 5). Månaden summeras 
 
 ### 7.1 Fast kommandolista
 
-**Utkast, inväntar Hugos OK.** Listan bygger på de kommandon som faktiskt används i projektet. Allt körs inifrån projektmappen.
+**Godkänd av Hugo 2026-10-25.** Listan bygger på de kommandon som faktiskt används i projektet. Allt körs inifrån projektmappen.
 
 | Kommando | Till vad |
 |---|---|
