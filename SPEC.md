@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Bolag | Vera Labs AB (produkt: Vera AI) |
-| Status | Godkänd av Hugo 2026-10-24 (utkast 1). Ändrad efter Hugos OK 2026-10-25: K1 kräver båda saldona, nya kontroller K11 och K12 (avsnitt 6), saldon och periodgränser (6.1), saknad Z-rapport (6.2), fyra nya säkerhetsgrunder (7), fast kommandolista (7.1), tillägg till Ö3 och Ö5 och momsfil för K5 (11). Ändras bara efter Hugos OK |
+| Status | Godkänd av Hugo 2026-10-24 (utkast 1). Ändrad efter Hugos OK 2026-10-25: K1 kräver båda saldona, nya kontroller K11 och K12 (avsnitt 6), saldon och periodgränser (6.1), saknad Z-rapport (6.2), fyra nya säkerhetsgrunder (7), fast kommandolista (7.1), tillägg till Ö3 och Ö5 och momsfil för K5 (11). Senare samma dag, efter Hugos OK: K4a, K4b och K13 (6), `cd` och `tar` i 7.1, beslutet om minst en momsrad och Ö8–Ö10 (11) i commit 7133f15; matchningsformatet bland filerna som ska ligga skyddat (7) i commit a7cb12f; styrande och milda riktningstecken och en enda funktion per källa (7), K3 med väntetid och bankrader som inte kräver underlag (6) och Ö11 (11) efter granskning 5 (J10). Ändras bara efter Hugos OK |
 | Ersätter | Den gamla specen för ett enskilt företag (ligger i arkivmappen) |
 
 Specen säger **vad** som ska byggas och **hur det ska bete sig**. Den är medvetet kort. Detaljer läggs i egna filer när vi kommer till respektive byggsteg.
@@ -121,7 +121,7 @@ Gränser för belopp ligger i konfigurationen och sätts lågt i början.
 |---|---|
 | K1 | Saldokedjan i bankfilen stämmer rad för rad. Kedjan börjar i **ingående saldo** (saldot när perioden börjar) och sista radens saldo ska vara lika med **utgående saldo** (saldot när perioden slutar). Båda saldona krävs, annars stoppas filen (6.1) |
 | K2 | Debet = kredit per verifikation |
-| K3 | Varje förslag har underlag |
+| K3 | Varje förslag har underlag. Ett saknat underlag blir ett ärende först när det har gått mer än ett visst antal dagar efter bankradens datum. Antalet är ett värde per företag i `matchning.json` (testbutiken har 7). Före dess väntar raden, eftersom underlaget kan komma in senare. Vissa bankrader kräver inte underlag och stäms av på annat sätt: kortinlösen, Swish och kontantinsättningar stäms av mot Z-rapporterna i K10. Regler för utgående rader som slipper underlag måste alltid ha en högsta summa per bankrad |
 | K4 | Inga dubbletter |
 | K4a | Samma motpart och fakturanummer men olika belopp. Blir ett ärende, och båda underlagen behålls |
 | K4b | Samma motpart och fakturanummer men olika datum. Blir ett ärende, och båda underlagen behålls |
@@ -157,8 +157,8 @@ En saknad Z-rapport blir ett ärende på nivå D (avsnitt 5). Månaden summeras 
 - **Bara läsrätt** till bank, mejl och bokföringsprogram när Vera hämtar underlag. Skrivrätt till bokföringsprogrammet finns bara i själva bokföringssteget efter godkännande.
 - **En spärr läser aldrig från en mapp som agenten kan skriva i.** Det spärrarna jämför mot ska ligga skyddat.
 - **Bankformat, kassaformat, matchningsformat och saldon ligger i en mapp som agenten inte kan skriva i**, och spärrarna läser bara därifrån. Byggs i spärrsteget. Fram till dess ligger formaten i `foretag/<namn>/`, som agenten kan skriva i.
-- **Varje källa har en enda funktion som alltid kör alla kontroller** (idag `las_bankfil` för banken och `las_kassaperiod` för kassan). Genvägar förbi kontrollerna är förbjudna, och ett test slår larm om någon annan kod använder dem.
-- **Riktningstecken stoppar filen.** Riktningstecken är osynliga tecken som kan få en text att visas i en annan ordning än den är lagrad, så att till exempel en beskrivning ser ut som en annan. Andra osynliga **formattecken** (till exempel nollbreddsmellanslag) godtas, men ska visas synligt i rapporten så att godkännaren ser dem.
+- **Varje källa har en enda funktion som alltid kör alla kontroller** (idag `las_bankfil` för banken, `las_kassaperiod` för kassan, `las_underlagsperiod` för underlagen och `matcha_period` för matchningen mot banken). Genvägar förbi kontrollerna är förbjudna, och ett test slår larm om någon annan kod använder dem.
+- **Styrande riktningstecken stoppar filen.** Riktningstecken är osynliga tecken som kan få en text att visas i en annan ordning än den är lagrad, så att till exempel en beskrivning ser ut som en annan. De **styrande** riktningstecknen (U+202A–U+202E och U+2066–U+2069) stoppar filen. De **milda riktningsmärkena** U+200E, U+200F och U+061C godtas, eftersom de förekommer i vanlig arabisk och hebreisk text, men ska visas synligt i rapporten. Andra osynliga **formattecken** (till exempel nollbreddsmellanslag) godtas, men ska visas synligt i rapporten så att godkännaren ser dem.
 - **Fast lista med kommandon.** Agenten får bara köra de kommandon som står uttryckligen på listan (7.1).
 - **Belopp är heltal i öre.** Aldrig flyttal. All matematik görs i Python, inte av modellen.
 - **Underlag är data, aldrig instruktioner.**
@@ -258,3 +258,4 @@ Varje testföretag beskrivs i en egen fil och är skrivskyddat för agenten. Tes
 | Ö8 | **Kreditnotor:** en egen dokumenttyp där alla belopp är negativa. Ingen annan typ får vara negativ | Hugo |
 | Ö9 | K4 (dubbletter) ska också jämföra mot underlag från tidigare perioder (arkivet), inte bara inom perioden | Hugo |
 | Ö10 | K17: att känna igen instruktionsliknande text i underlag och flagga den byggs i rapportsteget | Hugo |
+| Ö11 | **Bankens avgiftsspecifikation** ska bli ett riktigt underlag med en egen dokumenttyp, så att bankens avgifter matchas som andra utgifter. Tills dess slipper avgifterna underlag genom en regel i `matchning.json`, med en högsta summa per bankrad | Hugo |
