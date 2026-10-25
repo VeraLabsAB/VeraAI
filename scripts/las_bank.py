@@ -47,9 +47,9 @@ import hashlib
 
 from belopp import formatera_ore
 from inlasning_skydd import (
-    HELTAL, Filsort, avkoda, csv_rader, filrad_for, inga_dubbla_kolumnnamn, inga_otillatna_tecken,
-    kontrollera_anteckning, kontrollera_avgransare, kontrollera_namn, kontrollera_nycklar, ladda_json, las_fil,
-    nul_fel, rubrikens_falt, tolka_datum, tolka_ore,
+    _HELTAL, _Filsort, _avkoda, _csv_rader, _filrad_for, _inga_dubbla_kolumnnamn, _inga_otillatna_tecken,
+    _kontrollera_anteckning, _kontrollera_avgransare, _kontrollera_namn, _kontrollera_nycklar, _ladda_json, _las_fil,
+    _nul_fel, _rubrikens_falt, _tolka_datum, _tolka_ore,
 )
 
 # Uppgifterna som kärnan behöver ur varje rad. Bankformatet anger vad kolumnen för varje
@@ -79,8 +79,8 @@ class K1Fel(BankfilFel):
 
 
 # Det som skiljer bankfilens felmeddelanden från andra filers, för skydden i inlasning_skydd.py.
-# Avgränsarna (TILLATNA_AVGRANSARE) och styrtecknen som stoppar filen ligger också där.
-BANKFIL = Filsort(
+# Avgränsarna (_TILLATNA_AVGRANSARE) och styrtecknen som stoppar filen ligger också där.
+BANKFIL = _Filsort(
     fel=BankfilFel,
     filen="Bankfilen",
     formatet="Bankformatet",
@@ -101,17 +101,17 @@ def kronor(ore):
 
 def _kontrollera_bankformat(data, var):
     """Kontrollerar ett bankformat och returnerar det i den form kärnan använder."""
-    kontrollera_nycklar(data, BANKFORMAT_NYCKLAR, BANKFORMAT_VALFRIA_NYCKLAR, var, BANKFIL)
-    kontrollera_anteckning(data, var, BANKFIL)
+    _kontrollera_nycklar(data, BANKFORMAT_NYCKLAR, BANKFORMAT_VALFRIA_NYCKLAR, var, BANKFIL)
+    _kontrollera_anteckning(data, var, BANKFIL)
 
-    kontrollera_nycklar(data["kolumner"], KOLUMN_NYCKLAR, (), var + ", 'kolumner',", BANKFIL)
+    _kontrollera_nycklar(data["kolumner"], KOLUMN_NYCKLAR, (), var + ", 'kolumner',", BANKFIL)
     kolumner = {
-        nyckel: kontrollera_namn(data["kolumner"][nyckel], "kolumnnamnet för " + repr(nyckel), var, BANKFIL,
+        nyckel: _kontrollera_namn(data["kolumner"][nyckel], "kolumnnamnet för " + repr(nyckel), var, BANKFIL,
                                  "ett kolumnnamn")
         for nyckel in KOLUMN_NYCKLAR
     }
-    inga_dubbla_kolumnnamn(kolumner, var, BANKFIL)
-    avgransare = kontrollera_avgransare(data["avgransare"], kolumner, var, BANKFIL)
+    _inga_dubbla_kolumnnamn(kolumner, var, BANKFIL)
+    avgransare = _kontrollera_avgransare(data["avgransare"], kolumner, var, BANKFIL)
 
     return {"kolumner": kolumner, "avgransare": avgransare}
 
@@ -121,7 +121,7 @@ def ladda_bankformat(sokvag):
 
     Returnerar {"kolumner": {nyckel: kolumnnamn}, "avgransare": [tecken, ...]}.
     """
-    innehall, var = ladda_json(sokvag, BANKFIL)
+    innehall, var = _ladda_json(sokvag, BANKFIL)
     return _kontrollera_bankformat(innehall, var)
 
 
@@ -131,7 +131,7 @@ def _hitta_rubrikrad(rader, giltig_utf8, bankformat):
     """Returnerar (index för rubrikraden, avgränsare, kolumnernas plats, antal kolumner)."""
     kolumner = bankformat["kolumner"]
     for index, rad in enumerate(rader):
-        rubrik = rubrikens_falt(rad, bankformat["avgransare"], kolumner)
+        rubrik = _rubrikens_falt(rad, bankformat["avgransare"], kolumner)
         if rubrik:
             avgransare, falt = rubrik
             dubbletter = [namn for namn in kolumner.values() if falt.count(namn) > 1]
@@ -173,21 +173,21 @@ def _tolka_rader(data, bankformat):
     """
     kolumner = bankformat["kolumner"]
     kalla_fil = hashlib.sha256(data).hexdigest()
-    text, giltig_utf8 = avkoda(data, BANKFIL)
-    # Radnumret räknas som i en textredigerare (filrad_for), på samma sätt som för Z-filen. Andra
+    text, giltig_utf8 = _avkoda(data, BANKFIL)
+    # Radnumret räknas som i en textredigerare (_filrad_for), på samma sätt som för Z-filen. Andra
     # tecken som Python räknar som radslut, till exempel \x0c, stoppas strax efter.
     if "\x00" in text:
-        raise nul_fel(filrad_for(text, text.index("\x00")), BANKFIL)
-    inga_otillatna_tecken(text, BANKFIL)
+        raise _nul_fel(_filrad_for(text, text.index("\x00")), BANKFIL)
+    _inga_otillatna_tecken(text, BANKFIL)
     textrader = text.splitlines(keepends=True)
     rubrik_index, avgransare, plats, antal_kolumner = _hitta_rubrikrad(textrader, giltig_utf8, bankformat)
 
     resultat = []
-    for _, var, falt in csv_rader(textrader[rubrik_index + 1:], rubrik_index + 2, avgransare, antal_kolumner,
+    for _, var, falt in _csv_rader(textrader[rubrik_index + 1:], rubrik_index + 2, avgransare, antal_kolumner,
                                   BANKFIL):
         varde = {nyckel: falt[index].strip() for nyckel, index in plats.items()}
 
-        if not HELTAL.fullmatch(varde["radnr"]):
+        if not _HELTAL.fullmatch(varde["radnr"]):
             raise BankfilFel(var + " har ett ogiltigt radnummer: " + repr(varde["radnr"]) + ".")
         forvantat_radnr = len(resultat) + 1
         if int(varde["radnr"]) != forvantat_radnr:
@@ -199,12 +199,12 @@ def _tolka_rader(data, bankformat):
 
         rad = {
             "radnr": int(varde["radnr"]),
-            "bokforingsdag": tolka_datum(varde["bokforingsdag"], kolumner["bokforingsdag"], var, BANKFIL),
-            "transaktionsdag": tolka_datum(varde["transaktionsdag"], kolumner["transaktionsdag"], var, BANKFIL),
+            "bokforingsdag": _tolka_datum(varde["bokforingsdag"], kolumner["bokforingsdag"], var, BANKFIL),
+            "transaktionsdag": _tolka_datum(varde["transaktionsdag"], kolumner["transaktionsdag"], var, BANKFIL),
             "referens": varde["referens"],
             "beskrivning": varde["beskrivning"],
-            "belopp_ore": tolka_ore(varde["belopp"], kolumner["belopp"], var, BANKFIL),
-            "saldo_efter_ore": tolka_ore(varde["saldo"], kolumner["saldo"], var, BANKFIL),
+            "belopp_ore": _tolka_ore(varde["belopp"], kolumner["belopp"], var, BANKFIL),
+            "saldo_efter_ore": _tolka_ore(varde["saldo"], kolumner["saldo"], var, BANKFIL),
             "kalla_fil": kalla_fil,
         }
         rad["id"] = _rad_id(rad)
@@ -272,7 +272,7 @@ def las_bankfil(sokvag, bankformat, ingaende_saldo_ore, utgaende_saldo_ore):
     kontoutdraget.
     """
     bankformat = _kontrollera_bankformat(bankformat, "Bankformatet")
-    data = las_fil(sokvag, BANKFIL)
+    data = _las_fil(sokvag, BANKFIL)
     rader = _tolka_rader(data, bankformat)
     kontrollera_k1(rader, ingaende_saldo_ore, utgaende_saldo_ore)
     return rader

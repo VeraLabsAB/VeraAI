@@ -19,7 +19,8 @@ Inläsningen skyddas på samma sätt som bankfilen i las_bank.py, med de gemensa
 inlasning_skydd.py och kassafilens egna felmeddelanden (KASSAFIL): teckenkodningen upptäcks (UTF-8,
 annars Windows-1252, UTF-16 och NUL-tecken stoppas), styrtecken, ovanliga radbrytningar och
 riktningstecken (I3) stoppar filen, radbrytning inuti ett fält stoppar filen, CSV läses strikt och
-varje rad ska ha lika många fält som rubrikraden. Beloppen tolkas med belopp.tolka_belopp och blir heltal i öre, aldrig flyttal.
+varje rad ska ha lika många fält som rubrikraden. Beloppen tolkas med belopp.tolka_belopp och blir
+heltal i öre, aldrig flyttal.
 Ett Z-nummer får ha högst ZNUMMER_HOGST_SIFFROR siffror (H1). Kassaregistret måste finnas i
 kassaformatets lista "kassaregister". Namnen jämförs efter normalisera_kassaregister, så stora och
 små bokstäver, blanksteg och osynliga tecken räknas inte (H2).
@@ -38,9 +39,11 @@ kassaregister ska följa på varandra utan luckor och utan dubbletter, och datum
 bakåt när Z-numret ökar. Luckor beskrivs som ett intervall, både de saknade Z-numren och dagarna
 utan rapport, och ett Z-nummer som verkar ha börjat om ger ett eget meddelande (öppen fråga H4).
 
-summa_per_momssats summerar försäljningen per momssats för flera Z-rapporter. Den kör alltid
-kontrollera_z_serien först, så en dubblett, en lucka eller en tom lista stoppar summeringen (I2).
-Rapporterna som summeras måste alltså vara en hel serie utan luckor.
+las_kassaperiod läser en hel period: alla Z-filer i en mapp med datum i perioden, var och en med
+las_kassafil (Z-kontroll a–e), och sedan kontrollera_z_serien på alla tillsammans. Först då
+returneras raderna, som en Kassaperiod. summa_per_momssats summerar försäljningen per momssats och
+tar bara emot en Kassaperiod, så att det som summeras alltid har gått igenom alla kontroller och är
+en hel serie utan luckor eller dubbletter (I2).
 
 Vid minsta fel stoppas hela filen: inga rader returneras, och ett KassafilFel kastas.
 """
@@ -50,10 +53,14 @@ import hashlib
 import re
 import unicodedata
 
+from pathlib import Path
+from types import MappingProxyType
+
 from inlasning_skydd import (
-    HELTAL, RADBRYTNINGAR, Filsort, avkoda, csv_rader, filrad_for, inga_dubbla_kolumnnamn, inga_otillatna_tecken,
-    kontrollera_anteckning, kontrollera_avgransare, kontrollera_namn, kontrollera_nycklar, ladda_json, las_fil,
-    nul_fel, rubrikens_falt, tolka_datum, tolka_ore,
+    _DATUM, _HELTAL, _RADBRYTNINGAR, _Filsort, _ar_sokvag, _avkoda, _csv_rader, _filrad_for,
+    _inga_dubbla_kolumnnamn, _inga_otillatna_tecken, _kontrollera_anteckning, _kontrollera_avgransare,
+    _kontrollera_namn, _kontrollera_nycklar, _ladda_json, _las_fil, _nul_fel, _rubrikens_falt, _sokvagens_typ,
+    _tolka_datum, _tolka_ore,
 )
 from las_bank import kronor
 
@@ -124,7 +131,7 @@ class ZSerieFel(KassafilFel):
 
 
 # Det som skiljer kassafilens felmeddelanden från andra filers, för skydden i inlasning_skydd.py.
-KASSAFIL = Filsort(
+KASSAFIL = _Filsort(
     fel=KassafilFel,
     filen="Kassafilen",
     formatet="Kassaformatet",
@@ -160,27 +167,27 @@ def _kontrollera_filnamn(monster, var):
         )
     if any(tecken in monster for tecken in "/\\") or monster.startswith("."):
         raise KassafilFel(var + ": 'filnamn' ska vara ett filnamn, utan mapp och utan punkt först.")
-    if any(unicodedata.category(tecken) in ("Cc", "Cf") or tecken in RADBRYTNINGAR for tecken in monster):
+    if any(unicodedata.category(tecken) in ("Cc", "Cf") or tecken in _RADBRYTNINGAR for tecken in monster):
         raise KassafilFel(var + ": 'filnamn' innehåller ett styrtecken eller ett osynligt tecken.")
     return monster
 
 
 def _kontrollera_kassaformat(data, var):
     """Kontrollerar ett kassaformat och returnerar det i den form kärnan använder."""
-    kontrollera_nycklar(data, KASSAFORMAT_NYCKLAR, KASSAFORMAT_VALFRIA_NYCKLAR, var, KASSAFIL)
-    kontrollera_anteckning(data, var, KASSAFIL)
+    _kontrollera_nycklar(data, KASSAFORMAT_NYCKLAR, KASSAFORMAT_VALFRIA_NYCKLAR, var, KASSAFIL)
+    _kontrollera_anteckning(data, var, KASSAFIL)
 
     filnamn = _kontrollera_filnamn(data["filnamn"], var)
 
-    kontrollera_nycklar(data["kolumner"], KOLUMN_NYCKLAR, (), var + ", 'kolumner',", KASSAFIL)
+    _kontrollera_nycklar(data["kolumner"], KOLUMN_NYCKLAR, (), var + ", 'kolumner',", KASSAFIL)
     kolumner = {
-        nyckel: kontrollera_namn(data["kolumner"][nyckel], "kolumnnamnet för " + repr(nyckel), var, KASSAFIL)
+        nyckel: _kontrollera_namn(data["kolumner"][nyckel], "kolumnnamnet för " + repr(nyckel), var, KASSAFIL)
         for nyckel in KOLUMN_NYCKLAR
     }
-    inga_dubbla_kolumnnamn(kolumner, var, KASSAFIL)
-    avgransare = kontrollera_avgransare(data["avgransare"], kolumner, var, KASSAFIL)
+    _inga_dubbla_kolumnnamn(kolumner, var, KASSAFIL)
+    avgransare = _kontrollera_avgransare(data["avgransare"], kolumner, var, KASSAFIL)
 
-    kontrollera_nycklar(data["poster"], POSTTYPER, (), var + ", 'poster',", KASSAFIL)
+    _kontrollera_nycklar(data["poster"], POSTTYPER, (), var + ", 'poster',", KASSAFIL)
     poster = {}
     for posttyp in POSTTYPER:
         if posttyp == "betalsatt":
@@ -188,11 +195,11 @@ def _kontrollera_kassaformat(data, var):
             if not isinstance(lista, list) or not lista:
                 raise KassafilFel(var + ": 'betalsatt' under 'poster' ska vara en lista med minst ett postnamn.")
             poster[posttyp] = [
-                kontrollera_namn(namn, "postnamnet för betalsätt nummer " + str(nummer), var, KASSAFIL)
+                _kontrollera_namn(namn, "postnamnet för betalsätt nummer " + str(nummer), var, KASSAFIL)
                 for nummer, namn in enumerate(lista, start=1)
             ]
         else:
-            poster[posttyp] = kontrollera_namn(data["poster"][posttyp], "postnamnet för " + repr(posttyp), var,
+            poster[posttyp] = _kontrollera_namn(data["poster"][posttyp], "postnamnet för " + repr(posttyp), var,
                                                KASSAFIL)
     alla_postnamn = [poster[posttyp] for posttyp in POSTTYPER if posttyp != "betalsatt"] + poster["betalsatt"]
     for namn in alla_postnamn:
@@ -212,7 +219,7 @@ def _kontrollera_kassaformat(data, var):
     if not isinstance(lista, list) or not lista:
         raise KassafilFel(var + ": 'kassaregister' ska vara en lista med minst ett kassaregister.")
     kassaregister = [
-        kontrollera_namn(namn, "kassaregister nummer " + str(nummer), var, KASSAFIL)
+        _kontrollera_namn(namn, "kassaregister nummer " + str(nummer), var, KASSAFIL)
         for nummer, namn in enumerate(lista, start=1)
     ]
     sedda = {}  # normaliserat namn -> namnet
@@ -243,7 +250,7 @@ def ladda_kassaformat(sokvag):
     "poster": {posttyp: postnamn, "betalsatt": [postnamn, ...]}, "momsavrundning": sätt,
     "kassaregister": [namn, ...]}.
     """
-    innehall, var = ladda_json(sokvag, KASSAFIL)
+    innehall, var = _ladda_json(sokvag, KASSAFIL)
     return _kontrollera_kassaformat(innehall, var)
 
 
@@ -252,7 +259,7 @@ def ladda_kassaformat(sokvag):
 def _las_rubrikrad(rad, kassaformat):
     """Returnerar (avgränsare, kolumnernas plats, antal kolumner) för filens första rad."""
     kolumner = kassaformat["kolumner"]
-    rubrik = rubrikens_falt(rad, kassaformat["avgransare"], kolumner)
+    rubrik = _rubrikens_falt(rad, kassaformat["avgransare"], kolumner)
     if rubrik:
         avgransare, falt = rubrik
         dubbletter = [namn for namn in kolumner.values() if falt.count(namn) > 1]
@@ -268,14 +275,14 @@ def _las_rubrikrad(rad, kassaformat):
 
 
 def _tolka_heltal(text, kolumn, var):
-    if not HELTAL.fullmatch(text):
+    if not _HELTAL.fullmatch(text):
         raise KassafilFel(var + " har ett ogiltigt heltal i kolumnen " + repr(kolumn) + ": " + repr(text) + ".")
     return int(text)
 
 
 def _tolka_znummer(text, kolumn, var):
     """Z-numret som heltal. Fler än ZNUMMER_HOGST_SIFFROR siffror stoppar filen (H1)."""
-    if not HELTAL.fullmatch(text):
+    if not _HELTAL.fullmatch(text):
         raise KassafilFel(var + " har ett ogiltigt heltal i kolumnen " + repr(kolumn) + ": " + repr(text) + ".")
     siffror = text.lstrip("0") or "0"
     if len(siffror) > ZNUMMER_HOGST_SIFFROR:
@@ -324,10 +331,10 @@ def _tolka_kassarader(data, kassaformat):
     kolumner = kassaformat["kolumner"]
     posttyper = _posttyper(kassaformat)
     kalla_fil = hashlib.sha256(data).hexdigest()
-    text, _ = avkoda(data, KASSAFIL)
+    text, _ = _avkoda(data, KASSAFIL)
     if "\x00" in text:
-        raise nul_fel(filrad_for(text, text.index("\x00")), KASSAFIL)
-    inga_otillatna_tecken(text, KASSAFIL)
+        raise _nul_fel(_filrad_for(text, text.index("\x00")), KASSAFIL)
+    _inga_otillatna_tecken(text, KASSAFIL)
     textrader = text.splitlines(keepends=True)
     if not textrader:
         raise KassafilFel("Kassafilen stoppas: filen är tom.")
@@ -335,7 +342,7 @@ def _tolka_kassarader(data, kassaformat):
 
     resultat = []
     sedda = {}  # (postnamn, sats) -> filrad, för att hitta poster som står två gånger
-    for filrad, var, falt in csv_rader(textrader[1:], 2, avgransare, antal_kolumner, KASSAFIL):
+    for filrad, var, falt in _csv_rader(textrader[1:], 2, avgransare, antal_kolumner, KASSAFIL):
         varde = {nyckel: falt[index].strip() for nyckel, index in plats.items()}
 
         postnamn = varde["postnamn"]
@@ -366,13 +373,13 @@ def _tolka_kassarader(data, kassaformat):
         sedda[nyckel] = filrad
 
         rad = {
-            "rapportdatum": tolka_datum(varde["rapportdatum"], kolumner["rapportdatum"], var, KASSAFIL),
+            "rapportdatum": _tolka_datum(varde["rapportdatum"], kolumner["rapportdatum"], var, KASSAFIL),
             "znummer": _tolka_znummer(varde["znummer"], kolumner["znummer"], var),
             "kassaregister": kassaregister,
             "postnamn": postnamn,
             "posttyp": posttyp,
             "sats": sats,
-            "belopp_ore": tolka_ore(varde["belopp"], kolumner["belopp"], var, KASSAFIL),
+            "belopp_ore": _tolka_ore(varde["belopp"], kolumner["belopp"], var, KASSAFIL),
             "kalla_fil": kalla_fil,
             "filrad": filrad,
         }
@@ -406,10 +413,15 @@ def _totalsumma(rader):
     return [rad["belopp_ore"] for rad in rader if rad["posttyp"] == "totalsumma"][0]
 
 
+def _filnamnsmonster(kassaformat):
+    """Kassaformatets filnamnsmönster som reguljärt uttryck. Datumet är grupp 1."""
+    fore, efter = kassaformat["filnamn"].split(DATUMPLATS)
+    return re.compile(re.escape(fore) + r"(\d{4}-\d{2}-\d{2})" + re.escape(efter), re.ASCII)
+
+
 def _datum_i_filnamnet(filnamn, kassaformat):
     """Läser ut datumet ur filnamnet enligt kassaformatets mönster. Fel ger ZKontrollFel (a)."""
-    fore, efter = kassaformat["filnamn"].split(DATUMPLATS)
-    traff = re.fullmatch(re.escape(fore) + r"(\d{4}-\d{2}-\d{2})" + re.escape(efter), filnamn, re.ASCII)
+    traff = _filnamnsmonster(kassaformat).fullmatch(filnamn)
     if traff:
         try:
             dt.date.fromisoformat(traff.group(1))
@@ -542,7 +554,7 @@ def las_kassafil(sokvag, kassaformat):
     och filrad (raden i filen).
     """
     kassaformat = _kontrollera_kassaformat(kassaformat, "Kassaformatet")
-    data = las_fil(sokvag, KASSAFIL)
+    data = _las_fil(sokvag, KASSAFIL)
     rader = _tolka_kassarader(data, kassaformat)
     filnamn = str(sokvag).replace("\\", "/").rsplit("/", 1)[-1]
     kontrollera_z_rapport(rader, filnamn, kassaformat)
@@ -677,16 +689,153 @@ def kontrollera_z_serien(rapporter):
                 )
 
 
-def summa_per_momssats(rapporter):
-    """Försäljning per momssats för flera Z-rapporter: {sats: {"brutto_ore", "moms_ore", "netto_ore"}}.
+# --- En hel period ---
 
-    Kör kontrollera_z_serien först, så att samma Z-rapport aldrig räknas två gånger och en period
-    med en lucka i Z-serien inte summeras (I2). En dubblett, lucka eller tom lista stoppas med samma
-    fel som seriekontrollen ger, och ingen summa returneras.
+# Nyckeln som bara las_kassaperiod har. Utan den går det inte att skapa en Kassaperiod, så att
+# summa_per_momssats aldrig får rader som inte har gått igenom Z-kontroll a–e och seriekontrollen.
+# Ett test (test_inga_genvagar.py) stoppar annan kärnkod från att använda den.
+_PERIODNYCKEL = object()
+
+
+class Kassaperiod:
+    """Z-rapporterna för en period, från las_kassaperiod. Kan bara skapas där och kan inte ändras.
+
+    rapporter är en lista med raderna för varje Z-fil i datumordning, i samma form som från
+    las_kassafil. Varje gång rapporter läses ges nya kopior, så att en ändring i dem aldrig når det
+    som summa_per_momssats summerar. fran_datum och till_datum är periodens gränser (ÅÅÅÅ-MM-DD).
     """
+
+    __slots__ = ("_rapporter", "_fran_datum", "_till_datum")
+
+    def __init__(self, nyckel, rapporter, fran_datum, till_datum):
+        if nyckel is not _PERIODNYCKEL:
+            raise KassafilFel(
+                "En Kassaperiod kan bara skapas av las_kassaperiod, som läser Z-filerna och kör alla kontroller först."
+            )
+        # Raderna sparas som oföränderliga kopior. object.__setattr__ behövs eftersom vanlig
+        # tilldelning är spärrad nedan.
+        object.__setattr__(self, "_rapporter", tuple(
+            tuple(MappingProxyType(dict(rad)) for rad in rader) for rader in rapporter))
+        object.__setattr__(self, "_fran_datum", fran_datum)
+        object.__setattr__(self, "_till_datum", till_datum)
+
+    def __setattr__(self, namn, varde):
+        raise AttributeError("En Kassaperiod kan inte ändras.")
+
+    def __delattr__(self, namn):
+        raise AttributeError("En Kassaperiod kan inte ändras.")
+
+    @property
+    def rapporter(self):
+        return [[dict(rad) for rad in rader] for rader in self._rapporter]
+
+    @property
+    def fran_datum(self):
+        return self._fran_datum
+
+    @property
+    def till_datum(self):
+        return self._till_datum
+
+    def __repr__(self):
+        return ("Kassaperiod(" + self._fran_datum + " till " + self._till_datum + ", "
+                + str(len(self._rapporter)) + " Z-rapporter)")
+
+
+def _periodens_datum(datum, namn):
+    """Ett datum som text, ÅÅÅÅ-MM-DD. Annat stoppas med KassafilFel."""
+    if isinstance(datum, str) and _DATUM.fullmatch(datum):
+        try:
+            dt.date.fromisoformat(datum)
+            return datum
+        except ValueError:
+            pass
+    raise KassafilFel(
+        "Kassaperioden: " + namn + " ska vara ett giltigt datum som text, ÅÅÅÅ-MM-DD, inte " + repr(datum) + "."
+    )
+
+
+def _z_filer_i_mappen(mapp, kassaformat):
+    """[(datum, sökväg), ...] för filerna i mappen vars namn följer kassaformatets mönster, i datumordning.
+
+    Andra filer i mappen hoppas över. En fil som följer mönstret men har ett datum som inte finns
+    (till exempel 2025-02-30) stoppar perioden, eftersom den kan vara en felstavad Z-fil.
+    Undermappar gås inte igenom.
+    """
+    if not _ar_sokvag(mapp):
+        raise KassafilFel("Kassaperioden: " + _sokvagens_typ(mapp))
+    mapp = Path(mapp)
+    try:
+        namn = [fil.name for fil in mapp.iterdir()]
+    except FileNotFoundError:
+        raise KassafilFel("Kassaperioden: mappen finns inte: " + str(mapp) + ".") from None
+    except NotADirectoryError:
+        raise KassafilFel("Kassaperioden: " + str(mapp) + " är en fil, inte en mapp.") from None
+    except OSError as fel:
+        raise KassafilFel(
+            "Kassaperioden: mappen " + str(mapp) + " går inte att läsa (" + (fel.strerror or str(fel)) + ")."
+        ) from None
+    monster = _filnamnsmonster(kassaformat)
+    filer = []
+    for filnamn in namn:
+        traff = monster.fullmatch(filnamn)
+        if not traff:
+            continue
+        try:
+            dt.date.fromisoformat(traff.group(1))
+        except ValueError:
+            raise KassafilFel(
+                "Kassaperioden: filen " + repr(filnamn) + " i " + str(mapp) + " följer mönstret "
+                + repr(kassaformat["filnamn"]) + ", men datumet " + traff.group(1) + " finns inte."
+                + " Kontrollera filnamnet."
+            ) from None
+        filer.append((traff.group(1), mapp / filnamn))
+    return sorted(filer)
+
+
+def las_kassaperiod(mapp, kassaformat, fran_datum, till_datum):
+    """Läser alla Z-filer i mappen med datum från fran_datum till till_datum, gränserna medräknade.
+
+    Varje fil läses med las_kassafil (Z-kontroll a–e), och sedan körs kontrollera_z_serien på alla
+    tillsammans. Först om allt stämmer returneras raderna, som en Kassaperiod. Minsta fel i en fil
+    eller i serien stoppar hela perioden med KassafilFel (eller en underklass), och inget returneras.
+
+    Vilka filer som hör till perioden avgörs av datumet i filnamnet, enligt kassaformatets mönster.
+    Datumen ges som text, ÅÅÅÅ-MM-DD. En period utan Z-filer stoppas.
+
+    OBS: som kontrollera_z_serien ser perioden bara luckor mellan rapporterna som finns i den.
+    Saknas periodens första eller sista Z-rapport syns det inte här.
+    """
+    kassaformat = _kontrollera_kassaformat(kassaformat, "Kassaformatet")
+    fran = _periodens_datum(fran_datum, "fran_datum")
+    till = _periodens_datum(till_datum, "till_datum")
+    if fran > till:
+        raise KassafilFel("Kassaperioden: fran_datum (" + fran + ") ligger efter till_datum (" + till + ").")
+    filer = [sokvag for datum, sokvag in _z_filer_i_mappen(mapp, kassaformat) if fran <= datum <= till]
+    if not filer:
+        raise KassafilFel(
+            "Kassaperioden: " + str(mapp) + " har inga Z-filer (" + repr(kassaformat["filnamn"]) + ") från "
+            + fran + " till " + till + ". En period helt utan Z-rapporter kan inte godkännas."
+        )
+    rapporter = [las_kassafil(sokvag, kassaformat) for sokvag in filer]
     kontrollera_z_serien(rapporter)
+    return Kassaperiod(_PERIODNYCKEL, rapporter, fran, till)
+
+
+def summa_per_momssats(period):
+    """Försäljning per momssats för en Kassaperiod: {sats: {"brutto_ore", "moms_ore", "netto_ore"}}.
+
+    Tar bara emot en Kassaperiod från las_kassaperiod, inte godtyckliga rader. Då har varje Z-fil
+    gått igenom Z-kontroll a–e och hela perioden gått igenom seriekontrollen, så att samma Z-rapport
+    aldrig räknas två gånger och en period med en lucka inte summeras (I2).
+    """
+    if type(period) is not Kassaperiod:
+        raise KassafilFel(
+            "summa_per_momssats tar bara emot en period från las_kassaperiod, inte " + type(period).__name__
+            + ". Läs Z-filerna med las_kassaperiod, som kör alla kontroller först."
+        )
     summor = {}
-    for rader in rapporter:
+    for rader in period._rapporter:
         for rad in rader:
             if rad["posttyp"] == "forsaljning_per_sats":
                 summor.setdefault(rad["sats"], {"brutto_ore": 0, "moms_ore": 0})["brutto_ore"] += rad["belopp_ore"]

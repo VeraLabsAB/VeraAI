@@ -1017,3 +1017,108 @@ Dessutom gjordes ett mutationstest på den nya koden: en ny kontroll i taget tog
 **Ny iakttagelse under arbetet (inte rättad).** Efter I2 går en månad med en saknad Z-rapport inte att summera alls förrän den saknade rapporten är hämtad. Det är rätt för en inläsning, men testdatan säger att Z-rapport 1011 *inte finns* (butiken hade öppet, och dagens betalningar syns på banken). Hur en sådan månad ska hanteras i drift (ärende till människa, eller summering med ett godkänt undantag) behöver bestämmas när K10 och rapporten byggs.
 
 Testsviten efter rättelserna: 565 passed, 0 misslyckade (496 före, 63 nya i `test_inga_genvagar.py` och 6 nya i `test_las_kassa.py`).
+
+### Senare samma dag: I3, I4, I6, NUL-radnumret, dolda tecken och säkrare form (två commits)
+
+Rättat 2026-10-25 i en egen session, i två commits: **del A** (commit da1be60, små rättelser) och **del B** (säkrare form, samma commit som det här avsnittet). Granskarens text ovan är inte ändrad, och inte heller tabellen ovan. Där stod I3, I4 och I6 som "Nej, medvetet", vilket stämde när den skrevs. Tabellen nedan gäller nu för dem.
+
+**Ord som används nedan.** Ett **internt** namn börjar med understreck (till exempel `_avkoda`). I Python betyder det "inte till för annan kod", och det är inte en del av modulens offentliga gränssnitt. **Escape-kod** är ett sätt att skriva ett tecken som synlig text i koden, till exempel ` ` för ett hårt mellanslag. Python läser koden som exakt samma tecken. En **Kassaperiod** är det `las_kassaperiod` returnerar: raderna för alla Z-filer i en period, som bara kan skapas efter att alla kontroller har gått igenom.
+
+| Nr | Åtgärdad | Test |
+|---|---|---|
+| NUL-radnumret | Ja (del A). Bank och kassa räknade radnumret olika när en fil hade ett NUL-tecken. Bankfilen räknade som Python (`str.splitlines`), som också räknar tecken som `\x0c`, `\x85` och U+2028 som radslut. Z-filen räknade som en textredigerare (bara `\n`, `\r` och `\r\n`). Nu räknar båda som Z-filen, eftersom det ger radens verkliga nummer i filen. De andra radsluten stoppar filen ändå, men först efter NUL-kontrollen | `scripts/tests/test_bank_och_kassa.py`: `test_nul_tecken_far_radens_verkliga_radnummer` (8 sorters dolda radslut, för bank och kassa), `test_nul_tecken_efter_dolda_radslut_fore_rubrikraden` (skydd: `test_nul_tecken_med_windows_radslut`) |
+| Dolda tecken i källkoden (granskning 4, uppgift C) | Ja (del A). De sju avsiktliga osynliga tecknen i `scripts/` (U+00A0 och U+202F i `belopp.py` och `test_belopp.py`, U+2028 och två U+200B i `test_las_kassa.py`) är skrivna som escape-koder. Python ser exakt samma kod (kontrollerat med Pythons ast för `belopp.py` och `test_belopp.py`, och strängarna jämförda en och en i `test_las_kassa.py`), så testerna prövar samma sak som förut. Ett nytt permanent test läser alla `.py`-filer i `scripts/`, även `tests/`, och slår larm för råa styrtecken (även tabb och `\r`, bara `\n` får finnas), osynliga formattecken (kategori Cf, bland dem riktningstecknen och nollbreddstecknen), andra blanksteg än vanligt mellanslag (Zs, Zl, Zp), utfyllnadstecken, blank blindskrift och variantväljare | `scripts/tests/test_inga_dolda_tecken.py`: `test_ingen_pythonfil_innehaller_dolda_tecken`, 38 fall i `test_kontrollen_hittar_dolda_tecken` (skydd: `test_det_finns_filer_att_soka_i`, `test_kontrollen_slapper_igenom_vanlig_kod`) |
+| I3 | Ja (del A). En bank- eller Z-fil med något av riktningstecknen U+202A–U+202E eller U+2066–U+2069, var som helst i filen, stoppas med "rad N i filen innehåller tecknet U+…, som är ett riktningstecken …". Andra osynliga formattecken, till exempel U+200D i emoji, U+200B och mjukt bindestreck, godtas som förut. En fil som också har ett styrtecken före riktningstecknet stoppas för styrtecknet, med samma meddelande som förut | `test_bank_och_kassa.py`: `test_i3_riktningstecken_i_ett_textfalt_stoppar_filen` (alla 9 tecken, granskarens `ET-VEL`, bank och kassa), `test_i3_riktningstecken_i_bankens_referens_och_fore_rubrikraden`, `test_i3_riktningstecken_i_kassaregistret_stoppar_filen`, `test_i3_riktningstecknen_ar_nio`, skydd: `test_i3_andra_osynliga_formattecken_godtas` (5 sorter, bank och kassa), `test_i3_styrtecken_fore_riktningstecken_ger_samma_meddelande_som_forut` |
+| I4 | Ja (del A). En sökväg som inte är text eller `Path` stoppas med `BankfilFel`/`KassafilFel` ("sökvägen ska vara text eller en Path, inte …") innan någon fil öppnas, i `las_bankfil`, `las_kassafil`, `ladda_bankformat` och `ladda_kassaformat`. `True`, `False` och heltal stänger alltså inte längre programmets in- eller utdata. Obs: även en sökväg som bytes stoppas nu (den fungerade förut för bankfilen, men inte för Z-filen) | `test_bank_och_kassa.py`: `test_i4_sokvag_av_fel_typ_stoppas_innan_nagot_oppnas` (None, flyttal, lista, ordbok, bytes och objekt i alla fyra funktionerna, med en spärr som slår larm om en fil öppnas), `test_i4_heltal_och_sanningsvarden_stanger_inte_programmets_utdata` (True, False, 0, 1 och 2 i ett eget program, som ska kunna skriva efteråt), skydd: `test_i4_text_och_path_godtas` |
+| I5 | Nej, medvetet | Blir ointressant när byggstenarna är interna (del B nedan). Ingen kärnfil utom inläsningsmodulerna får använda dem (I1-testet), och de är inte längre en del av något offentligt gränssnitt |
+| I6 | Ja (del A). När det inte finns någon dag mellan rapporterna före och efter luckan skrivs samma datum bara en gång ("Den saknade rapporten är från 9999-12-31."), och flera saknade rapporter får plural ("De saknade rapporterna är från …", och vid två olika datum "… från A, från B eller från båda dagarna."). En enda dag mellan rapporterna heter nu "Dag däremellan utan Z-rapport", inte "Dagar" | `test_las_kassa.py`: `test_i6_en_saknad_rapport_samma_dag`, `test_i6_flera_saknade_rapporter_samma_dag` (granskarens fall 37 och 100 039), `test_i6_flera_saknade_rapporter_dagar_i_rad`, `test_i6_en_dag_daremellan_ar_ental`, skydd: `test_i6_en_saknad_rapport_dagar_i_rad_ar_som_forut` |
+| I7 | Nej, medvetet | Gäller en siffra i en tidigare slutrapport, inte koden |
+| Förslag 1 ovan: interna byggstenar | Ja (del B). Alla namn i `inlasning_skydd.py` börjar med understreck (`_las_fil`, `_avkoda`, `_csv_rader`, `_Filsort` …). `las_bank.py` och `las_kassa.py` importerar dem under samma interna namn och gör inget av dem offentligt. Inget beteende har ändrats | `test_inga_genvagar.py`: `test_byggstenarna_har_bara_interna_namn`, `test_inlasningsmodulerna_har_inga_byggstenar_under_offentligt_namn` (samma sak när programmet kör), skydd: 8 fall i `test_kontrollen_hittar_offentliga_byggstenar`, `test_kontrollen_hittar_byggstenar_under_offentligt_namn_nar_programmet_kor`, `test_kontrollen_slapper_igenom_interna_namn_och_vanliga_offentliga_namn`. I1-testet bevisar fortfarande skyddet med de nya namnen |
+| Förslag 2 ovan: läsa en hel kassaperiod | Ja, för kassan (del B). `las_kassaperiod(mapp, kassaformat, fran_datum, till_datum)` läser alla Z-filer i mappen med datum i perioden, gränserna medräknade (datumet tas ur filnamnet enligt kassaformatet), kör `las_kassafil` på varje fil och `kontrollera_z_serien` på alla, och returnerar först då raderna, som en `Kassaperiod`. `summa_per_momssats` tar bara emot en `Kassaperiod`, inte listor med rader. En `Kassaperiod` kan bara skapas av `las_kassaperiod` (en nyckel som bara den har) och kan inte ändras: raderna sparas som oföränderliga kopior, och `rapporter` ger nya kopior varje gång. I1-testet förbjuder annan kärnkod att använda nyckeln och periodens inre. Andra filer i mappen hoppas över, undermappar gås inte igenom, och en fil som följer mönstret men har ett datum som inte finns stoppar perioden | `test_las_kassa.py`: facittestet `test_summorna_per_momssats_stammer_med_facit_per_manad_och_for_hela_perioden` (januari som 2025-01-01–2025-01-14 och 2025-01-16–2025-01-31, kvartalet som 2025-01-01–2025-01-14 och 2025-01-16–2025-03-31, stämmer mot facit), `test_i2_testdatans_januari_och_kvartal_stoppas_av_den_planterade_luckan` (januari i ett stycke stoppas vid Z-rapport 1011), `test_i2_summa_tar_inte_emot_godtyckliga_rader` (granskarens fall), 4 fler `test_i2_…` och 13 testfunktioner `test_period_…` (20 tester). I `test_inga_genvagar.py` 6 nya fall i `test_i1_kontrollen_hittar_en_fil_som_anvander_en_genvag` |
+
+**Så bevisades testerna i del A.** Dagens tester kördes i en kopia av projektet utanför projektmappen med koden från commit 14c6bf0 (före rättelserna). Resultat: 63 röda och 628 gröna. Alla 63 röda är nya eller ändrade tester och blev röda av rätt skäl: NUL-testerna för banken fick "rad 4" i stället för "rad 3" (9, kassans fall var redan gröna, som de ska), riktningstecknen släpptes igenom eller stoppades av något annat (21), sökvägarna av fel typ öppnades eller kraschade med `TypeError` (24), programmet med `True` som sökväg förlorade sin utdata och avslutades med fel (1), luckmeddelandena hade det gamla, dubbla datumet eller "Dagar" (7), och dolda-tecken-testet hittade hårt mellanslag och smalt hårt mellanslag i den gamla `belopp.py` (1). Körd mot hela den gamla `scripts/` (även de gamla testfilerna) hittade dolda-tecken-testet exakt granskarens sju tecken.
+
+**Ändrade befintliga tester.** Tre i del A: två luckmeddelanden som krävde den gamla, felaktiga meningen (I6), och en variant i H2-testet (`vand_text`, U+202E i kassaregistret) som nu stoppas redan vid inläsningen och därför prövas i I3-testet i stället. I del B: facittestet och fem `test_i2_…` skrivs om till `las_kassaperiod`, eftersom `summa_per_momssats` inte längre tar listor, och `test_inlasning_skydd.py` och `test_inga_genvagar.py` använder byggstenarnas nya namn. Körde man del A:s tester oförändrade mot del B:s kod blev 150 röda, alla av just de skälen (gamla namn som inte finns, eller listor till `summa_per_momssats`). Alla andra, bland dem hela `test_las_bank.py` och resten av `test_las_kassa.py`, var gröna.
+
+**Har `las_bankfil` och `las_kassafil` ändrat beteende?** Samma sätt som granskare 4: 3 034 provfall (1 517 bankfiler och 1 517 Z-filer, slumpade men samma vid varje körning) kördes mot tre kopior av koden: före rättelserna (14c6bf0), efter del A (da1be60) och efter del B. Fallen var giltiga filer med 1–8 rader, olika avgränsare, förrader, extra och omkastade kolumner och olika skrivsätt för kassan. 80 % fick 1–3 skador: styrtecken, NUL, riktningstecken, dolda radslut följda av NUL, U+FEFF, U+200B, U+200D, citattecken, avgränsare, borttagna, dubblerade och omkastade rader, avklippta rader och filer, ändrade siffror, fält på upp till 200 000 tecken, Windows-1252, UTF-16, BOM och trasiga byte. Dessutom tom fil, bara BOM, saknad fil, mapp, oläsbar fil och sökvägar av fel typ (None, flyttal, lista, ordbok, bytes, `Path`, och `True`, `False`, 0, 1, 2 i ett eget program per fall). För varje fall jämfördes felklassen, hela meddelandet och felets extra uppgifter, eller alla godkända rader och fält.
+
+| Jämförelse | Fall med skillnad | Förklaring |
+|---|---|---|
+| Efter del A mot efter del B | **0 av 3 034** | Del B har inte ändrat något beteende i `las_bankfil` eller `las_kassafil` |
+| Före rättelserna mot efter del B | 378 av 3 034, alla förklarade | 249 riktningstecken (I3: 14 filer som förut godkändes stoppas nu, och 235 som förut stoppades av något annat stoppas nu för riktningstecknet), 109 bankfiler med NUL efter ett dolt radslut (bara radnumret i meddelandet), 20 sökvägar av fel typ (I4: 8 krascher och 4 program som förlorade sin utdata blir `BankfilFel`/`KassafilFel`, och 8 bytes eller None som förut stoppades av något annat). Ingen oförklarad skillnad |
+
+Efter del B godkändes 579 fall (331 bank, 248 kassa) och 2 455 stoppades. Inget fall kraschade.
+
+**Mutationstest.** I en kopia av projektet utanför projektmappen togs en ny kontroll i taget bort (eller ett dolt tecken lades tillbaka), och hela sviten kördes. Alla 59 gav minst ett rött test. Två försök i del B gav först inget rött test och ledde till ändringar: testet för interna namn saknade egna skyddsfall, så det fick fall med påhittade filer (`test_kontrollen_hittar_offentliga_byggstenar` m.fl.), och kontrollen av kassaformatet i `las_kassaperiod` prövades bara med ett fel som `las_kassafil` också hittar, så testet prövar nu ett trasigt filnamnsmönster och en tom mapp. Ett tredje försök (att låta summeringen ta emot listor efter typkontrollen) ändrade inget, eftersom typkontrollen före stoppar listor. Det är ingen borttagen kontroll och togs bort ur listan.
+
+| Del | Borttagen kontroll eller tillagt tecken (i en kopia) | Röda tester |
+|---|---|---|
+| A | NUL: bankens gamla radräkning | 9 |
+| A | Dolda tecken: hårt mellanslag tillbaka i `belopp.py` | 1 |
+| A | Dolda tecken: U+2028 tillbaka i `test_las_kassa.py` | 1 |
+| A | Dolda tecken: U+202E i en kommentar i `las_bank.py` | 1 |
+| A | Dolda tecken: tabb i `inlasning_skydd.py` | 1 |
+| A | Dolda tecken: U+200D i en teststräng | 2 |
+| A | Dolda tecken: CR (Windows-radslut) i `las_kassa.py` | 1 |
+| A | Dolda-tecken-testet: kategori Cf borttagen | 19 |
+| A | Dolda-tecken-testet: kategori Cc borttagen | 8 |
+| A | Dolda-tecken-testet: Zl och Zp borttagna | 2 |
+| A | Dolda-tecken-testet: andra blanksteg (Zs) borttagna | 4 |
+| A | Dolda-tecken-testet: utfyllnadstecken borttagna | 5 |
+| A | Dolda-tecken-testet: `tests/` genomsöks inte | 1 |
+| A | I3: kontrollen av riktningstecken borttagen | 21 |
+| A | I3: bara U+202A–U+202E | 9 |
+| A | I3: bara U+2066–U+2069 | 12 |
+| A | I3: alla Cf-tecken stoppas (för mycket) | 14 |
+| A | I4: kontrollen i `_las_fil` borttagen | 13 |
+| A | I4: kontrollen i `_ladda_json` borttagen | 13 |
+| A | I4: heltal och sanningsvärden godtas | 2 |
+| A | I4: bytes godtas | 5 |
+| A | I6: samma datum två gånger igen | 4 |
+| A | I6: ental vid flera saknade samma dag | 1 |
+| A | I6: ental vid flera saknade dagar i rad | 1 |
+| A | I6: "Dagar" för en dag | 2 |
+| B | Ett offentligt namn i `inlasning_skydd.py` | 1 |
+| B | En offentlig funktion i `inlasning_skydd.py` | 1 |
+| B | `las_bank` gör en byggsten offentlig (`csv_rader = _csv_rader`) | 2 |
+| B | `las_kassa` importerar en byggsten under offentligt namn | 2 |
+| B | Perioden: nedre gränsen borttagen | 2 |
+| B | Perioden: övre gränsen borttagen | 4 |
+| B | Perioden: gränserna inte medräknade | 5 |
+| B | Perioden: seriekontrollen borttagen | 4 |
+| B | Perioden: Z-kontroll a–e borttagen (genvägen i stället för `las_kassafil`) | 2 |
+| B | Perioden: stoppet för period utan Z-filer borttaget | 1 |
+| B | Perioden: kontrollen att fran_datum inte ligger efter till_datum borttagen | 1 |
+| B | Perioden: datumens form kontrolleras inte | 3 |
+| B | Perioden: datum som inte finns godtas | 1 |
+| B | Perioden: mappens typ kontrolleras inte | 1 |
+| B | Perioden: saknad mapp översätts inte | 1 |
+| B | Perioden: fil i stället för mapp översätts inte | 1 |
+| B | Perioden: oläsbar mapp översätts inte | 1 |
+| B | Perioden: ogiltigt datum i filnamn hoppas över | 1 |
+| B | Perioden: filerna sorteras inte | 1 |
+| B | Perioden: kassaformatet kontrolleras inte | 1 |
+| B | Kassaperiod: nyckeln kontrolleras inte | 1 |
+| B | Kassaperiod: raderna sparas inte som oföränderliga kopior | 1 |
+| B | Kassaperiod: `rapporter` ger inte kopior | 1 |
+| B | Kassaperiod: tilldelning inte spärrad | 1 |
+| B | Kassaperiod: borttagning inte spärrad | 1 |
+| B | `summa_per_momssats`: typkontrollen borttagen | 1 |
+| B | `summa_per_momssats`: typkontrollen tar emot listor | 1 |
+| B | I1-testet: periodens inre inte förbjudet | 4 |
+| B | I1-testet: `__setattr__`/`__delattr__` inte förbjudna | 2 |
+| B | Testet för interna namn: offentliga namn i `inlasning_skydd.py` kontrolleras inte | 3 |
+| B | Testet för interna namn: import under offentligt namn kontrolleras inte | 2 |
+| B | Testet för interna namn: import av modulen kontrolleras inte | 1 |
+| B | Testet för interna namn: offentliga alias kontrolleras inte | 2 |
+| B | Testet för interna namn: kontrollen när programmet kör borttagen | 1 |
+
+**Nya iakttagelser under arbetet (inte rättade).**
+
+- **Andra riktningsmärken godtas.** U+200E och U+200F (vänster- och högermärke) och U+061C (arabiskt märke) påverkar också textens riktning, men ligger utanför intervallen i uppgiften. De godtas därför fortfarande. Ska de stoppas behöver det beslutas.
+- **NUL-tecken i sökvägen.** En sökväg som är text men innehåller ett NUL-tecken ger fortfarande `ValueError` från Python i stället för `BankfilFel`/`KassafilFel` (en del av granskarens I4, men utanför uppgiften "inte text eller Path").
+- **En period ser inte luckor i kanterna.** Precis som seriekontrollen ser `las_kassaperiod` bara luckor mellan rapporterna som finns i perioden. En period som börjar dagen efter en saknad rapport (som 2025-01-16 i facittestet) godkänns. Det är så facittestet ska fungera, men i drift måste K10 eller rapporten se till att perioderna tillsammans täcker hela månaden.
+- **Felstavade Z-filer hoppas över.** En fil som inte följer filnamnsmönstret exakt (till exempel `Kassa_2025-01-07.csv` med stort K) hoppas över utan varning. Mitt i en period syns det som en lucka i Z-serien, men i periodens början eller slut syns det inte.
+- **Skyddet kan kringgås med flit.** En `Kassaperiod` går att förfalska med kod som medvetet går förbi Python-reglerna. I1-testet stoppar de enkla sätten (nyckeln, periodens inre, `object.__setattr__`), men kan inte bevisa att inget annat sätt finns, på samma sätt som för I1.
+
+Testsviten: **730 passed**, 0 misslyckade (565 före, 691 efter del A, 730 efter del B). SPEC.md, CLAUDE.md, `foretag/`, testdatan och facit är inte ändrade.

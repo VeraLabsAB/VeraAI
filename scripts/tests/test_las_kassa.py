@@ -4,6 +4,7 @@ Testdatan är SYNTETISK (Syntet Testbutik AB, 2025-Q1). Rätt svar står i facit
 """
 
 import csv
+import datetime
 import io
 import json
 import os
@@ -21,7 +22,7 @@ sys.path.insert(0, str(AGENT / "scripts"))
 import las_kassa  # noqa: E402  (nya namn efter granskning 3 hämtas härifrån, inne i testerna)
 from las_kassa import (
     KassafilFel, ZKontrollFel, ZSerieFel, kontrollera_z_rapport, kontrollera_z_serien, ladda_kassaformat,
-    las_kassafil, momsen_i_brutto, summa_per_momssats,
+    las_kassafil, las_kassaperiod, momsen_i_brutto, summa_per_momssats,
 )
 
 KASSAFORMAT_FIL = AGENT / "foretag" / "syntet-testbutik" / "kassaformat.json"
@@ -155,93 +156,258 @@ def lagg_ihop(*summor_per_sats):
     return dict(sorted(totalt.items()))
 
 
-def delar_runt_luckan(rapporter):
-    """Delar rapporterna i två hela serier: före och efter den planterade luckan (Z-rapport 1011)."""
-    lucka = [f for f in facit()["planterade_fel"] if f["typ"] == "lucka_i_z_serien"][0]["z_nummer"]
-    fore = [rader for rader in rapporter if rader[0]["znummer"] < lucka]
-    efter = [rader for rader in rapporter if rader[0]["znummer"] > lucka]
-    assert fore and efter and len(fore) + len(efter) == len(rapporter)
-    return fore, efter
+def period(fran, till, mapp=KASSAMAPP, kassaformat=TESTBUTIKENS_KASSAFORMAT):
+    return las_kassaperiod(mapp, kassaformat, fran, till)
 
 
 def test_summorna_per_momssats_stammer_med_facit_per_manad_och_for_hela_perioden():
-    # summa_per_momssats kör seriekontrollen först (I2). Januari har en planterad lucka (Z-rapport
-    # 1011 saknas), så januari och hela kvartalet summeras i två hela delar: före och efter luckan.
+    # summa_per_momssats tar bara emot en period från las_kassaperiod, som kör seriekontrollen (I2).
+    # Januari har en planterad lucka (Z-rapport 1011 från 2025-01-15 saknas), så januari och hela
+    # kvartalet läses i två perioder: före och efter luckan.
     forsaljning = facit()["forsaljning"]
-    rapporter = las_alla()
-    per_manad = {}
-    for rader in rapporter:
-        per_manad.setdefault(rader[0]["rapportdatum"][:7], []).append(rader)
-    assert sorted(per_manad) == sorted(forsaljning)
+    assert sorted(forsaljning) == ["2025-01", "2025-02", "2025-03"]
+    januari = [period("2025-01-01", "2025-01-14"), period("2025-01-16", "2025-01-31")]
+    perioder = {"2025-01": januari, "2025-02": [period("2025-02-01", "2025-02-28")],
+                "2025-03": [period("2025-03-01", "2025-03-31")]}
 
     kvartal = {}
     for manad, fakta in forsaljning.items():
-        assert len(per_manad[manad]) == fakta["antal_z_rapporter"]
+        assert sum(len(del_.rapporter) for del_ in perioder[manad]) == fakta["antal_z_rapporter"]
         ratt = {int(sats): summor for sats, summor in fakta["per_momssats"].items()}
-        if manad == "2025-01":
-            assert lagg_ihop(*(summa_per_momssats(del_) for del_ in delar_runt_luckan(per_manad[manad]))) == ratt
-        else:
-            assert summa_per_momssats(per_manad[manad]) == ratt
+        assert lagg_ihop(*(summa_per_momssats(del_) for del_ in perioder[manad])) == ratt
         kvartal = lagg_ihop(kvartal, ratt)
 
-    assert lagg_ihop(*(summa_per_momssats(del_) for del_ in delar_runt_luckan(rapporter))) == kvartal
+    hela = [period("2025-01-01", "2025-01-14"), period("2025-01-16", "2025-03-31")]
+    assert lagg_ihop(*(summa_per_momssats(del_) for del_ in hela)) == kvartal
     assert kvartal[12]["brutto_ore"] == 27583500
+    # Skydd: de två delarna av januari slutar och börjar precis runt luckan.
+    assert januari[0].rapporter[-1][0]["znummer"] == 1010
+    assert januari[1].rapporter[0][0]["znummer"] == 1012
 
 
-# --- I2: summeringen kör seriekontrollen först ---
+# --- I2: summeringen tar bara emot en hel, kontrollerad period ---
 
 def test_i2_testdatans_januari_och_kvartal_stoppas_av_den_planterade_luckan():
-    rapporter = las_alla()
-    januari = [rader for rader in rapporter if rader[0]["rapportdatum"].startswith("2025-01")]
-    for period in (januari, rapporter):
+    for fran, till in [("2025-01-01", "2025-01-31"), ("2025-01-01", "2025-03-31")]:
         with pytest.raises(ZSerieFel) as fel:
-            summa_per_momssats(period)
+            period(fran, till)
         assert fel.value.typ == "lucka"
         assert fel.value.saknas_fran == fel.value.saknas_till == 1011
+        assert fel.value.znummer == [1010, 1012]
 
 
-def test_i2_samma_z_rapport_inlast_tva_ganger_summeras_inte(tmp_path):
+def test_i2_summa_tar_inte_emot_godtyckliga_rader(tmp_path):
     # Granskarens fall: samma Z-rapport (112 kr med 12 %) i två mappar, den ena med kassan skriven
     # tb-kassa-1. Var för sig är filerna felfria. Den gamla koden gav 224 kr i stället för 112 kr.
+    # Nu tar summa_per_momssats bara emot en Kassaperiod, inte listor med rader.
     fran_a = z_rapport(tmp_path / "a", "2025-01-02", 1001, "TB-KASSA-1")
     fran_b = z_rapport(tmp_path / "b", "2025-01-02", 1001, "tb-kassa-1")
-    assert summa_per_momssats([fran_a])[12]["brutto_ore"] == 11200  # skydd: en rapport ensam går bra
+    for rader in ([fran_a, fran_b], [fran_a, fran_a], [fran_a], [], fran_a, (fran_a,), None, {"rapporter": [fran_a]}):
+        with pytest.raises(KassafilFel, match="tar bara emot en period från las_kassaperiod"):
+            summa_per_momssats(rader)
+    # Skydd: samma rapport via en period går bra.
+    summor = summa_per_momssats(las_kassaperiod(tmp_path / "a", KASSAFORMAT, "2025-01-02", "2025-01-02"))
+    assert summor[12]["brutto_ore"] == 11200
+
+
+def test_i2_samma_z_rapport_med_annat_skrivsatt_kassaregister_stoppar_perioden(tmp_path):
+    z_rapport(tmp_path, "2025-01-02", 1001, "TB-KASSA-1")
+    z_rapport(tmp_path, "2025-01-03", 1001, "tb-kassa-1")
     with pytest.raises(ZSerieFel) as fel:
-        summa_per_momssats([fran_a, fran_b])
+        las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-01", "2025-01-31")
     assert fel.value.typ == "dubblett"
     assert fel.value.kassaregister == "TB-KASSA-1"
     assert "Z-rapport 1001 finns två gånger" in str(fel.value)
 
 
-def test_i2_samma_fil_tva_ganger_summeras_inte(tmp_path):
-    rapport = z_rapport(tmp_path, "2025-01-02", 1001)
-    with pytest.raises(ZSerieFel, match="samma fil är inläst två gånger") as fel:
-        summa_per_momssats([rapport, rapport])
-    assert fel.value.typ == "dubblett"
-
-
-def test_i2_lucka_summeras_inte(tmp_path):
-    rapporter = [z_rapport(tmp_path, "2025-01-02", 1001), z_rapport(tmp_path, "2025-01-04", 1003)]
+def test_i2_lucka_stoppar_perioden(tmp_path):
+    z_rapport(tmp_path, "2025-01-02", 1001)
+    z_rapport(tmp_path, "2025-01-04", 1003)
     with pytest.raises(ZSerieFel) as fel:
-        summa_per_momssats(rapporter)
+        las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-01", "2025-01-31")
     assert fel.value.typ == "lucka"
     assert fel.value.saknas_fran == fel.value.saknas_till == 1002
-    # Skydd: utan luckan summeras serien.
-    hel = rapporter[:1] + [z_rapport(tmp_path, "2025-01-03", 1002)] + rapporter[1:]
-    assert summa_per_momssats(hel) == {12: {"brutto_ore": 33600, "moms_ore": 3600, "netto_ore": 30000},
-                                       25: {"brutto_ore": 15000, "moms_ore": 3000, "netto_ore": 12000}}
+    # Skydd: utan luckan summeras perioden.
+    z_rapport(tmp_path, "2025-01-03", 1002)
+    assert summa_per_momssats(las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-01", "2025-01-31")) == {
+        12: {"brutto_ore": 33600, "moms_ore": 3600, "netto_ore": 30000},
+        25: {"brutto_ore": 15000, "moms_ore": 3000, "netto_ore": 12000}}
 
 
-def test_i2_z_nummer_som_gar_bakat_summeras_inte(tmp_path):
-    rapporter = [z_rapport(tmp_path, "2025-01-02", 1002), z_rapport(tmp_path, "2025-01-03", 1001)]
+def test_i2_z_nummer_som_gar_bakat_stoppar_perioden(tmp_path):
+    z_rapport(tmp_path, "2025-01-02", 1002)
+    z_rapport(tmp_path, "2025-01-03", 1001)
     with pytest.raises(ZSerieFel) as fel:
-        summa_per_momssats(rapporter)
+        las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-01", "2025-01-31")
     assert fel.value.typ == "ordning"
 
 
-def test_i2_tom_lista_summeras_inte():
-    with pytest.raises(KassafilFel, match="det finns inga Z-rapporter att kontrollera"):
-        summa_per_momssats([])
+def test_i2_period_utan_z_filer_stoppas(tmp_path):
+    z_rapport(tmp_path, "2025-02-03", 1001)
+    (tmp_path / "anteckning.txt").write_text("inte en Z-fil", encoding="utf-8")
+    for mapp in (tmp_path / "a", tmp_path):
+        with pytest.raises(KassafilFel, match="har inga Z-filer .* från 2025-01-01 till 2025-01-31. En period helt"
+                                              " utan Z-rapporter kan inte godkännas"):
+            las_kassaperiod(mapp, KASSAFORMAT, "2025-01-01", "2025-01-31")
+
+
+# --- las_kassaperiod ---
+
+def fyra_dagar(mapp):
+    """Fyra felfria Z-rapporter i följd, 2025-01-02 till 2025-01-05, Z-nummer 1001–1004."""
+    for dag, z in [("2025-01-02", 1001), ("2025-01-03", 1002), ("2025-01-04", 1003), ("2025-01-05", 1004)]:
+        z_rapport(mapp, dag, z)
+
+
+def znummer(period_):
+    return [rader[0]["znummer"] for rader in period_.rapporter]
+
+
+def test_period_raknar_med_granserna(tmp_path):
+    fyra_dagar(tmp_path)
+    assert znummer(las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-03", "2025-01-04")) == [1002, 1003]
+    assert znummer(las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-02", "2025-01-05")) == [1001, 1002, 1003, 1004]
+    assert znummer(las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-05", "2025-01-05")) == [1004]
+    assert znummer(las_kassaperiod(tmp_path, KASSAFORMAT, "2024-12-01", "2025-01-02")) == [1001]
+    period_ = las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-03", "2025-01-04")
+    assert (period_.fran_datum, period_.till_datum) == ("2025-01-03", "2025-01-04")
+    assert repr(period_) == "Kassaperiod(2025-01-03 till 2025-01-04, 2 Z-rapporter)"
+
+
+def test_period_ger_samma_rader_som_las_kassafil(tmp_path):
+    fyra_dagar(tmp_path)
+    period_ = las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-01", "2025-01-31")
+    assert period_.rapporter == [las_kassafil(fil, KASSAFORMAT) for fil in sorted(tmp_path.glob("kassa_*.csv"))]
+    assert all(list(rad) == FALT for rader in period_.rapporter for rad in rader)
+
+
+def test_period_lases_i_datumordning(tmp_path):
+    # Filerna skrivs i omvänd ordning. Perioden ska ändå komma i datumordning.
+    for dag, z in [("2025-01-05", 1004), ("2025-01-03", 1002), ("2025-01-04", 1003), ("2025-01-02", 1001)]:
+        z_rapport(tmp_path, dag, z)
+    assert znummer(las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-01", "2025-01-31")) == [1001, 1002, 1003, 1004]
+
+
+def test_period_laser_inte_filer_utanfor_perioden(tmp_path):
+    fyra_dagar(tmp_path)
+    z_fil(tmp_path, z_rader(datum="2025-01-10", z=1005, total="1.00"), "kassa_2025-01-10.csv")  # Z-kontroll c
+    assert znummer(las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-02", "2025-01-09")) == [1001, 1002, 1003, 1004]
+    with pytest.raises(ZKontrollFel) as fel:
+        las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-02", "2025-01-10")
+    assert fel.value.kontroll == "c"
+
+
+def test_period_med_en_trasig_z_fil_stoppas_helt(tmp_path):
+    fyra_dagar(tmp_path)
+    z_fil(tmp_path, ersatt(2, "12.00", "12.01"), "kassa_2025-01-02.csv")  # Z-kontroll e i den första filen
+    resultat = None
+    with pytest.raises(ZKontrollFel) as fel:
+        resultat = las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-01", "2025-01-31")
+    assert resultat is None
+    assert fel.value.kontroll == "e"
+
+
+def test_period_hoppar_over_filer_som_inte_ar_z_filer(tmp_path):
+    fyra_dagar(tmp_path)
+    for namn in ["README.txt", "kassa_2025-01-06.txt", "Kassa_2025-01-07.csv", "kassa_2025-01-08.csv.bak",
+                 "kassa_2025-1-9.csv", ".kassa_2025-01-10.csv", "x_kassa_2025-01-11.csv"]:
+        (tmp_path / namn).write_text("inte en Z-fil\n", encoding="utf-8")
+    (tmp_path / "kassa").mkdir()
+    z_rapport(tmp_path / "kassa", "2025-01-06", 1005)  # undermappar gås inte igenom
+    assert znummer(las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-01", "2025-01-31")) == [1001, 1002, 1003, 1004]
+
+
+def test_period_med_ogiltigt_datum_i_ett_filnamn_stoppas(tmp_path):
+    # En fil som följer mönstret men har ett datum som inte finns kan vara en felstavad Z-fil.
+    fyra_dagar(tmp_path)
+    (tmp_path / "kassa_2025-02-30.csv").write_text("x\n", encoding="utf-8")
+    with pytest.raises(KassafilFel, match="filen 'kassa_2025-02-30.csv' i .* följer mönstret 'kassa_ÅÅÅÅ-MM-DD.csv',"
+                                          " men datumet 2025-02-30 finns inte"):
+        las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-01", "2025-01-31")
+
+
+def test_period_mapp_som_saknas_eller_inte_ar_en_mapp(tmp_path):
+    fyra_dagar(tmp_path)
+    with pytest.raises(KassafilFel, match="Kassaperioden: mappen finns inte: "):
+        las_kassaperiod(tmp_path / "finns_inte", KASSAFORMAT, "2025-01-01", "2025-01-31")
+    with pytest.raises(KassafilFel, match="Kassaperioden: .*kassa_2025-01-02.csv är en fil, inte en mapp"):
+        las_kassaperiod(tmp_path / "kassa_2025-01-02.csv", KASSAFORMAT, "2025-01-01", "2025-01-31")
+    for mapp in (None, 5, True, 1.5, [str(tmp_path)], b"kassa"):
+        with pytest.raises(KassafilFel, match="Kassaperioden: sökvägen ska vara text eller en Path, inte "):
+            las_kassaperiod(mapp, KASSAFORMAT, "2025-01-01", "2025-01-31")
+    assert znummer(las_kassaperiod(str(tmp_path), KASSAFORMAT, "2025-01-01", "2025-01-31")) == [1001, 1002, 1003, 1004]
+
+
+@pytest.mark.skipif(os.name != "posix" or os.geteuid() == 0, reason="behöver filrättigheter som vanlig användare")
+def test_period_mapp_som_inte_gar_att_lasa(tmp_path):
+    fyra_dagar(tmp_path / "a")
+    (tmp_path / "a").chmod(0)
+    try:
+        with pytest.raises(KassafilFel, match="Kassaperioden: mappen .* går inte att läsa"):
+            las_kassaperiod(tmp_path / "a", KASSAFORMAT, "2025-01-01", "2025-01-31")
+    finally:
+        (tmp_path / "a").chmod(0o700)
+
+
+@pytest.mark.parametrize("fran, till, text", [
+    ("2025-1-1", "2025-01-31", "fran_datum ska vara ett giltigt datum som text, ÅÅÅÅ-MM-DD, inte '2025-1-1'"),
+    ("2025-01-01", "2025-02-30", "till_datum ska vara ett giltigt datum som text, ÅÅÅÅ-MM-DD, inte '2025-02-30'"),
+    (None, "2025-01-31", "fran_datum ska vara ett giltigt datum som text, ÅÅÅÅ-MM-DD, inte None"),
+    ("2025-01-01", 20250131, "till_datum ska vara ett giltigt datum som text"),
+    ("2025-01-01", datetime.date(2025, 1, 31), "till_datum ska vara ett giltigt datum som text"),
+    ("2025-01-01 ", "2025-01-31", "fran_datum ska vara ett giltigt datum som text"),
+    ("２０２５-01-01", "2025-01-31", "fran_datum ska vara ett giltigt datum som text"),
+    ("2025-01-31", "2025-01-01", "fran_datum (2025-01-31) ligger efter till_datum (2025-01-01)"),
+], ids=["fel_form", "datum_som_inte_finns", "none", "tal", "date", "mellanslag", "fullbreddssiffror", "fel_ordning"])
+def test_period_med_ogiltiga_datum_stoppas(tmp_path, fran, till, text):
+    fyra_dagar(tmp_path)
+    with pytest.raises(KassafilFel) as fel:
+        las_kassaperiod(tmp_path, KASSAFORMAT, fran, till)
+    assert "Kassaperioden: " + text in str(fel.value), str(fel.value)
+
+
+def test_period_kontrollerar_kassaformatet(tmp_path):
+    # Formatet kontrolleras innan mappen läses, även när mappen är tom och inget filnamn passar.
+    fyra_dagar(tmp_path)
+    for mapp in (tmp_path, tmp_path / "a"):
+        with pytest.raises(KassafilFel, match="'filnamn' ska innehålla 'ÅÅÅÅ-MM-DD' exakt en gång"):
+            las_kassaperiod(mapp, {**KASSAFORMAT, "filnamn": "kassa.csv"}, "2025-01-01", "2025-01-31")
+        with pytest.raises(KassafilFel, match="'momsavrundning'"):
+            las_kassaperiod(mapp, {**KASSAFORMAT, "momsavrundning": "uppat"}, "2025-01-01", "2025-01-31")
+        with pytest.raises(KassafilFel, match="ska vara ett objekt med nycklar"):
+            las_kassaperiod(mapp, None, "2025-01-01", "2025-01-31")
+
+
+def test_period_kan_inte_andras_utifran(tmp_path):
+    fyra_dagar(tmp_path)
+    period_ = las_kassaperiod(tmp_path, KASSAFORMAT, "2025-01-02", "2025-01-02")
+    fore = summa_per_momssats(period_)
+    # Raderna som läses ut är kopior. En ändring i dem når inte det som summeras.
+    period_.rapporter[0][0]["belopp_ore"] = 99999900
+    utlast = period_.rapporter
+    utlast[0][0]["belopp_ore"] = 99999900
+    utlast[0].append(dict(utlast[0][0]))
+    utlast.append(utlast[0])
+    assert summa_per_momssats(period_) == fore
+    assert period_.rapporter[0][0]["belopp_ore"] == 11200
+    # Perioden själv går inte att ändra.
+    for namn in ("_rapporter", "_fran_datum", "fran_datum", "rapporter", "ny"):
+        with pytest.raises(AttributeError):
+            setattr(period_, namn, [])
+        with pytest.raises(AttributeError):
+            delattr(period_, namn)
+    with pytest.raises(TypeError):
+        period_._rapporter[0][0]["belopp_ore"] = 1
+
+
+def test_period_kan_bara_skapas_av_las_kassaperiod(tmp_path):
+    fyra_dagar(tmp_path)
+    rader = [las_kassafil(tmp_path / "kassa_2025-01-02.csv", KASSAFORMAT)]
+    for nyckel in (None, object(), "nyckel", las_kassa.Kassaperiod):
+        with pytest.raises(KassafilFel, match="En Kassaperiod kan bara skapas av las_kassaperiod"):
+            las_kassa.Kassaperiod(nyckel, rader, "2025-01-02", "2025-01-02")
+    with pytest.raises(TypeError):
+        las_kassa.Kassaperiod(rader, "2025-01-02", "2025-01-02")
 
 
 # --- Det planterade felet: lucka i Z-serien ---

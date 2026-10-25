@@ -15,8 +15,14 @@ ligger därför här:
   nycklar, kolumnnamn och avgränsare kontrolleras.
 
 Modulen vet inte vilken sorts fil den läser. Allt som skiljer i felmeddelandena (vilken felklass
-som kastas och vad filen kallas) kommer från en Filsort, som varje inläsningsmodul skapar själv.
+som kastas och vad filen kallas) kommer från en _Filsort, som varje inläsningsmodul skapar själv.
 Meddelandena blir därför exakt desamma som när koden låg i varje modul för sig.
+
+Alla namn i modulen börjar med understreck. De är byggstenar för inläsningsmodulerna och inget
+gränssnitt för annan kod: var för sig hoppar de över de andra skydden. Annan kod läser filer med
+inläsningsmodulernas egna funktioner, som kör alla skydd i rätt ordning. Ett test
+(test_inga_genvagar.py) slår larm om modulen får ett namn utan understreck, och om en annan
+kärnfil använder byggstenarna.
 """
 
 import csv
@@ -30,7 +36,7 @@ from typing import NamedTuple
 from belopp import tolka_belopp
 
 
-class Filsort(NamedTuple):
+class _Filsort(NamedTuple):
     """Det som skiljer felmeddelandena åt mellan olika sorters filer."""
 
     fel: type             # felklassen som kastas
@@ -42,36 +48,36 @@ class Filsort(NamedTuple):
     nivaer: str           # meningen om hur många nivåer JSON-formatet har
 
 
-DATUM = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
-HELTAL = re.compile(r"\d+", re.ASCII)
+_DATUM = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
+_HELTAL = re.compile(r"\d+", re.ASCII)
 
 # Radbrytningar som inte får finnas inuti ett fält: \n, \r, U+2028 och U+2029.
-RADBRYTNINGAR = "\n\r\u2028\u2029"
+_RADBRYTNINGAR = "\n\r\u2028\u2029"
 
 # Styrtecken som får finnas i en fil: tabb, \n och \r. Alla andra styrtecken (Unicode-kategori
 # Cc), samt U+2028 och U+2029, stoppar filen (G1). Flera av dem räknas som radslut när filen
 # delas i rader, men inte av kontrollen mot radbrytning inuti fält, och kan då slå ihop flera
 # rader till en.
-TILLATNA_STYRTECKEN = "\t\n\r"
+_TILLATNA_STYRTECKEN = "\t\n\r"
 # Kategori Cc omfattar bara U+0000–U+001F och U+007F–U+009F, och Unicode lovar att den aldrig ändras.
-OTILLATNA_TECKEN = re.compile("[" + re.escape("".join(
+_OTILLATNA_TECKEN = re.compile("[" + re.escape("".join(
     chr(nummer) for nummer in range(0x100)
-    if unicodedata.category(chr(nummer)) == "Cc" and chr(nummer) not in TILLATNA_STYRTECKEN
+    if unicodedata.category(chr(nummer)) == "Cc" and chr(nummer) not in _TILLATNA_STYRTECKEN
 ) + "\u2028\u2029") + "]")
-RADSLUT = re.compile(r"\r\n|\r|\n")
+_RADSLUT = re.compile(r"\r\n|\r|\n")
 
 # Riktningstecken (I3): osynliga tecken som får text att visas i en annan ordning än den är lagrad,
 # U+202A–U+202E och U+2066–U+2069. En beskrivning kan då se ut som en annan text än den är. Andra
 # osynliga formattecken, till exempel U+200D som binder ihop emoji, stoppar inte filen.
-RIKTNINGSTECKEN = re.compile("[\u202a-\u202e\u2066-\u2069]")
+_RIKTNINGSTECKEN = re.compile("[\u202a-\u202e\u2066-\u2069]")
 
 # Avgränsare som ett format får använda (G2): komma, semikolon, tabb och lodstreck.
-TILLATNA_AVGRANSARE = (",", ";", "\t", "|")
+_TILLATNA_AVGRANSARE = (",", ";", "\t", "|")
 
 
 # --- Sökvägen ---
 
-def ar_sokvag(sokvag):
+def _ar_sokvag(sokvag):
     """True om sokvag är text eller en Path. Annat, till exempel None, ett tal eller True, får inte öppnas.
 
     Ett heltal (och True och False) tolkas annars av Python som ett filnummer, så att programmets
@@ -80,7 +86,7 @@ def ar_sokvag(sokvag):
     return isinstance(sokvag, (str, PurePath))
 
 
-def sokvagens_typ(sokvag):
+def _sokvagens_typ(sokvag):
     """Början på meddelandet för en sökväg av fel typ."""
     return "sökvägen ska vara text eller en Path, inte " + type(sokvag).__name__ + "."
 
@@ -88,7 +94,7 @@ def sokvagens_typ(sokvag):
 # --- JSON-formatet ---
 
 class _DubbelNyckel(Exception):
-    """En nyckel står två gånger i samma JSON-objekt. Fångas i ladda_json."""
+    """En nyckel står två gånger i samma JSON-objekt. Fångas i _ladda_json."""
 
 
 def _inga_dubbla_nycklar(par):
@@ -100,13 +106,13 @@ def _inga_dubbla_nycklar(par):
     return objekt
 
 
-def ladda_json(sokvag, filsort):
+def _ladda_json(sokvag, filsort):
     """Läser ett JSON-format. Returnerar (innehållet, var), där var är början på felmeddelanden.
 
     Innehållet är inte kontrollerat. Det gör anroparen, med funktionerna nedan.
     """
-    if not ar_sokvag(sokvag):
-        raise filsort.fel(filsort.formatet + " går inte att läsa: " + sokvagens_typ(sokvag))
+    if not _ar_sokvag(sokvag):
+        raise filsort.fel(filsort.formatet + " går inte att läsa: " + _sokvagens_typ(sokvag))
     var = filsort.formatet + " i " + str(sokvag)
     try:
         with open(sokvag, "rb") as fil:
@@ -137,7 +143,7 @@ def ladda_json(sokvag, filsort):
     return innehall, var
 
 
-def kontrollera_nycklar(data, obligatoriska, valfria, var, filsort):
+def _kontrollera_nycklar(data, obligatoriska, valfria, var, filsort):
     """data ska vara ett objekt med alla obligatoriska nycklar och inga andra än de valfria."""
     if not isinstance(data, dict):
         raise filsort.fel(var + " ska vara ett objekt med nycklar, inte " + type(data).__name__ + ".")
@@ -152,13 +158,13 @@ def kontrollera_nycklar(data, obligatoriska, valfria, var, filsort):
         )
 
 
-def kontrollera_anteckning(data, var, filsort):
+def _kontrollera_anteckning(data, var, filsort):
     """Den valfria nyckeln "anteckning" ska vara text om den finns."""
     if "anteckning" in data and not isinstance(data["anteckning"], str):
         raise filsort.fel(var + ": 'anteckning' ska vara text.")
 
 
-def kontrollera_namn(namn, vad, var, filsort, ett_namn="ett namn"):
+def _kontrollera_namn(namn, vad, var, filsort, ett_namn="ett namn"):
     """Kontrollerar ett namn i formatet och returnerar det utan mellanslag runt om.
 
     vad är början på meddelandet, till exempel "kolumnnamnet för 'belopp'". ett_namn är vad
@@ -166,7 +172,7 @@ def kontrollera_namn(namn, vad, var, filsort, ett_namn="ett namn"):
     """
     if not isinstance(namn, str) or not namn.strip():
         raise filsort.fel(var + ": " + vad + " får inte vara tomt.")
-    if any(tecken in namn for tecken in RADBRYTNINGAR + '"'):
+    if any(tecken in namn for tecken in _RADBRYTNINGAR + '"'):
         raise filsort.fel(var + ": " + vad + " får inte innehålla radbrytning eller citattecken.")
     osynliga = [tecken for tecken in namn if unicodedata.category(tecken) in ("Cc", "Cf")]
     if osynliga:
@@ -178,7 +184,7 @@ def kontrollera_namn(namn, vad, var, filsort, ett_namn="ett namn"):
     return namn.strip()
 
 
-def inga_dubbla_kolumnnamn(kolumner, var, filsort):
+def _inga_dubbla_kolumnnamn(kolumner, var, filsort):
     """Varje uppgift i kolumner ({nyckel: kolumnnamn}) måste ha ett eget kolumnnamn."""
     for nyckel, namn in kolumner.items():
         andra = [annan for annan, annat_namn in kolumner.items() if annat_namn == namn and annan != nyckel]
@@ -189,15 +195,15 @@ def inga_dubbla_kolumnnamn(kolumner, var, filsort):
             )
 
 
-def kontrollera_avgransare(avgransare, kolumner, var, filsort):
+def _kontrollera_avgransare(avgransare, kolumner, var, filsort):
     """Kontrollerar formatets lista med avgränsare och returnerar den som en ny lista."""
     if not isinstance(avgransare, list) or not avgransare:
         raise filsort.fel(var + ": 'avgransare' ska vara en lista med minst en avgränsare.")
     for tecken in avgransare:
-        if not isinstance(tecken, str) or tecken not in TILLATNA_AVGRANSARE:
+        if not isinstance(tecken, str) or tecken not in _TILLATNA_AVGRANSARE:
             raise filsort.fel(
                 var + ": avgränsaren " + repr(tecken) + " är ogiltig. Tillåtna avgränsare är komma,"
-                " semikolon, tabb och lodstreck (" + ", ".join(map(repr, TILLATNA_AVGRANSARE)) + ")."
+                " semikolon, tabb och lodstreck (" + ", ".join(map(repr, _TILLATNA_AVGRANSARE)) + ")."
             )
     if len(set(avgransare)) != len(avgransare):
         raise filsort.fel(var + ": samma avgränsare står flera gånger i 'avgransare'.")
@@ -208,10 +214,10 @@ def kontrollera_avgransare(avgransare, kolumner, var, filsort):
 
 # --- Filen: teckenkodning och styrtecken ---
 
-def las_fil(sokvag, filsort):
+def _las_fil(sokvag, filsort):
     """Filens innehåll som bytes. En fil som saknas eller inte går att läsa stoppas."""
-    if not ar_sokvag(sokvag):
-        raise filsort.fel(filsort.filen + " stoppas: " + sokvagens_typ(sokvag))
+    if not _ar_sokvag(sokvag):
+        raise filsort.fel(filsort.filen + " stoppas: " + _sokvagens_typ(sokvag))
     try:
         with open(sokvag, "rb") as fil:
             return fil.read()
@@ -226,7 +232,7 @@ def las_fil(sokvag, filsort):
         ) from None
 
 
-def avkoda(data, filsort):
+def _avkoda(data, filsort):
     """Returnerar (filens text, True om den var giltig UTF-8). Provar UTF-8 först och Windows-1252 sedan."""
     if data.startswith((b"\xff\xfe", b"\xfe\xff")):
         raise filsort.fel(
@@ -243,12 +249,12 @@ def avkoda(data, filsort):
         raise filsort.fel(filsort.filen + " stoppas: teckenkodningen är varken UTF-8 eller Windows-1252.") from None
 
 
-def filrad_for(text, position):
+def _filrad_for(text, position):
     """Radnumret i filen för en position i texten. Räknar bara \\n, \\r och \\r\\n, som en vanlig textredigerare."""
-    return len(RADSLUT.findall(text, 0, position)) + 1
+    return len(_RADSLUT.findall(text, 0, position)) + 1
 
 
-def nul_fel(filrad, filsort):
+def _nul_fel(filrad, filsort):
     """Felet för ett NUL-tecken (tecken nummer 0) på raden filrad. Anroparen räknar ut raden."""
     return filsort.fel(
         filsort.filen + " stoppas: rad " + str(filrad) + " i filen innehåller ett NUL-tecken"
@@ -256,19 +262,19 @@ def nul_fel(filrad, filsort):
     )
 
 
-def inga_otillatna_tecken(text, filsort):
+def _inga_otillatna_tecken(text, filsort):
     """Stoppar filen om den innehåller ett styrtecken utom tabb, \\n och \\r, U+2028/U+2029 eller ett riktningstecken."""
-    fynd = OTILLATNA_TECKEN.search(text)
+    fynd = _OTILLATNA_TECKEN.search(text)
     if fynd:
         raise filsort.fel(
-            filsort.filen + " stoppas: rad " + str(filrad_for(text, fynd.start())) + " i filen innehåller tecknet U+"
+            filsort.filen + " stoppas: rad " + str(_filrad_for(text, fynd.start())) + " i filen innehåller tecknet U+"
             + format(ord(fynd.group()), "04X") + ", som är ett styrtecken eller en ovanlig radbrytning. "
             + filsort.om_styrtecken
         )
-    fynd = RIKTNINGSTECKEN.search(text)
+    fynd = _RIKTNINGSTECKEN.search(text)
     if fynd:
         raise filsort.fel(
-            filsort.filen + " stoppas: rad " + str(filrad_for(text, fynd.start())) + " i filen innehåller tecknet U+"
+            filsort.filen + " stoppas: rad " + str(_filrad_for(text, fynd.start())) + " i filen innehåller tecknet U+"
             + format(ord(fynd.group()), "04X") + ", som är ett riktningstecken. Riktningstecken är osynliga och"
             " får text att visas i en annan ordning än den är lagrad, så att till exempel en beskrivning kan se ut"
             " som en annan text än den är."
@@ -277,7 +283,7 @@ def inga_otillatna_tecken(text, filsort):
 
 # --- CSV-läsningen ---
 
-def rubrikens_falt(rad, avgransare_lista, kolumner):
+def _rubrikens_falt(rad, avgransare_lista, kolumner):
     """(avgränsare, fälten) om raden är en rubrikrad med alla kolumnnamnen, annars None.
 
     Avgränsarna prövas i tur och ordning. Fälten har mellanslagen runt om borttagna.
@@ -292,7 +298,7 @@ def rubrikens_falt(rad, avgransare_lista, kolumner):
     return None
 
 
-def csv_fel(fel, var, filsort):
+def _csv_fel(fel, var, filsort):
     """Översätter ett fel från csv-läsaren till ett fel med svenskt meddelande."""
     if "field larger than field limit" in str(fel):
         return filsort.fel(
@@ -305,7 +311,7 @@ def csv_fel(fel, var, filsort):
     )
 
 
-def csv_rader(textrader, forsta_filrad, avgransare, antal_kolumner, filsort):
+def _csv_rader(textrader, forsta_filrad, avgransare, antal_kolumner, filsort):
     """Läser raderna efter rubrikraden. Ger (filrad, var, fälten) för varje rad som inte är tom.
 
     textrader är filens rader efter rubrikraden, och forsta_filrad radnumret i filen för den
@@ -325,12 +331,12 @@ def csv_rader(textrader, forsta_filrad, avgransare, antal_kolumner, filsort):
         except StopIteration:
             return
         except csv.Error as fel:
-            raise csv_fel(fel, var, filsort) from None
+            raise _csv_fel(fel, var, filsort) from None
         lasta_rader = lasare.line_num
         if not falt or all(not f.strip() for f in falt):
             continue  # tom rad
         for index, text in enumerate(falt):
-            if any(tecken in text for tecken in RADBRYTNINGAR):
+            if any(tecken in text for tecken in _RADBRYTNINGAR):
                 raise filsort.fel(
                     var + " har en radbrytning inuti fält nummer " + str(index + 1)
                     + ". Det beror troligen på ett citattecken i fel läge, som kan slå ihop "
@@ -343,9 +349,9 @@ def csv_rader(textrader, forsta_filrad, avgransare, antal_kolumner, filsort):
         yield filrad, var, falt
 
 
-def tolka_datum(text, kolumn, var, filsort):
+def _tolka_datum(text, kolumn, var, filsort):
     """Ett datum som ÅÅÅÅ-MM-DD, som text. Ett ogiltigt datum stoppar filen."""
-    if DATUM.fullmatch(text):
+    if _DATUM.fullmatch(text):
         try:
             dt.date.fromisoformat(text)
             return text
@@ -354,7 +360,7 @@ def tolka_datum(text, kolumn, var, filsort):
     raise filsort.fel(var + " har ett ogiltigt datum i kolumnen " + repr(kolumn) + ": " + repr(text) + ".")
 
 
-def tolka_ore(text, kolumn, var, filsort):
+def _tolka_ore(text, kolumn, var, filsort):
     """Ett belopp som heltal i öre, med belopp.tolka_belopp. Ett ogiltigt belopp stoppar filen."""
     try:
         return tolka_belopp(text)

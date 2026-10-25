@@ -184,7 +184,7 @@ def test_inlasning_skydd_namner_ingen_sorts_fil():
     """De gemensamma skydden vet inte vilken sorts fil de läser.
 
     Allt som skiljer bankfilen och Z-filen åt, som felklass och vad filen kallas, kommer in som en
-    Filsort från las_bank.py och las_kassa.py. Själva modulen får inte nämna bank, kassa eller
+    _Filsort från las_bank.py och las_kassa.py. Själva modulen får inte nämna bank, kassa eller
     Z-rapport någonstans, inte ens i kommentarer.
     """
     text = (SCRIPTS / "inlasning_skydd.py").read_text(encoding="utf-8").casefold()

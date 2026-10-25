@@ -1,6 +1,6 @@
 """Tester som prövar de gemensamma skydden i inlasning_skydd.py direkt.
 
-Varje skydd prövas med både bankfilens och kassafilens Filsort (BANKFIL och KASSAFIL). Felet ska
+Varje skydd prövas med både bankfilens och kassafilens _Filsort (BANKFIL och KASSAFIL). Felet ska
 vara filsortens egen felklass, och meddelandet ska börja med filsortens egna ord. Att meddelandena
 är exakt desamma som innan skydden flyttades hit bevisas av test_las_bank.py och test_las_kassa.py,
 som inte ändrades vid flytten.
@@ -39,7 +39,7 @@ def test_filsorterna_har_egna_felklasser_och_ord():
     assert BANKFIL.fel is BankfilFel and KASSAFIL.fel is KassafilFel
     assert (BANKFIL.filen, KASSAFIL.filen) == ("Bankfilen", "Kassafilen")
     assert (BANKFIL.formatet, KASSAFIL.formatet) == ("Bankformatet", "Kassaformatet")
-    for falt in skydd.Filsort._fields:
+    for falt in skydd._Filsort._fields:
         assert getattr(BANKFIL, falt) != getattr(KASSAFIL, falt), falt
 
 
@@ -50,14 +50,14 @@ def test_ladda_json_godtar_giltig_json_med_och_utan_bom(tmp_path, filsort):
     fil = tmp_path / "format.json"
     for data in (b'{"a": [1, {"b": "\xc3\xb6"}]}', b'\xef\xbb\xbf{"a": [1, {"b": "\xc3\xb6"}]}'):
         fil.write_bytes(data)
-        assert skydd.ladda_json(fil, filsort) == ({"a": [1, {"b": "ö"}]}, filsort.formatet + " i " + str(fil))
+        assert skydd._ladda_json(fil, filsort) == ({"a": [1, {"b": "ö"}]}, filsort.formatet + " i " + str(fil))
 
 
 @FILSORTER
 def test_ladda_json_saknad_fil_och_mapp(tmp_path, filsort):
-    assert stoppas(filsort, skydd.ladda_json, tmp_path / "x.json", filsort) == (
+    assert stoppas(filsort, skydd._ladda_json, tmp_path / "x.json", filsort) == (
         filsort.formatet + " saknas: filen finns inte: " + str(tmp_path / "x.json") + ".")
-    assert stoppas(filsort, skydd.ladda_json, tmp_path, filsort) == (
+    assert stoppas(filsort, skydd._ladda_json, tmp_path, filsort) == (
         filsort.formatet + " saknas: " + str(tmp_path) + " är en mapp, inte en fil.")
 
 
@@ -68,7 +68,7 @@ def test_ladda_json_olasbar_fil(tmp_path, filsort):
     fil.write_text("{}", encoding="utf-8")
     fil.chmod(0)
     try:
-        meddelande = stoppas(filsort, skydd.ladda_json, fil, filsort)
+        meddelande = stoppas(filsort, skydd._ladda_json, fil, filsort)
     finally:
         fil.chmod(0o600)
     assert meddelande.startswith(filsort.formatet + " går inte att läsa: " + str(fil) + " (")
@@ -84,40 +84,40 @@ def test_ladda_json_olasbar_fil(tmp_path, filsort):
 def test_ladda_json_trasig_fil(tmp_path, filsort, data, slut):
     fil = tmp_path / "format.json"
     fil.write_bytes(data)
-    assert stoppas(filsort, skydd.ladda_json, fil, filsort) == filsort.formatet + " i " + str(fil) + slut
+    assert stoppas(filsort, skydd._ladda_json, fil, filsort) == filsort.formatet + " i " + str(fil) + slut
 
 
 @FILSORTER
 def test_ladda_json_for_djup_nastling(tmp_path, filsort):
     fil = tmp_path / "format.json"
     fil.write_bytes(b"[" * 100000)
-    meddelande = stoppas(filsort, skydd.ladda_json, fil, filsort)
+    meddelande = stoppas(filsort, skydd._ladda_json, fil, filsort)
     assert "för många hakparenteser eller klammerparenteser inuti varandra. " + filsort.nivaer in meddelande
 
 
 @FILSORTER
 def test_kontrollera_nycklar(filsort):
-    skydd.kontrollera_nycklar({"a": 1, "c": 2}, ("a",), ("c",), "X", filsort)
-    skydd.kontrollera_nycklar({"a": 1}, ("a",), ("c",), "X", filsort)
-    assert stoppas(filsort, skydd.kontrollera_nycklar, [1], ("a",), (), "X", filsort) == (
+    skydd._kontrollera_nycklar({"a": 1, "c": 2}, ("a",), ("c",), "X", filsort)
+    skydd._kontrollera_nycklar({"a": 1}, ("a",), ("c",), "X", filsort)
+    assert stoppas(filsort, skydd._kontrollera_nycklar, [1], ("a",), (), "X", filsort) == (
         "X ska vara ett objekt med nycklar, inte list.")
-    assert stoppas(filsort, skydd.kontrollera_nycklar, {"c": 1}, ("a", "b"), ("c",), "X", filsort) == (
+    assert stoppas(filsort, skydd._kontrollera_nycklar, {"c": 1}, ("a", "b"), ("c",), "X", filsort) == (
         "X saknar nyckeln 'a', 'b'.")
-    assert stoppas(filsort, skydd.kontrollera_nycklar, {"a": 1, "z": 2, "y": 3}, ("a",), ("c",), "X", filsort) == (
+    assert stoppas(filsort, skydd._kontrollera_nycklar, {"a": 1, "z": 2, "y": 3}, ("a",), ("c",), "X", filsort) == (
         "X har en okänd nyckel: 'y', 'z'. Tillåtna nycklar är 'a', 'c'.")
 
 
 @FILSORTER
 def test_kontrollera_anteckning(filsort):
-    skydd.kontrollera_anteckning({}, "X", filsort)
-    skydd.kontrollera_anteckning({"anteckning": "fri text"}, "X", filsort)
-    assert stoppas(filsort, skydd.kontrollera_anteckning, {"anteckning": 5}, "X", filsort) == (
+    skydd._kontrollera_anteckning({}, "X", filsort)
+    skydd._kontrollera_anteckning({"anteckning": "fri text"}, "X", filsort)
+    assert stoppas(filsort, skydd._kontrollera_anteckning, {"anteckning": 5}, "X", filsort) == (
         "X: 'anteckning' ska vara text.")
 
 
 @FILSORTER
 def test_kontrollera_namn_godtar_och_tar_bort_mellanslag(filsort):
-    assert skydd.kontrollera_namn("  Bokföringsdag  ", "namnet", "X", filsort) == "Bokföringsdag"
+    assert skydd._kontrollera_namn("  Bokföringsdag  ", "namnet", "X", filsort) == "Bokföringsdag"
 
 
 @pytest.mark.parametrize("namn, slut", [
@@ -138,30 +138,30 @@ def test_kontrollera_namn_godtar_och_tar_bort_mellanslag(filsort):
         "osynligt_mellanslag", "sidbrytning", "tabb", "bom"])
 @FILSORTER
 def test_kontrollera_namn_stoppar_trasiga_namn(filsort, namn, slut):
-    assert stoppas(filsort, skydd.kontrollera_namn, namn, "namnet", "X", filsort).startswith("X: namnet" + slut)
+    assert stoppas(filsort, skydd._kontrollera_namn, namn, "namnet", "X", filsort).startswith("X: namnet" + slut)
 
 
 @FILSORTER
 def test_kontrollera_namn_sager_vad_namnet_kallas(filsort):
-    assert stoppas(filsort, skydd.kontrollera_namn, "a\u200b", "namnet", "X", filsort).endswith(
+    assert stoppas(filsort, skydd._kontrollera_namn, "a\u200b", "namnet", "X", filsort).endswith(
         "Sådana tecken får inte finnas i ett namn.")
-    assert stoppas(filsort, skydd.kontrollera_namn, "a\u200b", "namnet", "X", filsort, "ett kolumnnamn").endswith(
+    assert stoppas(filsort, skydd._kontrollera_namn, "a\u200b", "namnet", "X", filsort, "ett kolumnnamn").endswith(
         "Sådana tecken får inte finnas i ett kolumnnamn.")
 
 
 @FILSORTER
 def test_inga_dubbla_kolumnnamn(filsort):
-    skydd.inga_dubbla_kolumnnamn({"a": "A", "b": "B"}, "X", filsort)
-    assert stoppas(filsort, skydd.inga_dubbla_kolumnnamn, {"a": "A", "b": "B", "c": "A"}, "X", filsort) == (
+    skydd._inga_dubbla_kolumnnamn({"a": "A", "b": "B"}, "X", filsort)
+    assert stoppas(filsort, skydd._inga_dubbla_kolumnnamn, {"a": "A", "b": "B", "c": "A"}, "X", filsort) == (
         "X: kolumnnamnet 'A' används för både 'a' och 'c'. Varje kolumn måste ha ett eget namn.")
 
 
 @FILSORTER
 def test_kontrollera_avgransare_godtar_tillatna(filsort):
     lista = [",", ";", "\t", "|"]
-    resultat = skydd.kontrollera_avgransare(lista, KOLUMNER, "X", filsort)
+    resultat = skydd._kontrollera_avgransare(lista, KOLUMNER, "X", filsort)
     assert resultat == lista and resultat is not lista  # en ny lista, inte formatets egen
-    assert skydd.TILLATNA_AVGRANSARE == (",", ";", "\t", "|")
+    assert skydd._TILLATNA_AVGRANSARE == (",", ";", "\t", "|")
 
 
 @pytest.mark.parametrize("avgransare, slut", [
@@ -177,14 +177,14 @@ def test_kontrollera_avgransare_godtar_tillatna(filsort):
 ], ids=["tom", "text", "tuple", "punkt", "mellanslag", "sidbrytning", "tva_tecken", "tal", "dubbel"])
 @FILSORTER
 def test_kontrollera_avgransare_stoppar(filsort, avgransare, slut):
-    assert stoppas(filsort, skydd.kontrollera_avgransare, avgransare, KOLUMNER, "X", filsort).startswith("X" + slut)
+    assert stoppas(filsort, skydd._kontrollera_avgransare, avgransare, KOLUMNER, "X", filsort).startswith("X" + slut)
 
 
 @FILSORTER
 def test_kontrollera_avgransare_kolumnnamn_med_avgransare(filsort):
     kolumner = {"datum": "Datum", "belopp": "Belopp; kr"}
-    skydd.kontrollera_avgransare([","], kolumner, "X", filsort)
-    assert stoppas(filsort, skydd.kontrollera_avgransare, [",", ";"], kolumner, "X", filsort) == (
+    skydd._kontrollera_avgransare([","], kolumner, "X", filsort)
+    assert stoppas(filsort, skydd._kontrollera_avgransare, [",", ";"], kolumner, "X", filsort) == (
         "X: ett kolumnnamn innehåller en av avgränsarna.")
 
 
@@ -194,10 +194,10 @@ def test_kontrollera_avgransare_kolumnnamn_med_avgransare(filsort):
 def test_las_fil(tmp_path, filsort):
     fil = tmp_path / "fil.csv"
     fil.write_bytes(b"a,b\r\n")
-    assert skydd.las_fil(fil, filsort) == b"a,b\r\n"
-    assert stoppas(filsort, skydd.las_fil, tmp_path / "x.csv", filsort) == (
+    assert skydd._las_fil(fil, filsort) == b"a,b\r\n"
+    assert stoppas(filsort, skydd._las_fil, tmp_path / "x.csv", filsort) == (
         filsort.filen + " stoppas: filen finns inte: " + str(tmp_path / "x.csv") + ".")
-    assert stoppas(filsort, skydd.las_fil, tmp_path, filsort) == (
+    assert stoppas(filsort, skydd._las_fil, tmp_path, filsort) == (
         filsort.filen + " stoppas: " + str(tmp_path) + " är en mapp, inte en fil.")
 
 
@@ -208,7 +208,7 @@ def test_las_fil_olasbar(tmp_path, filsort):
     fil.write_bytes(b"a")
     fil.chmod(0)
     try:
-        meddelande = stoppas(filsort, skydd.las_fil, fil, filsort)
+        meddelande = stoppas(filsort, skydd._las_fil, fil, filsort)
     finally:
         fil.chmod(0o600)
     assert meddelande.startswith(filsort.filen + " stoppas: filen " + str(fil) + " går inte att läsa (")
@@ -216,17 +216,17 @@ def test_las_fil_olasbar(tmp_path, filsort):
 
 @FILSORTER
 def test_avkoda(filsort):
-    assert skydd.avkoda("Bokföringsdag".encode("utf-8"), filsort) == ("Bokföringsdag", True)
-    assert skydd.avkoda("Bokföringsdag".encode("utf-8-sig"), filsort) == ("Bokföringsdag", True)
-    assert skydd.avkoda("Bokföringsdag".encode("cp1252"), filsort) == ("Bokföringsdag", False)
-    assert skydd.avkoda(b"", filsort) == ("", True)
+    assert skydd._avkoda("Bokföringsdag".encode("utf-8"), filsort) == ("Bokföringsdag", True)
+    assert skydd._avkoda("Bokföringsdag".encode("utf-8-sig"), filsort) == ("Bokföringsdag", True)
+    assert skydd._avkoda("Bokföringsdag".encode("cp1252"), filsort) == ("Bokföringsdag", False)
+    assert skydd._avkoda(b"", filsort) == ("", True)
 
 
 @pytest.mark.parametrize("kodning", ["utf-16", "utf-16-le", "utf-16-be"])
 @FILSORTER
 def test_avkoda_stoppar_utf16(filsort, kodning):
     data = "\ufeffDatum,Belopp".encode(kodning) if kodning != "utf-16" else "Datum,Belopp".encode(kodning)
-    assert stoppas(filsort, skydd.avkoda, data, filsort) == (
+    assert stoppas(filsort, skydd._avkoda, data, filsort) == (
         filsort.filen + " stoppas: filen är sparad som UTF-16 (\"Unicode-text\"), som inte stöds. "
         + filsort.exportera_igen + ", eller spara den som UTF-8 eller CSV.")
 
@@ -234,29 +234,29 @@ def test_avkoda_stoppar_utf16(filsort, kodning):
 @FILSORTER
 def test_avkoda_stoppar_okand_teckenkodning(filsort):
     # Byten 0x81 finns inte i Windows-1252, och ensam är den inte giltig UTF-8.
-    assert stoppas(filsort, skydd.avkoda, b"Datum\x81", filsort) == (
+    assert stoppas(filsort, skydd._avkoda, b"Datum\x81", filsort) == (
         filsort.filen + " stoppas: teckenkodningen är varken UTF-8 eller Windows-1252.")
 
 
 def test_filrad_for_raknar_bara_vanliga_radslut():
     text = "a\nb\r\nc\rd\x0ce\u2028f"
-    assert skydd.filrad_for(text, 0) == 1
-    assert skydd.filrad_for(text, text.index("b")) == 2
-    assert skydd.filrad_for(text, text.index("c")) == 3  # \r\n räknas som ett radslut
-    assert skydd.filrad_for(text, text.index("d")) == 4
-    assert skydd.filrad_for(text, text.index("f")) == 4  # \x0c och U+2028 räknas inte
+    assert skydd._filrad_for(text, 0) == 1
+    assert skydd._filrad_for(text, text.index("b")) == 2
+    assert skydd._filrad_for(text, text.index("c")) == 3  # \r\n räknas som ett radslut
+    assert skydd._filrad_for(text, text.index("d")) == 4
+    assert skydd._filrad_for(text, text.index("f")) == 4  # \x0c och U+2028 räknas inte
 
 
 @FILSORTER
 def test_nul_fel(filsort):
-    fel = skydd.nul_fel(7, filsort)
+    fel = skydd._nul_fel(7, filsort)
     assert type(fel) is filsort.fel
     assert str(fel) == (filsort.filen + " stoppas: rad 7 i filen innehåller ett NUL-tecken (tecken nummer 0)."
                         " Filen är troligen trasig eller sparad i fel format.")
 
 
 def test_otillatna_tecken_ar_alla_styrtecken_utom_tabb_och_radslut():
-    otillatna = {chr(nummer) for nummer in range(0x110000) if skydd.OTILLATNA_TECKEN.fullmatch(chr(nummer))}
+    otillatna = {chr(nummer) for nummer in range(0x110000) if skydd._OTILLATNA_TECKEN.fullmatch(chr(nummer))}
     ratt = {chr(nummer) for nummer in range(0x110000) if unicodedata.category(chr(nummer)) == "Cc"}
     assert otillatna == (ratt - {"\t", "\n", "\r"}) | {"\u2028", "\u2029"}
 
@@ -265,47 +265,47 @@ def test_otillatna_tecken_ar_alla_styrtecken_utom_tabb_och_radslut():
 @FILSORTER
 def test_inga_otillatna_tecken_stoppar(filsort, tecken):
     text = "Datum,Belopp\r\n2025-01-02,1\r\nx" + tecken + "y\n"
-    assert stoppas(filsort, skydd.inga_otillatna_tecken, text, filsort) == (
+    assert stoppas(filsort, skydd._inga_otillatna_tecken, text, filsort) == (
         filsort.filen + " stoppas: rad 3 i filen innehåller tecknet U+" + format(ord(tecken), "04X")
         + ", som är ett styrtecken eller en ovanlig radbrytning. " + filsort.om_styrtecken)
 
 
 @FILSORTER
 def test_inga_otillatna_tecken_godtar_tabb_och_radslut(filsort):
-    skydd.inga_otillatna_tecken("Datum\tBelopp\r\n2025-01-02\t1\n\r\u00a0ö\u200b", filsort)
+    skydd._inga_otillatna_tecken("Datum\tBelopp\r\n2025-01-02\t1\n\r\u00a0ö\u200b", filsort)
 
 
 # --- CSV-läsningen ---
 
 def test_rubrikens_falt():
-    assert skydd.rubrikens_falt(' Belopp ;"Datum";x\r\n', [",", ";"], KOLUMNER) == (";", ["Belopp", "Datum", "x"])
-    assert skydd.rubrikens_falt("Datum,Belopp,Datum\n", [","], KOLUMNER) == (",", ["Datum", "Belopp", "Datum"])
-    assert skydd.rubrikens_falt("Datum;Summa\n", [",", ";"], KOLUMNER) is None
-    assert skydd.rubrikens_falt("Datum;Belopp\n", [","], KOLUMNER) is None
-    assert skydd.rubrikens_falt("", [","], KOLUMNER) is None
+    assert skydd._rubrikens_falt(' Belopp ;"Datum";x\r\n', [",", ";"], KOLUMNER) == (";", ["Belopp", "Datum", "x"])
+    assert skydd._rubrikens_falt("Datum,Belopp,Datum\n", [","], KOLUMNER) == (",", ["Datum", "Belopp", "Datum"])
+    assert skydd._rubrikens_falt("Datum;Summa\n", [",", ";"], KOLUMNER) is None
+    assert skydd._rubrikens_falt("Datum;Belopp\n", [","], KOLUMNER) is None
+    assert skydd._rubrikens_falt("", [","], KOLUMNER) is None
 
 
 def test_rubrikens_falt_hoppar_over_rad_som_inte_gar_att_tolka():
     # Med komma som avgränsare blir hela raden ett enda fält, längre än csv-läsarens gräns. Det ger
     # csv.Error, och då prövas nästa avgränsare.
     rad = "Datum;Belopp;" + ";".join(["x" * 1000] * (csv.field_size_limit() // 1000 + 1)) + "\n"
-    assert skydd.rubrikens_falt(rad, [",", ";"], KOLUMNER)[0] == ";"
-    assert skydd.rubrikens_falt(rad, [","], KOLUMNER) is None
+    assert skydd._rubrikens_falt(rad, [",", ";"], KOLUMNER)[0] == ";"
+    assert skydd._rubrikens_falt(rad, [","], KOLUMNER) is None
 
 
 @FILSORTER
 def test_csv_fel(filsort):
-    fel = skydd.csv_fel(csv.Error("field larger than field limit (131072)"), "X", filsort)
+    fel = skydd._csv_fel(csv.Error("field larger than field limit (131072)"), "X", filsort)
     assert type(fel) is filsort.fel
     assert str(fel) == "X har ett fält som är längre än " + str(csv.field_size_limit()) + " tecken. Filen är troligen trasig."
-    fel = skydd.csv_fel(csv.Error("',' expected after '\"'"), "X", filsort)
+    fel = skydd._csv_fel(csv.Error("',' expected after '\"'"), "X", filsort)
     assert type(fel) is filsort.fel
     assert str(fel) == ("X kan inte tolkas som CSV, till exempel på grund av ett citattecken i fel läge."
                         " Teknisk detalj: ',' expected after '\"'.")
 
 
 def csv_lista(textrader, filsort, forsta_filrad=2, avgransare=",", antal_kolumner=2):
-    return list(skydd.csv_rader(textrader, forsta_filrad, avgransare, antal_kolumner, filsort))
+    return list(skydd._csv_rader(textrader, forsta_filrad, avgransare, antal_kolumner, filsort))
 
 
 @FILSORTER
@@ -341,7 +341,7 @@ def test_tolka_datum_kraver_monstret_aven_om_python_godtar_mer(filsort, monkeypa
 
     monkeypatch.setattr(skydd, "dt", types.SimpleNamespace(date=AllaDatum))
     for text in ("20250102", "2025-W01-1", "2025-01-02T00:00", "\uff12025-01-02"):
-        assert stoppas(filsort, skydd.tolka_datum, text, "Datum", "X", filsort) == (
+        assert stoppas(filsort, skydd._tolka_datum, text, "Datum", "X", filsort) == (
             "X har ett ogiltigt datum i kolumnen 'Datum': " + repr(text) + ".")
 @FILSORTER
 def test_csv_rader_radbrytning_inuti_falt(filsort):
@@ -376,24 +376,24 @@ def test_csv_rader_for_langt_falt(filsort):
 
 @FILSORTER
 def test_tolka_datum(filsort):
-    assert skydd.tolka_datum("2024-02-29", "Datum", "X", filsort) == "2024-02-29"
+    assert skydd._tolka_datum("2024-02-29", "Datum", "X", filsort) == "2024-02-29"
     for text in ("2025-02-29", "2025-13-01", "2025-1-02", "2025-01-02 ", "20250102", "\uff12025-01-02", ""):
-        assert stoppas(filsort, skydd.tolka_datum, text, "Datum", "X", filsort) == (
+        assert stoppas(filsort, skydd._tolka_datum, text, "Datum", "X", filsort) == (
             "X har ett ogiltigt datum i kolumnen 'Datum': " + repr(text) + ".")
 
 
 @FILSORTER
 def test_tolka_ore(filsort):
-    assert skydd.tolka_ore("-1234.50", "Belopp", "X", filsort) == -123450
+    assert skydd._tolka_ore("-1234.50", "Belopp", "X", filsort) == -123450
     for text in ("12,5.0", "1e3", "", "abc"):
-        assert stoppas(filsort, skydd.tolka_ore, text, "Belopp", "X", filsort) == (
+        assert stoppas(filsort, skydd._tolka_ore, text, "Belopp", "X", filsort) == (
             "X har ett ogiltigt belopp i kolumnen 'Belopp': " + repr(text) + ".")
 
 
 def test_heltal_och_datum_godtar_bara_vanliga_siffror():
-    assert skydd.HELTAL.fullmatch("0123")
-    assert not skydd.HELTAL.fullmatch("\uff11")  # fullbreddssiffra
-    assert not skydd.HELTAL.fullmatch("-1")
-    assert not skydd.DATUM.fullmatch("\uff12\uff10\uff12\uff15-01-02")
-    assert skydd.RADBRYTNINGAR == "\n\r\u2028\u2029"
-    assert json.dumps(skydd.TILLATNA_STYRTECKEN) == '"\\t\\n\\r"'
+    assert skydd._HELTAL.fullmatch("0123")
+    assert not skydd._HELTAL.fullmatch("\uff11")  # fullbreddssiffra
+    assert not skydd._HELTAL.fullmatch("-1")
+    assert not skydd._DATUM.fullmatch("\uff12\uff10\uff12\uff15-01-02")
+    assert skydd._RADBRYTNINGAR == "\n\r\u2028\u2029"
+    assert json.dumps(skydd._TILLATNA_STYRTECKEN) == '"\\t\\n\\r"'
