@@ -11,7 +11,7 @@ import re
 
 # Mellanslag som får användas som tusentalsavgränsare:
 # vanligt mellanslag, hårt mellanslag och smalt hårt mellanslag.
-_TUSENTAL = "   "
+_TUSENTAL = " \u00a0\u202f"
 
 # Heltalsdelen är antingen bara siffror ("1234"),
 # eller grupper om tre siffror med mellanslag emellan ("1 234 567").

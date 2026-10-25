@@ -17,9 +17,9 @@ något kassasystem (Ö5).
 
 Inläsningen skyddas på samma sätt som bankfilen i las_bank.py, med de gemensamma skydden i
 inlasning_skydd.py och kassafilens egna felmeddelanden (KASSAFIL): teckenkodningen upptäcks (UTF-8,
-annars Windows-1252, UTF-16 och NUL-tecken stoppas), styrtecken och ovanliga radbrytningar stoppar
-filen, radbrytning inuti ett fält stoppar filen, CSV läses strikt och varje rad ska ha lika många
-fält som rubrikraden. Beloppen tolkas med belopp.tolka_belopp och blir heltal i öre, aldrig flyttal.
+annars Windows-1252, UTF-16 och NUL-tecken stoppas), styrtecken, ovanliga radbrytningar och
+riktningstecken (I3) stoppar filen, radbrytning inuti ett fält stoppar filen, CSV läses strikt och
+varje rad ska ha lika många fält som rubrikraden. Beloppen tolkas med belopp.tolka_belopp och blir heltal i öre, aldrig flyttal.
 Ett Z-nummer får ha högst ZNUMMER_HOGST_SIFFROR siffror (H1). Kassaregistret måste finnas i
 kassaformatets lista "kassaregister". Namnen jämförs efter normalisera_kassaregister, så stora och
 små bokstäver, blanksteg och osynliga tecken räknas inte (H2).
@@ -653,9 +653,18 @@ def kontrollera_z_serien(rapporter):
                            + " (" + str(till - fran + 1) + " st)")
                 dag_fran, dag_till = _dagar_mellan(datum_fore, datum_efter)
                 if dag_fran is None:
-                    dagar = "Den saknade rapporten är från " + datum_fore + " eller " + datum_efter + "."
+                    # Ingen dag däremellan. Samma datum skrivs bara en gång, och "rapporten" bara när
+                    # en enda saknas (I6).
+                    if datum_fore == datum_efter:
+                        dagar = (("Den saknade rapporten" if fran == till else "De saknade rapporterna")
+                                 + " är från " + datum_fore + ".")
+                    elif fran == till:
+                        dagar = "Den saknade rapporten är från " + datum_fore + " eller " + datum_efter + "."
+                    else:
+                        dagar = ("De saknade rapporterna är från " + datum_fore + ", från " + datum_efter
+                                 + " eller från båda dagarna.")
                 elif dag_fran == dag_till:
-                    dagar = "Dagar däremellan utan Z-rapport: " + dag_fran + "."
+                    dagar = "Dag däremellan utan Z-rapport: " + dag_fran + "."
                 else:
                     antal = (dt.date.fromisoformat(dag_till) - dt.date.fromisoformat(dag_fran)).days + 1
                     dagar = ("Dagar däremellan utan Z-rapport: från " + dag_fran + " till " + dag_till

@@ -7,7 +7,8 @@ ligger därför här:
 - Teckenkodningen: först UTF-8 (med eller utan BOM), annars Windows-1252. UTF-16 stoppas.
 - Styrtecken: andra styrtecken än tabb och vanliga radslut (\\n, \\r), samt de ovanliga
   radbrytningarna U+2028 och U+2029, stoppar filen. NUL-tecken (tecken nummer 0) får ett eget
-  meddelande.
+  meddelande. Riktningstecknen U+202A–U+202E och U+2066–U+2069 stoppar också filen (I3).
+- Sökvägen: en sökväg som inte är text eller Path stoppas innan något öppnas (I4).
 - CSV-läsningen: strikt läsning, ingen radbrytning inuti ett fält, och varje rad ska ha lika
   många fält som rubrikraden. Datum och belopp tolkas på samma sätt i alla filer.
 - JSON-formatet: filen läses som UTF-8, dubbla nycklar och för djup nästling stoppas, och
@@ -23,6 +24,7 @@ import datetime as dt
 import json
 import re
 import unicodedata
+from pathlib import PurePath
 from typing import NamedTuple
 
 from belopp import tolka_belopp
@@ -58,8 +60,29 @@ OTILLATNA_TECKEN = re.compile("[" + re.escape("".join(
 ) + "\u2028\u2029") + "]")
 RADSLUT = re.compile(r"\r\n|\r|\n")
 
+# Riktningstecken (I3): osynliga tecken som får text att visas i en annan ordning än den är lagrad,
+# U+202A–U+202E och U+2066–U+2069. En beskrivning kan då se ut som en annan text än den är. Andra
+# osynliga formattecken, till exempel U+200D som binder ihop emoji, stoppar inte filen.
+RIKTNINGSTECKEN = re.compile("[\u202a-\u202e\u2066-\u2069]")
+
 # Avgränsare som ett format får använda (G2): komma, semikolon, tabb och lodstreck.
 TILLATNA_AVGRANSARE = (",", ";", "\t", "|")
+
+
+# --- Sökvägen ---
+
+def ar_sokvag(sokvag):
+    """True om sokvag är text eller en Path. Annat, till exempel None, ett tal eller True, får inte öppnas.
+
+    Ett heltal (och True och False) tolkas annars av Python som ett filnummer, så att programmets
+    egen in- eller utdata läses och sedan stängs (I4).
+    """
+    return isinstance(sokvag, (str, PurePath))
+
+
+def sokvagens_typ(sokvag):
+    """Början på meddelandet för en sökväg av fel typ."""
+    return "sökvägen ska vara text eller en Path, inte " + type(sokvag).__name__ + "."
 
 
 # --- JSON-formatet ---
@@ -82,6 +105,8 @@ def ladda_json(sokvag, filsort):
 
     Innehållet är inte kontrollerat. Det gör anroparen, med funktionerna nedan.
     """
+    if not ar_sokvag(sokvag):
+        raise filsort.fel(filsort.formatet + " går inte att läsa: " + sokvagens_typ(sokvag))
     var = filsort.formatet + " i " + str(sokvag)
     try:
         with open(sokvag, "rb") as fil:
@@ -185,6 +210,8 @@ def kontrollera_avgransare(avgransare, kolumner, var, filsort):
 
 def las_fil(sokvag, filsort):
     """Filens innehåll som bytes. En fil som saknas eller inte går att läsa stoppas."""
+    if not ar_sokvag(sokvag):
+        raise filsort.fel(filsort.filen + " stoppas: " + sokvagens_typ(sokvag))
     try:
         with open(sokvag, "rb") as fil:
             return fil.read()
@@ -230,13 +257,21 @@ def nul_fel(filrad, filsort):
 
 
 def inga_otillatna_tecken(text, filsort):
-    """Stoppar filen om den innehåller ett styrtecken utom tabb, \\n och \\r, eller U+2028/U+2029."""
+    """Stoppar filen om den innehåller ett styrtecken utom tabb, \\n och \\r, U+2028/U+2029 eller ett riktningstecken."""
     fynd = OTILLATNA_TECKEN.search(text)
     if fynd:
         raise filsort.fel(
             filsort.filen + " stoppas: rad " + str(filrad_for(text, fynd.start())) + " i filen innehåller tecknet U+"
             + format(ord(fynd.group()), "04X") + ", som är ett styrtecken eller en ovanlig radbrytning. "
             + filsort.om_styrtecken
+        )
+    fynd = RIKTNINGSTECKEN.search(text)
+    if fynd:
+        raise filsort.fel(
+            filsort.filen + " stoppas: rad " + str(filrad_for(text, fynd.start())) + " i filen innehåller tecknet U+"
+            + format(ord(fynd.group()), "04X") + ", som är ett riktningstecken. Riktningstecken är osynliga och"
+            " får text att visas i en annan ordning än den är lagrad, så att till exempel en beskrivning kan se ut"
+            " som en annan text än den är."
         )
 
 

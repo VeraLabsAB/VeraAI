@@ -17,6 +17,8 @@ Det här gör modulen:
 - Andra styrtecken än tabb och vanliga radslut (\\n, \\r), samt de ovanliga radbrytningarna
   U+2028 och U+2029, stoppar filen var de än står. Flera av dem kan annars få raderna att delas
   fel så att flera transaktioner slås ihop till en.
+- Riktningstecknen U+202A–U+202E och U+2066–U+2069 stoppar filen var de än står (I3). De är
+  osynliga och kan få en beskrivning att visas som en annan text än den är.
 - Rader före rubrikraden hoppas över. Rubrikraden är den första raden som innehåller alla
   kolumnerna i bankformatet, i valfri ordning.
 - Avgränsaren upptäcks automatiskt på rubrikraden, bland dem som bankformatet tillåter.
@@ -45,7 +47,7 @@ import hashlib
 
 from belopp import formatera_ore
 from inlasning_skydd import (
-    HELTAL, Filsort, avkoda, csv_rader, inga_dubbla_kolumnnamn, inga_otillatna_tecken,
+    HELTAL, Filsort, avkoda, csv_rader, filrad_for, inga_dubbla_kolumnnamn, inga_otillatna_tecken,
     kontrollera_anteckning, kontrollera_avgransare, kontrollera_namn, kontrollera_nycklar, ladda_json, las_fil,
     nul_fel, rubrikens_falt, tolka_datum, tolka_ore,
 )
@@ -172,11 +174,12 @@ def _tolka_rader(data, bankformat):
     kolumner = bankformat["kolumner"]
     kalla_fil = hashlib.sha256(data).hexdigest()
     text, giltig_utf8 = avkoda(data, BANKFIL)
-    textrader = text.splitlines(keepends=True)
-    for index, rad in enumerate(textrader):
-        if "\x00" in rad:
-            raise nul_fel(index + 1, BANKFIL)
+    # Radnumret räknas som i en textredigerare (filrad_for), på samma sätt som för Z-filen. Andra
+    # tecken som Python räknar som radslut, till exempel \x0c, stoppas strax efter.
+    if "\x00" in text:
+        raise nul_fel(filrad_for(text, text.index("\x00")), BANKFIL)
     inga_otillatna_tecken(text, BANKFIL)
+    textrader = text.splitlines(keepends=True)
     rubrik_index, avgransare, plats, antal_kolumner = _hitta_rubrikrad(textrader, giltig_utf8, bankformat)
 
     resultat = []

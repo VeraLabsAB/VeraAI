@@ -265,7 +265,7 @@ def test_planterat_fel_lucka_i_z_serien_upptacks_och_pekar_ut_z_nummer_och_datum
     assert "Z-rapport 1011 saknas" in meddelande
     assert "Z-rapport 1010 (2025-01-14)" in meddelande
     assert "Z-rapport 1012 (2025-01-16)" in meddelande
-    assert "Dagar däremellan utan Z-rapport: 2025-01-15." in meddelande
+    assert "Dag däremellan utan Z-rapport: 2025-01-15." in meddelande
     print("\nFelmeddelandet för Z-serien:\n" + meddelande)
 
 
@@ -491,7 +491,7 @@ def ersatt(rad_index, gammalt, nytt):
         (ersatt(1, "K-1", '"K\r-1"'), "radbrytning inuti fält"),
         (ersatt(1, "K-1", "K\x0b-1"), "innehåller tecknet U+000B"),
         (ersatt(1, "K-1", "K\x85-1"), "innehåller tecknet U+0085"),
-        (ersatt(1, "K-1", "K -1"), "innehåller tecknet U+2028"),
+        (ersatt(1, "K-1", "K\u2028-1"), "innehåller tecknet U+2028"),
         (ersatt(1, "K-1", "K\x00-1"), "rad 3 i filen innehåller ett NUL-tecken"),
     ],
     ids=[
@@ -698,7 +698,7 @@ def utan_nyckel(nyckel, data):
         (med_kolumner(sats=""), "kolumnnamnet för 'sats' får inte vara tomt"),
         (med_kolumner(sats=None), "kolumnnamnet för 'sats' får inte vara tomt"),
         (med_kolumner(sats='Moms"'), "får inte innehålla radbrytning eller citattecken"),
-        (med_kolumner(sats="Moms​"), "innehåller tecknet U+200B"),
+        (med_kolumner(sats="Moms\u200b"), "innehåller tecknet U+200B"),
         (med_kolumner(sats="Moms;%"), "ett kolumnnamn innehåller en av avgränsarna"),
         (med(kolumner=["Dag"]), "'kolumner', ska vara ett objekt"),
         (med(avgransare=[]), "minst en avgränsare"),
@@ -720,7 +720,7 @@ def utan_nyckel(nyckel, data):
         (med(filnamn="ÅÅÅÅ-MM-DD_ÅÅÅÅ-MM-DD.txt"), "exakt en gång"),
         (med(filnamn="z/ÅÅÅÅ-MM-DD.txt"), "utan mapp"),
         (med(filnamn=".ÅÅÅÅ-MM-DD.txt"), "utan punkt först"),
-        (med(filnamn="ÅÅÅÅ-MM-DD​.txt"), "styrtecken eller ett osynligt tecken"),
+        (med(filnamn="ÅÅÅÅ-MM-DD\u200b.txt"), "styrtecken eller ett osynligt tecken"),
         (med(filnamn=1), "'filnamn' ska vara text"),
         (med(momsavrundning="nedat"), "'momsavrundning' är 'nedat', men kärnan känner bara till 'narmaste_ore'"),
         (med(anteckning=1), "'anteckning' ska vara text"),
@@ -880,14 +880,15 @@ def test_h2_testbutikens_format_godtar_bara_testbutikens_kassa(tmp_path):
     assert las_kassafil(z_fil(tmp_path, z_rader(register="TB-KASSA-1")), TESTBUTIKENS_KASSAFORMAT)
 
 
-# Samma kassaregister skrivet på olika sätt. Granskarens varianter: stora och små bokstäver,
-# osynligt mellanslag (U+200B) och tecken som vänder textens riktning (U+202E). Dessutom blanksteg,
-# hårt mellanslag, fullbreddstecken och två sätt att skriva "Ö" (NFC och NFD).
+# Samma kassaregister skrivet på olika sätt. Granskarens varianter: stora och små bokstäver och
+# osynligt mellanslag (U+200B). Dessutom blanksteg, hårt mellanslag, fullbreddstecken och två sätt
+# att skriva "Ö" (NFC och NFD). Granskarens tredje variant, tecknet U+202E som vänder textens
+# riktning, stoppas efter I3 redan vid inläsningen (test_i3_riktningstecken_i_kassaregistret_stoppar_filen
+# i test_bank_och_kassa.py).
 VARIANTER = {
     "sma_bokstaver": ("K-1", "k-1"),
     "osynligt_mellanslag_sist": ("K-1", "K-1\u200b"),
     "osynligt_mellanslag_inuti": ("K-1", "K\u200b-1"),
-    "vand_text": ("K-1", "\u202eK-1"),
     "mellanslag_inuti": ("K-1", "K -1"),
     "hart_mellanslag_inuti": ("K-1", "K\u00a0-1"),
     "fullbredd": ("K-1", "\uff2b\uff0d\uff11"),
@@ -995,4 +996,48 @@ def test_lucka_samma_dag_vid_kalenderns_kant(tmp_path, datum):
         kontrollera_z_serien(rapporter)
     assert fel.value.typ == "lucka"
     assert (fel.value.dagar_fran, fel.value.dagar_till, fel.value.antal_dagar) == (None, None, 0)
-    assert "Den saknade rapporten är från " + datum + " eller " + datum + "." in str(fel.value)
+    assert "Den saknade rapporten är från " + datum + "." in str(fel.value)
+    assert str(fel.value).count(datum) == 3  # I6: två gånger vid Z-rapporterna och en gång i sista meningen
+
+
+# --- I6: luckmeddelandet säger inte samma datum två gånger och har rätt ental och plural ---
+
+def lucka(rapporter):
+    with pytest.raises(ZSerieFel) as fel:
+        kontrollera_z_serien(rapporter)
+    assert fel.value.typ == "lucka"
+    return str(fel.value)
+
+
+def test_i6_en_saknad_rapport_samma_dag(tmp_path):
+    meddelande = lucka([z_rapport(tmp_path / "a", "2025-01-02", 1001), z_rapport(tmp_path / "b", "2025-01-02", 1003)])
+    assert meddelande.endswith("Den saknade rapporten är från 2025-01-02. Hämta den saknade Z-rapporten från kassan.")
+    assert "eller" not in meddelande
+
+
+def test_i6_flera_saknade_rapporter_samma_dag(tmp_path):
+    # Granskarens fall: Z-nummer 37 och 100 039, båda daterade 9999-12-31.
+    meddelande = lucka([z_rapport(tmp_path / "a", "9999-12-31", 37), z_rapport(tmp_path / "b", "9999-12-31", 100039)])
+    assert "Z-rapporter saknas från nummer 38 till 100038 (100001 st)" in meddelande
+    assert "De saknade rapporterna är från 9999-12-31." in meddelande
+    assert "Den saknade rapporten" not in meddelande
+    assert "9999-12-31 eller 9999-12-31" not in meddelande
+
+
+def test_i6_flera_saknade_rapporter_dagar_i_rad(tmp_path):
+    meddelande = lucka([z_rapport(tmp_path, "2025-01-02", 1001), z_rapport(tmp_path, "2025-01-03", 1004)])
+    assert "Z-rapporter saknas från nummer 1002 till 1003 (2 st)" in meddelande
+    assert "De saknade rapporterna är från 2025-01-02, från 2025-01-03 eller från båda dagarna." in meddelande
+    assert "Den saknade rapporten" not in meddelande
+
+
+def test_i6_en_dag_daremellan_ar_ental(tmp_path):
+    meddelande = lucka([z_rapport(tmp_path, "2025-01-02", 1001), z_rapport(tmp_path, "2025-01-04", 1003)])
+    assert "Dag däremellan utan Z-rapport: 2025-01-03." in meddelande
+    assert "Dagar" not in meddelande
+
+
+def test_i6_en_saknad_rapport_dagar_i_rad_ar_som_forut(tmp_path):
+    # Skydd: två olika datum och en saknad rapport ger samma mening som förut.
+    meddelande = lucka([z_rapport(tmp_path, "2025-01-02", 1001), z_rapport(tmp_path, "2025-01-03", 1003)])
+    assert "Den saknade rapporten är från 2025-01-02 eller 2025-01-03." in meddelande

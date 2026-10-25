@@ -45,8 +45,8 @@ def test_tolka_negativa_belopp(text, ore):
     "text, ore",
     [
         ("1 234 567,89", 123456789),
-        ("1 234,56", 123456),       # hårt mellanslag
-        ("1 234,56", 123456),       # smalt hårt mellanslag
+        ("1\u00a0234,56", 123456),       # hårt mellanslag
+        ("1\u202f234,56", 123456),       # smalt hårt mellanslag
         ("12 345 678", 1234567800),
         ("999 999 999 999,99", 99999999999999),  # stora belopp blir exakta
     ],
