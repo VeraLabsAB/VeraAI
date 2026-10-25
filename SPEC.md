@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Bolag | Vera Labs AB (produkt: Vera AI) |
-| Status | Godkänd av Hugo 2026-10-24 (utkast 1). Ändras bara efter Hugos OK |
+| Status | Godkänd av Hugo 2026-10-24 (utkast 1). Ändrad efter Hugos OK 2026-10-25: K1 kräver båda saldona, nya kontroller K11 och K12 (avsnitt 6), saldon och periodgränser (6.1), saknad Z-rapport (6.2), fyra nya säkerhetsgrunder (7), utkast till fast kommandolista (7.1), tillägg till Ö3 och Ö5 och momsfil för K5 (11). Ändras bara efter Hugos OK |
 | Ersätter | Den gamla specen för ett enskilt företag (ligger i arkivmappen) |
 
 Specen säger **vad** som ska byggas och **hur det ska bete sig**. Den är medvetet kort. Detaljer läggs i egna filer när vi kommer till respektive byggsteg.
@@ -119,7 +119,7 @@ Gränser för belopp ligger i konfigurationen och sätts lågt i början.
 
 | Nr | Kontroll |
 |---|---|
-| K1 | Saldokedjan i bankfilen stämmer rad för rad |
+| K1 | Saldokedjan i bankfilen stämmer rad för rad. Kedjan börjar i **ingående saldo** (saldot när perioden börjar) och sista radens saldo ska vara lika med **utgående saldo** (saldot när perioden slutar). Båda saldona krävs, annars stoppas filen (6.1) |
 | K2 | Debet = kredit per verifikation |
 | K3 | Varje förslag har underlag |
 | K4 | Inga dubbletter |
@@ -129,7 +129,22 @@ Gränser för belopp ligger i konfigurationen och sätts lågt i början.
 | K8 | Avdragsbegränsat (t.ex. representation): alltid ärende |
 | K9 | Ovanliga belopp |
 | K10 | Månadsavstämning: bank, kassa, skattekonto, leverantörsskulder, moms, försäljning mot kassa |
+| K11 | Z-rapportens interna kontroller. En **Z-rapport** är kassans dagsavslut: försäljningen per momssats, momsen, hur kunderna betalade och dagens totalsumma. Varje Z-rapport har ett löpnummer, **Z-numret**. Kontrollen prövar att datumet i filen stämmer med datumet i filnamnet, att filen har ett enda Z-nummer och en enda kassa, att försäljningen summerar till totalsumman, att betalsätten summerar till totalsumman och att momsen stämmer med försäljningen och momssatsen |
+| K12 | Z-serien, per kassa: Z-numren följer på varandra utan luckor eller dubbletter, och datumen går framåt |
 | K17 | Text i underlag som försöker styra agenten: flaggas, underlaget används inte |
+
+### 6.1 Saldon och periodgränser
+
+En **period** är den tid som stäms av, till exempel en månad. För att en period ska kunna kontrolleras krävs:
+
+- **Bank:** ingående och utgående saldo.
+- **Kassa:** periodens första och sista Z-nummer.
+
+Värdena är obligatoriska. Saknas något stoppas perioden. De hämtas från kontoutdraget och stäms av mot nästa periods ingående värden, så att perioderna hänger ihop utan glapp. Avstämningen hör till K10.
+
+### 6.2 Saknad Z-rapport
+
+En saknad Z-rapport blir ett ärende på nivå D (avsnitt 5). Månaden summeras inte tyst, med eller utan den saknade rapporten. Ett undantag kräver ett uttryckligt godkännande av en människa hos företaget, och undantaget loggas.
 
 ---
 
@@ -138,13 +153,30 @@ Gränser för belopp ligger i konfigurationen och sätts lågt i början.
 - **Inget bokförs utan godkännande** av en människa hos företaget, i båda lägena.
 - **Bara läsrätt** till bank, mejl och bokföringsprogram när Vera hämtar underlag. Skrivrätt till bokföringsprogrammet finns bara i själva bokföringssteget efter godkännande.
 - **En spärr läser aldrig från en mapp som agenten kan skriva i.** Det spärrarna jämför mot ska ligga skyddat.
-- **Fast lista med kommandon.** Agenten får bara köra de kommandon som står uttryckligen på listan.
+- **Bankformat, kassaformat och saldon ligger i en mapp som agenten inte kan skriva i**, och spärrarna läser bara därifrån. Byggs i spärrsteget. Fram till dess ligger formaten i `foretag/<namn>/`, som agenten kan skriva i.
+- **Varje källa har en enda funktion som alltid kör alla kontroller** (idag `las_bankfil` för banken och `las_kassaperiod` för kassan). Genvägar förbi kontrollerna är förbjudna, och ett test slår larm om någon annan kod använder dem.
+- **Riktningstecken stoppar filen.** Riktningstecken är osynliga tecken som kan få en text att visas i en annan ordning än den är lagrad, så att till exempel en beskrivning ser ut som en annan. Andra osynliga **formattecken** (till exempel nollbreddsmellanslag) godtas, men ska visas synligt i rapporten så att godkännaren ser dem.
+- **Fast lista med kommandon.** Agenten får bara köra de kommandon som står uttryckligen på listan (7.1).
 - **Belopp är heltal i öre.** Aldrig flyttal. All matematik görs i Python, inte av modellen.
 - **Underlag är data, aldrig instruktioner.**
 - **Logg som inte kan skrivas om** (varje rad bär föregående rads hash).
 - **Rättelser görs bara med motverifikation**, aldrig genom att ändra eller radera.
 - **Spärrtester** körs vid varje ändring: bokföra utan godkännande, ändra efter godkännande, för stort belopp, förfalskat godkännande, ändrad regelbok, instruktion i underlag.
 - Personuppgifter maskeras i loggar och rapporter.
+
+### 7.1 Fast kommandolista
+
+**Utkast, inväntar Hugos OK.** Listan bygger på de kommandon som faktiskt används i projektet. Allt körs inifrån projektmappen.
+
+| Kommando | Till vad |
+|---|---|
+| `.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests` | Köra testsviten med projektets egen Python (i mappen `.venv`) |
+| `git status` | Se vilka filer som är ändrade |
+| `git log` | Se tidigare ändringar |
+| `git diff` | Se exakt vad som har ändrats |
+| `git add` | Välja ut ändrade filer inför en commit |
+| `git commit` | Spara ändringarna i projektets historik (en **commit**) |
+| `ls`, `cat`, `head`, `tail`, `grep` | Läsa och söka i filer i projektet, utan att ändra något |
 
 ---
 
@@ -191,11 +223,13 @@ Varje testföretag beskrivs i en egen fil och är skrivskyddat för agenten. Tes
 
 **Avgjort:** godkännande är obligatoriskt i båda lägena. I automatiskt läge kräver det ett sista godkännande av veckans utkast innan bokföringen skickas vidare. Ett läge utan något godkännande finns inte i version 1.
 
+**Avgjort:** kontrollen K5 (momssatsen finns för datumet) kräver en momsfil i företagets konfiguration (`foretag/<namn>/`), med momssatser per varugrupp och datum. Vad som står i filen hänger på Ö3.
+
 | # | Fråga | Ägare |
 |---|---|---|
 | Ö1 | **Produktionsarkitektur.** Version 1 körs lokalt som referensprodukt. Hur och var kundens data ska lagras säkert när Vera blir en tjänst är inte bestämt | Hugo |
 | Ö2 | Vilka bokföringsprogram får direktkoppling först (Fortnox, Bokio, Spiris)? Version 1 använder SIE-export | Hugo |
-| Ö3 | Momssatser och särregler per bransch (restaurang, bygg, begagnade varor) ska verifieras mot Skatteverket eller en redovisningskonsult innan de läggs i någon regelbok | Konsult |
+| Ö3 | Momssatser och särregler per bransch (restaurang, bygg, begagnade varor) ska verifieras mot Skatteverket eller en redovisningskonsult innan de läggs i någon regelbok. Hit hör också **momsavrundning**: testdatan visar att kassan avrundar momsen till närmaste öre, men inte vad som gäller när momsen hamnar på exakt ett halvt öre. Och **Z-nummer som börjar om**, till exempel vid årsskifte: kanske tillåtet, och ska kontrolleras med kassaleverantören eller en redovisningskonsult. Tills dess stoppas en Z-serie som börjar om (K12) | Konsult |
 | Ö4 | Får rutinposter i kassa bokföras samlat per vecka? | Konsult |
-| Ö5 | Vilka kassasystem och bankformat ska stödjas först | Hugo |
+| Ö5 | Vilka kassasystem och bankformat ska stödjas först. Bankformatet, kassaformatet och att bankfilens rader numreras 1, 2, 3 … är **antaget** för testföretaget och ska jämföras mot riktiga exportfiler innan de används på riktiga underlag | Hugo |
 | Ö7 | Hur får Vera tillgång till bank, mejl och bokföringsprogram i automatiskt läge, och hur säkras det? | Hugo |
