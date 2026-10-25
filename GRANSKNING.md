@@ -707,3 +707,245 @@ Dessutom gjordes ett mutationstest på den nya koden: en ny kontroll i taget tog
 Testsviten efter rättelserna: 355 passed, 0 misslyckade.
 
 **Senare samma dag (två commits):** (A) seriekontrollen beskriver dagarna utan Z-rapport som ett intervall ("från DATUM till DATUM (N dagar)"), så datum långt isär ger ett kort meddelande (`test_datum_langt_isar_ger_kort_meddelande`, rött på gamla koden med ett meddelande på 43 824 888 tecken); (B) inläsningskoden som bank och kassa delade ligger nu i `scripts/inlasning_skydd.py`, med samma felmeddelanden och felklasser som förut (`test_inlasning_skydd.py`).
+
+## Granskning 4: inläsningslagret (bank, kassa och gemensamma skydd)
+
+| | |
+|---|---|
+| Datum | 2026-10-25 |
+| Granskad version | commit 61a5946 ("Gemensamma inläsningsskydd i inlasning_skydd.py") |
+| Granskare | Oberoende session som inte sett inläsningslagret byggas. Ingen kod eller befintlig fil har ändrats, bara det här avsnittet har lagts till |
+| Underlag | CLAUDE.md, SPEC.md (avsnitt 2, 5, 6, 7, 8), foretag/README.md, foretag/syntet-testbutik/bankformat.json och kassaformat.json, scripts/belopp.py, scripts/inlasning_skydd.py, scripts/las_bank.py, scripts/las_kassa.py, alla filer i scripts/tests/, testdata/README.md, facit.json, tidigare granskningar och åtgärdstabeller ovan |
+
+### Så gick granskningen till
+
+Allt provande gjordes i en temporär mapp utanför projektet. Där lades tre kopior av koden: commit f3ecc76 (före flytten, som uppgiften angav), commit 6adbf24 (direkt före flytten) och commit 61a5946 (nu). Egna provskript skapade filer och format, körde dem mot kopiorna och skrev ut utfallet: **STOPPAD** (tydligt `BankfilFel`/`KassafilFel` eller underklass), **GODKÄND** (raderna släpptes igenom) eller **KRASCH** (annat, oförklarat fel). Mutationstesterna gjordes i ytterligare en kopia. Den temporära mappen är borttagen efteråt.
+
+Ord som används nedan: en **genväg** är en funktion som läser en fil men hoppar över en kontroll. En **byggsten** är en liten funktion i `inlasning_skydd.py` som gör en sak, till exempel avkodar text eller läser CSV-rader. **Riktningstecken** (bidi) är osynliga tecken som får text att visas baklänges eller i annan ordning än den är lagrad.
+
+Allvar: **hög** = kan ge fel bokföring, **medel** = onödig krasch eller otydligt fel, **låg** = kosmetiskt.
+
+Obs: mellan f3ecc76 och flytten ligger commit 6adbf24, som medvetet ändrade seriekontrollens meddelande om dagar utan Z-rapport. För att inte blanda ihop den avsiktliga ändringen med flytten jämfördes nya koden mot båda.
+
+### Uppgift A: har flytten ändrat beteendet?
+
+Nej. Flytten har inte ändrat något beteende som jag kunde hitta.
+
+**Vad jag körde:** 6 181 provfall, körda mot alla tre kopiorna. För varje fall jämfördes felklassen (med modulnamn), hela felmeddelandet och felets extra uppgifter (till exempel `radnr`, `kontroll`, `typ`, `saknas_fran`). När filen godkändes jämfördes i stället hela resultatet (alla rader och alla fält).
+
+| Sorts fall | Antal | Hur de skapades |
+|---|---|---|
+| Bankfiler (`las_bankfil`) | 2 228 | Giltiga filer med 1–8 rader, komma, semikolon, tabb eller lodstreck, med och utan förrader och extra kolumn. 80 % fick 1–3 slumpade skador: styrtecken, NUL, U+2028, U+FEFF, U+200B, U+202E, U+2066, citattecken, avgränsare, radslut av olika slag (CR, CRLF, `\x0c`, `\x85`), borttagna, dubblerade och omkastade rader, avklippt fil, ändrade siffror, fält på 200 000 tecken, UTF-16, Windows-1252, trasiga byte. Ibland fel saldo, eller saldo av fel typ (flyttal, `True`, `None`, text). Ibland ett skadat bankformat som skickas direkt. Dessutom saknad fil, mapp, oläsbar fil (rättigheter 000), tom fil, bara BOM och bara rubrikrad |
+| Z-filer (`las_kassafil`) | 2 131 | Giltiga Z-rapporter med rätt moms, betalsätt och totalsumma, omkastade kolumner och rader, olika skrivsätt för kassan. Samma slumpade skador som bankfilerna. Dessutom handgjorda fall: bara rubrikrad, tomt kassaregister, Z-nummer med 10, 13 och 5 000 siffror, dubbel post, dubbel kolumn, fält med radbrytning, fullbreddstecken och fel datum i filnamnet |
+| Bankformat (`ladda_bankformat`) | 600 | Skadade värden och nycklar, dubbla nycklar, 1 000–100 000 nästlade parenteser, avklippt JSON, `NaN`, NFD-form ("ö" som "o" plus prickar), fel teckenkodning |
+| Kassaformat (`ladda_kassaformat`) | 572 | Samma sorts skador, samt krockande kassaregister (`K-1`/`k-1`, osynligt tecken, fullbredd), filnamnsmönster med mapp, punkt först och osynligt tecken |
+| Z-serier (`kontrollera_z_serien`) | 650 | 0–5 giltiga Z-filer med luckor, dubbletter, omstarter, samma fil två gånger och datum från år 1 till år 9999 |
+
+**Vad som hände:**
+
+| Jämförelse | Fall med skillnad | Förklaring |
+|---|---|---|
+| 6adbf24 (direkt före flytten) mot nu | **0 av 6 181** | Felklass, meddelande, extra uppgifter och godkända rader är identiska i alla fall |
+| f3ecc76 mot nu | 385 av 6 181, alla i seriekontrollen | Alla kommer från 6adbf24, inte från flytten: 330 fall har bara nya namn på felets uppgifter (`dagar_fran`, `dagar_till`, `antal_dagar` i stället för listan `dagar_utan_rapport`), 48 fall har det nya meddelandet om dagar som intervall, och 7 fall gav `OverflowError` i f3ecc76 men `ZSerieFel` nu (två rapporter samma dag år 9999) |
+
+Proverna träffade 255 olika sorters felmeddelanden, bland dem alla meddelanden som flyttades till `inlasning_skydd.py`. Även de sällsynta grenarna provades med handgjorda fall: för långt fält, oläsbar fil, mapp i stället för fil, NUL före rubrikraden, radbrytning inuti fält och dubbel kolumn på rubrikraden.
+
+**Det enda som har ändrats utöver beteendet** är var namnen finns. Hjälpfunktionerna som förut hette till exempel `las_bank._avkoda` och `las_kassa._csv_fel` finns nu bara i `inlasning_skydd.py` (utan understreck), och konstanten `TILLATNA_AVGRANSARE` kan inte längre hämtas som `las_bank.TILLATNA_AVGRANSARE`. Ingen fil i projektet använde de gamla namnen, så inget har gått sönder. Se I1 om vad det betyder att byggstenarna nu är offentliga.
+
+### Sammanfattning av nya fynd
+
+Inga fynd med allvar hög. Ingen skadad fil eller skadat format släpptes igenom av `las_bankfil` eller `las_kassafil` med fel siffror.
+
+| Nr | Fynd | Allvar |
+|---|---|---|
+| I1 | Kassans genväg `_tolka_kassarader` (hoppar över Z-kontroll a–e) och de offentliga byggstenarna i `inlasning_skydd.py` saknar skyddstest. En ny kärnfil kan använda dem utan att något test slår larm | Medel (risk inför nästa byggsteg) |
+| I2 | Seriekontrollen körs bara om anroparen kommer ihåg det. `summa_per_momssats` räknar samma Z-rapport två gånger utan varning | Medel (risk inför nästa byggsteg) |
+| I3 | Osynliga tecken, bland annat riktningstecken, släpps igenom i bank- och Z-filernas textfält | Låg (observation inför rapportsteget och K17) |
+| I4 | En sökväg av fel typ ger Python-fel i stället för `BankfilFel`/`KassafilFel`. Ett heltal eller `True` som sökväg stänger programmets utdata | Låg (kräver programmeringsfel, fanns före flytten) |
+| I5 | Byggstenarna anropade direkt med ovanliga indata ger Python-fel eller konstiga svar | Låg (kräver programmeringsfel) |
+| I6 | Luckmeddelandet kan säga "Den saknade rapporten är från 9999-12-31 eller 9999-12-31" och "rapporten" i ental när flera saknas | Låg (kosmetiskt, fanns före flytten) |
+| I7 | Slutrapportens "355 tester före" gäller f3ecc76. Direkt före flytten var det 358 | Låg (kosmetiskt) |
+
+### Fynd i detalj
+
+#### I1. Genvägar förbi kontrollerna utan skyddstest. Allvar: medel
+
+**Vad jag körde:** (a) en bankfil där saldot efter rad 1 är fel, och en Z-fil där försäljningen (112 kr) inte summerar till totalsumman (1 kr). Varje fil lästes både på vanligt sätt och via genvägarna. (b) I en kopia av projektet lade jag till en ny kärnfil, `scripts/rapport.py`, med en enda rad i taget, och körde hela testsviten.
+
+**Vad som hände (a):**
+
+| Anrop | Bankfilen | Z-filen |
+|---|---|---|
+| `las_bankfil` / `las_kassafil` | STOPPAD (`K1Fel`) | STOPPAD (`ZKontrollFel`, kontroll c) |
+| `las_bank._tolka_rader` | GODKÄND, saldo 999,00 kr | – |
+| `las_kassa._tolka_kassarader` | – | GODKÄND, 4 rader, och `summa_per_momssats` ger 112 kr i försäljning |
+| `las_fil` + `avkoda` + `csv_rader` ur `inlasning_skydd` | GODKÄND som råa fält | GODKÄND som råa fält |
+
+**Vad som hände (b):**
+
+| Rad i den nya filen `scripts/rapport.py` | Testsviten |
+|---|---|
+| `from las_bank import _tolka_rader` | 1 röd (F11-testet, rätt) |
+| `from las_kassa import _tolka_kassarader` | **496 gröna** |
+| `from inlasning_skydd import las_fil, avkoda, csv_rader` | **496 gröna** |
+| `from las_bank import csv_rader, las_fil, avkoda` (byggstenarna går också att hämta via `las_bank` och `las_kassa`) | **496 gröna** |
+
+**Varför:** F11-testet söker bara efter texten `_tolka_rader`. `_tolka_kassarader` innehåller inte den texten, och det finns inget motsvarande test för kassan. Byggstenarna är gjorda för att anropas i rätt ordning (`las_fil`, `avkoda`, NUL-kontroll, `inga_otillatna_tecken`, rubrikrad, `csv_rader`), men ingenting tvingar fram ordningen. `csv_rader` ensam godtar till exempel tecknet `\x0c` (sidbrytning) inuti ett fält, vilket är just G1-felet, eftersom styrteckenkontrollen ligger i en annan byggsten.
+
+**Varför allvaret är medel och inte hög:** ingen kod i projektet använder genvägarna i dag, och ingen bokföring byggs ännu. Men konsekvensen om nästa byggsteg (matchning, kontering, rapport) råkar använda dem vore hög: Z-rapporter som inte går ihop, eller en bankfil utan K1, skulle gå vidare. Granskningen ser ingen sådan kod i dag.
+
+**Vad som borde hända:** ett test som stoppar alla filer i `scripts/` utom `las_bank.py`, `las_kassa.py` och `tests/` från att använda `_tolka_kassarader` och från att importera `inlasning_skydd`. Testet bör också klara alias och `getattr` (G8 punkt 5). Ett alternativ är att samla byggstenarna i en enda funktion som alltid kör alla skydd i rätt ordning.
+
+#### I2. Seriekontrollen tvingas inte fram. Allvar: medel
+
+**Vad jag körde:** samma giltiga Z-rapport (112 kr i försäljning) i två mappar, den ena med kassan skriven `tb-kassa-1`. Båda lästes med `las_kassafil`, och sedan anropades `summa_per_momssats` direkt.
+
+**Vad som hände:** båda filerna GODKÄNDES (rätt, var för sig är de felfria). `summa_per_momssats` gav **224 kr** i försäljning och 24 kr i moms, utan varning. `kontrollera_z_serien` på samma två rapporter STOPPADE dem som dubblett (rätt), men den körs bara om anroparen kommer ihåg det.
+
+**Varför det spelar roll:** seriekontrollen är i dag det enda skyddet mot att samma Z-rapport räknas två gånger (H2). `summa_per_momssats` tar emot vilka rader som helst, även rader från `_tolka_kassarader` som inte gått igenom Z-kontroll a–e (se I1). Allvaret är medel av samma skäl som I1: inget anropar funktionen i dag, men konsekvensen vore dubbel försäljning.
+
+**Vad som borde hända:** att summera försäljningen ska bara gå att göra efter en godkänd seriekontroll, till exempel genom att `summa_per_momssats` kör `kontrollera_z_serien` själv, eller genom en enda funktion som läser en hel period. Bör bestämmas innan K10 och rapporten byggs.
+
+#### I3. Osynliga tecken och riktningstecken i textfälten. Allvar: låg (observation)
+
+**Vad jag körde:** en bankfil med beskrivningen U+202E + `ET-VEL` och referensen `R` + U+200B + `1`. Även `inga_otillatna_tecken` direkt med U+FEFF mitt i texten, U+200B, U+202E, U+2066 och U+00AD (mjukt bindestreck).
+
+**Vad som hände:** GODKÄND. Beskrivningen lagras som U+202E + `ET-VEL`, men visas för en människa som `LEV-TE`. Skyddet mot ovanliga tecken stoppar bara styrtecken (kategori Cc) och U+2028/U+2029, inte osynliga formattecken (kategori Cf).
+
+**Varför det spelar roll:** när rapporten byggs ser godkännaren beskrivningen och referensen. En text som visas som en känd motpart men är lagrad som något annat kan vilseleda. Det lindras av att regelboken troligen jämför exakt, så att texten blir "ny motpart" (nivå C, rad för rad). Granskarens förslag i H2 (stoppa Cf i Z-filens fält) gjordes medvetet inte, och för bankfilen har frågan inte tagits upp tidigare. Hör ihop med K17 (text i underlag som försöker styra agenten).
+
+**Vad som borde hända:** bestäm före rapportsteget om Cf-tecken ska stoppa filen, tas bort, eller visas synligt (till exempel som `<U+202E>`) i rapporten.
+
+#### I4. Sökväg av fel typ. Allvar: låg
+
+**Vad jag körde:** `las_fil`, `ladda_json` och `las_bankfil` med sökvägen `None`, en lista, ett flyttal, en text med NUL-tecken, en bytes-sökväg, `pathlib.Path`, tom text, 5 000 tecken och `True`.
+
+**Vad som hände:** `None`, lista och flyttal gav `TypeError`, och NUL i sökvägen gav `ValueError`, i stället för `BankfilFel`/`KassafilFel`. Bytes, `Path`, tom text och lång sökväg fungerade eller stoppades rätt. **`True` (eller ett heltal) tolkas av Python som ett filnummer:** `las_bankfil(True, …)` försökte läsa från programmets egen utdata (filnummer 1), stoppades med "filen True går inte att läsa (Bad file descriptor)", och **stängde sedan programmets utdata**. Allt programmet skrev efteråt gick förlorat och processen avslutades med fel.
+
+**Varför allvaret är lågt:** det kräver ett programmeringsfel, eftersom sökvägar från en mapp alltid är text. Beteendet är detsamma som före flytten. **Förslag:** kontrollera att sökvägen är text eller `Path` innan filen öppnas.
+
+#### I5. Byggstenarna med ovanliga indata. Allvar: låg
+
+Funktionerna i `inlasning_skydd.py` anropades direkt. Inget av detta kan nås från en bank- eller Z-fil eller ett JSON-format, bara från kod.
+
+| Anrop | Utfall |
+|---|---|
+| `avkoda` med text, `None`, `memoryview`, heltal | KRASCH (`TypeError`/`AttributeError`). `bytearray`, tom fil, bara BOM och 10 MB fungerade |
+| `inga_otillatna_tecken` med bytes, `None`, lista | KRASCH (`TypeError`). 50 MB ren text gick bra |
+| `csv_rader` med avgränsaren tom, `None` eller två tecken | KRASCH (`TypeError` från csv-läsaren) |
+| `csv_rader` med `textrader` som en text i stället för en lista, och 1 kolumn | GODKÄND, varje **tecken** blir en egen rad |
+| `csv_rader` med `filsort=None` eller en felklass som inte är ett fel | KRASCH (`AttributeError`/`TypeError`). Med `StopIteration` som felklass blir det `RuntimeError`, alltså ingen tyst hoppad kontroll |
+| `rubrikens_falt` med tom kolumnlista | Godtar vilken rad som helst som rubrikrad |
+| `kontrollera_nycklar` med en nyckel som är ett tal | KRASCH (`TypeError` när okända nycklar sorteras) |
+| `kontrollera_namn` med bytes | STOPPAD, men med det missvisande "får inte vara tomt" |
+| `kontrollera_namn` med U+2800 (blank blindskrift) eller U+115F (osynlig koreansk utfyllnad) | Godtas som namn. Ofarligt, eftersom namnet måste stå exakt så i filen |
+| `kontrollera_avgransare` med en text-underklass som säger sig vara lika med allt | Godtar `x` som avgränsare |
+| `tolka_datum`/`tolka_ore` med `None`, tal eller bytes | KRASCH (`TypeError`) |
+| `nul_fel("x", …)` | Meddelandet "rad x i filen" |
+| bankformat.json och kassaformat.json med en avgränsare eller momsavrundning nästlad 900–999 nivåer (för att se om felmeddelandet kraschar när det skriver ut värdet) | STOPPAD i alla fall, ingen krasch |
+
+**Vad som borde hända:** inget av detta släpper igenom en felaktig rad från en fil. Om byggstenarna ska användas av fler inläsningsmoduler (kvitton, fakturor) bör de antingen kontrollera typerna eller göras interna, se I1.
+
+#### I6. Luckmeddelande med samma datum två gånger. Allvar: låg (kosmetiskt)
+
+Två Z-rapporter med Z-nummer 37 och 100 039, båda daterade 9999-12-31, gav: "Z-rapporter saknas från nummer 38 till 100038 (100001 st) … Den saknade rapporten är från 9999-12-31 eller 9999-12-31." Samma sak med två rapporter samma dag och vilka nummer som helst. Meddelandet skriver samma datum två gånger och "rapporten" i ental fast flera saknas. Serien stoppas rätt. Fanns före flytten.
+
+#### I7. Antalet tester före flytten. Allvar: låg (kosmetiskt)
+
+Se uppgift D. Påståendet "355 före, 496 efter" stämmer om det gäller båda commitarna tillsammans (6adbf24 och 61a5946). Direkt före flytten var det 358.
+
+### Uppgift B: finns det en väg förbi kontrollerna?
+
+Ja, men bara genom att anropa funktioner direkt från kod. Ingen fil eller konfiguration kan få `las_bankfil` eller `las_kassafil` att hoppa över en kontroll.
+
+| Kontroll | Hoppas över av | Skyddstest som slår larm |
+|---|---|---|
+| K1 (saldokedjan och utgående saldo) | `las_bank._tolka_rader` (känd, F11). Byggstenarna i `inlasning_skydd` | Bara för `_tolka_rader`, och det går att lura (G8 punkt 5) |
+| Z-kontroll a–e | `las_kassa._tolka_kassarader`. Byggstenarna | **Inget** (I1) |
+| Seriekontrollen | Allt som läser Z-filer, inklusive `las_kassafil`. `summa_per_momssats` kräver den inte | **Inget** (I2) |
+| Styrtecken och NUL | `csv_rader` och `rubrikens_falt` direkt | Inget (I1) |
+
+Övrigt som provades och fungerade:
+
+- En felklass (`fel`) i en `Filsort` kan inte få en kontroll att tyst hoppas över. `raise` kastar alltid något, och `StopIteration` inuti `csv_rader` blir `RuntimeError`.
+- `BANKFIL` och `KASSAFIL` är oföränderliga (`NamedTuple`). Konstanterna i `inlasning_skydd.py` (till exempel `OTILLATNA_TECKEN`) går däremot att byta ut från annan kod i samma körning, och ett enda byte slår då ut skyddet för både bank och kassa. Det kräver medvetet skriven kod och går inte att stänga helt i Python. Samma sak gäller `csv.field_size_limit`, som gäller hela programmet.
+- Djupt nästlad JSON nästan upp till Pythons gräns (900–999 nivåer) där JSON-läsaren klarar sig men felmeddelandet skriver ut värdet: ingen krasch.
+
+### Uppgift C: dolda tecken i hela projektet
+
+**Vad jag körde:** ett skript som läste alla 138 filer under `agent/` utom `.git/` och `.venv/` (kod, tester, konfiguration, testdata, dokument, GRANSKNING.md, `.gitignore`, `.pytest_cache`), filnamnen och alla commitmeddelanden. Det letade efter styrtecken (kategori Cc utom tabb och radslut), formattecken (Cf, bland dem nollbreddstecken, riktningstecken U+202A–U+202E och U+2066–U+2069, U+FEFF och mjukt bindestreck), U+2028, U+2029, privata och otilldelade tecken, andra blanksteg än vanligt mellanslag, utfyllnadstecken (U+115F, U+1160, U+3164, U+FFA0, U+2800), variantväljare och CR (Windows-radslut). Dessutom bokstäver från andra skriftsystem än latin i `.py`-filer.
+
+**Vad som hände:**
+
+| Fil och rad | Tecken | Avsiktligt? |
+|---|---|---|
+| scripts/belopp.py:14 | U+00A0 (hårt mellanslag) och U+202F (smalt hårt mellanslag) | Ja. Tillåtna tusentalsavgränsare, förklarade i kommentaren ovanför |
+| scripts/tests/test_belopp.py:48 | U+00A0 | Ja. Teststräng `"1 234,56"`, kommentaren säger "hårt mellanslag" |
+| scripts/tests/test_belopp.py:49 | U+202F | Ja. Teststräng, kommentaren säger "smalt hårt mellanslag" |
+| scripts/tests/test_las_kassa.py:416 | U+2028 (ovanlig radbrytning) | Ja. Teststräng `"K` + U+2028 + `-1"`, testet kräver meddelandet "innehåller tecknet U+2028" |
+| scripts/tests/test_las_kassa.py:623 | U+200B (osynligt mellanslag) | Ja. Kolumnnamnet `"Moms` + U+200B + `"`, testet kräver "innehåller tecknet U+200B" |
+| scripts/tests/test_las_kassa.py:645 | U+200B | Ja. Filnamnsmönster med osynligt tecken, testet kräver "styrtecken eller ett osynligt tecken" |
+| scripts/tests/test_las_kassa.py:615 | Fullbreddsbokstäver (`ＴＢ－ＫＡＳＳＡ－１`) | Ja. H2-testet för kassaregister i fullbredd. Synliga, inte dolda |
+
+Inga riktningstecken, ingen U+FEFF (inte ens i början av en fil), ingen U+2029, inga styrtecken utom tabb och `\n`, inga CR-radslut och inga dolda tecken i filnamn eller commitmeddelanden. De enda filerna som inte är UTF-8 är tre `.DS_Store` (macOS egna mappinställningar), som inte är incheckade (`.gitignore`).
+
+**Kosmetiskt:** de tre osynliga tecknen i test_las_kassa.py är inskrivna som själva tecknet, medan testerna annars skriver sådana tecken som `\u200b` och `\u2028` (21 ställen). Om en textredigerare skulle ta bort tecknen blir testerna röda (de kräver tecknets kod i meddelandet), så felet skulle märkas. Förslag: skriv dem som `\u2028` och `\u200b` så att de syns.
+
+### Uppgift D: kontroll mot reglerna
+
+| Kontroll | Resultat |
+|---|---|
+| Företagsspecifika uppgifter i `scripts/` (utom `tests/`) | Inga företagsnamn, banknamn, kassaregister, kolumnnamn, postnamn, konton, momssatser eller belopp. `inlasning_skydd.py` nämner varken bank, kassa, Z-rapport, kvitto eller faktura. Talen i koden är 0, 1, 2, 8 (UTF-8), 16 (UTF-16 och längd på id), 100 (procent), 0x100, 1252 (Windows-1252), 2028/2029 (tecknens koder), 9 (`ZNUMMER_HOGST_SIFFROR`) och exempel i kommentarer |
+| Flyttal | Inga. Ingen division med `/` i koden (bara `divmod`), inga decimaltal. "float" står bara i en kommentar som förbjuder det |
+| Nätverksanrop | Inga (ingen `socket`, `urllib`, `http`, `requests`). Importerna är bara `csv`, `datetime`, `hashlib`, `json`, `re`, `unicodedata`, `typing` och projektets egna moduler |
+| Körning av kommandon | Ingen (ingen `subprocess`, `os.system`, `popen`, `eval`, `exec`, `__import__`, `importlib`, `pickle`) |
+| Läsning från mappar agenten kan skriva i | Bara läsning (`open(sokvag, "rb")` på två ställen, båda i `inlasning_skydd.py`) av sökvägar som anroparen anger. Inget skrivs. Flytten har inte lagt till någon ny läsning. Bank- och kassaformatet läses fortfarande från `foretag/`, som agenten kan skriva i (G9, H11, spärrsteget) |
+| Har SPEC.md ändrats sedan 7823bd8? | Nej. `git diff 7823bd8 HEAD -- SPEC.md CLAUDE.md` är tom |
+| 355 tester före, 496 efter | Egen körning i kopiorna: **355** vid f3ecc76, **358** vid 6adbf24 (direkt före flytten, 3 nya tester för dagar som intervall) och **496** nu. Ökningen vid flytten är 138: 136 i den nya `test_inlasning_skydd.py` och 2 i `test_karnan_ar_generell.py` (från 8 till 10) |
+| Oförändrade bank- och kassatester | Stämmer för flytten: `git diff 6adbf24 61a5946 -- scripts/tests/test_las_bank.py scripts/tests/test_las_kassa.py` är tom, och antalet tester i dem är 104 och 164 både före och efter. `test_las_kassa.py` ändrades i 6adbf24, vilket hör till den commiten |
+| Flyttcommitens påstående om 20 040 filer med samma felklass och meddelande | Inte omkört (filerna finns inte kvar), men min egen jämförelse med 6 181 fall ger samma slutsats |
+| Fast lista med kommandon (SPEC avsnitt 7) | Finns fortfarande inte i SPEC.md |
+
+### Uppgift E: stickprov på mutationstesterna
+
+I en kopia av projektet togs en kontroll i taget bort, och hela testsviten kördes. Uppgiften bad om tio. Jag gjorde tjugoen, eftersom varje körning tar en sekund.
+
+| Fil | Borttagen kontroll | Röda tester (exempel) |
+|---|---|---|
+| inlasning_skydd.py | UTF-16 stoppas | 10 (`test_avkoda_stoppar_utf16`) |
+| inlasning_skydd.py | Styrtecken i filen (G1) | 28 (`test_inga_otillatna_tecken_stoppar`) |
+| inlasning_skydd.py | Radbrytning inuti fält (F1) | 8 (`test_csv_rader_radbrytning_inuti_falt`, `test_f1_…`) |
+| inlasning_skydd.py | Antal fält mot rubrikraden | 6 (`test_csv_rader_fel_antal_falt`) |
+| inlasning_skydd.py | Strikt csv-läsning (F9) | 4 (`test_csv_rader_lases_strikt`, `test_f9_…`) |
+| inlasning_skydd.py | Styrtecken och osynliga tecken i namn (G2) | 19 (`test_kontrollera_namn_stoppar_trasiga_namn`) |
+| inlasning_skydd.py | Dubbla JSON-nycklar | 6 (`test_ladda_json_trasig_fil`) |
+| inlasning_skydd.py | Datum som inte finns (2025-02-30) | 5 (`test_tolka_datum`) |
+| inlasning_skydd.py | Fasta listan med avgränsare | 21 (`test_kontrollera_avgransare_stoppar`) |
+| inlasning_skydd.py | Översättningen av "för långt fält" | 6 (`test_csv_fel`, `test_csv_rader_for_langt_falt`) |
+| las_bank.py | K1: utgående saldo (F2) | 1 (`test_f2_avklippt_fil_stoppas`) |
+| las_bank.py | K1: saldokedjan rad för rad | 3 (`test_k1_godkanner_korrekt_kedja_…`) |
+| las_bank.py | Radnummer 1, 2, 3 (F4) | 5 (`test_f4_…`) |
+| las_bank.py | `las_bankfil` kontrollerar formatet igen | 1 (`test_f5_las_bankfil_kontrollerar_bankformatet_igen`) |
+| las_bank.py | NUL-kontrollen | 2 (`test_f3_nul_tecken_…`) |
+| las_kassa.py | Z-kontroll d | 3 (`test_d_…`) |
+| las_kassa.py | Z-kontroll e | 5 (`test_e_…`) |
+| las_kassa.py | Okänt kassaregister (H2) | 6 (`test_h2_kassaregister_som_inte_finns_i_listan_stoppas`) |
+| las_kassa.py | Seriekontrollen: luckor | 9 (`test_serien_lucka_…`) |
+| las_kassa.py | Gränsen för Z-numrets siffror (H1) | 4 (`test_h1_…`) |
+| las_kassa.py | NUL-kontrollen | 1 (`test_trasig_z_fil_stoppas[nul_tecken]`) |
+
+Alla borttagningar gav minst ett rött test. Ingen testlucka hittades i stickprovet. Testluckorna i I1 och I2 gäller inte borttagna kontroller, utan att det saknas test som stoppar ny kod från att gå förbi dem.
+
+### Testsviten
+
+Kommando: `.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests`
+
+Resultat: **496 passed**, 0 misslyckade, både före och efter granskningen. `git status` visade bara den här filen som ändrad.
+
+Kommandon som kördes i granskningen: Python i projektets `.venv` (provskript och pytest), `git log`, `git show`, `git diff`, `git status`, `git archive`, `git ls-files`, `tar`, samt `ls`, `cat`, `head`, `tail`, `grep`, `sed`, `diff`, `od`, `awk`, `cut`, `sort`, `uniq`, `wc`, `printf`, `cp`, `mkdir` och `rm` (de tre sista bara i den temporära mappen). Provskripten skrev bara i den temporära mappen.
+
+### Beslut som behövs från Hugo
+
+1. **I1 och I2:** ska skyddstesterna byggas ut nu, så att ingen ny kärnfil kan använda `_tolka_kassarader` eller byggstenarna i `inlasning_skydd.py`, och ska summering av försäljning bara gå efter en godkänd seriekontroll? Rekommendation: ja, innan nästa byggsteg (matchning eller rapport) börjar använda inläsningen.
+2. **I3:** hur ska osynliga tecken och riktningstecken i bank- och Z-filernas text hanteras (stoppa, ta bort eller visa synligt i rapporten)? Behöver bestämmas senast när rapporten byggs. Hör ihop med K17.
+3. **I4–I7:** små rättelser (typkontroll av sökvägen, luckmeddelandet, teststrängar som `\u`-koder). Kan samlas till ett senare tillfälle.
