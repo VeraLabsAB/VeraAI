@@ -179,7 +179,8 @@ def test_planterat_fel_lucka_i_z_serien_upptacks_och_pekar_ut_z_nummer_och_datum
     assert fel.value.kassaregister == "TB-KASSA-1"
     assert fel.value.saknas_fran == fel.value.saknas_till == planterat["z_nummer"]
     assert fel.value.antal_saknade == 1
-    assert fel.value.dagar_utan_rapport == [planterat["datum"]]
+    assert fel.value.dagar_fran == fel.value.dagar_till == planterat["datum"]
+    assert fel.value.antal_dagar == 1
     assert fel.value.znummer == [1010, 1012]
 
     meddelande = str(fel.value)
@@ -333,15 +334,16 @@ def test_serien_lucka_med_flera_saknade_rapporter(tmp_path):
                               z_rapport(tmp_path, "2025-01-07", 1005)])
     assert fel.value.typ == "lucka"
     assert (fel.value.saknas_fran, fel.value.saknas_till, fel.value.antal_saknade) == (1003, 1004, 2)
-    assert fel.value.dagar_utan_rapport == ["2025-01-04", "2025-01-05", "2025-01-06"]
+    assert (fel.value.dagar_fran, fel.value.dagar_till, fel.value.antal_dagar) == ("2025-01-04", "2025-01-06", 3)
     assert ("Z-rapporter saknas från nummer 1003 till 1004 (2 st) mellan Z-rapport 1002 (2025-01-03)"
             in str(fel.value))
+    assert "Dagar däremellan utan Z-rapport: från 2025-01-04 till 2025-01-06 (3 dagar)." in str(fel.value)
 
 
 def test_serien_lucka_utan_dag_emellan(tmp_path):
     with pytest.raises(ZSerieFel) as fel:
         kontrollera_z_serien([z_rapport(tmp_path, "2025-01-02", 1001), z_rapport(tmp_path, "2025-01-03", 1003)])
-    assert fel.value.dagar_utan_rapport == []
+    assert (fel.value.dagar_fran, fel.value.dagar_till, fel.value.antal_dagar) == (None, None, 0)
     assert "Den saknade rapporten är från 2025-01-02 eller 2025-01-03." in str(fel.value)
 
 
@@ -888,3 +890,31 @@ def test_h4_serien_som_fortsatter_over_arsskiftet_godkanns(tmp_path):
 def test_h6_tom_lista_stoppas():
     with pytest.raises(KassafilFel, match="det finns inga Z-rapporter att kontrollera"):
         kontrollera_z_serien([])
+
+
+# --- Datum långt isär i seriekontrollen (iakttagelse efter granskning 3) ---
+
+def test_datum_langt_isar_ger_kort_meddelande(tmp_path):
+    # Den gamla koden räknade upp alla 3,65 miljoner dagar mellan år 1 och år 9999 och gav ett
+    # meddelande på 43,8 miljoner tecken. Nu beskrivs dagarna som ett intervall.
+    rapporter = [z_rapport(tmp_path, "0001-01-01", 1), z_rapport(tmp_path, "9999-12-31", 3)]
+    with pytest.raises(ZSerieFel) as fel:
+        kontrollera_z_serien(rapporter)
+    meddelande = str(fel.value)
+    assert len(meddelande) < 500
+    assert fel.value.typ == "lucka"
+    assert (fel.value.dagar_fran, fel.value.dagar_till, fel.value.antal_dagar) == ("0001-01-02", "9999-12-30", 3652057)
+    assert "Z-rapport 2 saknas mellan Z-rapport 1 (0001-01-01) och Z-rapport 3 (9999-12-31)." in meddelande
+    assert "Dagar däremellan utan Z-rapport: från 0001-01-02 till 9999-12-30 (3652057 dagar)." in meddelande
+
+
+@pytest.mark.parametrize("datum", ["0001-01-01", "9999-12-31"], ids=["ar_1", "ar_9999"])
+def test_lucka_samma_dag_vid_kalenderns_kant(tmp_path, datum):
+    # Två rapporter samma dag vid kalenderns början eller slut. Det finns ingen dag före år 1 eller
+    # efter år 9999, så uträkningen av dagarna däremellan får inte gå utanför kalendern.
+    rapporter = [z_rapport(tmp_path / "a", datum, 1), z_rapport(tmp_path / "b", datum, 3)]
+    with pytest.raises(ZSerieFel) as fel:
+        kontrollera_z_serien(rapporter)
+    assert fel.value.typ == "lucka"
+    assert (fel.value.dagar_fran, fel.value.dagar_till, fel.value.antal_dagar) == (None, None, 0)
+    assert "Den saknade rapporten är från " + datum + " eller " + datum + "." in str(fel.value)

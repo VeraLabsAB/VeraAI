@@ -34,8 +34,8 @@ Varje Z-fil kontrolleras internt varje gång den läses (Z-kontroll a–e):
 
 kontrollera_z_serien kontrollerar flera Z-rapporter över en period: Z-numren för varje
 kassaregister ska följa på varandra utan luckor och utan dubbletter, och datumen får inte gå
-bakåt när Z-numret ökar. Luckor beskrivs som ett intervall, och ett Z-nummer som verkar ha börjat
-om ger ett eget meddelande (öppen fråga H4).
+bakåt när Z-numret ökar. Luckor beskrivs som ett intervall, både de saknade Z-numren och dagarna
+utan rapport, och ett Z-nummer som verkar ha börjat om ger ett eget meddelande (öppen fråga H4).
 
 Vid minsta fel stoppas hela filen: inga rader returneras, och ett KassafilFel kastas.
 """
@@ -97,13 +97,15 @@ class ZSerieFel(KassafilFel):
     """Z-serien har en lucka, en dubblett eller datum i fel ordning.
 
     typ är "lucka", "dubblett" eller "ordning". Vid lucka är saknas_fran och saknas_till det
-    första och sista saknade Z-numret, antal_saknade hur många de är, och dagar_utan_rapport
-    vilka dagar mellan rapporterna före och efter luckan som saknar Z-rapport. De saknade
-    Z-numren räknas aldrig upp ett och ett, eftersom luckan kan vara mycket stor (H1).
+    första och sista saknade Z-numret och antal_saknade hur många de är. dagar_fran och
+    dagar_till är första och sista dagen mellan rapporterna före och efter luckan, som text, och
+    antal_dagar hur många dagar det är (None, None och 0 om det inte finns någon dag däremellan).
+    Varken de saknade Z-numren eller dagarna räknas upp en och en, eftersom luckan kan vara
+    mycket stor (H1) och datumen kan ligga långt isär.
     """
 
     def __init__(self, meddelande, typ, kassaregister, znummer, saknas_fran=None, saknas_till=None,
-                 dagar_utan_rapport=()):
+                 dagar_fran=None, dagar_till=None):
         super().__init__(meddelande)
         self.typ = typ
         self.kassaregister = kassaregister
@@ -111,7 +113,10 @@ class ZSerieFel(KassafilFel):
         self.saknas_fran = saknas_fran
         self.saknas_till = saknas_till
         self.antal_saknade = 0 if saknas_fran is None else saknas_till - saknas_fran + 1
-        self.dagar_utan_rapport = list(dagar_utan_rapport)
+        self.dagar_fran = dagar_fran
+        self.dagar_till = dagar_till
+        self.antal_dagar = 0 if dagar_fran is None else (
+            dt.date.fromisoformat(dagar_till) - dt.date.fromisoformat(dagar_fran)).days + 1
 
 
 def normalisera_kassaregister(namn):
@@ -715,14 +720,17 @@ def _rapportens_huvud(rader):
 
 
 def _dagar_mellan(fran, till):
-    """Datumen efter fran och före till, som text."""
-    dag = dt.date.fromisoformat(fran) + dt.timedelta(days=1)
-    slut = dt.date.fromisoformat(till)
-    dagar = []
-    while dag < slut:
-        dagar.append(dag.isoformat())
-        dag += dt.timedelta(days=1)
-    return dagar
+    """(första, sista) dagen efter fran och före till, som text, eller (None, None) om det inte finns någon.
+
+    Dagarna räknas aldrig upp en och en, eftersom datumen kan ligga tusentals år isär.
+    """
+    # Dagnummer i stället för datum, så att det inte blir fel vid år 1 och år 9999, där det inte
+    # finns någon dag före eller efter.
+    forsta = dt.date.fromisoformat(fran).toordinal() + 1
+    sista = dt.date.fromisoformat(till).toordinal() - 1
+    if forsta > sista:
+        return None, None
+    return dt.date.fromordinal(forsta).isoformat(), dt.date.fromordinal(sista).isoformat()
 
 
 _OMSTART_OPPEN_FRAGA = (
@@ -785,25 +793,33 @@ def kontrollera_z_serien(rapporter):
                     "ordning", kassaregister, [z_efter, z_fore],
                 )
 
-        datum_med_rapport = {datum for _, datum, _ in serie}
         for (z_fore, datum_fore, _), (z_efter, datum_efter, _) in zip(serie, serie[1:]):
             if z_efter > z_fore + 1:
-                # Luckan beskrivs som ett intervall. De saknade Z-numren räknas aldrig upp, eftersom
-                # luckan kan vara hur stor som helst (H1).
+                # Luckan beskrivs som ett intervall, både Z-numren och dagarna. Inget räknas upp ett
+                # och ett, eftersom luckan kan vara hur stor som helst (H1) och datumen kan ligga
+                # tusentals år isär. Ingen annan rapport kan ha ett datum mellan datum_fore och
+                # datum_efter: den skulle vara en dubblett eller gå bakåt i tiden, och det har
+                # stoppats ovan.
                 fran, till = z_fore + 1, z_efter - 1
                 if fran == till:
                     vad = "Z-rapport " + str(fran) + " saknas"
                 else:
                     vad = ("Z-rapporter saknas från nummer " + str(fran) + " till " + str(till)
                            + " (" + str(till - fran + 1) + " st)")
-                dagar = [dag for dag in _dagar_mellan(datum_fore, datum_efter) if dag not in datum_med_rapport]
+                dag_fran, dag_till = _dagar_mellan(datum_fore, datum_efter)
+                if dag_fran is None:
+                    dagar = "Den saknade rapporten är från " + datum_fore + " eller " + datum_efter + "."
+                elif dag_fran == dag_till:
+                    dagar = "Dagar däremellan utan Z-rapport: " + dag_fran + "."
+                else:
+                    antal = (dt.date.fromisoformat(dag_till) - dt.date.fromisoformat(dag_fran)).days + 1
+                    dagar = ("Dagar däremellan utan Z-rapport: från " + dag_fran + " till " + dag_till
+                             + " (" + str(antal) + " dagar).")
                 raise ZSerieFel(
                     borjan + " har en lucka: " + vad + " mellan Z-rapport " + str(z_fore) + " ("
                     + datum_fore + ") och Z-rapport " + str(z_efter) + " (" + datum_efter + "). "
-                    + ("Dagar däremellan utan Z-rapport: " + ", ".join(dagar) + "." if dagar else
-                       "Den saknade rapporten är från " + datum_fore + " eller " + datum_efter + ".")
-                    + " Hämta den saknade Z-rapporten från kassan.",
-                    "lucka", kassaregister, [z_fore, z_efter], fran, till, dagar,
+                    + dagar + " Hämta den saknade Z-rapporten från kassan.",
+                    "lucka", kassaregister, [z_fore, z_efter], fran, till, dag_fran, dag_till,
                 )
 
 
