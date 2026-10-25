@@ -180,16 +180,17 @@ Listan gäller byggarbetet i Claude Code, inklusive granskningar. Veras egen lis
 | `git commit` | Spara ändringarna i projektets historik (en **commit**) |
 | `ls`, `cat`, `head`, `tail`, `grep` | Läsa och söka i filer i projektet, utan att ändra något |
 | `git show` | Visa en tidigare commit, eller en fil som den såg ut då |
-| `git archive` | Ta ut en ren kopia av projektet ur historiken, till exempel inför en granskning |
+| `git archive` | Ta ut en ren kopia av projektet ur historiken, till exempel inför en granskning, bara med mål utanför projektet (se nedan) |
 | `diff` | Jämföra två filer eller mappar rad för rad |
-| `find` | Leta upp filer efter namn eller typ |
+| `find` | Leta upp filer efter namn eller typ, bara för att söka (se nedan) |
 | `wc` | Räkna rader, ord eller tecken i en fil |
 | `sort` | Sortera rader, till exempel för att jämföra två listor |
 | `mkdir` | Skapa en mapp, bara i en tillfällig mapp utanför projektet (se nedan) |
 | `cp -R` | Kopiera filer och mappar, bara till en tillfällig mapp utanför projektet (se nedan) |
 
-- `mkdir` och `cp -R` får bara ha mål i en tillfällig mapp utanför projektet (till exempel scratchpad-mappen), aldrig inne i projektmappen.
-- Testsviten (pytest-kommandot ovan) får också köras mot en sådan kopia.
+- `mkdir`, `cp -R` och `git archive` får bara ha mål i en tillfällig mapp utanför projektet (till exempel scratchpad-mappen), aldrig inne i projektmappen.
+- `find` används bara för att söka. Tilläggen `-delete` och `-exec`, som raderar filer eller kör andra kommandon, är förbjudna.
+- Testsviten (pytest-kommandot ovan) får också köras mot en sådan kopia, och då inifrån kopian. Det är det enda undantaget från att allt körs inifrån projektmappen.
 - Nya filer i projektet skapas med Claudes fil-verktyg (Write och Edit), inte med skalkommandon (kommandon i terminalen).
 
 ---
