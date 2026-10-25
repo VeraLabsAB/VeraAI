@@ -130,7 +130,7 @@ Ett JSON-dokument per leverantörsfaktura och kvitto. Filnamnet är dokumentets 
 | `motpart` | Motpartens kortnamn |
 | `fakturanummer` | Faktura- eller kvittonummer. Står som referens på bankraden när fakturan betalas |
 | `belopp_ore` | Att betala, inklusive moms, heltal i öre |
-| `moms` | En rad per momssats: sats i procent, belopp utan moms och moms, heltal i öre. Tom lista om dokumentet saknar moms |
+| `moms` | En rad per momssats: sats i procent, belopp utan moms och moms, heltal i öre. Minst en rad. Ett dokument utan moms har en rad med sats 0 och moms 0 (beslut i SPEC.md avsnitt 11) |
 | `flaggor` | Tom lista. Fylls av kärnan senare |
 
 Hyresavin är lagd som `leverantorsfaktura`.

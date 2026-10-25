@@ -4,15 +4,19 @@
 - I3: riktningstecken (U+202A–U+202E och U+2066–U+2069) stoppar filen. Andra osynliga
   formattecken, till exempel U+200D i emoji, godtas fortfarande.
 - I4: en sökväg som inte är text eller Path stoppas innan något öppnas.
+- Jättelånga tal i bankformat.json och kassaformat.json stoppas med ett tydligt svenskt fel, utan att
+  talet räknas ut, på samma sätt som i underlagen.
 
 Varje test körs på både las_bankfil och las_kassafil. Bankfilen och Z-filen nedan är felfria så
 när som på det som testet lägger till.
 """
 
 import builtins
+import json
 import subprocess
 import sys
 import textwrap
+import time
 from pathlib import Path
 
 import pytest
@@ -23,6 +27,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 from las_bank import BankfilFel, ladda_bankformat, las_bankfil  # noqa: E402
 from las_kassa import KassafilFel, ladda_kassaformat, las_kassafil  # noqa: E402
+import inlasning_skydd  # noqa: E402
 
 BANKFORMAT_FIL = AGENT / "foretag" / "syntet-testbutik" / "bankformat.json"
 KASSAFORMAT_FIL = AGENT / "foretag" / "syntet-testbutik" / "kassaformat.json"
@@ -278,3 +283,66 @@ def test_i4_heltal_och_sanningsvarden_stanger_inte_programmets_utdata():
         typ = "bool" if rad.split()[2] in ("True", "False") else "int"
         assert rad.startswith("STOPPAD") and rad.endswith(
             "sökvägen ska vara text eller en Path, inte " + typ + "."), rad
+
+
+# --- Jättelånga tal i bankformat.json och kassaformat.json ---
+
+FORMATEN = {
+    "bankformat": (BANKFORMAT_FIL, ladda_bankformat, BankfilFel, "Bankformatet"),
+    "kassaformat": (KASSAFORMAT_FIL, ladda_kassaformat, KassafilFel, "Kassaformatet"),
+}
+
+
+def format_med_tal(mapp, original, siffror):
+    """Formatet med ett heltal med så många siffror i stället för listan med avgränsare."""
+    data = json.loads(original.read_text(encoding="utf-8"))
+    data["avgransare"] = "@@TAL@@"
+    fil = mapp / original.name
+    fil.write_text(json.dumps(data, ensure_ascii=False).replace('"@@TAL@@"', "9" * siffror), encoding="utf-8")
+    return fil
+
+
+@pytest.mark.parametrize("siffror", [16, 4301, 900_000])
+@pytest.mark.parametrize("sort", FORMATEN, ids=FORMATEN.keys())
+def test_jattelangt_tal_i_formatet_stoppas_utan_att_raknas_ut(tmp_path, sort, siffror):
+    # Python 3.9 räknade ut talet, vilket tar mycket lång tid för ett jättelångt tal, och sedan stoppade
+    # kontrollen av avgränsarna formatet med ett annat fel. Python 3.11 och senare ger ett ValueError
+    # på engelska för tal med fler än 4300 siffror.
+    original, ladda, fel, formatet = FORMATEN[sort]
+    fil = format_med_tal(tmp_path, original, siffror)
+    start = time.perf_counter()
+    with pytest.raises(fel) as stopp:
+        ladda(fil)
+    assert time.perf_counter() - start < 2
+    assert type(stopp.value) is fel
+    assert str(stopp.value) == (formatet + " i " + str(fil) + " innehåller ett heltal med " + str(siffror)
+                                + " siffror, men ett tal i formatet får ha högst 15 siffror.")
+
+
+@pytest.mark.parametrize("sort", FORMATEN, ids=FORMATEN.keys())
+def test_jattelangt_tal_stoppas_aven_med_nyare_pythons_grans(tmp_path, monkeypatch, sort):
+    # Python 3.11 och senare vägrar räkna ut ett tal med fler än 4300 siffror och ger då ett
+    # ValueError. Här efterliknas det med en egen int, så att testet visar att längden prövas
+    # innan talet räknas ut, i alla Pythonversioner.
+    original, ladda, fel, formatet = FORMATEN[sort]
+    vanlig_int = builtins.int
+
+    def int_med_grans(text, *args):
+        if isinstance(text, str) and len(text) > 4300:
+            raise ValueError("Exceeds the limit (4300) for integer string conversion")
+        return vanlig_int(text, *args)
+
+    monkeypatch.setattr(inlasning_skydd, "int", int_med_grans, raising=False)
+    with pytest.raises(fel, match="innehåller ett heltal med 5000 siffror"):
+        ladda(format_med_tal(tmp_path, original, 5000))
+
+
+@pytest.mark.parametrize("sort", FORMATEN, ids=FORMATEN.keys())
+def test_tal_med_femton_siffror_lases_och_stoppas_av_den_vanliga_kontrollen(tmp_path, sort):
+    # Skydd: gränsen är 15 siffror. Ett tal med 15 siffror läses, och stoppas sedan av kontrollen av
+    # avgränsarna som vanligt, eftersom ett tal inte är en lista.
+    original, ladda, fel, formatet = FORMATEN[sort]
+    with pytest.raises(fel, match="'avgransare' ska vara en lista med minst en avgränsare"):
+        ladda(format_med_tal(tmp_path, original, 15))
+    with pytest.raises(fel, match="'avgransare' ska vara en lista med minst en avgränsare"):
+        ladda(format_med_tal(tmp_path, original, 1))

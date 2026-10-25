@@ -35,6 +35,7 @@ INGAENDE_SALDO_ORE = 8500000  # 85 000,00 kr den 1 januari
 # SYNTETISKA antaganden, inte verifierade (se testdata/README.md).
 MOMS_LIVSMEDEL = 12
 MOMS_OVRIGT = 25
+MOMSFRI = 0  # momssatsen på momsraden i ett underlag utan moms
 KORTAVGIFT_PROMILLE = 12  # 1,2 % av kortförsäljningen dras vid avräkningen
 BANKAVGIFT_KONTO_ORE = 12500
 BANKAVGIFT_KORTINLOSEN_ORE = 19900
@@ -221,10 +222,11 @@ def skapa_leverantorsfakturor(rng):
                 fakturor.append({"dok": dok, "betaldag": nasta_bankdag(forfallodag), "markering": None})
                 lopnummer += 1
 
-    # Försäkringens helårspremie. Fakturan har ingen moms (antagande, se README: Öppen fråga).
+    # Försäkringens helårspremie. Fakturan har ingen moms (antagande, se README: Öppen fråga). Ett
+    # momsfritt underlag har en momsrad med sats 0 och moms 0 (beslut i SPEC 11).
     datum = dt.date(2025, 1, 8)
     dok = nytt_underlag("leverantorsfaktura", datum, "LEV-FORSAKRING", "SYNT-FORS-" + str(rng.randint(1000, 9999)),
-                        [], belopp_ore=FORSAKRING_HELAR_ORE)
+                        [(MOMSFRI, FORSAKRING_HELAR_ORE, 0)])
     fakturor.append({"dok": dok, "betaldag": nasta_bankdag(datum + dt.timedelta(days=BETALNINGSVILLKOR_DAGAR)),
                      "markering": None})
 

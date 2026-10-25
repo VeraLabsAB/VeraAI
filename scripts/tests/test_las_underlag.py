@@ -368,10 +368,22 @@ def test_trasiga_flaggor_stoppas(tmp_path, flaggor, text):
     stoppas(tmp_path, text)
 
 
-def test_underlag_utan_moms_godtas(tmp_path):
-    # Som försäkringsfakturan i testdatan. Utan momsrader finns inget att summera mot beloppet.
+def test_underlag_utan_momsrader_stoppas(tmp_path):
+    # Beslut i SPEC 11: varje underlag har minst en momsrad, så att K13 alltid kan kontrollera beloppet.
+    # Förut godtogs en tom lista, och då kontrollerades beloppet inte alls.
     skriv(tmp_path, underlag(moms=[], belopp_ore=960000))
-    assert las(tmp_path).underlag[0]["moms"] == []
+    stoppas(tmp_path, "'moms' har inga momsrader. Varje underlag ska ha minst en momsrad",
+            "Ett momsfritt underlag har en rad med momssats 0 och moms 0.")
+
+
+def test_momsfritt_underlag_med_sats_0_godtas_och_kontrolleras(tmp_path):
+    # Som försäkringsfakturan i testdatan: en momsrad med sats 0 och moms 0.
+    moms = [{"momssats": 0, "underlag_ore": 960000, "moms_ore": 0}]
+    skriv(tmp_path, underlag(moms=moms, belopp_ore=960000))
+    assert las(tmp_path).underlag[0]["moms"] == moms
+    # K13 kontrollerar nu även det momsfria underlaget.
+    skriv(tmp_path, underlag(moms=moms, belopp_ore=960001))
+    stoppas(tmp_path, "momsraderna summerar till 9600,00 kr, men 'belopp_ore' är 9600,01 kr")
 
 
 def test_tva_momssatser_godtas(tmp_path):
@@ -897,8 +909,8 @@ def ar_ratt_last(post):
     for rad in post["moms"]:
         assert list(rad) == list(las_underlag.MOMSRAD_NYCKLAR)
         assert all(type(rad[nyckel]) is int and rad[nyckel] >= 0 for nyckel in rad)
-    if post["moms"]:
-        assert sum(rad["underlag_ore"] + rad["moms_ore"] for rad in post["moms"]) == post["belopp_ore"]
+    assert post["moms"]  # minst en momsrad
+    assert sum(rad["underlag_ore"] + rad["moms_ore"] for rad in post["moms"]) == post["belopp_ore"]
     assert all(isinstance(flagga, str) and len(flagga) <= 200 for flagga in post["flaggor"])
 
 

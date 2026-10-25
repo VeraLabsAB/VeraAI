@@ -11,8 +11,8 @@ ligger därför här:
 - Sökvägen: en sökväg som inte är text eller Path stoppas innan något öppnas (I4).
 - CSV-läsningen: strikt läsning, ingen radbrytning inuti ett fält, och varje rad ska ha lika
   många fält som rubrikraden. Datum och belopp tolkas på samma sätt i alla filer.
-- JSON-formatet: filen läses som UTF-8, dubbla nycklar och för djup nästling stoppas, och
-  nycklar, kolumnnamn och avgränsare kontrolleras.
+- JSON-formatet: filen läses som UTF-8, dubbla nycklar, för djup nästling och heltal med fler än
+  15 siffror stoppas, och nycklar, kolumnnamn och avgränsare kontrolleras.
 
 Modulen vet inte vilken sorts fil den läser. Allt som skiljer i felmeddelandena (vilken felklass
 som kastas och vad filen kallas) kommer från en _Filsort, som varje inläsningsmodul skapar själv.
@@ -97,6 +97,27 @@ class _DubbelNyckel(Exception):
     """En nyckel står två gånger i samma JSON-objekt. Fångas i _ladda_json."""
 
 
+class _OgiltigtTal(Exception):
+    """Ett tal som inte får finnas i ett JSON-format. Fångas i _ladda_json."""
+
+
+def _heltal_ur_json(text, hogst_siffror=15):
+    """Ett heltal i ett JSON-format, med högst hogst_siffror siffror (samma gräns som i underlagen).
+
+    Längden prövas innan talet räknas ut. Annars tar ett jättelångt tal mycket lång tid att läsa i
+    äldre Pythonversioner, och ger ett ValueError på engelska i nyare (som har en egen gräns på 4300
+    siffror). Gränsen står här och inte som ett eget namn, eftersom ett skyddstest
+    (test_inga_genvagar.py) annars tar talet för en byggsten när en annan modul har samma tal.
+    """
+    siffror = len(text.lstrip("-"))
+    if siffror > hogst_siffror:
+        raise _OgiltigtTal(
+            "ett heltal med " + str(siffror) + " siffror, men ett tal i formatet får ha högst "
+            + str(hogst_siffror) + " siffror"
+        )
+    return int(text)
+
+
 def _inga_dubbla_nycklar(par):
     objekt = {}
     for nyckel, varde in par:
@@ -126,7 +147,8 @@ def _ladda_json(sokvag, filsort):
             filsort.formatet + " går inte att läsa: " + str(sokvag) + " (" + (fel.strerror or str(fel)) + ")."
         ) from None
     try:
-        innehall = json.loads(data.decode("utf-8-sig"), object_pairs_hook=_inga_dubbla_nycklar)
+        innehall = json.loads(data.decode("utf-8-sig"), object_pairs_hook=_inga_dubbla_nycklar,
+                              parse_int=_heltal_ur_json)
     except UnicodeDecodeError:
         raise filsort.fel(var + " är inte sparat som UTF-8.") from None
     except json.JSONDecodeError as fel:
@@ -135,6 +157,8 @@ def _ladda_json(sokvag, filsort):
         ) from None
     except _DubbelNyckel as fel:
         raise filsort.fel(var + ": " + str(fel) + ".") from None
+    except _OgiltigtTal as fel:
+        raise filsort.fel(var + " innehåller " + str(fel) + ".") from None
     except RecursionError:
         raise filsort.fel(
             var + " är inte giltigt: för många hakparenteser eller klammerparenteser inuti varandra. "

@@ -11,9 +11,9 @@ inga fler och inga färre (NYCKLAR):
   motpart        motpartens namn, en icke-tom text
   fakturanummer  faktura- eller kvittonumret, en icke-tom text
   belopp_ore     att betala inklusive moms, heltal i öre
-  moms           en lista med en rad per momssats. Varje rad har exakt nycklarna MOMSRAD_NYCKLAR:
-                 momssatsen i procent och beloppet utan moms och momsen, heltal i öre. Tom lista
-                 om dokumentet saknar moms
+  moms           en lista med en rad per momssats, minst en rad. Varje rad har exakt nycklarna
+                 MOMSRAD_NYCKLAR: momssatsen i procent och beloppet utan moms och momsen, heltal i
+                 öre. Ett momsfritt underlag har en rad med sats 0 och moms 0 (beslut i SPEC 11)
   flaggor        en lista med korta texter
 
 Alla tal ska vara heltal i JSON, aldrig decimaltal, text, true/false, NaN eller Infinity, och
@@ -21,8 +21,8 @@ högst HELTAL_HOGST_SIFFROR siffror långa. Negativa tal stoppas: hur kreditnoto
 inte bestämt. En text får vara högst TEXT_HOGST_TECKEN tecken. En text som bara består av
 blanksteg och osynliga tecken räknas som tom.
 
-Intern kontroll: har underlaget momsrader ska summan av underlag_ore och moms_ore över alla rader
-vara lika med belopp_ore. Ett underlag utan momsrader kan inte kontrolleras så.
+Intern kontroll (K13): summan av underlag_ore och moms_ore över alla momsrader ska vara lika med
+belopp_ore. Eftersom varje underlag har minst en momsrad kontrolleras alla underlag så.
 
 Inläsningen skyddas på samma sätt som bank- och kassafilen, med de gemensamma skydden i
 inlasning_skydd.py: sökvägen ska vara text eller en Path, filen får vara högst FIL_HOGST_BYTE
@@ -248,9 +248,14 @@ def _kontrollera_datum(varde, var, filsort):
 
 
 def _kontrollera_momsrader(rader, var, filsort):
-    """Listan med momsrader, en rad per momssats. Returnerar nya rader."""
+    """Listan med momsrader, en rad per momssats och minst en rad. Returnerar nya rader."""
     if not isinstance(rader, list):
         raise filsort.fel(var + ": 'moms' ska vara en lista med momsrader, inte " + _typnamn(rader) + ".")
+    if not rader:
+        raise filsort.fel(
+            var + ": 'moms' har inga momsrader. Varje underlag ska ha minst en momsrad, så att beloppet kan"
+            " kontrolleras (K13). Ett momsfritt underlag har en rad med momssats 0 och moms 0."
+        )
     resultat = []
     for nummer, rad in enumerate(rader, start=1):
         vad = "momsrad nummer " + str(nummer)
@@ -274,9 +279,7 @@ def _kontrollera_flaggor(flaggor, var, filsort):
 
 
 def _kontroll_summa(underlag, var, filsort):
-    """Intern kontroll: underlag_ore plus moms_ore över alla momsrader är lika med belopp_ore."""
-    if not underlag["moms"]:
-        return
+    """K13, intern kontroll: underlag_ore plus moms_ore över alla momsrader är lika med belopp_ore."""
     summa = sum(rad["underlag_ore"] + rad["moms_ore"] for rad in underlag["moms"])
     if summa != underlag["belopp_ore"]:
         raise filsort.fel(

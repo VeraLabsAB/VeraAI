@@ -280,5 +280,13 @@ def test_underlagen_har_ratt_falt_och_gar_ihop():
         for rad in dok["moms"]:
             assert list(rad) == ["momssats", "underlag_ore", "moms_ore"]
             assert all(isinstance(v, int) for v in rad.values())
-        if dok["moms"]:
-            assert dok["belopp_ore"] == sum(r["underlag_ore"] + r["moms_ore"] for r in dok["moms"]), fil.name
+        assert dok["moms"], fil.name  # minst en momsrad (beslut i SPEC 11)
+        assert dok["belopp_ore"] == sum(r["underlag_ore"] + r["moms_ore"] for r in dok["moms"]), fil.name
+
+
+def test_momsfria_underlag_har_en_rad_med_sats_0_och_moms_0():
+    # Försäkringsfakturan har ingen moms. Den har en momsrad med sats 0 och moms 0, inte en tom lista.
+    momsfria = [dok for dok in underlag() if any(rad["momssats"] == 0 for rad in dok["moms"])]
+    assert [(dok["motpart"], dok["moms"]) for dok in momsfria] == [
+        ("LEV-FORSAKRING", [{"momssats": 0, "underlag_ore": generator.FORSAKRING_HELAR_ORE, "moms_ore": 0}])]
+    assert all(rad["moms_ore"] == 0 for dok in momsfria for rad in dok["moms"] if rad["momssats"] == 0)

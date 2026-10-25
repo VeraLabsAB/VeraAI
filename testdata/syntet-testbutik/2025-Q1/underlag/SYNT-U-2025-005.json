@@ -5,6 +5,12 @@
   "motpart": "LEV-FORSAKRING",
   "fakturanummer": "SYNT-FORS-1616",
   "belopp_ore": 960000,
-  "moms": [],
+  "moms": [
+    {
+      "momssats": 0,
+      "underlag_ore": 960000,
+      "moms_ore": 0
+    }
+  ],
   "flaggor": []
 }

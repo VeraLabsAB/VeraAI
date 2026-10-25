@@ -1122,3 +1122,30 @@ Efter del B godkändes 579 fall (331 bank, 248 kassa) och 2 455 stoppades. Inget
 - **Skyddet kan kringgås med flit.** En `Kassaperiod` går att förfalska med kod som medvetet går förbi Python-reglerna. I1-testet stoppar de enkla sätten (nyckeln, periodens inre, `object.__setattr__`), men kan inte bevisa att inget annat sätt finns, på samma sätt som för I1.
 
 Testsviten: **730 passed**, 0 misslyckade (565 före, 691 efter del A, 730 efter del B). SPEC.md, CLAUDE.md, `foretag/`, testdatan och facit är inte ändrade.
+
+## Åtgärder 2026-10-25: små rättelser och matchning mot banken
+
+Gjort i en egen session, i tre commits: SPEC.md (del A, commit 7133f15, med Hugos godkända text: `cd` och `tar` i 7.1, K4a, K4b och K13 i avsnitt 6, beslutet om minst en momsrad, och Ö8–Ö10), små rättelser (del B) och matchning mot banken (del C). Ingen granskares text ovan är ändrad. SPEC.md är inte ändrad i del B och C.
+
+### Del B: små rättelser
+
+| Nr | Rättelse | Test |
+|---|---|---|
+| 5 | Ett jättelångt heltal i `bankformat.json` eller `kassaformat.json` stoppas med `BankfilFel`/`KassafilFel`: "… innehåller ett heltal med N siffror, men ett tal i formatet får ha högst 15 siffror." Längden prövas i `_ladda_json` (i `inlasning_skydd.py`) innan talet räknas ut, med samma gräns som i underlagen. Förut räknade Python 3.9 (projektets Python) ut talet, vilket tog 2,7–3,1 sekunder för 900 000 siffror, och sedan stoppades formatet av ett annat fel. Python 3.11 och senare ger i stället ett `ValueError` på engelska för tal med fler än 4300 siffror. Gränsen står i funktionen och inte som ett eget namn, eftersom skyddstestet för offentliga byggstenar (som jämför värden när programmet kör) annars tog talet 15 för en byggsten när underlagets gräns också är 15 | `test_bank_och_kassa.py`: `test_jattelangt_tal_i_formatet_stoppas_utan_att_raknas_ut` (16, 4301 och 900 000 siffror, bank och kassa, hela meddelandet och högst 2 sekunder), `test_jattelangt_tal_stoppas_aven_med_nyare_pythons_grans` (efterliknar gränsen i Python 3.11 med en egen `int`), skydd: `test_tal_med_femton_siffror_lases_och_stoppas_av_den_vanliga_kontrollen` |
+| 6 | Varje underlag ska ha minst en momsrad (beslut i SPEC 11). En tom lista stoppas: "'moms' har inga momsrader. Varje underlag ska ha minst en momsrad, så att beloppet kan kontrolleras (K13). Ett momsfritt underlag har en rad med momssats 0 och moms 0." K13 (summan av momsraderna är lika med beloppet) görs därför alltid. Förut hoppades den över för ett underlag utan momsrader | `test_las_underlag.py`: `test_underlag_utan_momsrader_stoppas` (ersätter `test_underlag_utan_moms_godtas`, som krävde det gamla beteendet), skydd: `test_momsfritt_underlag_med_sats_0_godtas_och_kontrolleras`. Fuzzens kontroll av inlästa underlag kräver nu minst en momsrad. `test_testdata_q1.py`: `test_momsfria_underlag_har_en_rad_med_sats_0_och_moms_0`, och `test_underlagen_har_ratt_falt_och_gar_ihop` kräver minst en momsrad |
+
+**Vad som ändrades i testdatan.** Generatorn ger försäkringsfakturan (LEV-FORSAKRING, `SYNT-U-2025-005`) en momsrad med sats 0, belopp utan moms 9 600,00 kr och moms 0, i stället för en tom lista (ny konstant `MOMSFRI = 0`). Beloppet är detsamma, 9 600,00 kr. Det var det enda momsfria underlaget. Generatorn kördes om: bara `underlag/SYNT-U-2025-005.json` ändrades. Inga andra filer, och inte facit, eftersom facit inte innehåller underlagens momsrader och slumpen drar samma tal som förut. `test_testdata_q1.py` är grönt. Raden om `moms` i `testdata/README.md` säger nu "Minst en rad" i stället för "Tom lista om dokumentet saknar moms".
+
+**Så bevisades testerna.** De nya och ändrade testfilerna kördes mot koden och testdatan från commit 7133f15 (före rättelserna) i en kopia utanför projektet: 12 röda, alla av rätt skäl (8 för talen: annat meddelande eller mer än 2 sekunder; 4 för momsraderna: tomma listan godtogs, eller försäkringsfakturan hade en tom lista), och 1 025 gröna.
+
+**Mutationstest.** En ny kontroll i taget togs bort i en kopia, och hela sviten kördes.
+
+| Borttagen kontroll (i en kopia) | Röda tester |
+|---|---|
+| `parse_int` borttagen i `_ladda_json` | 8 |
+| Längdkontrollen i `_heltal_ur_json` | 8 |
+| Översättningen till `BankfilFel`/`KassafilFel` (ett internt fel kommer igenom i stället) | 8 |
+| Kontrollen av minst en momsrad | 1 |
+| Generatorn ger försäkringsfakturan en tom lista igen | 1 |
+
+Testsviten efter del B: **1 037 passed**, 0 misslyckade (1 025 före).
