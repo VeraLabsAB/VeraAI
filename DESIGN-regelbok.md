@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Ingen kod finns. Ändrar inget i SPEC.md |
+| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil, avsnitt 7) är byggd. Ändrar inget i SPEC.md |
 | Gäller | Steg 4 i arbetsflödet (SPEC avsnitt 4): kontera enligt företagets regelbok, och kontrollerna K2, K5, K8 och K9 |
 | Exempel | Bara Syntet Testbutik AB och testdatan för 2025-Q1. **Allt är SYNTETISKT** |
 
@@ -653,7 +653,7 @@ uppgift 3 och efter uppgift 6.
 
 ## 8. Öppna frågor
 
-Ingen av frågorna nedan är besvarad här. Där det står ett värde i exemplen ovan är det ett antagande som
+D17–D21 är besvarade av Hugo (se beslutet under tabellen). D1–D16 är öppna. Där det står ett värde i exemplen ovan är det ett antagande som
 ska **verifieras**, inte ett svar. Numren D1–D21 är nya. Där en fråga redan finns i SPEC (Ö) eller i
 FIKTIVT_FORETAG.md (Ö-T) står det.
 
