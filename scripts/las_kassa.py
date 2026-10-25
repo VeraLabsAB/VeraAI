@@ -15,7 +15,8 @@ Kärnan vet bara vilka uppgifter som behövs och vilka sorters poster som finns:
 OBS: Formatet för testföretaget är ANTAGET och INTE verifierat mot en riktig exportfil från
 något kassasystem (Ö5).
 
-Inläsningen skyddas på samma sätt som bankfilen i las_bank.py: teckenkodningen upptäcks (UTF-8,
+Inläsningen skyddas på samma sätt som bankfilen i las_bank.py, med de gemensamma skydden i
+inlasning_skydd.py och kassafilens egna felmeddelanden (KASSAFIL): teckenkodningen upptäcks (UTF-8,
 annars Windows-1252, UTF-16 och NUL-tecken stoppas), styrtecken och ovanliga radbrytningar stoppar
 filen, radbrytning inuti ett fält stoppar filen, CSV läses strikt och varje rad ska ha lika många
 fält som rubrikraden. Beloppen tolkas med belopp.tolka_belopp och blir heltal i öre, aldrig flyttal.
@@ -40,18 +41,17 @@ utan rapport, och ett Z-nummer som verkar ha börjat om ger ett eget meddelande 
 Vid minsta fel stoppas hela filen: inga rader returneras, och ett KassafilFel kastas.
 """
 
-import csv
 import datetime as dt
 import hashlib
-import json
 import re
 import unicodedata
 
-from belopp import tolka_belopp
-from las_bank import (
-    TILLATNA_AVGRANSARE, BankfilFel, _DATUM, _HELTAL, _OTILLATNA_TECKEN, _RADBRYTNINGAR, _RADSLUT,
-    _inga_dubbla_nycklar, kronor,
+from inlasning_skydd import (
+    HELTAL, RADBRYTNINGAR, Filsort, avkoda, csv_rader, filrad_for, inga_dubbla_kolumnnamn, inga_otillatna_tecken,
+    kontrollera_anteckning, kontrollera_avgransare, kontrollera_namn, kontrollera_nycklar, ladda_json, las_fil,
+    nul_fel, rubrikens_falt, tolka_datum, tolka_ore,
 )
+from las_bank import kronor
 
 # Uppgifterna som kärnan behöver ur varje rad. Kassaformatet anger vad kolumnen för varje
 # uppgift heter i Z-filen.
@@ -119,6 +119,18 @@ class ZSerieFel(KassafilFel):
             dt.date.fromisoformat(dagar_till) - dt.date.fromisoformat(dagar_fran)).days + 1
 
 
+# Det som skiljer kassafilens felmeddelanden från andra filers, för skydden i inlasning_skydd.py.
+KASSAFIL = Filsort(
+    fel=KassafilFel,
+    filen="Kassafilen",
+    formatet="Kassaformatet",
+    exportera_igen="Exportera Z-rapporten från kassan igen",
+    om_styrtecken="Sådana tecken finns inte i en vanlig Z-rapport, och de kan få raderna att delas fel.",
+    ihopslaget="flera rader",
+    nivaer="Ett kassaformat har bara tre nivåer.",
+)
+
+
 def normalisera_kassaregister(namn):
     """Kassaregistrets namn i den form som jämförs (H2).
 
@@ -135,35 +147,6 @@ def normalisera_kassaregister(namn):
 
 # --- Kassaformat ---
 
-def _kontrollera_nycklar(data, obligatoriska, valfria, var):
-    if not isinstance(data, dict):
-        raise KassafilFel(var + " ska vara ett objekt med nycklar, inte " + type(data).__name__ + ".")
-    saknas = [nyckel for nyckel in obligatoriska if nyckel not in data]
-    if saknas:
-        raise KassafilFel(var + " saknar nyckeln " + ", ".join(map(repr, saknas)) + ".")
-    okanda = sorted(nyckel for nyckel in data if nyckel not in obligatoriska + valfria)
-    if okanda:
-        raise KassafilFel(
-            var + " har en okänd nyckel: " + ", ".join(map(repr, okanda)) + ". Tillåtna nycklar är "
-            + ", ".join(map(repr, obligatoriska + valfria)) + "."
-        )
-
-
-def _kontrollera_namn(namn, vad, var):
-    """Kontrollerar ett kolumnnamn eller postnamn och returnerar det utan mellanslag runt om."""
-    if not isinstance(namn, str) or not namn.strip():
-        raise KassafilFel(var + ": " + vad + " får inte vara tomt.")
-    if any(tecken in namn for tecken in _RADBRYTNINGAR + '"'):
-        raise KassafilFel(var + ": " + vad + " får inte innehålla radbrytning eller citattecken.")
-    osynliga = [tecken for tecken in namn if unicodedata.category(tecken) in ("Cc", "Cf")]
-    if osynliga:
-        raise KassafilFel(
-            var + ": " + vad + " innehåller tecknet U+" + format(ord(osynliga[0]), "04X")
-            + ", som är ett styrtecken eller ett osynligt tecken. Sådana tecken får inte finnas i ett namn."
-        )
-    return namn.strip()
-
-
 def _kontrollera_filnamn(monster, var):
     if not isinstance(monster, str):
         raise KassafilFel(var + ": 'filnamn' ska vara text, till exempel \"z_" + DATUMPLATS + ".csv\".")
@@ -173,47 +156,27 @@ def _kontrollera_filnamn(monster, var):
         )
     if any(tecken in monster for tecken in "/\\") or monster.startswith("."):
         raise KassafilFel(var + ": 'filnamn' ska vara ett filnamn, utan mapp och utan punkt först.")
-    if any(unicodedata.category(tecken) in ("Cc", "Cf") or tecken in _RADBRYTNINGAR for tecken in monster):
+    if any(unicodedata.category(tecken) in ("Cc", "Cf") or tecken in RADBRYTNINGAR for tecken in monster):
         raise KassafilFel(var + ": 'filnamn' innehåller ett styrtecken eller ett osynligt tecken.")
     return monster
 
 
 def _kontrollera_kassaformat(data, var):
     """Kontrollerar ett kassaformat och returnerar det i den form kärnan använder."""
-    _kontrollera_nycklar(data, KASSAFORMAT_NYCKLAR, KASSAFORMAT_VALFRIA_NYCKLAR, var)
-    if "anteckning" in data and not isinstance(data["anteckning"], str):
-        raise KassafilFel(var + ": 'anteckning' ska vara text.")
+    kontrollera_nycklar(data, KASSAFORMAT_NYCKLAR, KASSAFORMAT_VALFRIA_NYCKLAR, var, KASSAFIL)
+    kontrollera_anteckning(data, var, KASSAFIL)
 
     filnamn = _kontrollera_filnamn(data["filnamn"], var)
 
-    _kontrollera_nycklar(data["kolumner"], KOLUMN_NYCKLAR, (), var + ", 'kolumner',")
+    kontrollera_nycklar(data["kolumner"], KOLUMN_NYCKLAR, (), var + ", 'kolumner',", KASSAFIL)
     kolumner = {
-        nyckel: _kontrollera_namn(data["kolumner"][nyckel], "kolumnnamnet för " + repr(nyckel), var)
+        nyckel: kontrollera_namn(data["kolumner"][nyckel], "kolumnnamnet för " + repr(nyckel), var, KASSAFIL)
         for nyckel in KOLUMN_NYCKLAR
     }
-    for nyckel, namn in kolumner.items():
-        andra = [annan for annan, annat_namn in kolumner.items() if annat_namn == namn and annan != nyckel]
-        if andra:
-            raise KassafilFel(
-                var + ": kolumnnamnet " + repr(namn) + " används för både " + repr(nyckel)
-                + " och " + repr(andra[0]) + ". Varje kolumn måste ha ett eget namn."
-            )
+    inga_dubbla_kolumnnamn(kolumner, var, KASSAFIL)
+    avgransare = kontrollera_avgransare(data["avgransare"], kolumner, var, KASSAFIL)
 
-    avgransare = data["avgransare"]
-    if not isinstance(avgransare, list) or not avgransare:
-        raise KassafilFel(var + ": 'avgransare' ska vara en lista med minst en avgränsare.")
-    for tecken in avgransare:
-        if not isinstance(tecken, str) or tecken not in TILLATNA_AVGRANSARE:
-            raise KassafilFel(
-                var + ": avgränsaren " + repr(tecken) + " är ogiltig. Tillåtna avgränsare är komma,"
-                " semikolon, tabb och lodstreck (" + ", ".join(map(repr, TILLATNA_AVGRANSARE)) + ")."
-            )
-    if len(set(avgransare)) != len(avgransare):
-        raise KassafilFel(var + ": samma avgränsare står flera gånger i 'avgransare'.")
-    if any(tecken in namn for tecken in avgransare for namn in kolumner.values()):
-        raise KassafilFel(var + ": ett kolumnnamn innehåller en av avgränsarna.")
-
-    _kontrollera_nycklar(data["poster"], POSTTYPER, (), var + ", 'poster',")
+    kontrollera_nycklar(data["poster"], POSTTYPER, (), var + ", 'poster',", KASSAFIL)
     poster = {}
     for posttyp in POSTTYPER:
         if posttyp == "betalsatt":
@@ -221,11 +184,12 @@ def _kontrollera_kassaformat(data, var):
             if not isinstance(lista, list) or not lista:
                 raise KassafilFel(var + ": 'betalsatt' under 'poster' ska vara en lista med minst ett postnamn.")
             poster[posttyp] = [
-                _kontrollera_namn(namn, "postnamnet för betalsätt nummer " + str(nummer), var)
+                kontrollera_namn(namn, "postnamnet för betalsätt nummer " + str(nummer), var, KASSAFIL)
                 for nummer, namn in enumerate(lista, start=1)
             ]
         else:
-            poster[posttyp] = _kontrollera_namn(data["poster"][posttyp], "postnamnet för " + repr(posttyp), var)
+            poster[posttyp] = kontrollera_namn(data["poster"][posttyp], "postnamnet för " + repr(posttyp), var,
+                                               KASSAFIL)
     alla_postnamn = [poster[posttyp] for posttyp in POSTTYPER if posttyp != "betalsatt"] + poster["betalsatt"]
     for namn in alla_postnamn:
         if alla_postnamn.count(namn) > 1:
@@ -244,7 +208,7 @@ def _kontrollera_kassaformat(data, var):
     if not isinstance(lista, list) or not lista:
         raise KassafilFel(var + ": 'kassaregister' ska vara en lista med minst ett kassaregister.")
     kassaregister = [
-        _kontrollera_namn(namn, "kassaregister nummer " + str(nummer), var)
+        kontrollera_namn(namn, "kassaregister nummer " + str(nummer), var, KASSAFIL)
         for nummer, namn in enumerate(lista, start=1)
     ]
     sedda = {}  # normaliserat namn -> namnet
@@ -261,7 +225,7 @@ def _kontrollera_kassaformat(data, var):
     return {
         "filnamn": filnamn,
         "kolumner": kolumner,
-        "avgransare": list(avgransare),
+        "avgransare": avgransare,
         "poster": poster,
         "momsavrundning": data["momsavrundning"],
         "kassaregister": kassaregister,
@@ -275,120 +239,39 @@ def ladda_kassaformat(sokvag):
     "poster": {posttyp: postnamn, "betalsatt": [postnamn, ...]}, "momsavrundning": sätt,
     "kassaregister": [namn, ...]}.
     """
-    var = "Kassaformatet i " + str(sokvag)
-    try:
-        with open(sokvag, "rb") as fil:
-            data = fil.read()
-    except FileNotFoundError:
-        raise KassafilFel("Kassaformatet saknas: filen finns inte: " + str(sokvag) + ".") from None
-    except IsADirectoryError:
-        raise KassafilFel("Kassaformatet saknas: " + str(sokvag) + " är en mapp, inte en fil.") from None
-    except OSError as fel:
-        raise KassafilFel(
-            "Kassaformatet går inte att läsa: " + str(sokvag) + " (" + (fel.strerror or str(fel)) + ")."
-        ) from None
-    try:
-        innehall = json.loads(data.decode("utf-8-sig"), object_pairs_hook=_inga_dubbla_nycklar)
-    except UnicodeDecodeError:
-        raise KassafilFel(var + " är inte sparat som UTF-8.") from None
-    except json.JSONDecodeError as fel:
-        raise KassafilFel(
-            var + " är inte giltig JSON (rad " + str(fel.lineno) + ", tecken " + str(fel.colno) + ")."
-        ) from None
-    except BankfilFel as fel:  # dubbla nycklar, från _inga_dubbla_nycklar
-        raise KassafilFel(var + ": " + str(fel) + ".") from None
-    except RecursionError:
-        raise KassafilFel(
-            var + " är inte giltigt: för många hakparenteser eller klammerparenteser inuti varandra."
-            " Ett kassaformat har bara tre nivåer. Filen är troligen trasig."
-        ) from None
+    innehall, var = ladda_json(sokvag, KASSAFIL)
     return _kontrollera_kassaformat(innehall, var)
 
 
 # --- Inläsning ---
 
-def _avkoda(data):
-    """Returnerar filens text. Provar UTF-8 först och Windows-1252 sedan."""
-    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
-        raise KassafilFel(
-            "Kassafilen stoppas: filen är sparad som UTF-16 (\"Unicode-text\"), som inte stöds."
-            " Exportera Z-rapporten från kassan igen, eller spara den som UTF-8 eller CSV."
-        )
-    try:
-        return data.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        pass
-    try:
-        return data.decode("cp1252")
-    except UnicodeDecodeError:
-        raise KassafilFel("Kassafilen stoppas: teckenkodningen är varken UTF-8 eller Windows-1252.") from None
-
-
-def _inga_otillatna_tecken(text):
-    """Stoppar filen om den innehåller NUL, ett annat styrtecken än tabb, \\n och \\r, eller U+2028/U+2029."""
-    if "\x00" in text:
-        filrad = len(_RADSLUT.findall(text, 0, text.index("\x00"))) + 1
-        raise KassafilFel(
-            "Kassafilen stoppas: rad " + str(filrad) + " i filen innehåller ett NUL-tecken"
-            " (tecken nummer 0). Filen är troligen trasig eller sparad i fel format."
-        )
-    fynd = _OTILLATNA_TECKEN.search(text)
-    if fynd:
-        filrad = len(_RADSLUT.findall(text, 0, fynd.start())) + 1
-        raise KassafilFel(
-            "Kassafilen stoppas: rad " + str(filrad) + " i filen innehåller tecknet U+"
-            + format(ord(fynd.group()), "04X") + ", som är ett styrtecken eller en ovanlig radbrytning."
-            + " Sådana tecken finns inte i en vanlig Z-rapport, och de kan få raderna att delas fel."
-        )
-
-
 def _las_rubrikrad(rad, kassaformat):
     """Returnerar (avgränsare, kolumnernas plats, antal kolumner) för filens första rad."""
     kolumner = kassaformat["kolumner"]
-    for avgransare in kassaformat["avgransare"]:
-        try:
-            falt = [f.strip() for f in next(csv.reader([rad], delimiter=avgransare), [])]
-        except csv.Error:
-            continue
-        if all(namn in falt for namn in kolumner.values()):
-            dubbletter = [namn for namn in kolumner.values() if falt.count(namn) > 1]
-            if dubbletter:
-                raise KassafilFel(
-                    "Kassafilen stoppas: rubrikraden har kolumnen " + repr(dubbletter[0]) + " flera gånger."
-                )
-            return avgransare, {nyckel: falt.index(namn) for nyckel, namn in kolumner.items()}, len(falt)
+    rubrik = rubrikens_falt(rad, kassaformat["avgransare"], kolumner)
+    if rubrik:
+        avgransare, falt = rubrik
+        dubbletter = [namn for namn in kolumner.values() if falt.count(namn) > 1]
+        if dubbletter:
+            raise KassafilFel(
+                "Kassafilen stoppas: rubrikraden har kolumnen " + repr(dubbletter[0]) + " flera gånger."
+            )
+        return avgransare, {nyckel: falt.index(namn) for nyckel, namn in kolumner.items()}, len(falt)
     raise KassafilFel(
         "Kassafilen stoppas: första raden i filen ska vara en rubrikrad med kolumnerna "
         + ", ".join(kolumner.values()) + "."
     )
 
 
-def _tolka_datum(text, kolumn, var):
-    if _DATUM.fullmatch(text):
-        try:
-            dt.date.fromisoformat(text)
-            return text
-        except ValueError:
-            pass
-    raise KassafilFel(var + " har ett ogiltigt datum i kolumnen " + repr(kolumn) + ": " + repr(text) + ".")
-
-
-def _tolka_ore(text, kolumn, var):
-    try:
-        return tolka_belopp(text)
-    except ValueError:
-        raise KassafilFel(var + " har ett ogiltigt belopp i kolumnen " + repr(kolumn) + ": " + repr(text) + ".") from None
-
-
 def _tolka_heltal(text, kolumn, var):
-    if not _HELTAL.fullmatch(text):
+    if not HELTAL.fullmatch(text):
         raise KassafilFel(var + " har ett ogiltigt heltal i kolumnen " + repr(kolumn) + ": " + repr(text) + ".")
     return int(text)
 
 
 def _tolka_znummer(text, kolumn, var):
     """Z-numret som heltal. Fler än ZNUMMER_HOGST_SIFFROR siffror stoppar filen (H1)."""
-    if not _HELTAL.fullmatch(text):
+    if not HELTAL.fullmatch(text):
         raise KassafilFel(var + " har ett ogiltigt heltal i kolumnen " + repr(kolumn) + ": " + repr(text) + ".")
     siffror = text.lstrip("0") or "0"
     if len(siffror) > ZNUMMER_HOGST_SIFFROR:
@@ -415,18 +298,6 @@ def _kassaregister_i_listan(text, kassaformat, kolumn, var):
     )
 
 
-def _csv_fel(fel, var):
-    """Översätter ett fel från csv-läsaren till ett KassafilFel med svenskt meddelande."""
-    if "field larger than field limit" in str(fel):
-        return KassafilFel(
-            var + " har ett fält som är längre än " + str(csv.field_size_limit()) + " tecken. Filen är troligen trasig."
-        )
-    return KassafilFel(
-        var + " kan inte tolkas som CSV, till exempel på grund av ett citattecken i fel läge."
-        + " Teknisk detalj: " + str(fel) + "."
-    )
-
-
 def _rad_id(rad):
     """Stabilt id som bara beror på radens innehåll, inte på filens kodning eller avgränsare."""
     delar = [
@@ -449,8 +320,10 @@ def _tolka_kassarader(data, kassaformat):
     kolumner = kassaformat["kolumner"]
     posttyper = _posttyper(kassaformat)
     kalla_fil = hashlib.sha256(data).hexdigest()
-    text = _avkoda(data)
-    _inga_otillatna_tecken(text)
+    text, _ = avkoda(data, KASSAFIL)
+    if "\x00" in text:
+        raise nul_fel(filrad_for(text, text.index("\x00")), KASSAFIL)
+    inga_otillatna_tecken(text, KASSAFIL)
     textrader = text.splitlines(keepends=True)
     if not textrader:
         raise KassafilFel("Kassafilen stoppas: filen är tom.")
@@ -458,29 +331,7 @@ def _tolka_kassarader(data, kassaformat):
 
     resultat = []
     sedda = {}  # (postnamn, sats) -> filrad, för att hitta poster som står två gånger
-    # strict=True: text direkt efter ett citerat fält, som "X"Y, stoppar filen.
-    lasare = csv.reader(textrader[1:], delimiter=avgransare, strict=True)
-    lasta_rader = 0
-    while True:
-        filrad = 2 + lasta_rader  # raden i filen där posten börjar
-        var = "Kassafilen stoppas: rad " + str(filrad) + " i filen"
-        try:
-            falt = next(lasare)
-        except StopIteration:
-            break
-        except csv.Error as fel:
-            raise _csv_fel(fel, var) from None
-        lasta_rader = lasare.line_num
-        if not falt or all(not f.strip() for f in falt):
-            continue  # tom rad
-        for index, faltet in enumerate(falt):
-            if any(tecken in faltet for tecken in _RADBRYTNINGAR):
-                raise KassafilFel(
-                    var + " har en radbrytning inuti fält nummer " + str(index + 1)
-                    + ". Det beror troligen på ett citattecken i fel läge, som kan slå ihop flera rader till en."
-                )
-        if len(falt) != antal_kolumner:
-            raise KassafilFel(var + " har " + str(len(falt)) + " fält, men rubrikraden har " + str(antal_kolumner) + ".")
+    for filrad, var, falt in csv_rader(textrader[1:], 2, avgransare, antal_kolumner, KASSAFIL):
         varde = {nyckel: falt[index].strip() for nyckel, index in plats.items()}
 
         postnamn = varde["postnamn"]
@@ -511,13 +362,13 @@ def _tolka_kassarader(data, kassaformat):
         sedda[nyckel] = filrad
 
         rad = {
-            "rapportdatum": _tolka_datum(varde["rapportdatum"], kolumner["rapportdatum"], var),
+            "rapportdatum": tolka_datum(varde["rapportdatum"], kolumner["rapportdatum"], var, KASSAFIL),
             "znummer": _tolka_znummer(varde["znummer"], kolumner["znummer"], var),
             "kassaregister": kassaregister,
             "postnamn": postnamn,
             "posttyp": posttyp,
             "sats": sats,
-            "belopp_ore": _tolka_ore(varde["belopp"], kolumner["belopp"], var),
+            "belopp_ore": tolka_ore(varde["belopp"], kolumner["belopp"], var, KASSAFIL),
             "kalla_fil": kalla_fil,
             "filrad": filrad,
         }
@@ -687,17 +538,7 @@ def las_kassafil(sokvag, kassaformat):
     och filrad (raden i filen).
     """
     kassaformat = _kontrollera_kassaformat(kassaformat, "Kassaformatet")
-    try:
-        with open(sokvag, "rb") as fil:
-            data = fil.read()
-    except FileNotFoundError:
-        raise KassafilFel("Kassafilen stoppas: filen finns inte: " + str(sokvag) + ".") from None
-    except IsADirectoryError:
-        raise KassafilFel("Kassafilen stoppas: " + str(sokvag) + " är en mapp, inte en fil.") from None
-    except OSError as fel:
-        raise KassafilFel(
-            "Kassafilen stoppas: filen " + str(sokvag) + " går inte att läsa (" + (fel.strerror or str(fel)) + ")."
-        ) from None
+    data = las_fil(sokvag, KASSAFIL)
     rader = _tolka_kassarader(data, kassaformat)
     filnamn = str(sokvag).replace("\\", "/").rsplit("/", 1)[-1]
     kontrollera_z_rapport(rader, filnamn, kassaformat)

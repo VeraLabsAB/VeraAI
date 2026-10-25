@@ -170,3 +170,23 @@ def test_kassanamn_kontrollen_hittar_inbyggda_namn(tmp_path):
         "x.py:5 har textsträngen 'post'",
         "x.py:7 innehåller 'summa_brutto'",
     ]
+
+
+# --- De gemensamma skydden i inlasning_skydd.py ---
+
+def test_karnan_soker_aven_i_inlasning_skydd():
+    # Skydd: alla sökningar ovan (företagsnamn, organisationsnummer, bankformatens kolumnnamn och
+    # kassaformatens namn) går igenom karnans_filer(). Den gemensamma modulen ska vara en av dem.
+    assert SCRIPTS / "inlasning_skydd.py" in karnans_filer()
+
+
+def test_inlasning_skydd_namner_ingen_sorts_fil():
+    """De gemensamma skydden vet inte vilken sorts fil de läser.
+
+    Allt som skiljer bankfilen och Z-filen åt, som felklass och vad filen kallas, kommer in som en
+    Filsort från las_bank.py och las_kassa.py. Själva modulen får inte nämna bank, kassa eller
+    Z-rapport någonstans, inte ens i kommentarer.
+    """
+    text = (SCRIPTS / "inlasning_skydd.py").read_text(encoding="utf-8").casefold()
+    fynd = [ord for ord in ("bank", "kassa", "z-rapport", "z-fil") if ord in text]
+    assert not fynd, "inlasning_skydd.py nämner " + ", ".join(map(repr, fynd))
