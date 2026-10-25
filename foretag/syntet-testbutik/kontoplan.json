@@ -1,0 +1,27 @@
+{
+  "anteckning": "SYNTETISK kontoplan för Syntet Testbutik AB. Numren liknar BAS men är INTE verifierade. Ska kontrolleras av en redovisningskonsult och mot kundens bokföringsprogram.",
+  "status": "SYNTETISK",
+  "konton": [
+    {"nummer": "1580", "namn": "Avräkning kortinlösen"},
+    {"nummer": "1581", "namn": "Avräkning Swish"},
+    {"nummer": "1910", "namn": "Kassa"},
+    {"nummer": "1940", "namn": "Företagskonto"},
+    {"nummer": "2440", "namn": "Leverantörsskulder"},
+    {"nummer": "2611", "namn": "Utgående moms, sats 25"},
+    {"nummer": "2621", "namn": "Utgående moms, sats 12"},
+    {"nummer": "2641", "namn": "Ingående moms"},
+    {"nummer": "3001", "namn": "Försäljning, övrigt"},
+    {"nummer": "3002", "namn": "Försäljning, livsmedel"},
+    {"nummer": "4010", "namn": "Inköp av varor"},
+    {"nummer": "5460", "namn": "Förbrukningsmaterial"},
+    {"nummer": "6071", "namn": "Representation"},
+    {"nummer": "6310", "namn": "Företagsförsäkringar"},
+    {"nummer": "6570", "namn": "Bank- och kortavgifter"}
+  ],
+  "roller": {
+    "bank": "1940",
+    "leverantorsskulder": "2440",
+    "ingaende_moms": "2641",
+    "utgaende_moms_per_sats": {"25": "2611", "12": "2621"}
+  }
+}

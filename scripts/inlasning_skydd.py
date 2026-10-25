@@ -13,6 +13,9 @@ ligger därför här:
   många fält som rubrikraden. Datum och belopp tolkas på samma sätt i alla filer.
 - JSON-formatet: filen läses som UTF-8, dubbla nycklar, för djup nästling och heltal med fler än
   15 siffror stoppas, och nycklar, kolumnnamn och avgränsare kontrolleras.
+- Värden i ett JSON-format (för kontoplanen och momssatserna): dolda tecken var som helst i filen,
+  även i nycklar och anteckningar, stoppar filen. Text, heltal och datum kontrolleras med samma
+  meddelanden i alla format.
 
 Modulen vet inte vilken sorts fil den läser. Allt som skiljer i felmeddelandena (vilken felklass
 som kastas och vad filen kallas) kommer från en _Filsort, som varje inläsningsmodul skapar själv.
@@ -34,6 +37,7 @@ from pathlib import PurePath
 from typing import NamedTuple
 
 from belopp import tolka_belopp
+from normalisering import normalisera_for_jamforelse as _jamforbar
 
 
 class _Filsort(NamedTuple):
@@ -234,6 +238,88 @@ def _kontrollera_avgransare(avgransare, kolumner, var, filsort):
     if any(tecken in namn for tecken in avgransare for namn in kolumner.values()):
         raise filsort.fel(var + ": ett kolumnnamn innehåller en av avgränsarna.")
     return list(avgransare)
+
+
+# --- Värden i ett JSON-format ---
+
+_JSON_TYPER = {str: "text", int: "heltal", float: "decimaltal", bool: "true eller false", type(None): "null",
+               list: "en lista", dict: "ett objekt"}
+
+
+def _json_typ(varde):
+    """Vad ett värde ur ett JSON-format är, för ett felmeddelande, till exempel "decimaltal"."""
+    return _JSON_TYPER.get(type(varde), type(varde).__name__)
+
+
+def _ar_dolt_tecken(tecken):
+    """True för ett tecken som inte syns, utom vanligt mellanslag.
+
+    Det gäller allt som normaliseringen för jämförelser tar bort (normalisering.py): blanksteg
+    utom vanligt mellanslag, styrtecken, osynliga formattecken (bland dem riktningstecknen) och
+    tecken som ser tomma ut. Dessutom halva tecken (kategori Cs), som inte är giltig Unicode.
+    """
+    if tecken == " ":
+        return False
+    return unicodedata.category(tecken) == "Cs" or not _jamforbar(tecken)
+
+
+def _inga_dolda_tecken_i_json(data, var, filsort, plats=""):
+    """Stoppar formatet om en text någonstans i det, även en nyckel, innehåller ett dolt tecken.
+
+    Ett tecken som har skrivits som kod i JSON (till exempel "\\u200b") blir ett riktigt tecken när
+    filen har lästs, och stoppas därför också. plats är var i formatet texten står, för meddelandet.
+    """
+    if isinstance(data, dict):
+        for nyckel, varde in data.items():
+            _inga_dolda_tecken_i_json(nyckel, var, filsort, plats + " nyckeln " + repr(nyckel))
+            _inga_dolda_tecken_i_json(varde, var, filsort, plats + " " + repr(nyckel))
+    elif isinstance(data, list):
+        for nummer, varde in enumerate(data, start=1):
+            _inga_dolda_tecken_i_json(varde, var, filsort, plats + " nummer " + str(nummer))
+    elif isinstance(data, str):
+        dolda = [tecken for tecken in data if _ar_dolt_tecken(tecken)]
+        if dolda:
+            raise filsort.fel(
+                var + ":" + (plats or " texten") + " innehåller tecknet U+" + format(ord(dolda[0]), "04X")
+                + ", som inte syns (ett styrtecken, ett osynligt tecken eller ett ovanligt blanksteg). Sådana"
+                " tecken kan dölja eller ändra text och får inte finnas någonstans i filen."
+            )
+
+
+def _text_i_json(varde, vad, var, filsort):
+    """En text som inte är tom och inte har blanksteg först eller sist. Returnerar den."""
+    if not isinstance(varde, str):
+        raise filsort.fel(var + ": " + vad + " ska vara text, inte " + _json_typ(varde) + ".")
+    if not varde.strip():
+        raise filsort.fel(var + ": " + vad + " får inte vara tom.")
+    if varde != varde.strip():
+        raise filsort.fel(var + ": " + vad + " får inte ha blanksteg först eller sist.")
+    return varde
+
+
+def _heltal_i_json(varde, vad, lagst, hogst, var, filsort):
+    """Ett heltal från lagst till och med hogst. true/false, decimaltal och text stoppas. Returnerar det."""
+    # type() i stället för isinstance(), eftersom True och False räknas som heltal i Python.
+    if type(varde) is not int:
+        raise filsort.fel(var + ": " + vad + " ska vara ett heltal, inte " + _json_typ(varde) + ".")
+    if not lagst <= varde <= hogst:
+        raise filsort.fel(
+            var + ": " + vad + " ska vara från " + str(lagst) + " till och med " + str(hogst) + ", inte "
+            + str(varde) + "."
+        )
+    return varde
+
+
+def _datumtext(varde, vad, var, filsort):
+    """Ett giltigt datum som text, ÅÅÅÅ-MM-DD. Returnerar det som text."""
+    if isinstance(varde, str) and _DATUM.fullmatch(varde):
+        try:
+            dt.date.fromisoformat(varde)
+            return varde
+        except ValueError:
+            pass
+    visas = repr(varde) if isinstance(varde, str) else _json_typ(varde)
+    raise filsort.fel(var + ": " + vad + " ska vara ett giltigt datum som text, ÅÅÅÅ-MM-DD, inte " + visas + ".")
 
 
 # --- Filen: teckenkodning och styrtecken ---

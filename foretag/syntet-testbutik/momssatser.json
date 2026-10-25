@@ -1,0 +1,16 @@
+{
+  "anteckning": "SYNTETISKA momssatser för Syntet Testbutik AB, utlästa ur testdata/README.md. INTE verifierade mot Skatteverket eller en redovisningskonsult (Ö3, Ö-T2).",
+  "status": "SYNTETISK",
+  "varugrupper": {
+    "livsmedel": [
+      {"fran": "2025-01-01", "till": null, "sats": 12, "kalla": "SYNTETISK, testdata/README.md"}
+    ],
+    "ovrigt": [
+      {"fran": "2025-01-01", "till": null, "sats": 25, "kalla": "SYNTETISK, testdata/README.md"}
+    ],
+    "momsfritt": [
+      {"fran": "2025-01-01", "till": null, "sats": 0, "kalla": "SYNTETISK. Öppen fråga: moms på försäkring"}
+    ]
+  },
+  "moms_tolerans_ore_per_rad": 1
+}

@@ -13,13 +13,19 @@ En genväg är en funktion som läser en fil men hoppar över en kontroll:
   seriekontrollen, och Kassaperiodens inre (_rapporter m.fl.) är raderna som summeras,
 - las_underlag._las_underlagsfil hoppar över kontrollen av dubbla id och K4 (dubbletter), och
   las_underlag._PERIODNYCKEL skapar en Underlagsperiod med vilka underlag som helst. Periodens inre
-  (_underlag, _arenden) är underlagen och ärendena.
+  (_underlag, _arenden) är underlagen och ärendena,
+- las_kontoplan och las_momssatser: _kontrollera_konto, _kontrollera_period och de andra
+  delkontrollerna gör var sin del av kontrollerna och hoppar över resten (till exempel överlapp och
+  glapp mellan perioder). _KONTOPLANSNYCKEL och _MOMSNYCKEL skapar en Kontoplan eller Momssatser
+  med vilket innehåll som helst, och deras inre (_konton, _roller, _varugrupper m.fl.) är det som
+  uppslagen läser.
 
-All annan kod ska läsa filer med las_bankfil, las_kassafil, las_kassaperiod och
-las_underlagsperiod, som alltid kör alla kontroller, summera med summa_per_momssats, som bara
+All annan kod ska läsa filer med las_bankfil, las_kassafil, las_kassaperiod,
+las_underlagsperiod, las_kontoplan och las_momssatser, som alltid kör alla kontroller, summera med summa_per_momssats, som bara
 tar emot en Kassaperiod, och matcha med matcha_period, som bara tar emot en Bankperiod. Bara inläsningsmodulerna själva (UNDANTAGNA) och testerna får använda
-genvägarna. En ny inläsningsmodul måste läggas till i UNDANTAGNA med flit. las_matchningsformat.py
-läser matchning.json med de gemensamma skydden och är därför en inläsningsmodul. matcha_bank.py
+genvägarna. En ny inläsningsmodul måste läggas till i UNDANTAGNA med flit. las_matchningsformat.py,
+las_kontoplan.py och las_momssatser.py läser JSON-format med de gemensamma skydden och är därför
+inläsningsmoduler. matcha_bank.py
 läser inga filer och är inte undantagen: förbudet gäller den som alla andra kärnfiler.
 
 Kontrollen läser koden med Pythons ast-modul, alltså som Python själv ser den, och inte som text.
@@ -39,10 +45,17 @@ SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 
 # Filer i scripts/ som får använda genvägarna: inläsningsmodulerna själva.
-UNDANTAGNA = ("las_bank.py", "las_kassa.py", "las_underlag.py", "las_matchningsformat.py", "inlasning_skydd.py")
+UNDANTAGNA = ("las_bank.py", "las_kassa.py", "las_underlag.py", "las_matchningsformat.py", "las_kontoplan.py",
+              "las_momssatser.py", "inlasning_skydd.py")
 SKYDDSMODUL = "inlasning_skydd"
-INLASNINGSMODULER = ("las_bank", "las_kassa", "las_underlag", "las_matchningsformat")
-GENVAGAR = ("_tolka_rader", "_tolka_kassarader", "_las_underlagsfil")
+INLASNINGSMODULER = ("las_bank", "las_kassa", "las_underlag", "las_matchningsformat", "las_kontoplan", "las_momssatser")
+GENVAGAR = ("_tolka_rader", "_tolka_kassarader", "_las_underlagsfil",
+            # Kontoplanens och momsfilens delkontroller, och kontrollerna som ger ett ofryst resultat
+            "_kontrollera_kontoplan", "_kontrollera_konton", "_kontrollera_konto", "_kontrollera_roller",
+            "_kontrollera_momssatser", "_kontrollera_perioder", "_kontrollera_period")
+# Nycklarna som skapar en Kontoplan eller Momssatser, och det som ligger i dem.
+KONFIGURATIONENS_INRE = ("_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_status", "_konton", "_roller", "_varugrupper",
+                         "_tolerans_ore_per_rad")
 # Det inre i en Kassaperiod, en Underlagsperiod och en Bankperiod: nyckeln som skapar en (den heter
 # _PERIODNYCKEL i alla tre modulerna), och det som ligger i den.
 PERIODENS_INRE = ("_PERIODNYCKEL", "_rapporter", "_fran_datum", "_till_datum", "_underlag", "_arenden", "_rader",
@@ -100,7 +113,8 @@ def namn_som_leder_till_genvagar(inlasningsmodul, forbjudna):
 
 def forbjudna_namn(mapp=SCRIPTS):
     """Alla namn som leder till en genväg: genvägarna, byggstenarna och deras alias."""
-    forbjudna = set(GENVAGAR) | set(PERIODENS_INRE) | {SKYDDSMODUL} | toppnamn(mapp / (SKYDDSMODUL + ".py"))
+    forbjudna = (set(GENVAGAR) | set(PERIODENS_INRE) | set(KONFIGURATIONENS_INRE) | {SKYDDSMODUL}
+                 | toppnamn(mapp / (SKYDDSMODUL + ".py")))
     for modul in INLASNINGSMODULER:
         forbjudna |= namn_som_leder_till_genvagar(mapp / (modul + ".py"), forbjudna)
     return forbjudna
@@ -208,7 +222,10 @@ def test_i1_de_forbjudna_namnen_hittas():
                  "_TILLATNA_AVGRANSARE", "_HELTAL", "_RADBRYTNINGAR", "_RIKTNINGSTECKEN", "_ar_sokvag", "_DATUM",
                  "_sokvagens_typ", "_PERIODNYCKEL", "_rapporter", "_las_underlagsfil", "_underlag", "_arenden",
                  "_DubbelNyckel", "_inga_dubbla_nycklar", "_UNDERLAGSFIL", "_rader", "_ingaende_saldo_ore",
-                 "_utgaende_saldo_ore"]:
+                 "_utgaende_saldo_ore", "_inga_dolda_tecken_i_json", "_text_i_json", "_heltal_i_json", "_datumtext",
+                 "_ar_dolt_tecken", "_json_typ", "_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_konton", "_roller",
+                 "_varugrupper", "_status", "_tolerans_ore_per_rad", "_kontrollera_konto", "_kontrollera_period",
+                 "_kontrollera_perioder", "_KONTOPLAN", "_MOMSSATSER"]:
         assert namn in forbjudna, namn
     # Det som annan kod ska använda är inte förbjudet.
     for namn in ["las_bankfil", "las_kassafil", "las_kassaperiod", "Kassaperiod", "ladda_bankformat",
@@ -216,8 +233,25 @@ def test_i1_de_forbjudna_namnen_hittas():
                  "BankfilFel", "KassafilFel", "rapporter", "fran_datum", "till_datum", "las_underlagsperiod",
                  "Underlagsperiod", "UnderlagFilFel", "underlag", "arenden", "ladda_matchningsformat",
                  "kontrollera_matchningsformat", "MatchningsformatFel", "matcha_period", "MatchningFel",
-                 "Bankperiod", "sla_ihop_bankperioder", "rader", "ingaende_saldo_ore", "utgaende_saldo_ore"]:
+                 "Bankperiod", "sla_ihop_bankperioder", "rader", "ingaende_saldo_ore", "utgaende_saldo_ore",
+                 "las_kontoplan", "Kontoplan", "KontoplanFel", "kontots_namn", "rollens_konto", "utgaende_moms_konto",
+                 "konton", "status", "las_momssatser", "Momssatser", "MomssatsFel", "sats", "period", "varugrupper",
+                 "tolerans_ore_per_rad", "ROLLER", "HOGSTA_SATS"]:
         assert namn not in forbjudna, namn
+
+
+def test_konfigurationens_inre_finns_i_modulerna_och_ar_forbjudet():
+    # Skydd: nycklarna, det inre och delkontrollerna ska verkligen heta så i las_kontoplan.py och
+    # las_momssatser.py. Annars förbjuder testerna namn som ingen använder, medan det verkliga heter något annat.
+    import las_kontoplan
+    import las_momssatser
+
+    toppnamn_i_modulerna = toppnamn(SCRIPTS / "las_kontoplan.py") | toppnamn(SCRIPTS / "las_momssatser.py")
+    assert {"_KONTOPLANSNYCKEL", "_MOMSNYCKEL"} <= toppnamn_i_modulerna
+    assert {namn for namn in GENVAGAR if namn.startswith("_kontrollera_")} <= toppnamn_i_modulerna
+    inre = set(las_kontoplan.Kontoplan.__slots__) | set(las_momssatser.Momssatser.__slots__)
+    assert inre | {"_KONTOPLANSNYCKEL", "_MOMSNYCKEL"} == set(KONFIGURATIONENS_INRE)
+    assert set(KONFIGURATIONENS_INRE) <= forbjudna_namn()
 
 
 def test_i1_underlagets_genvagar_finns_i_modulen():
@@ -294,10 +328,13 @@ def test_inlasningsmodulerna_har_inga_byggstenar_under_offentligt_namn():
     import las_kassa
     import las_underlag
 
+    import las_kontoplan
     import las_matchningsformat
+    import las_momssatser
     import matcha_bank
 
-    assert offentliga_namn_for_byggstenar([las_bank, las_kassa, las_underlag, las_matchningsformat, matcha_bank]) == []
+    assert offentliga_namn_for_byggstenar([las_bank, las_kassa, las_underlag, las_matchningsformat, matcha_bank,
+                                           las_kontoplan, las_momssatser]) == []
 
 
 def test_kontrollen_hittar_byggstenar_under_offentligt_namn_nar_programmet_kor():
@@ -359,6 +396,12 @@ def projekt(tmp_path):
         "def _las_underlagsfil(sokvag): ...\n_PERIODNYCKEL = object()\n", encoding="utf-8")
     (tmp_path / "las_matchningsformat.py").write_text(
         "from inlasning_skydd import _ladda_json\ndef ladda_matchningsformat(sokvag): ...\n", encoding="utf-8")
+    (tmp_path / "las_kontoplan.py").write_text(
+        "from inlasning_skydd import _ladda_json\n_KONTOPLANSNYCKEL = object()\ndef las_kontoplan(sokvag): ...\n",
+        encoding="utf-8")
+    (tmp_path / "las_momssatser.py").write_text(
+        "from inlasning_skydd import _ladda_json\n_MOMSNYCKEL = object()\ndef las_momssatser(sokvag): ...\n",
+        encoding="utf-8")
     (tmp_path / "inlasning_skydd.py").write_text("def _las_fil(sokvag, filsort): ...\n", encoding="utf-8")
     (tmp_path / "belopp.py").write_text("def tolka_belopp(text): ...\n", encoding="utf-8")
     return tmp_path
@@ -495,6 +538,52 @@ def test_i1_kontrollen_hittar_genvagar_forbi_bankperiodens_skydd(projekt, kod):
     (projekt / "rapport.py").write_text(kod, encoding="utf-8")
     fynd = genvagar_i(projekt)
     assert fynd and all(rad.startswith("rapport.py:") for rad in fynd), fynd
+
+
+# Genvägar förbi kontoplanens och momsfilens kontroller. las_kontoplan.py och las_momssatser.py är
+# undantagna, men förbudet gäller alla andra kärnfiler.
+KONFIGURATIONENS_GENVAGSKOD = {
+    "kontoplanens_nyckel": "from las_kontoplan import _KONTOPLANSNYCKEL\n",
+    "kontoplanens_nyckel_attribut": ("import las_kontoplan as k\n"
+                                     "p = k.Kontoplan(k._KONTOPLANSNYCKEL, 'x', {}, {})\n"),
+    "kontoplanens_nyckel_getattr": "import las_kontoplan\nn = getattr(las_kontoplan, '_KONTOPLANS' + 'NYCKEL')\n",
+    "kontoplanens_konton": "def f(plan):\n    return plan._konton\n",
+    "kontoplanens_roller_setattr": "def f(plan):\n    object.__setattr__(plan, '_roller', {})\n",
+    "kontoplanens_delkontroll": "from las_kontoplan import _kontrollera_konto\n",
+    "kontoplanens_delkontroll_attribut": "import las_kontoplan\nk = las_kontoplan._kontrollera_roller({}, {}, 'x')\n",
+    "kontoplanens_kontroll_utan_frysning": "from las_kontoplan import _kontrollera_kontoplan\n",
+    "kontoplanens_byggsten": "from las_kontoplan import _ladda_json\n",
+    "kontoplanens_stjarna": "from las_kontoplan import *\n",
+    "momsfilens_nyckel": "from las_momssatser import _MOMSNYCKEL\n",
+    "momsfilens_nyckel_attribut": "import las_momssatser as m\ns = m.Momssatser(m._MOMSNYCKEL, 'x', {}, 0)\n",
+    "momsfilens_varugrupper": "def f(satser):\n    return satser._varugrupper\n",
+    "momsfilens_tolerans_getattr": "def f(satser):\n    return getattr(satser, '_tolerans_ore_per_rad')\n",
+    "momsfilens_status": "def f(satser):\n    return satser._status\n",
+    "momsfilens_delkontroll": "from las_momssatser import _kontrollera_period\n",
+    "momsfilens_perioder_utan_overlappskontroll": "import las_momssatser\np = las_momssatser._kontrollera_period({}, 'x', 'y')\n",
+    "momsfilens_kontroll_utan_frysning": "from las_momssatser import _kontrollera_momssatser\n",
+    "momsfilens_byggsten": "from las_momssatser import _datumtext\n",
+    "momsfilens_stjarna": "from las_momssatser import *\n",
+    "nya_byggstenar_direkt": "from inlasning_skydd import _inga_dolda_tecken_i_json\n",
+}
+
+
+@pytest.mark.parametrize("kod", KONFIGURATIONENS_GENVAGSKOD.values(), ids=KONFIGURATIONENS_GENVAGSKOD.keys())
+def test_i1_kontrollen_hittar_genvagar_forbi_kontoplanens_och_momsfilens_kontroller(projekt, kod):
+    (projekt / "rapport.py").write_text(kod, encoding="utf-8")
+    fynd = genvagar_i(projekt)
+    assert fynd and all(rad.startswith("rapport.py:") for rad in fynd), fynd
+
+
+@pytest.mark.parametrize("kod", [
+    "from las_kontoplan import las_kontoplan, Kontoplan, KontoplanFel, ROLLER\n"
+    "plan = las_kontoplan('k.json')\nkonto = plan.rollens_konto('bank', '2025-01-01')\nx = plan.konton\n",
+    "from las_momssatser import las_momssatser, MomssatsFel\nsatser = las_momssatser('m.json')\n"
+    "sats = satser.sats('grupp', '2025-01-01')\nstatus = satser.status\n",
+], ids=["kontoplan", "momssatser"])
+def test_i1_kontoplanen_och_momsfilen_las_pa_ratt_satt_slapps_igenom(projekt, kod):
+    (projekt / "rapport.py").write_text(kod, encoding="utf-8")
+    assert genvagar_i(projekt) == []
 
 
 def test_matchningen_omfattas_av_skyddet():

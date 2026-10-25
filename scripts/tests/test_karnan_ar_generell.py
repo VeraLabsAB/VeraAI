@@ -314,6 +314,106 @@ def test_karnan_innehaller_inga_bankradstexter_eller_regler_ur_matchningen():
     assert not fynd, "Regler ur matchning.json eller texter ur testdatans bankfiler i kärnan:\n" + "\n".join(fynd)
 
 
+# --- Kontoplanen och momsfilen ---
+
+def namn_i_kontoplanerna_och_momsfilerna():
+    """Kontonummer och kontonamn ur alla företags kontoplan.json, och varugrupper ur alla momssatser.json."""
+    namn = set()
+    for fil in sorted(FORETAG.glob("*/kontoplan.json")):
+        data = json.loads(fil.read_text(encoding="utf-8"))
+        for konto in data["konton"]:
+            namn.update([konto["nummer"], konto["namn"]])
+    for fil in sorted(FORETAG.glob("*/momssatser.json")):
+        namn.update(json.loads(fil.read_text(encoding="utf-8"))["varugrupper"])
+    return sorted(namn)
+
+
+def satser_i_momsfilerna():
+    """Alla momssatser större än 0 ur alla företags momssatser.json och kontoplanernas utgående moms."""
+    satser = set()
+    for fil in sorted(FORETAG.glob("*/momssatser.json")):
+        for perioder in json.loads(fil.read_text(encoding="utf-8"))["varugrupper"].values():
+            satser.update(period["sats"] for period in perioder)
+    for fil in sorted(FORETAG.glob("*/kontoplan.json")):
+        satser.update(map(int, json.loads(fil.read_text(encoding="utf-8"))["roller"]["utgaende_moms_per_sats"]))
+    return sorted(satser - {0})
+
+
+def satser_i_filer(filer, satser):
+    """Var momssatserna står i filerna.
+
+    - Ett tal i koden som är lika med en sats ger träff, till exempel sats = 25. Ett tal som är en
+      gräns i en del av en text eller lista (text[:12]) är en längd, inte en momssats, och godtas.
+    - En textsträng i koden som är exakt en sats ger träff, till exempel "12".
+    - En sats med procenttecken efter ger träff var den än står, även i kommentarer, till exempel "12 %".
+    """
+    procent = re.compile(r"(?<![\d.,])(" + "|".join(map(str, satser)) + r")\s?%")
+    fynd = []
+    for fil in filer:
+        kalla = fil.read_text(encoding="utf-8")
+        trad = ast.parse(kalla)
+        i_granser = {id(nod) for del_ in ast.walk(trad) if isinstance(del_, ast.Slice) for nod in ast.walk(del_)}
+        for nod in ast.walk(trad):
+            if not isinstance(nod, ast.Constant) or id(nod) in i_granser:
+                continue
+            if type(nod.value) in (int, float) and nod.value in satser:
+                fynd.append(fil.name + ":" + str(nod.lineno) + " har talet " + repr(nod.value))
+            elif isinstance(nod.value, str) and nod.value.strip() in map(str, satser):
+                fynd.append(fil.name + ":" + str(nod.lineno) + " har textsträngen " + repr(nod.value))
+        for radnummer, rad in enumerate(kalla.splitlines(), start=1):
+            fynd += [fil.name + ":" + str(radnummer) + " innehåller " + repr(traff.group())
+                     for traff in procent.finditer(rad)]
+    return fynd
+
+
+def test_kontoplanerna_och_momsfilerna_har_namn_och_satser_att_soka_efter():
+    # Skydd mot att testerna nedan blir gröna för att de inte hittar några namn eller satser alls.
+    assert {"1940", "2611", "Företagskonto", "Kassa", "livsmedel", "ovrigt", "momsfritt"} <= set(
+        namn_i_kontoplanerna_och_momsfilerna())
+    assert satser_i_momsfilerna() == [12, 25]
+    assert {SCRIPTS / "las_kontoplan.py", SCRIPTS / "las_momssatser.py"} <= set(karnans_filer())
+
+
+def test_karnan_innehaller_inga_konton_eller_varugrupper():
+    """Kontonummer, kontonamn och varugrupper hör till företagets konfiguration (SPEC 2), inte till kärnan.
+
+    Ett kontonummer har siffror och ger träff var det än står, även i kommentarer. Kontonamn och
+    varugrupper ger träff som textsträngar i koden (som kassaformatens namn ovan), så att vanliga ord
+    som "kassa" får stå i förklarande text.
+    """
+    fynd = kassanamn_i_filer(karnans_filer(), namn_i_kontoplanerna_och_momsfilerna(), set())
+    assert not fynd, "Konton eller varugrupper från kontoplanen eller momsfilen i kärnan:\n" + "\n".join(fynd)
+
+
+def test_karnan_innehaller_inga_momssatser():
+    """Momssatserna hör till företagets momsfil (SPEC 2 och 11), inte till kärnan."""
+    fynd = satser_i_filer(karnans_filer(), satser_i_momsfilerna())
+    assert not fynd, "Momssatser i kärnan:\n" + "\n".join(fynd)
+
+
+def test_konto_och_satskontrollerna_hittar_inbyggda_varden(tmp_path):
+    fil = tmp_path / "x.py"
+    fil.write_text(
+        '"""Förklaring om kassa och livsmedel."""\n'
+        'KONTO = "1940"\n'
+        '# bokförs på 2611\n'
+        'x = text[:12]\n'
+        'sats = 25\n'
+        'y = "moms 12 %"\n'
+        'z = "Kassa"\n'
+        'grupp = "livsmedel"\n'
+        'w = 12.0\n'
+        'v = "25"\n'
+        'u = 1250\n',
+        encoding="utf-8",
+    )
+    assert kassanamn_i_filer([fil], namn_i_kontoplanerna_och_momsfilerna(), set()) == [
+        "x.py:2 har textsträngen '1940'", "x.py:7 har textsträngen 'Kassa'", "x.py:8 har textsträngen 'livsmedel'",
+        "x.py:2 innehåller '1940'", "x.py:3 innehåller '2611'"]
+    assert sorted(satser_i_filer([fil], satser_i_momsfilerna())) == [
+        "x.py:10 har textsträngen '25'", "x.py:5 har talet 25", "x.py:6 innehåller '12 %'", "x.py:9 har talet 12.0"]
+
+
 def test_bankradstext_kontrollen_hittar_inbyggda_texter(tmp_path):
     fil = tmp_path / "x.py"
     fil.write_text('# kortinlosen kräver inget underlag\nif rad["referens"].startswith("AVR-"):\n    pass\n'

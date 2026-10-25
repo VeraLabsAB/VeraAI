@@ -87,3 +87,65 @@ För Syntet Testbutik har regeln `bankavgift` gränsen 25000 öre (250 kr), som 
 Saknas en nyckel, finns en okänd nyckel eller är ett värde fel, stoppas inläsningen med ett tydligt fel (`MatchningsformatFel`).
 
 Formatet i `syntet-testbutik/` är **antaget** utifrån testdatan och inte jämfört med en riktig bankfil (Ö5). Det ligger där agenten kan skriva, som bank- och kassaformatet. Flytten till en skyddad mapp hör till spärrsteget (SPEC 7).
+
+## Gemensamt för kontoplan.json och momssatser.json
+
+Formaten är Hugos beslut D17 (DESIGN-regelbok.md avsnitt 2 och 8). Båda filerna läses av en enda funktion var, som alltid kör alla kontroller, och resultatet går inte att ändra efteråt. **Hela filen stoppas vid minsta fel**:
+
+- en okänd eller saknad nyckel,
+- fel typ, till exempel ett decimaltal, en text eller `true` där det ska vara ett heltal, eller ett tal där det ska vara text,
+- ett tomt värde (en tom text, en tom lista eller ett tomt objekt), eller en text med blanksteg först eller sist,
+- ett **dolt tecken** var som helst i filen, även i nycklar och anteckningar: styrtecken (till exempel tabb och radbrytning), osynliga tecken (till exempel U+200B, osynligt mellanslag), riktningstecken, ovanliga blanksteg (till exempel hårt mellanslag) och tecken som ser tomma ut. Det gäller också tecken som skrivits som kod i JSON, till exempel `"​"`. Vanligt mellanslag är tillåtet,
+- en fil som inte är UTF-8, inte är giltig JSON eller har en nyckel två gånger.
+
+Ett **uppslag** (till exempel "vilken sats har livsmedel den 10 februari?") görs alltid för ett datum. Finns inget svar för datumet stoppas uppslaget med ett fel. Vera gissar aldrig ett konto eller en sats.
+
+## kontoplan.json
+
+Företagets konton, och vilka konton som har en **roll** som kärnan behöver känna till. Rollerna behövs eftersom kärnan aldrig får ha ett kontonummer i sin kod (SPEC 2). Läses och kontrolleras av `las_kontoplan` i `scripts/las_kontoplan.py`.
+
+| Nyckel | Krävs | Innehåll |
+|---|---|---|
+| `status` | Ja | Vad filen är, till exempel `"SYNTETISK"`. Visas för människor |
+| `konton` | Ja | Lista med minst ett konto, se nedan |
+| `roller` | Ja | Exakt rollerna `bank`, `leverantorsskulder`, `ingaende_moms` och `utgaende_moms_per_sats`. De tre första pekar på ett konto. `utgaende_moms_per_sats` är ett objekt med minst en momssats och kontot för utgående moms med den satsen, till exempel `{"25": "2611"}`. Satsen skrivs som ett heltal i text, från `"0"` till `"100"`, utan nollor först |
+| `anteckning` | Nej | Fri text för människor. Används inte av koden |
+
+Ett konto:
+
+| Nyckel | Krävs | Innehåll |
+|---|---|---|
+| `nummer` | Ja | Kontonumret som **text**, bara siffrorna 0–9 (högst 15), till exempel `"1940"`. Text och inte ett tal, så att ett konto som börjar med noll behåller nollan |
+| `namn` | Ja | Kontots namn |
+| `fran` | Nej | Första dagen kontot får användas, `ÅÅÅÅ-MM-DD`. Saknas den gäller kontot från början |
+| `till` | Nej | Sista dagen kontot får användas, `ÅÅÅÅ-MM-DD`, eller `null`. Saknas den gäller kontot tills vidare |
+
+Dessutom stoppas filen om samma kontonummer står två gånger, om ett konto slutar före sitt första datum, eller om en roll pekar på ett konto som inte finns i `konton`. Ett uppslag på ett konto som inte finns, eller som inte gäller på datumet, stoppas.
+
+`fran` och `till` för konton finns inte i exemplet i DESIGN-regelbok.md. De är valfria och lades till för att konton ska gälla per datum, som för momssatserna. Testbutikens fil använder dem inte.
+
+## momssatser.json
+
+Vilken momssats varje **varugrupp** (en grupp varor med samma sats, till exempel livsmedel) har, och från och till vilket datum. Läses och kontrolleras av `las_momssatser` i `scripts/las_momssatser.py`. Behövs för kontroll K5 (SPEC 11).
+
+| Nyckel | Krävs | Innehåll |
+|---|---|---|
+| `status` | Ja | Vad filen är, till exempel `"SYNTETISK"`. Visas för människor |
+| `varugrupper` | Ja | Objekt med minst en varugrupp. Namnet får bara ha små bokstäverna a–z, siffror och understreck, och ska börja med en bokstav (så att två namn som ser likadana ut aldrig är olika). Varje varugrupp har en lista med minst en period, se nedan |
+| `moms_tolerans_ore_per_rad` | Ja | Hur många öre momsen på en momsrad får skilja från sats × belopp (K5). Heltal från 0 |
+| `anteckning` | Nej | Fri text för människor. Används inte av koden |
+
+En period:
+
+| Nyckel | Krävs | Innehåll |
+|---|---|---|
+| `fran` | Ja | Första dagen satsen gäller, `ÅÅÅÅ-MM-DD` |
+| `till` | Ja | Sista dagen satsen gäller, `ÅÅÅÅ-MM-DD`, eller `null` om den gäller tills vidare. Bara den sista perioden får ha `null` |
+| `sats` | Ja | Momssatsen i procent, ett **heltal** från 0 till och med 100. Aldrig ett decimaltal |
+| `kalla` | Ja | Varifrån satsen kommer. För en riktig kund ska den peka på ett beslut av en redovisningskonsult |
+
+Perioderna står i tidsordning och ska följa direkt på varandra: nästa period börjar dagen efter att den förra slutar. **Överlapp** (två satser samma dag) och **glapp** (en dag utan sats) stoppar filen. När en sats ändras läggs en ny period till och den gamla får ett slutdatum, så att ett gammalt underlag kontrolleras mot satsen som gällde då.
+
+**Ingen sats i filen är en skatteregel.** Satserna i `syntet-testbutik/` är SYNTETISKA, utlästa ur `testdata/README.md`, och inte verifierade mot Skatteverket eller en redovisningskonsult (Ö3). Kontonumren i `syntet-testbutik/kontoplan.json` liknar BAS men är SYNTETISKA och inte verifierade (D2). Båda filerna är exakt exemplen i DESIGN-regelbok.md avsnitt 2, och ett test kontrollerar det.
+
+Båda filerna ligger där agenten kan skriva, som de andra formatfilerna. Flytten till en skyddad mapp hör till spärrsteget (SPEC 7).
