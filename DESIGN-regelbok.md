@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Förslag**, inte godkänt. Ingen kod finns. Ändrar inget i SPEC.md |
+| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Ingen kod finns. Ändrar inget i SPEC.md |
 | Gäller | Steg 4 i arbetsflödet (SPEC avsnitt 4): kontera enligt företagets regelbok, och kontrollerna K2, K5, K8 och K9 |
 | Exempel | Bara Syntet Testbutik AB och testdatan för 2025-Q1. **Allt är SYNTETISKT** |
 
@@ -690,6 +690,15 @@ konfigurationen.
 | D19 | Värdena för K9 (`minst_historik`, procentgränserna) | 3, 300 %, 33 % |
 | D20 | Att en ny motpart alltid blir ett ärende, att en regel bara kan skärpa företagets gränser, och att bankrader utan underlag aldrig blir nivå A | Ja på alla tre |
 | D21 | Om listan över stängda dagar ska finnas för K8:s varningssignal, och var den ligger | I regelboken, nyckeln `oppettider` |
+
+**Hugos beslut 2026-10-26:**
+
+- **D17:** filformaten och nyckelnamnen i exemplen gäller.
+- **D18:** A-gräns 20 000 kr, B-gräns 40 000 kr, 3 godkännanden innan nivå A.
+- **D19:** K9 med värdena 3 / 300 % / 33 %.
+- **D20:** ny motpart är alltid ett ärende; en regel kan bara skärpa företagets gränser; bankrader utan underlag
+  blir aldrig nivå A.
+- **D21:** lista över stängda dagar för K8 ligger i regelboken under nyckeln `oppettider`.
 
 Det som Hugo bestämmer gäller bara testföretaget och produktens beteende. För en riktig kund ska varje
 konto, sats och metod komma från kunden och dess redovisningskonsult, och stå som källa i konfigurationen.
