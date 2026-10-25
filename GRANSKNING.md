@@ -1422,3 +1422,237 @@ Gjort i en egen session, efter Hugos beslut ovan ("Bankens avgifter slipper unde
 **Kommandon utanför den fasta listan.** Kopiorna för mutationstestet skapades och testsviten kördes i dem med en `for`-slinga, med `printf` för att skriva ut kopians namn, och en gång med `echo`. Testsvitens tid mättes en gång med `time`. Inget av det står på listan i SPEC 7.1, och inget ändrade något i projektet. Kopiorna gjordes med `cp -R`, `git archive` och `tar` i den tillfälliga mappen, och ändringarna i kopiorna gjordes med fil-verktygen.
 
 Testsviten: **1 248 passed**, 0 misslyckade (1 209 före, alltså 39 nya tester i `test_las_matchningsformat.py` och `test_matcha_bank.py`).
+
+## Granskning 5: underlag och matchning mot banken
+
+| | |
+|---|---|
+| Datum | 2026-10-25 |
+| Granskad version | commit c46142f ("Gräns för regler för pengar ut …") |
+| Granskare | Oberoende session som inte sett steg 5 (underlag) och steg 6 (matchning) byggas. Ingen kod eller befintlig fil har ändrats, bara det här avsnittet har lagts till |
+| Underlag | CLAUDE.md, SPEC.md (hela), foretag/README.md, foretag/syntet-testbutik/matchning.json, bankformat.json och kassaformat.json, scripts/las_underlag.py, las_bank.py, matcha_bank.py, las_matchningsformat.py, inlasning_skydd.py, testerna i scripts/tests/, testdata/README.md, facit.json, tidigare granskningar och åtgärdsavsnitt ovan |
+
+### Så gick granskningen till
+
+Allt provande gjordes i en tillfällig mapp utanför projektet. Där lades en ren kopia av commit c46142f (med `git archive` och `tar`) och projektets `.venv` (med `cp -R`). Provskripten skrevs med fil-verktyget som egna testfiler i en andra kopia som bara hade kärnans filer, testdatan och `foretag/`, och kördes med testsvitens kommando inifrån kopian. Varje prov skrev sitt utfall till en textfil: **STOPPAD** (tydligt `UnderlagFilFel`, `MatchningFel`, `MatchningsformatFel` eller `BankfilFel`), **GODKÄND** (resultatet släpptes igenom, med vad som hände) eller **KRASCH** (annat Python-fel). Mutationstesterna gjordes i den rena kopian, en ändring i taget, som återställdes efteråt (`diff -r` mot projektets `scripts/` visar inga skillnader).
+
+**Ord som används nedan.** En **dubblett** är samma underlag inläst två gånger. **Matcha** är att para ihop en bankrad med underlaget som förklarar den. En **kandidat** är ett underlag som kan höra till en bankrad. **Oavstämt** är ett underlag som ingen bankrad har matchats mot, till exempel en obetald faktura. Ett **förväxlingstecken** är ett tecken som ser ut som ett annat men är ett annat tecken i datorn, till exempel ett annat sorts bindestreck (‐ i stället för -) eller ett litet L i stället för en etta. Ett **riktningstecken** är ett osynligt tecken som kan få text att visas i en annan ordning än den är lagrad.
+
+Allvar: **hög** = kan ge fel bokföring, **medel** = onödig krasch eller otydligt fel (eller fel som kräver ovanliga omständigheter), **låg** = kosmetiskt eller kräver avsiktligt skriven kod.
+
+### Sammanfattning av nya fynd
+
+| Nr | Fynd | Allvar |
+|---|---|---|
+| J1 | En dubblett där fakturanumret eller motparten bara *ser* likadan ut (förväxlingstecken, annat bindestreck, mellanslag) fångas inte av K4. Fakturanummerregeln i matchningen matchar sedan originalet, och dubbletten blir ett oavstämt underlag, som en obetald faktura. **Inget ärende någonstans** | **Hög** |
+| J2 | Fakturanummerregeln kan avgöra på ett ord som bara råkar stå i bankradens text (ett kort fakturanummer, ett fakturanummer som är motpartens namn, ett nummer som är en del av ett annat). En verklig tvetydighet blir då en matchning utan ärende | Medel |
+| J3 | Tre riktningstecken släpps igenom: U+200E, U+200F och U+061C. SPEC 7 säger att riktningstecken stoppar filen | Medel |
+| J4 | Ett kort motpartsnamn passar en annan, längre motparts bankrad ("ICA" passar "KORTKOP ICA MAXI"), och en motpart som heter som ett vanligt ord i banktexten passar alla sådana rader | Låg |
+| J5 | Matchningen är kvadratisk: 100 000 bankrader mot 100 000 underlag tar ungefär en kvart, och med samma belopp på alla flera timmar. En momsrad-lista på knappt 1 MB tar 6,6 sekunder | Låg |
+| J6 | Filer i underlagsmappen som inte heter exakt `.json` (till exempel `U-2.JSON`) och undermappar hoppas över utan att det sägs. En namngiven rörledning (FIFO) får inläsningen att stanna för alltid. Symboliska länkar till filer utanför mappen följs | Låg |
+| J7 | En tom `Bankperiod` eller `Underlagsperiod` skapad med `__new__` ger `AttributeError` i stället för `MatchningFel`. Två nya sätt att förfalska eller ändra en Bankperiod (via `inspect` och `gc`) går förbi genvägstestet | Låg (kräver avsiktligt skriven kod) |
+| J8 | Testlucka: att fakturanumret också söks i bankradens *beskrivning* (inte bara referensen) prövas inte av något test (mutation D8) | Låg |
+| J9 | Små brister i meddelanden och regler: K4 nämner bara "olika belopp" när både belopp och datum skiljer; "lägst id" är bokstavsordning (`U-10` före `U-9`); ett bedömningsdatum före bankradens datum godtas; NFC/NFD-filnamn ger ett meddelande med två namn som ser likadana ut; formatet godtar en osynlig utfyllnad (U+3164) som mönster och regelnamnen `swish` och `Swish` samtidigt | Låg |
+| J10 | SPEC: statusraden överst nämner inte ändringarna i 7133f15 och a7cb12f, och SPEC 7 nämner fortfarande bara `las_bankfil` och `las_kassaperiod` som "enda funktion" per källa | Låg (kosmetiskt) |
+
+### Fynd i detalj
+
+#### J1. Dubblett med förväxlingstecken passerar både K4 och matchningen. Allvar: hög
+
+**Vad jag körde (A):** två underlag, `U-1` och `U-2`, med samma motpart (`LEV-A`), samma belopp (125,00 kr) och samma datum. Bara fakturanumret (eller motparten) skilde, på sätt som ser likadant ut eller nästan likadant ut för en människa. Lästes med `las_underlagsperiod`.
+
+| Fakturanummer i U-2 (U-1 har `F-1`) | Utfall |
+|---|---|
+| `f-1`, `F-1 ` (mellanslag sist), `F-1` med U+200B eller mjukt bindestreck, `Ｆ－１` (fullbredd) | Dubblett, ärende "dublett av U-1" (rätt) |
+| `F‐1` (U+2010 bindestreck), `F–1` (U+2013 tankstreck), `F−1` (U+2212 minustecken) | **Båda behålls, inget ärende** |
+| `Ғ-1` (kyrilliskt tecken som liknar F), `F-l` (litet L i stället för 1) | **Båda behålls, inget ärende** |
+| `F 1`, `F1`, `F-01` | **Båda behålls, inget ärende** |
+| Motpart `LEV A`, `LEV-А` (kyrilliskt А), `LEV-A AB` i stället för `LEV-A` | **Båda behålls, inget ärende** |
+
+**Vad jag körde (B):** samma par (`F-1` och `F‐1`, och `F-1` och `F-l`) och en bankrad på −125,00 kr från `LEV-A`.
+
+| Bankradens referens | Utfall |
+|---|---|
+| `F-1` | `U-1` matchad. `U-2` **oavstämd, inget ärende** |
+| `OCR 5555` (inget fakturanummer) | Ärende "tvetydig" med båda (rätt: en människa ser dubbletten) |
+
+**Varför det spelar roll:** K4 finns för att samma faktura inte ska bokföras två gånger. Här säger varken K4 eller matchningen något. Dubbletten ser ut som en obetald faktura från samma leverantör med samma belopp, och kan föreslås bokförd som en andra leverantörsskuld (dubbel kostnad). Fakturanummerregeln gör det värre: utan den hade bankraden blivit "tvetydig" och en människa hade sett de två fakturorna bredvid varandra. Förväxlingar som `1`/`l` och `0`/`O` är vanliga när text läses ur en bild (OCR), och olika bindestreck är vanliga när text kopieras från en PDF.
+
+**Vad som borde hända (förslag, beslut behövs):** K4 bör ge ett ärende, till exempel "möjlig dublett", när två underlag har samma motpart (normaliserad), samma belopp och samma datum, även om fakturanumret skiljer. Båda underlagen behålls, som i K4a och K4b, och en människa avgör. Ett komplement är att normaliseringen av fakturanummer också tar bort skiljetecken och bindestreck av alla slag, men det löser inte `1`/`l`. Det rör inga skatteregler, bara hur strikt dubblettkontrollen ska vara.
+
+#### J2. Fakturanummerregeln kan avgöra på ett ord som råkar stå i texten. Allvar: medel
+
+**Vad jag körde:** två fakturor från samma motpart med samma belopp, båda i tidsfönstret, och en bankrad som betalar en av dem.
+
+| Fakturanummer | Bankradens text | Utfall |
+|---|---|---|
+| `10` och `11` | referens `OCR`, beskrivning `LEV-A 10 ST` | `U-1` (nr 10) matchad, `U-2` oavstämd. Inget ärende |
+| `LEV-A` (fakturanumret är motpartens namn) och `F-2` | referens `OCR 5555`, beskrivning `LEV-A` | `U-1` matchad, utan att bankraden säger något om vilken faktura |
+| `761` och `SYNT-TE-761` | referens `SYNT TE 761` (mellanslag i stället för bindestreck) | `U-1` (nr 761) matchad, fast referensen pekar på den andra |
+| `761` och `SYNT-TE-761` | referens `SYNT-TE-761` | `U-2` matchad (rätt) |
+| `F-1` och `F-10` | referens `F-10` | `U-2` matchad (rätt) |
+
+Regeln väljer rätt i alla fall jag provade där fakturanumret verkligen är bankradens referens, och den gör aldrig två matchningar mot samma underlag eller samma bankrad (se uppgift B). Felet är att ett fakturanummer som bara råkar stå som ett eget ord någonstans i texten räcker. Då blir en verklig tvetydighet (två lika troliga fakturor) en matchning utan ärende, och fel faktura kan markeras som betald. Beloppen är lika, så kassan och banken stämmer ändå, men leverantörsreskontran (listan över vilka fakturor som är betalda) blir fel.
+
+**Vad som borde hända (förslag):** låt fakturanumret avgöra bara när bankradens referens, normaliserad, är exakt fakturanumret, så som i testdatan. Annars "tvetydig".
+
+#### J3. Tre riktningstecken släpps igenom. Allvar: medel
+
+**Vad jag körde:** ett underlag vars motpart innehåller U+200F (höger-till-vänster-märke), U+200E (vänster-till-höger-märke) eller U+061C (arabiskt bokstavsmärke).
+
+**Vad som hände:** GODKÄND i alla tre fallen. U+202A–U+202E och U+2066–U+2069 stoppas (rätt). Unicode räknar tolv tecken som styr textriktningen (egenskapen Bidi_Control): de nio som stoppas plus de tre ovan. Testet `test_riktningstecknen_ar_nio` låser listan vid nio. Bankfilen använder samma lista (`_RIKTNINGSTECKEN` i `inlasning_skydd.py`), så enligt koden gäller samma sak bankradernas beskrivning och referens (inte provkört). Matchningsformatet stoppar dem redan, eftersom alla osynliga tecken stoppas där.
+
+**Varför det spelar roll:** U+200F räknas som en höger-till-vänster-bokstav. Enligt Unicodes regler för textriktning visas till exempel U+200F följt av `123 456` som `456 123` i en vanlig vänster-till-höger-text. Ett fakturanummer eller en beskrivning kan alltså se ut som en annan än den är, vilket är precis det SPEC 7 säger ska stoppas ("kan få en text att visas i en annan ordning än den är lagrad").
+
+**Vad som borde hända:** U+200E, U+200F och U+061C läggs till bland riktningstecknen som stoppar filen, och testet räknar tolv.
+
+#### J4. Kort motpartsnamn passar en annan motparts bankrad. Allvar: låg
+
+**Vad jag körde:** ett underlag på 125,00 kr och en bankrad med samma belopp och datum, men en annan text.
+
+| Underlagets motpart | Bankradens beskrivning | Utfall |
+|---|---|---|
+| `ICA` | `KORTKOP ICA MAXI` | Matchad |
+| `LEV` | `KORTKOP LEV A` | Matchad |
+| `KORTKOP` | `KORTKOP BUTIK-X` | Matchad |
+| `TE` | `LEV T E` | Matchad (orden slås ihop) |
+| `ICA MAXI` | `KORTKOP ICA` | Saknat underlag (rätt) |
+| `LEV-A` | `LEV A`, `LEVA`, `LEV–A`, `KORTKOP*LEV-A`, `LEV-A/STHLM`, `KORTKOP` + U+200B + `LEV-A` | Saknat underlag (säker riktning: blir ett ärende) |
+| `LEV-A` | `lev-a`, `LEV` + U+200B + `-A`, `KORTKOP` + hårt mellanslag + `LEV-A` | Matchad (rätt) |
+
+"Hela ord" stoppar `LEV-TE` mot `LEV-TELE`, som avsett, men inte ett kortare namn som är ett eget ord i ett längre. En fel matchning kräver att beloppet är exakt detsamma på öret och att rätt bankrad för underlaget saknas (finns den blir båda "tvetydig"), så risken är liten. Det är ändå en matchning utan ärende. Förslag: när regelboken finns, jämför motparten mot regelbokens kända motparter, så att en bankrad som också passar en längre motpart blir ett ärende.
+
+#### J5. Kvadratisk tid. Allvar: låg
+
+| Antal bankrader och underlag | Inläsning bank | Inläsning underlag | Matchning |
+|---|---|---|---|
+| 1 000, olika belopp | 0,01 s | 0,07 s | 0,09 s |
+| 4 000, olika belopp | 0,04 s | 0,25 s | 1,23 s |
+| 8 000, olika belopp | 0,08 s | 0,85 s | 5,56 s |
+| 1 000, samma belopp | 0,01 s | 0,08 s | 5,71 s |
+| 2 000, samma belopp | 0,02 s | 0,14 s | 20,26 s |
+| 100 000, olika belopp | 1,0 s | 11,7 s | 1 000 rader mot alla underlag: 9,4 s, alltså ungefär **940 s (16 minuter)** för alla |
+
+Tiden fyrdubblas när antalet fördubblas: `_kandidater` går igenom alla underlag för varje bankrad, och normaliserar bankradens text på nytt för varje underlag med samma belopp. Med samma belopp på alla blir 100 000 ungefär 14 timmar (räknat från 2 000). Ett litet företag har några hundra rader i kvartalet, så det spelar ingen roll i dag. I `las_underlag.py` är kontrollen av dubbla momssatser också kvadratisk: 2 000 momsrader 0,07 s, 10 000 rader 1,75 s, 19 000 rader (920 kB, under gränsen 1 MB) 6,6 s för en enda fil. Förslag: sortera underlagen efter belopp en gång (en ordbok från belopp till underlag), och använd en mängd för momssatserna.
+
+#### J6. Filer som hoppas över, rörledning och länkar. Allvar: låg
+
+| Prov | Utfall |
+|---|---|
+| Mappen har `U-1.json`, `U-2.JSON`, `U-3.json.txt`, `U-4.txt` och `undermapp/U-5.json` | Bara `U-1` läses. **Ingen varning** om de andra |
+| AppleDouble-fil `._U-1.json` (macOS skapar sådana på USB-minnen och nätverksdiskar) | Hela perioden STOPPAD (NUL-tecken), med tydligt meddelande |
+| `U-1.json` är en namngiven rörledning (FIFO) | **Inläsningen stannar** och väntar för alltid på att något skrivs i den |
+| Symbolisk länk till en fil utanför mappen | Filen läses (GODKÄND) |
+| Länk till `/dev/zero`, två länkar som pekar på varandra, trasig länk, mapp som heter `U-1.json`, tom fil, bara BOM, 1 000 001 byte, 50 MB | STOPPAD med tydligt meddelande (rätt) |
+
+Ett underlag som hoppas över blir inte fel bokfört: bankraden blir "saknat underlag" efter 7 dagar. Men den som lade dit `U-2.JSON` får aldrig veta varför. Förslag: lista filer som inte läses (som en varning eller ett ärende), stoppa eller hoppa över allt som inte är en vanlig fil innan den öppnas, och bestäm om länkar ska följas.
+
+#### J7. Tomma eller förfalskade perioder. Allvar: låg
+
+| Prov | Utfall |
+|---|---|
+| `copy.copy`, `copy.deepcopy`, `pickle.dumps` av en Bankperiod | Stoppas (`AttributeError`/`TypeError`) |
+| `__dict__`, `bp._rader = ()`, ändra `bp._rader[0]`, konstruktören utan nyckel, underklass till `matcha_period` | Stoppas, med tydligt fel |
+| `Bankperiod.__new__(Bankperiod)` till `matcha_period` | **KRASCH** `AttributeError: _rader` i stället för `MatchningFel` |
+| `Underlagsperiod.__new__(Underlagsperiod)` till `matcha_period` | **KRASCH** `AttributeError: _underlag` |
+| `object.__setattr__` på en tom Bankperiod, med bara en av två rader och fel saldo | GICK: matchningen tog emot den (känt sedan Bankperiod-åtgärden, och stoppas av genvägstestet i kärnkod) |
+| `inspect.getmembers(Bankperiod)` och `__set__`, utan texten `_rader` och utan `__setattr__` | GICK: en tom Bankperiod gav ett resultat utan rader och utan ärenden |
+| `gc.get_referents` når ordboken bakom en rad i en riktig Bankperiod | GICK: rad 2 ändrades från "saknat underlag" till en insättning, utan att K1 kördes igen |
+| `gc.get_referents` på en post i ett `Matchningsresultat` | GICK: ärendets typ ändrades |
+
+I en kopia lades en ny kärnfil `scripts/rapport.py` med `inspect`- och `gc`-sätten: **alla 1 248 tester gröna**. Genvägstestet hittar dem inte, eftersom inga förbjudna namn eller texter används. Åtgärdsavsnittet säger redan att skyddet "kan kringgås med flit", och båda sätten är tydligt avsiktliga. Förslag: förbjud `gc` och `inspect` i kärnan i genvägstestet, och låt `matcha_period` stoppa en period vars inre saknas med `MatchningFel`.
+
+#### J8. Testlucka för fakturanumret i beskrivningen. Allvar: låg
+
+Se uppgift D, mutation D8. Beskrivningen överst i `matcha_bank.py` säger att fakturanumret söks i "beskrivning eller referens". När sökningen i beskrivningen togs bort var alla 1 248 tester gröna. Om J2 rättas som föreslaget (bara referensen) försvinner luckan. Annars behövs ett test.
+
+#### J9. Små brister. Allvar: låg
+
+- **K4 nämner bara ett fel.** Samma fakturanummer med både annat belopp och annat datum ger bara "samma fakturanummer, olika belopp". Med tre underlag A (125 kr, dag 1), B (5 kr, dag 1) och C (5 kr, dag 2) jämförs C bara med A ("olika belopp"), inte med B, som C skiljer sig från bara i datum. Båda underlagen behålls och ärendet finns, så inget går förlorat.
+- **"Lägst id" är bokstavsordning.** `U-10` behålls och `U-9` blir "dublett av U-10". Testdatans id har nollor först (`SYNT-U-2025-003`), så det märks inte där.
+- **Bedömningsdatum före bankraden.** Bedömningsdatum 2025-02-01 för en bankrad från 2025-03-01 godtas, och raden väntar. Ett bedömningsdatum före bankradens datum är troligen fel och kunde stoppas.
+- **NFC och NFD.** "Ö" kan lagras som ett tecken (NFC) eller som "O" plus två prickar (NFD). Ett underlag med id i NFD i en fil vars namn är i NFC gav: "Underlaget 'Ö-1.json' stoppas: filen ska heta … alltså 'Ö-1.json'." De två namnen ser likadana ut. Gamla Mac-diskar (HFS+) sparar filnamn i NFD.
+- **Matchningsformatet** godtar U+3164 (en osynlig utfyllnad, som inte räknas som osynligt tecken) som mönster, regelnamnen `swish` och `Swish` i samma fil, och tar tyst bort mellanslag sist i ett mönster (`"BANK AVGIFT "` blir `"BANK AVGIFT"`, alltså en något bredare regel). En `anteckning` med riktningstecken eller NUL skrivet som kod godtas, men används inte. Filen har ingen storleksgräns (2 000 regler lästes utan problem).
+- **Momssats över 100 %** godtas (101, 250 och 10^14). Omkastade belopp utan moms och moms (2 500 och 10 000 i stället för 10 000 och 2 500) godtas, eftersom summan stämmer. Båda hör till K5, som inte är byggd.
+- **Helt osynliga motparter** (bara U+3164, U+115F eller U+2800) godtas som icke-tomma. Ofarligt för matchningen (de passar ingen vanlig bankrad), men godkännaren ser en tom motpart.
+
+#### J10. SPEC. Allvar: låg (kosmetiskt)
+
+`git diff 7133f15 HEAD -- SPEC.md` visar en enda ändring: "matchningsformat" i SPEC 7, i commit a7cb12f, som stämmer med åtgärdsavsnittet ("Gjort i SPEC.md (samma commit som det här avsnittet)"). Statusraden överst i SPEC listar ändringarna från tidigare samma dag, men inte K4a, K4b, K13, Ö8–Ö10 (7133f15) eller matchningsformatet (a7cb12f). SPEC 7 säger att varje källa har en enda funktion, "idag `las_bankfil` för banken och `las_kassaperiod` för kassan". `las_underlagsperiod` och `sla_ihop_bankperioder` nämns inte (det senare står redan under "Att tänka på" i Bankperiod-åtgärden).
+
+### Kända luckor (inte nya fynd, kommentarer)
+
+- **SPEC K3** saknar 7 dagar och rader som inte kräver underlag. Bekräftat: koden och `matchning.json` har båda, SPEC inget.
+- **K4a och K4b heter K4 i koden.** Bekräftat: ärendena har `"kontroll": "K4"`. Vid rättningen bör J9 (bara ett av två fel nämns) tas med, eftersom ett underlag kan vara både K4a och K4b.
+- **Bankens avgiftsspecifikation** som öppen fråga saknas i SPEC 11. Bekräftat.
+- **Kreditnotor stoppas.** Bekräftat: alla negativa tal stoppas, även `-1` i momssatsen. `-0` läses som 0 och godtas, vilket är ofarligt.
+- **K4 ser bara perioden.** Bekräftat: ett underlag daterat 2024-12-31 som är en exakt kopia av ett i januari 2025 ger inget ärende när perioden är januari. Gäller också J1: förslaget om "möjlig dublett" bör jämföra mot arkivet när Ö9 byggs.
+- **K17 flaggar inte än.** Bekräftat: texterna lämnas oförändrade och ärendenas texter innehåller inga texter ur bankraderna (`test_saknat_underlag_text_namner_dagarna_men_inga_texter_ur_bankraden` och ärendet "över gräns").
+
+### Uppgift A: övrigt som provades och fungerade
+
+- **Tal:** `1e3`, `1E3`, `1.0`, `12500.00`, `-0.0`, `1e400` (blir oändligt i Python) stoppas som decimaltal. `true`, `"12500"`, `null` och `[12500]` stoppas med sin sort. 15 siffror godtas, 16 stoppas innan talet räknas ut. `0x10`, `+12500` och `012500` är inte giltig JSON och stoppas.
+- **Datum:** periodens första och sista dag räknas med, dagen före och efter gör det inte. 0001-01-01 och 9999-12-31 fungerar. 0000-01-01, 2025-02-29 och fel form stoppas. 2024-02-29 godtas. Period baklänges, `None` och fullbreddssiffror stoppas.
+- **Id och filnamn:** fel stora och små bokstäver i filnamnet stoppas. Två id som bara skiljer i osynligt tecken eller fullbredd stoppar perioden. Id med snedstreck stoppas. Id `.` i filen `..json` godtas (ofarligt).
+- **K4:** tre likadana ger två ärenden "dublett av U-1". Dublett av ett underlag som behölls av K4a fungerar. Typ och momsrader spelar ingen roll för dubbletten (som avsett).
+- **moms:** tom lista stoppas, dubbla satser stoppas, momsrad som lista och `moms` som objekt stoppas.
+- **Texter:** U+202E skrivet som kod stoppas. Andra formattecken (U+2060, U+FFF9, taggtecken U+E0041) godtas, som SPEC 7 säger, och ska visas synligt i rapporten.
+
+### Uppgift B: övrigt som provades och fungerade
+
+- **Fakturanummerregeln** gjorde aldrig två matchningar mot samma underlag. När ett utpekat underlag också passade en annan bankrad blev båda "tvetydig". Två bankrader med samma fakturanummer (dubbelbetalning) blev båda "tvetydig". Två fakturanummer i samma text gav "tvetydig". K4b-paret (samma fakturanummer, samma belopp, olika datum) blev "tvetydig".
+- **Tidsfönster** (testbutikens format): faktura dag 0 och dag 40 matchas, dag 41 och dagen före inte. Kvitto dag 3 matchas, dag 4 inte. **Sju dagar:** dag 7 väntar, dag 8 blir ärende.
+- **Flera med samma belopp:** två underlag och en rad, en rad och två underlag, och korsvis passande par blev alla "tvetydig".
+- **Regler:** en utgående rad med Swish-text och en inkommande rad med avgiftstext kräver underlag. Avgift exakt 250,00 kr kräver inget underlag, 250,01 kr blir "över gräns". 0 kr passar ingen regel. Bara referensen eller dubbla mellanslag i beskrivningen räcker inte. Mellanslag först i bankfilen tas bort av `las_bankfil`, så `" SWISH-1"` räknas som Swish (rätt). En Swish-insättning på 1 000 000 kr kräver inget underlag (ingen gräns för pengar in, öppen fråga för Hugo sedan förra åtgärden).
+- **Invarianter och ordning:** kvartalets 395 bankrader kastades om slumpvis **240 gånger** (skrevs som en ny bankfil med nya radnummer och saldon och lästes med `las_bankfil`), med fyra bedömningsdatum. **Alla 240 gav exakt samma resultat** som originalordningen (jämfört utan radnummer, id och saldo). Dessutom 200 små påhittade fall med många lika belopp, fakturanummer och motparter, var och ett omkastat 10 gånger: **0 skillnader**. I alla körningar fanns varje bankrad i exakt en grupp, varje underlag i högst en matchning, och matchade plus oavstämda var precis periodens underlag.
+- **Matchningsformatet** (48 prov på filen, varav 12 godtogs; av dem är `-0` som antal dagar (blir 0) ofarligt och resten nämns här eller i J9): dubbla nycklar överst och i en regel, nästling 990–200 000, tal med 16 och 100 000 siffror, `1e5`, `NaN` och `Infinity` som gräns och tidsfönster, osynliga tecken och kyrilliska bokstäver i nycklar, U+200B, U+202E, U+200F och NUL i mönster, okända nycklar, utgående regel utan gräns, inkommande regel med gräns, gräns som text och `true`, riktning `UT` och `ut `, tomt mönster och bara mellanslag, krockande regler, en tredje underlagstyp, UTF-16, Windows-1252, NUL-byte och styrtecken: alla STOPPADE med tydligt meddelande. Testbutikens fil, UTF-8 med BOM, tom regellista och gränsen 999 999 999 999 999 godtas (rätt).
+
+### Uppgift C: kontroll mot reglerna
+
+| Kontroll | Resultat |
+|---|---|
+| Företags- och motpartsnamn i `scripts/` (utom `tests/`) | Inga. Sökt efter testbutikens namn, motparter, kassaregister, banknamn och alla mönster i `matchning.json` (`AVR-`, `SWISH-`, `INS-`, `AVG-`, `BET-KORT`, `KORTKOP`, `BANK AVGIFT`). Bara de allmänna orden "kontant" och "Swish-betalningar" i kommentarer. Tal i de nya filerna: 200, 15, 366 (gränser), 40 (hur mycket text som visas i ett fel), 10 (i `10 ** 15`), och exempel i kommentarer. Inga momssatser, konton, belopp eller antal dagar ur `matchning.json` |
+| Flyttal | Inga. "float" och "decimaltal" står bara i tabeller över sorter som stoppas. Ingen division i de nya filerna |
+| Nätverksanrop och körning av kommandon | Inga. Importerna i hela kärnan är `csv`, `datetime`, `hashlib`, `json`, `re`, `unicodedata`, `pathlib`, `types`, `typing` och projektets egna moduler. `open` bara på två ställen i `inlasning_skydd.py`, för läsning |
+| Dolda tecken | Inga i `scripts/` utom `tests/`. I testerna bara synliga fullbreddsbokstäver (med flit, för normaliseringen). I hela kopian (140 filer) inga riktningstecken, ingen BOM, inga CR-radslut. Ett hårt mellanslag (U+00A0) i GRANSKNING.md rad 1025, i en åtgärdstext, ofarligt |
+| SPEC sedan 7133f15 | Bara "matchningsformat" i SPEC 7 (a7cb12f). Stämmer med åtgärdsavsnittet. Se J10 om statusraden |
+| Antal tester enligt slutrapporterna | Egen körning i kopior av varje commit: **1 025** (7133f15), **1 037** (ca6867d, del B), **1 203** (2817f42, del C), **1 209** (e3a618c, Bankperiod), **1 248** (c46142f, gränsen). Alla stämmer med åtgärdsavsnitten, liksom "166 nya" och "39 nya" |
+| Commits | Del A, B och C är 7133f15, ca6867d och 2817f42, som avsnittet säger. Filerna i e3a618c och c46142f stämmer med vad avsnitten säger är ändrat och inte ändrat (SPEC, testdatan och facit orörda i båda) |
+
+### Uppgift D: stickprov på mutationstesterna
+
+I den rena kopian togs en kontroll i taget bort eller gjordes svagare, hela sviten kördes, och ändringen togs tillbaka. Fjorton mutationer, de flesta andra än byggarens egna.
+
+| Nr | Fil | Borttagen eller svagare kontroll | Röda tester |
+|---|---|---|---|
+| D1 | las_underlag.py | Negativa tal godtas | 4 (`test_negativa_tal_stoppas`) |
+| D2 | las_underlag.py | Dubbla id jämförs utan normalisering | 1 (`test_samma_id_i_tva_filer_stoppar_perioden`) |
+| D3 | las_underlag.py | K4 jämför fakturanumret utan normalisering | 5 (`test_k4_jamfor_motpart_och_fakturanummer_efter_normalisering`) |
+| D4 | las_underlag.py | K13 borttagen | 7 (bland dem `test_summan_av_momsraderna_ska_vara_beloppet` och fuzzen) |
+| D5 | las_underlag.py | Samma momssats på flera rader godtas | 1 (`test_trasiga_momsrader_stoppas[samma_sats_tva_ganger]`) |
+| D6 | las_underlag.py | Periodens sista dag räknas inte med | 1 (`test_perioden_raknar_med_forsta_och_sista_dagen`) |
+| D7 | las_underlag.py | K4a och K4b ger inga ärenden | 3 |
+| **D8** | matcha_bank.py | Fakturanumret söks bara i referensen, inte i beskrivningen | **0** (se J8) |
+| D9 | matcha_bank.py | Fakturanumret avgör bara vid tre kandidater eller fler | 7 (bland dem kvartalets tester) |
+| D10 | matcha_bank.py | Tidsfönstrets sista dag räknas inte med | 3 (`test_tidsfonstret_per_underlagstyp`) |
+| D11 | las_matchningsformat.py | Krockkontrollen ser bara på referensen | 1 (`test_regler_som_aldrig_passar_samma_bankrad_godtas`) |
+| D12 | las_matchningsformat.py | 0 dagar godtas inte | 2 |
+| D13 | matcha_bank.py | Motparten får bara vara ett ord | 2 (`test_motparten_i_bankradens_text_matchas`) |
+| D14 | matcha_bank.py | Regelns referens får stå var som helst, inte bara först | 2 (bland dem fuzzen) |
+
+13 av 14 gav minst ett rött test. D8 är en testlucka (J8). Flera kontroller fångas av bara ett test (D2, D5, D6, D11), men det räcker för att en borttagning ska märkas.
+
+### Testsviten
+
+Kommando: `.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests`
+
+Resultat: **1 248 passed**, 0 misslyckade, i projektet och i den rena kopian, före och efter mutationstesterna. `git status` visade inga ändrade filer innan det här avsnittet skrevs.
+
+**Kommandon.** Jag använde listans kommandon och fil-verktygen. Kopior, provskript och mutationer låg bara i den tillfälliga mappen, och Python kördes bara genom testsvitens kommando, inifrån kopiorna. Utanför listan i SPEC 7.1, av misstag och bara för att läsa: `.venv/bin/python --version` en gång, `sed -n` och `cut` för att visa några rader, `uniq -c` efter `sort` för att räkna importer, `echo` för rubriker i en sökning, och `|| true`. `cd` användes också till projektmappen (listan tillåter `cd` bara till en tillfällig mapp), alltid för att köra listans kommandon där. Inget av det ändrade något.
+
+### Beslut som behövs från Hugo
+
+1. **J1 (hög):** ska K4 ge ett ärende "möjlig dublett" när motpart, belopp och datum är samma men fakturanumret skiljer? Rekommendation: ja, innan konteringen byggs, och samtidigt med K4a/K4b-namnen och Ö9 (arkivet).
+2. **J2:** ska fakturanumret bara avgöra när bankradens referens är exakt fakturanumret? Rekommendation: ja. Då försvinner också testluckan J8.
+3. **J3:** ska U+200E, U+200F och U+061C stoppa filen, som de nio andra riktningstecknen? Rekommendation: ja, det är vad SPEC 7 redan säger.
+4. **J4–J10:** små rättelser som kan samlas: varning för filer som inte läses och stopp för sådant som inte är vanliga filer (J6), `MatchningFel` för tomma perioder och `gc`/`inspect` i genvägstestet (J7), snabbare kandidatsökning (J5), statusraden och SPEC 7 (J10). Ingen av dem är bråttom.
