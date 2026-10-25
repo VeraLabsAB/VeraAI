@@ -87,13 +87,14 @@ KARNANS_EGNA_ORD = {"belopp"}
 
 
 def namn_i_kassaformaten():
-    """Alla kolumnnamn och postnamn från alla företags kassaformat.json."""
+    """Alla kolumnnamn, postnamn och kassaregister från alla företags kassaformat.json."""
     namn = set()
     for fil in sorted(FORETAG.glob("*/kassaformat.json")):
         data = json.loads(fil.read_text(encoding="utf-8"))
         namn.update(data["kolumner"].values())
         for postnamn in data["poster"].values():
             namn.update(postnamn if isinstance(postnamn, list) else [postnamn])
+        namn.update(data["kassaregister"])
     return sorted(namn)
 
 
@@ -137,7 +138,7 @@ def kassanamn_i_filer(filer, namnlista):
 def test_kassaformaten_har_namn_att_soka_efter():
     # Skydd mot att testet nedan blir grönt för att det inte hittar några kassaformat alls.
     namn = namn_i_kassaformaten()
-    assert {"z_nummer", "summa_brutto", "forsaljning", "moms", "betalsatt_kort", "post"} <= set(namn)
+    assert {"z_nummer", "summa_brutto", "forsaljning", "moms", "betalsatt_kort", "post", "TB-KASSA-1"} <= set(namn)
 
 
 def test_karnans_egna_ord_ar_verkligen_karnans_nycklar():
@@ -148,7 +149,7 @@ def test_karnans_egna_ord_ar_verkligen_karnans_nycklar():
 def test_karnan_innehaller_inga_namn_fran_kassaformaten():
     """Kassaformatet hör till företagets konfiguration, inte till kärnan."""
     fynd = kassanamn_i_filer(karnans_filer(), namn_i_kassaformaten())
-    assert not fynd, "Kolumnnamn eller postnamn från kassaformatet i kärnan:\n" + "\n".join(fynd)
+    assert not fynd, "Kolumnnamn, postnamn eller kassaregister från kassaformatet i kärnan:\n" + "\n".join(fynd)
 
 
 def test_kassanamn_kontrollen_hittar_inbyggda_namn(tmp_path):

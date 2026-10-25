@@ -639,3 +639,69 @@ Kommandon som kördes i granskningen: Python i projektets `.venv` (provskript oc
 2. **H4 (Öppen fråga):** får ett kassaregisters Z-nummer börja om, till exempel vid årsskifte? Ska verifieras med Skatteverket eller en redovisningskonsult.
 3. **H10 / G8 punkt 5–6:** när ska generalitetstestet byggas ut så att det också fångar konton, momssatser och belopp? Senast när kontoplan och momssatser läggs till.
 4. **H11 / G9:** var ska bankformat och kassaformat ligga så att agenten inte kan ändra dem? Hör till spärrsteget.
+
+## Åtgärder efter granskning 3
+
+Rättat 2026-10-25 i en egen session. Granskarens text ovan är inte ändrad. GRANSKNING.md med granskning 3 var redan committad (commit 419c849) när sessionen började, så det steget behövdes inte. Ett halvfärdigt, ocommittat försök från en tidigare session låg kvar i `las_kassa.py` och `kassaformat.json`. Det jämförde kassaregistrets namn exakt i stället för att normalisera det, så det togs bort och rättelserna gjordes om från commit 419c849. Alla tester ligger i `scripts/tests/test_las_kassa.py` (namn som börjar med `test_h1_`, `test_h2_`, `test_h4_`, `test_h6_`, och fallen `h2_…` i `test_trasigt_kassaformat_ger_kassafilfel`).
+
+**Ord som används nedan.** Att **normalisera** ett namn betyder att skriva om det till en fast form innan det jämförs, så att två namn som ser likadana ut för en människa också räknas som samma av programmet.
+
+**Så bevisades testerna.** De nya testerna kördes i en kopia av projektet utanför projektmappen, där `las_kassa.py` var den gamla versionen (commit 419c849, samma kod som granskades i a2d1540). Den gamla koden stoppar den nya nyckeln `kassaregister` i kassaformat.json som okänd, så ingen test alls kunde köras. För att se att varje test blir rött av rätt skäl fick den gamla koden i kopian två extra rader som släpper igenom nyckeln utan att kontrollera den. Inget annat ändrades. Resultat: 42 röda och 312 gröna.
+
+- 39 nya tester blev röda av rätt skäl: 33 släpptes igenom (`DID NOT RAISE`: för långa Z-nummer, okända kassaregister, varianter av samma kassaregister, trasig kassalista, tom lista), 1 kraschade med `OverflowError` (lucka upp till 10²⁰), 2 gav granskarens missvisande luckmeddelande i stället för omstart, 1 saknade omstartstipset vid dubblett, och 2 hittade inte den nya konstanten eller funktionen (`ZNUMMER_HOGST_SIFFROR`, `normalisera_kassaregister`).
+- 3 befintliga tester blev röda eftersom de nu frågar efter de nya fälten för luckan (`saknas_fran`, `saknas_till`) i stället för den gamla listan `saknade_znummer`.
+- 2 nya skyddstester var gröna även i den gamla koden, som de ska: `test_h1_z_nummer_med_hogst_nio_siffror_godtas` och `test_h4_serien_som_fortsatter_over_arsskiftet_godkanns`.
+- 1 nytt test kördes inte mot den gamla koden: `test_h1_storsta_tillatna_lucka_gar_fort` (lucka från 1 till 999 999 999). Den gamla koden skulle bygga en lista med nästan en miljard tal och fylla datorns minne, vilket är just felet. Att den gamla koden inte klarar stora luckor bevisas i stället av testet med 10²⁰.
+
+Dessutom gjordes ett mutationstest på den nya koden: en ny kontroll i taget togs bort i en kopia, och hela sviten kördes. Alla gav minst ett rött test.
+
+| Borttagen kontroll (i en kopia) | Röda tester |
+|---|---|
+| H1: gränsen för antal siffror i Z-numret | 4 |
+| H2: kontrollen mot kassalistan | 15 |
+| H2: hela normaliseringen | 14 |
+| H2: normaliseringen utom stora och små bokstäver | 11 |
+| H2: Unicode-normaliseringen (NFKC) | 4 |
+| H2: seriekontrollens egen normalisering | 1 |
+| H2: kontrollen av dubbla namn i kassalistan | 4 |
+| H2: kravet att kassalistan är en lista med minst ett namn | 2 |
+| H6: stoppet för tom lista | 1 |
+| H4: kontrollen i datumordning (omstart) | 3 |
+| H4: omstartstipset vid dubblett | 1 |
+
+**Gränsen för Z-numret (H1).** Ett Z-nummer får ha högst 9 siffror, inledande nollor oräknade (konstanten `ZNUMMER_HOGST_SIFFROR` i `las_kassa.py`). Motivering: Z-numret ökar med ett per dagsavslut. Även en kassa med tio Z-rapporter om dagen i tusen år kommer bara upp i ungefär 3,7 miljoner (7 siffror), så 9 siffror (upp till 999 999 999) ger god marginal. Gränsen ligger i kärnan och inte i kassaformat.json, eftersom den gäller alla företag och bara fångar trasiga filer. Den är inget belopp, konto eller momssats.
+
+| Nr | Åtgärdad | Test |
+|---|---|---|
+| H1 | Ja. Ett Z-nummer med fler än 9 siffror stoppas vid inläsningen med ett kort meddelande som säger hur många siffror det har. Seriekontrollen beskriver en lucka som ett intervall ("Z-rapporter saknas från nummer X till Y (N st)") och sparar bara första och sista saknade numret och antalet (`saknas_fran`, `saknas_till`, `antal_saknade`), aldrig en lista med alla saknade nummer | `test_h1_z_nummer_med_for_manga_siffror_stoppas` (10 siffror, 10¹², 10²⁰, 5 000 siffror), `test_h1_stor_lucka_beskrivs_som_intervall_med_kort_meddelande` (lucka till 10²⁰), `test_h1_storsta_tillatna_lucka_gar_fort`, `test_h1_granssen_for_z_numret_ar_nio_siffror` (skyddstest: `test_h1_z_nummer_med_hogst_nio_siffror_godtas`) |
+| H2 | Ja. kassaformat.json har en obligatorisk lista `kassaregister`. En Z-fil från ett register som inte står i listan stoppas. Namnen jämförs efter normalisering (Unicode-normalisering NFKC, blanksteg och osynliga tecken bort, stora och små bokstäver räknas som samma). Raderna får registrets namn som det står i listan, och seriekontrollen jämför också normaliserade namn, så samma datum, Z-nummer och kassa i två filer stoppas som dubblett. Två namn i listan som blir samma efter normalisering stoppas | `test_h2_samma_z_rapport_med_annat_skrivsatt_kassaregister_ar_en_dubblett` (granskarens varianter: `tb-1`, osynligt mellanslag U+200B sist och inuti, U+202E som vänder text, samt mellanslag, hårt mellanslag, fullbreddstecken och "Ö" skrivet på två sätt), `test_h2_kassaregister_som_inte_finns_i_listan_stoppas` (granskarens `TB-1 X`, samt okänt register, extra bokstav, extra siffra, annan kassa), `test_h2_testbutikens_format_godtar_bara_testbutikens_kassa`, `test_h2_seriekontrollen_jamfor_normaliserade_namn`, `test_h2_normalisering_av_kassaregister`, 12 fall `h2_…` i `test_trasigt_kassaformat_ger_kassafilfel` |
+| H3 | Nej (delvis som bieffekt) | Se nedan |
+| H4 | Meddelandet: ja. Den öppna frågan: nej | Seriekontrollen prövar nu, före luckorna, att Z-numret aldrig går ner när datumet går fram. Gör det det står det att Z-numret går ner från X till Y, att det kan vara ett omstartat Z-nummer, och att det är en öppen fråga (H4) som ska kontrolleras med Skatteverket eller en redovisningskonsult. Serien stoppas fortfarande. Börjar numret om och upprepar ett Z-nummer som redan finns, med ett annat datum, får dubblettmeddelandet samma tips. Test: `test_h4_z_nummer_som_borjar_om_vid_arsskifte_ger_tydligt_meddelande`, `test_h4_z_nummer_som_borjar_om_mitt_i_ger_tydligt_meddelande`, `test_h4_z_nummer_som_borjar_om_och_upprepas_ger_tydligt_meddelande` (skyddstest: `test_h4_serien_som_fortsatter_over_arsskiftet_godkanns`) |
+| H5 | Nej, medvetet | Se nedan |
+| H6 | Ja. `kontrollera_z_serien([])` stoppas med `KassafilFel`: "det finns inga Z-rapporter att kontrollera" | `test_h6_tom_lista_stoppas` |
+| H7 | Nej, medvetet | Se nedan |
+| H8 | Nej, medvetet | Se nedan |
+| H9 | Nej, medvetet | Se nedan |
+| H10 | Nej, medvetet | Se nedan |
+| H11 | Nej, medvetet | Se nedan |
+
+**Varför resten inte är åtgärdat nu.** Uppgiften var att rätta H1, H2 och de låga fynden i samma kod (H4:s meddelande och H6). Övriga fynd kräver mer än en rättelse i den här koden, eller ett beslut först:
+
+- **H2, granskarens andra förslag** (stoppa osynliga tecken i Z-filens fält): inte gjort. Uppgiften valde normalisering i stället. Kassaregistret var det enda fältet med fri text: postnamnen måste stämma exakt med kassaformatet, och datum, Z-nummer, momssats och belopp har fasta mönster. Ett osynligt tecken i registrets namn tas nu bort vid jämförelsen.
+- **H3** (blandad teckenkodning): ett felkodat kassaregister som `KASSA-Ã–` finns inte i kassalistan och stoppas därför nu (provat för hand, inget eget test). Meddelandet nämner däremot inte teckenkodningen, och en fil med UTF-8-BOM som inte är giltig UTF-8 stoppas fortfarande med fel förklaring. Det kräver samma ändring som F8 i `las_bank.py` och ingick inte i uppgiften.
+- **H4, den öppna frågan**: om ett Z-nummer får börja om ska verifieras med Skatteverket eller en redovisningskonsult. Om det är tillåtet måste kärnan kunna ta emot en ny serie, vilket är en större ändring.
+- **H5** (filnamnet rymmer bara datum): kräver att filnamnsmönstret också kan innehålla kassaregistret, och hör till Ö5 (vilka kassasystem som ska stödjas).
+- **H7** (vilken momssats som helst godtas): hör till K5 och K10, som inte är byggda.
+- **H8** (hjälpfunktioner): `momsen_i_brutto` utan typkontroll och Z-nummer som text i rader som inte kommer från `las_kassafil` kräver programmeringsfel. Ingick inte i uppgiften.
+- **H9** (stora kassaformat och långa meddelanden): samma beslut om storleksgränser som G7.
+- **H10** (generalitetstestet går att lura): granskning 2:s beslut 3. Generalitetstestet letar nu däremot också efter kassaregistrens namn från kassaformat.json i kärnan, eftersom de är nya företagsuppgifter (`test_karnan_innehaller_inga_namn_fran_kassaformaten`).
+- **H11** (kassaformat.json ligger oskyddat): hör till spärrsteget. Kassalistan ligger i samma oskyddade fil.
+
+**Nya iakttagelser under arbetet (inte rättade).**
+
+- **Datum långt isär ger ett jättelångt meddelande.** Två Z-rapporter från samma kassa med datumen 0001-01-01 och 9999-12-31 och Z-nummer 1 och 3 ger en lucka där alla 3,65 miljoner dagar däremellan räknas upp. Meddelandet blev 43,8 miljoner tecken och kontrollen tog 1,6 sekunder (provat för hand). Inget släpps igenom och minnet tar inte slut, eftersom antalet dagar begränsas av kalendern, men meddelandet går inte att läsa. Det kräver en trasig fil. Förslag: beskriv dagarna som ett intervall när de är många, på samma sätt som Z-numren.
+- **En kassa i listan utan Z-rapporter syns inte.** Seriekontrollen får inte kassaformatet, så den vet inte vilka kassor som borde ha rapporter. En kassa som står i listan men saknar alla rapporter för perioden upptäcks inte. Hör ihop med H6 och K10.
+
+**Övrigt som ändrats.** Testerna för de små Z-filerna använder påhittade kassaregister (`K-1`, `K-2`, `K-A`, `K-B`, `KASSA-Ö`). De läggs till i en kopia av testbutikens kassaformat inne i testfilen, så att testbutikens `kassaformat.json` bara innehåller testbutikens egen kassa (`TB-KASSA-1`). Testdatan läses alltid med testbutikens oförändrade format. Tre befintliga tester frågar nu efter `saknas_fran` och `saknas_till` i stället för `saknade_znummer`, och ett befintligt test har fått det nya luckmeddelandet. `foretag/README.md` och beskrivningen överst i `las_kassa.py` beskriver kassalistan och de nya reglerna. SPEC.md och `las_bank.py` är inte ändrade.
+
+Testsviten efter rättelserna: 355 passed, 0 misslyckade.

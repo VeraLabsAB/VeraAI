@@ -16,5 +16,6 @@
     "betalsatt": ["betalsatt_kontant", "betalsatt_kort", "betalsatt_swish"],
     "totalsumma": "summa_brutto"
   },
-  "momsavrundning": "narmaste_ore"
+  "momsavrundning": "narmaste_ore",
+  "kassaregister": ["TB-KASSA-1"]
 }

@@ -19,6 +19,9 @@ Inläsningen skyddas på samma sätt som bankfilen i las_bank.py: teckenkodninge
 annars Windows-1252, UTF-16 och NUL-tecken stoppas), styrtecken och ovanliga radbrytningar stoppar
 filen, radbrytning inuti ett fält stoppar filen, CSV läses strikt och varje rad ska ha lika många
 fält som rubrikraden. Beloppen tolkas med belopp.tolka_belopp och blir heltal i öre, aldrig flyttal.
+Ett Z-nummer får ha högst ZNUMMER_HOGST_SIFFROR siffror (H1). Kassaregistret måste finnas i
+kassaformatets lista "kassaregister". Namnen jämförs efter normalisera_kassaregister, så stora och
+små bokstäver, blanksteg och osynliga tecken räknas inte (H2).
 Till skillnad från bankfilen ska rubrikraden vara filens första rad.
 
 Varje Z-fil kontrolleras internt varje gång den läses (Z-kontroll a–e):
@@ -31,7 +34,8 @@ Varje Z-fil kontrolleras internt varje gång den läses (Z-kontroll a–e):
 
 kontrollera_z_serien kontrollerar flera Z-rapporter över en period: Z-numren för varje
 kassaregister ska följa på varandra utan luckor och utan dubbletter, och datumen får inte gå
-bakåt när Z-numret ökar.
+bakåt när Z-numret ökar. Luckor beskrivs som ett intervall, och ett Z-nummer som verkar ha börjat
+om ger ett eget meddelande (öppen fråga H4).
 
 Vid minsta fel stoppas hela filen: inga rader returneras, och ett KassafilFel kastas.
 """
@@ -59,8 +63,14 @@ POSTTYPER = ("forsaljning_per_sats", "moms_per_sats", "betalsatt", "totalsumma")
 POSTTYPER_MED_SATS = ("forsaljning_per_sats", "moms_per_sats")
 
 # Nycklar i kassaformat.json. "anteckning" är fri text för människor och används inte i koden.
-KASSAFORMAT_NYCKLAR = ("filnamn", "kolumner", "avgransare", "poster", "momsavrundning")
+KASSAFORMAT_NYCKLAR = ("filnamn", "kolumner", "avgransare", "poster", "momsavrundning", "kassaregister")
 KASSAFORMAT_VALFRIA_NYCKLAR = ("anteckning",)
+
+# Högsta antal siffror i ett Z-nummer, utan inledande nollor (H1). Z-numret ökar med ett för
+# varje dagsavslut. Även en kassa med tio Z-rapporter om dagen i tusen år kommer bara upp i
+# ungefär 3,7 miljoner (7 siffror). Nio siffror (upp till 999 999 999) ger god marginal, och ett
+# längre Z-nummer betyder att filen är trasig. Gränsen gäller alla företag och ligger därför här.
+ZNUMMER_HOGST_SIFFROR = 9
 
 # Platsen för datumet i filnamnsmönstret, till exempel "z_ÅÅÅÅ-MM-DD.csv".
 DATUMPLATS = "ÅÅÅÅ-MM-DD"
@@ -86,18 +96,36 @@ class ZKontrollFel(KassafilFel):
 class ZSerieFel(KassafilFel):
     """Z-serien har en lucka, en dubblett eller datum i fel ordning.
 
-    typ är "lucka", "dubblett" eller "ordning". saknade_znummer och dagar_utan_rapport är
-    ifyllda vid lucka: vilka Z-nummer som saknas och vilka dagar mellan rapporterna före och
-    efter luckan som saknar Z-rapport.
+    typ är "lucka", "dubblett" eller "ordning". Vid lucka är saknas_fran och saknas_till det
+    första och sista saknade Z-numret, antal_saknade hur många de är, och dagar_utan_rapport
+    vilka dagar mellan rapporterna före och efter luckan som saknar Z-rapport. De saknade
+    Z-numren räknas aldrig upp ett och ett, eftersom luckan kan vara mycket stor (H1).
     """
 
-    def __init__(self, meddelande, typ, kassaregister, znummer, saknade_znummer=(), dagar_utan_rapport=()):
+    def __init__(self, meddelande, typ, kassaregister, znummer, saknas_fran=None, saknas_till=None,
+                 dagar_utan_rapport=()):
         super().__init__(meddelande)
         self.typ = typ
         self.kassaregister = kassaregister
         self.znummer = list(znummer)
-        self.saknade_znummer = list(saknade_znummer)
+        self.saknas_fran = saknas_fran
+        self.saknas_till = saknas_till
+        self.antal_saknade = 0 if saknas_fran is None else saknas_till - saknas_fran + 1
         self.dagar_utan_rapport = list(dagar_utan_rapport)
+
+
+def normalisera_kassaregister(namn):
+    """Kassaregistrets namn i den form som jämförs (H2).
+
+    Unicode-normaliseras (NFKC, så att till exempel fullbreddstecken och två sätt att skriva "Ö"
+    blir samma), blanksteg och osynliga tecken (Unicode-kategori Cc och Cf, till exempel U+200B)
+    tas bort, och stora och små bokstäver räknas som samma. "TB-1", "tb-1" och "TB-1" med ett
+    osynligt mellanslag blir alltså samma kassaregister.
+    """
+    namn = unicodedata.normalize("NFKC", namn)
+    namn = "".join(tecken for tecken in namn
+                   if not tecken.isspace() and unicodedata.category(tecken) not in ("Cc", "Cf"))
+    return namn.casefold()
 
 
 # --- Kassaformat ---
@@ -206,12 +234,32 @@ def _kontrollera_kassaformat(data, var):
             + ", ".join(map(repr, MOMSAVRUNDNINGAR)) + "."
         )
 
+    # Företagets kassaregister (H2). Z-filer från ett register som inte står här stoppas.
+    lista = data["kassaregister"]
+    if not isinstance(lista, list) or not lista:
+        raise KassafilFel(var + ": 'kassaregister' ska vara en lista med minst ett kassaregister.")
+    kassaregister = [
+        _kontrollera_namn(namn, "kassaregister nummer " + str(nummer), var)
+        for nummer, namn in enumerate(lista, start=1)
+    ]
+    sedda = {}  # normaliserat namn -> namnet
+    for namn in kassaregister:
+        normaliserat = normalisera_kassaregister(namn)
+        if normaliserat in sedda:
+            raise KassafilFel(
+                var + ": kassaregistren " + repr(sedda[normaliserat]) + " och " + repr(namn)
+                + " under 'kassaregister' räknas som samma kassaregister (stora och små bokstäver och"
+                + " blanksteg räknas inte). Varje kassaregister måste ha ett eget namn."
+            )
+        sedda[normaliserat] = namn
+
     return {
         "filnamn": filnamn,
         "kolumner": kolumner,
         "avgransare": list(avgransare),
         "poster": poster,
         "momsavrundning": data["momsavrundning"],
+        "kassaregister": kassaregister,
     }
 
 
@@ -219,7 +267,8 @@ def ladda_kassaformat(sokvag):
     """Läser och kontrollerar ett företags kassaformat.json. Fel ger KassafilFel.
 
     Returnerar {"filnamn": mönster, "kolumner": {nyckel: kolumnnamn}, "avgransare": [tecken, ...],
-    "poster": {posttyp: postnamn, "betalsatt": [postnamn, ...]}, "momsavrundning": sätt}.
+    "poster": {posttyp: postnamn, "betalsatt": [postnamn, ...]}, "momsavrundning": sätt,
+    "kassaregister": [namn, ...]}.
     """
     var = "Kassaformatet i " + str(sokvag)
     try:
@@ -332,6 +381,35 @@ def _tolka_heltal(text, kolumn, var):
     return int(text)
 
 
+def _tolka_znummer(text, kolumn, var):
+    """Z-numret som heltal. Fler än ZNUMMER_HOGST_SIFFROR siffror stoppar filen (H1)."""
+    if not _HELTAL.fullmatch(text):
+        raise KassafilFel(var + " har ett ogiltigt heltal i kolumnen " + repr(kolumn) + ": " + repr(text) + ".")
+    siffror = text.lstrip("0") or "0"
+    if len(siffror) > ZNUMMER_HOGST_SIFFROR:
+        raise KassafilFel(
+            var + " har ett Z-nummer med " + str(len(siffror)) + " siffror i kolumnen " + repr(kolumn)
+            + " (det börjar med " + siffror[:12] + "…), men ett Z-nummer får ha högst "
+            + str(ZNUMMER_HOGST_SIFFROR) + " siffror. Z-numret ökar med ett per Z-rapport, så ett så"
+            + " stort tal betyder att filen är trasig. Exportera Z-rapporten från kassan igen."
+        )
+    return int(siffror)
+
+
+def _kassaregister_i_listan(text, kassaformat, kolumn, var):
+    """Kassaregistrets namn som det står i kassaformatets lista. Okänt register stoppar filen (H2)."""
+    normaliserat = normalisera_kassaregister(text)
+    for namn in kassaformat["kassaregister"]:
+        if normalisera_kassaregister(namn) == normaliserat:
+            return namn
+    raise KassafilFel(
+        var + " har kassaregistret " + repr(text) + " i kolumnen " + repr(kolumn) + ", som inte"
+        + " finns bland företagets kassaregister i kassaformatet ("
+        + ", ".join(map(repr, kassaformat["kassaregister"])) + "). Kontrollera att filen kommer från"
+        + " företagets egen kassa. Har företaget fått en ny kassa ska den läggas till i kassaformat.json."
+    )
+
+
 def _csv_fel(fel, var):
     """Översätter ett fel från csv-läsaren till ett KassafilFel med svenskt meddelande."""
     if "field larger than field limit" in str(fel):
@@ -418,6 +496,7 @@ def _tolka_kassarader(data, kassaformat):
             sats = None
         if not varde["kassaregister"]:
             raise KassafilFel(var + " saknar kassaregister i kolumnen " + repr(kolumner["kassaregister"]) + ".")
+        kassaregister = _kassaregister_i_listan(varde["kassaregister"], kassaformat, kolumner["kassaregister"], var)
         nyckel = (postnamn, sats)
         if nyckel in sedda:
             raise KassafilFel(
@@ -428,8 +507,8 @@ def _tolka_kassarader(data, kassaformat):
 
         rad = {
             "rapportdatum": _tolka_datum(varde["rapportdatum"], kolumner["rapportdatum"], var),
-            "znummer": _tolka_heltal(varde["znummer"], kolumner["znummer"], var),
-            "kassaregister": varde["kassaregister"],
+            "znummer": _tolka_znummer(varde["znummer"], kolumner["znummer"], var),
+            "kassaregister": kassaregister,
             "postnamn": postnamn,
             "posttyp": posttyp,
             "sats": sats,
@@ -597,9 +676,10 @@ def las_kassafil(sokvag, kassaformat):
     """Läser EN Z-fil och kör Z-kontroll a–e. Returnerar raderna bara om allt stämmer.
 
     Kassaformatet kommer från ladda_kassaformat och kontrolleras igen här, så att ett trasigt
-    format aldrig används. Varje rad har: id, rapportdatum, znummer, kassaregister, postnamn
-    (som i filen), posttyp (en av POSTTYPER), sats (heltal i procent, eller None), belopp_ore,
-    kalla_fil (SHA-256 av hela filen) och filrad (raden i filen).
+    format aldrig används. Varje rad har: id, rapportdatum, znummer, kassaregister (namnet som
+    det står i kassaformatets lista, inte som i filen), postnamn (som i filen), posttyp (en av
+    POSTTYPER), sats (heltal i procent, eller None), belopp_ore, kalla_fil (SHA-256 av hela filen)
+    och filrad (raden i filen).
     """
     kassaformat = _kontrollera_kassaformat(kassaformat, "Kassaformatet")
     try:
@@ -645,55 +725,85 @@ def _dagar_mellan(fran, till):
     return dagar
 
 
+_OMSTART_OPPEN_FRAGA = (
+    " Det kan vara ett omstartat Z-nummer (till exempel vid årsskifte eller byte av kassa)."
+    " Om ett kassaregisters Z-nummer får börja om är en öppen fråga (H4) som ska kontrolleras med"
+    " Skatteverket eller en redovisningskonsult. Till dess stoppas serien."
+)
+
+
 def kontrollera_z_serien(rapporter):
     """Kontrollerar Z-serien över en period. rapporter är en lista med raderna från las_kassafil, en per Z-fil.
 
     För varje kassaregister ska Z-numren följa på varandra utan luckor och utan dubbletter, och
-    datumet får inte gå bakåt när Z-numret ökar. Kastar ZSerieFel vid första felet.
+    datumet får inte gå bakåt när Z-numret ökar. Kassaregistren jämförs efter
+    normalisera_kassaregister, så "TB-1" och "tb-1" är samma register (H2). En tom lista stoppas
+    (H6). Kastar ZSerieFel vid första felet, och KassafilFel om det inte finns något att kontrollera.
 
     OBS: Kontrollen ser bara luckor mellan rapporterna som finns. Saknas periodens första eller
     sista Z-rapport syns det inte här.
     """
-    per_register = {}
+    if not rapporter:
+        raise KassafilFel(
+            "Z-serien: det finns inga Z-rapporter att kontrollera. En period helt utan Z-rapporter kan"
+            " inte godkännas. Kontrollera att kassans filer för perioden är inlästa."
+        )
+    per_register = {}  # normaliserat namn -> (namnet, [(znummer, datum, kalla_fil), ...])
     for rader in rapporter:
         kassaregister, znummer, datum, kalla_fil = _rapportens_huvud(rader)
-        per_register.setdefault(kassaregister, []).append((znummer, datum, kalla_fil))
+        per_register.setdefault(normalisera_kassaregister(kassaregister), (kassaregister, []))[1].append(
+            (znummer, datum, kalla_fil))
 
-    for kassaregister in sorted(per_register):
-        serie = sorted(per_register[kassaregister])
-        datum_med_rapport = {datum for _, datum, _ in serie}
+    for normaliserat in sorted(per_register):
+        kassaregister, rapporter_i_registret = per_register[normaliserat]
+        serie = sorted(rapporter_i_registret)
+        borjan = "Z-serien för kassaregistret " + repr(kassaregister)
+
         for (z_fore, datum_fore, fil_fore), (z_efter, datum_efter, fil_efter) in zip(serie, serie[1:]):
             if z_efter == z_fore:
                 orsak = ("samma fil är inläst två gånger" if fil_fore == fil_efter
                          else "två olika filer har samma Z-nummer")
                 raise ZSerieFel(
-                    "Z-serien för kassaregistret " + repr(kassaregister) + " har en dubblett: Z-rapport "
-                    + str(z_fore) + " finns två gånger, daterad " + datum_fore + " och " + datum_efter
-                    + " (" + orsak + ").",
+                    borjan + " har en dubblett: Z-rapport " + str(z_fore) + " finns två gånger, daterad "
+                    + datum_fore + " och " + datum_efter + " (" + orsak + ")."
+                    + (_OMSTART_OPPEN_FRAGA if datum_fore != datum_efter else ""),
                     "dubblett", kassaregister, [z_fore],
                 )
-            if z_efter > z_fore + 1:
-                saknade = list(range(z_fore + 1, z_efter))
-                dagar = [dag for dag in _dagar_mellan(datum_fore, datum_efter) if dag not in datum_med_rapport]
-                if len(saknade) == 1:
-                    vad = "Z-rapport " + str(saknade[0]) + " saknas"
-                else:
-                    vad = "Z-rapport " + str(saknade[0]) + "–" + str(saknade[-1]) + " (" + str(len(saknade)) + " st) saknas"
+
+        # Datumet får inte gå bakåt när Z-numret ökar. I datumordning får Z-numret alltså aldrig gå
+        # ner. Det prövas före luckorna, så att ett Z-nummer som börjat om inte beskrivs som en
+        # stor lucka (H4).
+        i_datumordning = sorted(serie, key=lambda rapport: (rapport[1], rapport[0]))
+        for (z_fore, datum_fore, _), (z_efter, datum_efter, _) in zip(i_datumordning, i_datumordning[1:]):
+            if z_efter < z_fore:
                 raise ZSerieFel(
-                    "Z-serien för kassaregistret " + repr(kassaregister) + " har en lucka: " + vad
-                    + " mellan Z-rapport " + str(z_fore) + " (" + datum_fore + ") och Z-rapport "
-                    + str(z_efter) + " (" + datum_efter + "). "
+                    borjan + " går bakåt i tiden: Z-rapport " + str(z_fore) + " är daterad " + datum_fore
+                    + ", men Z-rapport " + str(z_efter) + " före den är daterad " + datum_efter + "."
+                    + " Z-numret går alltså ner från " + str(z_fore) + " till " + str(z_efter)
+                    + " när datumet går fram." + _OMSTART_OPPEN_FRAGA
+                    + " Det kan också vara ett fel datum eller Z-nummer i en av filerna.",
+                    "ordning", kassaregister, [z_efter, z_fore],
+                )
+
+        datum_med_rapport = {datum for _, datum, _ in serie}
+        for (z_fore, datum_fore, _), (z_efter, datum_efter, _) in zip(serie, serie[1:]):
+            if z_efter > z_fore + 1:
+                # Luckan beskrivs som ett intervall. De saknade Z-numren räknas aldrig upp, eftersom
+                # luckan kan vara hur stor som helst (H1).
+                fran, till = z_fore + 1, z_efter - 1
+                if fran == till:
+                    vad = "Z-rapport " + str(fran) + " saknas"
+                else:
+                    vad = ("Z-rapporter saknas från nummer " + str(fran) + " till " + str(till)
+                           + " (" + str(till - fran + 1) + " st)")
+                dagar = [dag for dag in _dagar_mellan(datum_fore, datum_efter) if dag not in datum_med_rapport]
+                raise ZSerieFel(
+                    borjan + " har en lucka: " + vad + " mellan Z-rapport " + str(z_fore) + " ("
+                    + datum_fore + ") och Z-rapport " + str(z_efter) + " (" + datum_efter + "). "
                     + ("Dagar däremellan utan Z-rapport: " + ", ".join(dagar) + "." if dagar else
                        "Den saknade rapporten är från " + datum_fore + " eller " + datum_efter + ".")
                     + " Hämta den saknade Z-rapporten från kassan.",
-                    "lucka", kassaregister, [z_fore, z_efter], saknade, dagar,
-                )
-            if datum_efter < datum_fore:
-                raise ZSerieFel(
-                    "Z-serien för kassaregistret " + repr(kassaregister) + " går bakåt i tiden: Z-rapport "
-                    + str(z_efter) + " är daterad " + datum_efter + ", men Z-rapport " + str(z_fore)
-                    + " före den är daterad " + datum_fore + ".",
-                    "ordning", kassaregister, [z_fore, z_efter],
+                    "lucka", kassaregister, [z_fore, z_efter], fran, till, dagar,
                 )
 
 

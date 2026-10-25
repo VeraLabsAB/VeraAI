@@ -18,13 +18,20 @@ KASSAMAPP = DATAMAPP / "kassa"
 
 sys.path.insert(0, str(AGENT / "scripts"))
 
+import las_kassa  # noqa: E402  (nya namn efter granskning 3 hämtas härifrån, inne i testerna)
 from las_kassa import (
     KassafilFel, ZKontrollFel, ZSerieFel, kontrollera_z_rapport, kontrollera_z_serien, ladda_kassaformat,
     las_kassafil, momsen_i_brutto, summa_per_momssats,
 )
 
 KASSAFORMAT_FIL = AGENT / "foretag" / "syntet-testbutik" / "kassaformat.json"
-KASSAFORMAT = ladda_kassaformat(KASSAFORMAT_FIL)
+TESTBUTIKENS_KASSAFORMAT = ladda_kassaformat(KASSAFORMAT_FIL)
+# De små Z-filerna nedan har egna, påhittade kassaregister. De läggs till i listan här, så att
+# testbutikens kassaformat.json bara behöver innehålla testbutikens egen kassa. Testdatan läses
+# alltid med testbutikens oförändrade format (las_alla).
+SMA_FILERNAS_KASSAREGISTER = ["K-1", "K-2", "K-A", "K-B", "KASSA-Ö"]
+KASSAFORMAT = {**TESTBUTIKENS_KASSAFORMAT,
+               "kassaregister": TESTBUTIKENS_KASSAFORMAT["kassaregister"] + SMA_FILERNAS_KASSAREGISTER}
 
 FALT = ["id", "rapportdatum", "znummer", "kassaregister", "postnamn", "posttyp", "sats",
         "belopp_ore", "kalla_fil", "filrad"]
@@ -39,7 +46,7 @@ def kassafiler():
 
 
 def las_alla():
-    return [las_kassafil(fil, KASSAFORMAT) for fil in kassafiler()]
+    return [las_kassafil(fil, TESTBUTIKENS_KASSAFORMAT) for fil in kassafiler()]
 
 
 def utan(nycklar, rad):
@@ -170,7 +177,8 @@ def test_planterat_fel_lucka_i_z_serien_upptacks_och_pekar_ut_z_nummer_och_datum
         kontrollera_z_serien(las_alla())
     assert fel.value.typ == "lucka"
     assert fel.value.kassaregister == "TB-KASSA-1"
-    assert fel.value.saknade_znummer == [planterat["z_nummer"]]
+    assert fel.value.saknas_fran == fel.value.saknas_till == planterat["z_nummer"]
+    assert fel.value.antal_saknade == 1
     assert fel.value.dagar_utan_rapport == [planterat["datum"]]
     assert fel.value.znummer == [1010, 1012]
 
@@ -324,9 +332,10 @@ def test_serien_lucka_med_flera_saknade_rapporter(tmp_path):
         kontrollera_z_serien([z_rapport(tmp_path, "2025-01-02", 1001), z_rapport(tmp_path, "2025-01-03", 1002),
                               z_rapport(tmp_path, "2025-01-07", 1005)])
     assert fel.value.typ == "lucka"
-    assert fel.value.saknade_znummer == [1003, 1004]
+    assert (fel.value.saknas_fran, fel.value.saknas_till, fel.value.antal_saknade) == (1003, 1004, 2)
     assert fel.value.dagar_utan_rapport == ["2025-01-04", "2025-01-05", "2025-01-06"]
-    assert "Z-rapport 1003–1004 (2 st) saknas mellan Z-rapport 1002 (2025-01-03)" in str(fel.value)
+    assert ("Z-rapporter saknas från nummer 1003 till 1004 (2 st) mellan Z-rapport 1002 (2025-01-03)"
+            in str(fel.value))
 
 
 def test_serien_lucka_utan_dag_emellan(tmp_path):
@@ -343,7 +352,7 @@ def test_serien_kontrolleras_per_kassaregister(tmp_path):
     with pytest.raises(ZSerieFel) as fel:
         kontrollera_z_serien(rapporter + [z_rapport(tmp_path / "b", "2025-01-04", 504, "K-B")])
     assert fel.value.kassaregister == "K-B"
-    assert fel.value.saknade_znummer == [503]
+    assert fel.value.saknas_fran == fel.value.saknas_till == 503
 
 
 @pytest.fixture(autouse=True)
@@ -494,6 +503,7 @@ ANNAT_FORMAT = {
         "totalsumma": "TOTAL",
     },
     "momsavrundning": "narmaste_ore",
+    "kassaregister": ["TB-KASSA-1", "K"],
 }
 
 
@@ -561,6 +571,7 @@ def test_testbutikens_kassaformat_laddas():
     assert KASSAFORMAT["poster"]["totalsumma"] == "summa_brutto"
     assert KASSAFORMAT["filnamn"] == "kassa_ÅÅÅÅ-MM-DD.csv"
     assert KASSAFORMAT["momsavrundning"] == "narmaste_ore"
+    assert TESTBUTIKENS_KASSAFORMAT["kassaregister"] == ["TB-KASSA-1"]
     assert "anteckning" not in KASSAFORMAT  # fri text för människor, används inte i koden
 
 
@@ -588,6 +599,18 @@ def utan_nyckel(nyckel, data):
         (utan_nyckel("poster", ANNAT_FORMAT), "saknar nyckeln 'poster'"),
         (utan_nyckel("filnamn", ANNAT_FORMAT), "saknar nyckeln 'filnamn'"),
         (utan_nyckel("momsavrundning", ANNAT_FORMAT), "saknar nyckeln 'momsavrundning'"),
+        (utan_nyckel("kassaregister", ANNAT_FORMAT), "saknar nyckeln 'kassaregister'"),
+        (med(kassaregister=[]), "'kassaregister' ska vara en lista med minst ett kassaregister"),
+        (med(kassaregister="K"), "'kassaregister' ska vara en lista"),
+        (med(kassaregister=["K", ""]), "kassaregister nummer 2 får inte vara tomt"),
+        (med(kassaregister=["K", None]), "kassaregister nummer 2 får inte vara tomt"),
+        (med(kassaregister=["K\u200b"]), "innehåller tecknet U+200B"),
+        (med(kassaregister=["\u202eK"]), "innehåller tecknet U+202E"),
+        (med(kassaregister=["K\x0c"]), "innehåller tecknet U+000C"),
+        (med(kassaregister=["K", "K"]), "kassaregistren 'K' och 'K' under 'kassaregister' räknas som samma"),
+        (med(kassaregister=["TB-1", "tb-1"]), "kassaregistren 'TB-1' och 'tb-1' under 'kassaregister' räknas som samma"),
+        (med(kassaregister=["TB-1", "TB -1"]), "räknas som samma kassaregister"),
+        (med(kassaregister=["TB-1", "ＴＢ－１"]), "räknas som samma kassaregister"),
         (med(bank="X"), "okänd nyckel: 'bank'"),
         (med(kolumner=utan_nyckel("sats", ANNAT_FORMAT["kolumner"])), "saknar nyckeln 'sats'"),
         (med_kolumner(valuta="Valuta"), "okänd nyckel: 'valuta'"),
@@ -628,6 +651,10 @@ def utan_nyckel(nyckel, data):
     ],
     ids=[
         "saknar_kolumner", "saknar_avgransare", "saknar_poster", "saknar_filnamn", "saknar_momsavrundning",
+        "h2_saknar_kassaregister", "h2_inga_kassaregister", "h2_kassaregister_ar_text", "h2_tomt_kassaregister",
+        "h2_kassaregister_saknar_text", "h2_osynligt_mellanslag_i_kassaregister", "h2_vand_text_i_kassaregister",
+        "h2_styrtecken_i_kassaregister", "h2_samma_kassaregister_tva_ganger", "h2_kassaregister_stor_och_liten_bokstav",
+        "h2_kassaregister_blanksteg", "h2_kassaregister_fullbredd",
         "okand_nyckel", "saknar_kolumn", "okand_kolumn", "dubbla_kolumnnamn", "tomt_kolumnnamn",
         "kolumnnamn_saknar_text", "citattecken_i_kolumnnamn", "osynligt_tecken_i_kolumnnamn",
         "avgransare_i_kolumnnamn", "kolumner_ar_lista", "inga_avgransare", "avgransare_ar_text",
@@ -701,3 +728,163 @@ def test_serien_med_rader_fran_olika_filer_i_samma_rapport_stoppas(tmp_path):
     blandad = z_rapport(tmp_path / "a", "2025-01-02", 1001)[:3] + z_rapport(tmp_path / "b", "2025-01-03", 1002)[3:]
     with pytest.raises(KassafilFel, match="kommer inte från en och samma Z-fil"):
         kontrollera_z_serien([blandad])
+
+
+# --- Rättelser efter granskning 3 (H1, H2, H4, H6) ---
+
+def med_znummer(rader, znummer):
+    """Raderna med ett annat Z-nummer, som om de kom från las_kassafil. För tal som las_kassafil stoppar."""
+    return [{**rad, "znummer": znummer} for rad in rader]
+
+
+def test_h1_granssen_for_z_numret_ar_nio_siffror():
+    assert las_kassa.ZNUMMER_HOGST_SIFFROR == 9
+
+
+@pytest.mark.parametrize("znummer", ["1" + "0" * 9, "1" + "0" * 12, "1" + "0" * 20, "9" * 5000],
+                         ids=["10_siffror", "10_upphojt_till_12", "10_upphojt_till_20", "5000_siffror"])
+def test_h1_z_nummer_med_for_manga_siffror_stoppas(tmp_path, znummer):
+    resultat = None
+    with pytest.raises(KassafilFel) as fel:
+        resultat = las_kassafil(z_fil(tmp_path, z_rader(z=znummer)), KASSAFORMAT)
+    assert resultat is None
+    meddelande = str(fel.value)
+    assert "har ett Z-nummer med " + str(len(znummer)) + " siffror i kolumnen 'z_nummer'" in meddelande
+    assert "får ha högst 9 siffror" in meddelande
+    assert len(meddelande) < 500  # hela talet skrivs inte ut
+
+
+def test_h1_z_nummer_med_hogst_nio_siffror_godtas(tmp_path):
+    # Skydd: gränsen stoppar inte vanliga Z-nummer. Inledande nollor räknas inte som siffror.
+    assert las_kassafil(z_fil(tmp_path, z_rader(z="9" * 9)), KASSAFORMAT)[0]["znummer"] == 999999999
+    assert las_kassafil(z_fil(tmp_path, z_rader(z="0" * 10 + "1001")), KASSAFORMAT)[0]["znummer"] == 1001
+    assert las_kassafil(z_fil(tmp_path, z_rader(z="0")), KASSAFORMAT)[0]["znummer"] == 0
+
+
+def test_h1_stor_lucka_beskrivs_som_intervall_med_kort_meddelande(tmp_path):
+    # 10^20 kan inte läsas in (gränsen ovan), men seriekontrollen ska ändå klara det utan att
+    # räkna upp de saknade Z-numren. Den gamla koden kraschade här med OverflowError.
+    stort = 10 ** 20
+    rapporter = [z_rapport(tmp_path, "2025-01-02", 1), med_znummer(z_rapport(tmp_path, "2025-01-03", 2), stort)]
+    with pytest.raises(ZSerieFel) as fel:
+        kontrollera_z_serien(rapporter)
+    assert fel.value.typ == "lucka"
+    assert (fel.value.saknas_fran, fel.value.saknas_till) == (2, stort - 1)
+    assert fel.value.antal_saknade == stort - 2
+    assert not hasattr(fel.value, "saknade_znummer")  # ingen lista med alla saknade nummer
+    meddelande = str(fel.value)
+    assert "Z-rapporter saknas från nummer 2 till " + str(stort - 1) + " (" + str(stort - 2) + " st)" in meddelande
+    assert len(meddelande) < 400
+
+
+def test_h1_storsta_tillatna_lucka_gar_fort(tmp_path):
+    # Kördes INTE mot den gamla koden: där bygger den en lista med nästan en miljard tal och fyller
+    # minnet, vilket är just felet. Den gamla koden bevisas röd av testet med 10^20 ovan.
+    rapporter = [z_rapport(tmp_path, "2025-01-02", 1), z_rapport(tmp_path, "2025-01-03", 999999999)]
+    with pytest.raises(ZSerieFel) as fel:
+        kontrollera_z_serien(rapporter)
+    assert fel.value.antal_saknade == 999999997
+    assert "Z-rapporter saknas från nummer 2 till 999999998 (999999997 st)" in str(fel.value)
+    assert len(str(fel.value)) < 400
+
+
+@pytest.mark.parametrize("register", ["K-9", "K-1 X", "K-1X", "K-11", "TB-KASSA-2"],
+                         ids=["okant", "extra_ord", "extra_bokstav", "extra_siffra", "annan_kassa"])
+def test_h2_kassaregister_som_inte_finns_i_listan_stoppas(tmp_path, register):
+    stoppas(z_fil(tmp_path, z_rader(register=register)), "som inte finns bland företagets kassaregister")
+
+
+def test_h2_testbutikens_format_godtar_bara_testbutikens_kassa(tmp_path):
+    with pytest.raises(KassafilFel, match="'K-1' i kolumnen 'kassaregister_id', som inte finns bland"):
+        las_kassafil(z_fil(tmp_path), TESTBUTIKENS_KASSAFORMAT)
+    assert las_kassafil(z_fil(tmp_path, z_rader(register="TB-KASSA-1")), TESTBUTIKENS_KASSAFORMAT)
+
+
+# Samma kassaregister skrivet på olika sätt. Granskarens varianter: stora och små bokstäver,
+# osynligt mellanslag (U+200B) och tecken som vänder textens riktning (U+202E). Dessutom blanksteg,
+# hårt mellanslag, fullbreddstecken och två sätt att skriva "Ö" (NFC och NFD).
+VARIANTER = {
+    "sma_bokstaver": ("K-1", "k-1"),
+    "osynligt_mellanslag_sist": ("K-1", "K-1\u200b"),
+    "osynligt_mellanslag_inuti": ("K-1", "K\u200b-1"),
+    "vand_text": ("K-1", "\u202eK-1"),
+    "mellanslag_inuti": ("K-1", "K -1"),
+    "hart_mellanslag_inuti": ("K-1", "K\u00a0-1"),
+    "fullbredd": ("K-1", "\uff2b\uff0d\uff11"),
+    "o_med_prickar_nfd": ("KASSA-Ö", "KASSA-O\u0308"),
+    "o_med_prickar_sma_bokstaver": ("KASSA-Ö", "kassa-ö"),
+}
+
+
+@pytest.mark.parametrize("original, variant", list(VARIANTER.values()), ids=list(VARIANTER))
+def test_h2_samma_z_rapport_med_annat_skrivsatt_kassaregister_ar_en_dubblett(tmp_path, original, variant):
+    fran_original = z_rapport(tmp_path / "a", "2025-01-02", 1001, original)
+    fran_variant = z_rapport(tmp_path / "b", "2025-01-02", 1001, variant)
+    with pytest.raises(ZSerieFel) as fel:
+        kontrollera_z_serien([fran_original, fran_variant])
+    assert fel.value.typ == "dubblett"
+    assert fel.value.kassaregister == original
+    assert "Z-rapport 1001 finns två gånger" in str(fel.value)
+    # Raderna får kassaregistrets namn som det står i listan, så att varianten inte blir en egen kassa.
+    assert {rad["kassaregister"] for rad in fran_variant} == {original}
+
+
+def test_h2_seriekontrollen_jamfor_normaliserade_namn(tmp_path):
+    # Även rader som inte gått via las_kassafil jämförs efter normalisering.
+    fran_original = z_rapport(tmp_path, "2025-01-02", 1001, "K-1")
+    andra = [{**rad, "kassaregister": "k-1\u200b", "kalla_fil": "x"} for rad in fran_original]
+    with pytest.raises(ZSerieFel) as fel:
+        kontrollera_z_serien([fran_original, andra])
+    assert fel.value.typ == "dubblett"
+
+
+def test_h2_normalisering_av_kassaregister():
+    normalisera = las_kassa.normalisera_kassaregister
+    assert len({normalisera(namn) for namn in ["TB-1", "tb-1", "TB-1\u200b", "\u202eTB-1", " TB - 1 ",
+                                                "\uff34\uff22\uff0d\uff11"]}) == 1
+    assert normalisera("KASSA-Ö") == normalisera("KASSA-O\u0308") == normalisera("kassa-ö")
+    assert normalisera("TB-1 X") != normalisera("TB-1")
+    assert normalisera("TB-1") != normalisera("TB-2")
+
+
+def test_h4_z_nummer_som_borjar_om_vid_arsskifte_ger_tydligt_meddelande(tmp_path):
+    with pytest.raises(ZSerieFel) as fel:
+        kontrollera_z_serien([z_rapport(tmp_path, "2025-12-31", 1300), z_rapport(tmp_path, "2026-01-02", 1)])
+    meddelande = str(fel.value)
+    assert fel.value.typ == "ordning"
+    assert "Z-numret går alltså ner från 1300 till 1 när datumet går fram." in meddelande
+    assert "Det kan vara ett omstartat Z-nummer" in meddelande
+    assert "öppen fråga (H4)" in meddelande
+    assert "saknas" not in meddelande  # inte "Z-rapport 2–1299 (1298 st) saknas"
+
+
+def test_h4_z_nummer_som_borjar_om_mitt_i_ger_tydligt_meddelande(tmp_path):
+    rapporter = [z_rapport(tmp_path, "2025-01-02", 1001), z_rapport(tmp_path, "2025-01-03", 1002),
+                 z_rapport(tmp_path, "2025-01-04", 1), z_rapport(tmp_path, "2025-01-05", 2)]
+    with pytest.raises(ZSerieFel) as fel:
+        kontrollera_z_serien(rapporter)
+    assert fel.value.typ == "ordning"
+    assert "Z-numret går alltså ner från 1002 till 1 när datumet går fram." in str(fel.value)
+    assert "omstartat Z-nummer" in str(fel.value)
+    assert "saknas" not in str(fel.value)
+
+
+def test_h4_z_nummer_som_borjar_om_och_upprepas_ger_tydligt_meddelande(tmp_path):
+    # Börjar numret om från 1 och 1 redan finns blir det en dubblett. Meddelandet nämner omstart.
+    rapporter = [z_rapport(tmp_path, "2025-01-02", 1), z_rapport(tmp_path, "2025-01-03", 2),
+                 z_rapport(tmp_path, "2026-01-02", 1)]
+    with pytest.raises(ZSerieFel) as fel:
+        kontrollera_z_serien(rapporter)
+    assert fel.value.typ == "dubblett"
+    assert "daterad 2025-01-02 och 2026-01-02" in str(fel.value)
+    assert "Det kan vara ett omstartat Z-nummer" in str(fel.value)
+
+
+def test_h4_serien_som_fortsatter_over_arsskiftet_godkanns(tmp_path):
+    # Skydd: ett Z-nummer som fortsätter över årsskiftet är rätt.
+    kontrollera_z_serien([z_rapport(tmp_path, "2025-12-31", 1300), z_rapport(tmp_path, "2026-01-02", 1301)])
+
+
+def test_h6_tom_lista_stoppas():
+    with pytest.raises(KassafilFel, match="det finns inga Z-rapporter att kontrollera"):
+        kontrollera_z_serien([])
