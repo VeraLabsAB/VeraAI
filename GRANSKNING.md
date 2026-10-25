@@ -1767,3 +1767,207 @@ Testsviten efter del A: **1 248 passed**, 0 misslyckade.
 **Kommandon utanför den fasta listan.** Av misstag, och bara för att läsa: `sed -n` och `head -c` en gång var (båda på en tom fil, utan verkan), `uniq -c` efter `sort` för att räkna testdatans fakturanummer och `cut -c` för att korta felrader. I mutationstestet kördes listans kommandon efter varandra med `;` i ett kommando, med en variabel för kopiornas mapp. Kopiorna gjordes med `git archive`, `tar` och `cp -R` i den tillfälliga mappen, och ändringarna i kopiorna gjordes med fil-verktygen. Inget av det ändrade något i projektet.
 
 Testsviten efter del B: **1 346 passed**, 0 misslyckade (1 248 före, alltså 98 fler).
+
+## Granskning 6: rättelserna efter granskning 5
+
+| | |
+|---|---|
+| Datum | 2026-10-25 |
+| Granskad version | commit d667ab3 (SPEC) och 60fbaa3 (koden), alltså "Åtgärder efter granskning 5" ovan |
+| Granskare | Oberoende session som inte sett rättelserna byggas. Ingen kod eller befintlig fil har ändrats, bara det här avsnittet har lagts till |
+| Underlag | CLAUDE.md, SPEC.md (hela, särskilt 5, 6, 7, 7.1 och 11), granskning 5 och åtgärdsavsnittet ovan, scripts/normalisering.py, las_underlag.py, matcha_bank.py, las_matchningsformat.py, inlasning_skydd.py, testerna i scripts/tests/, foretag/syntet-testbutik/matchning.json, `git show d667ab3` och `git show 60fbaa3` |
+
+### Så gick granskningen till
+
+Allt provande gjordes i en tillfällig mapp utanför projektet. Där lades rena kopior av commit 60fbaa3 och d667ab3 (med `git archive` och `tar`) och projektets `.venv` (med `cp -R`). Mina prov skrevs med fil-verktyget som två egna testfiler i en tredje kopia av 60fbaa3 och kördes med testsvitens kommando inifrån kopian. Varje prov skrev sitt utfall till en textfil: **STOPPAD** (tydligt `UnderlagFilFel` eller `MatchningFel`), **GODKÄND** (resultatet släpptes igenom, med vad som hände) eller **KRASCH** (annat Python-fel). För uppgift D gjordes en fjärde kopia, där en kontroll i taget togs bort eller gjordes svagare och sedan återställdes (`diff -r` mot projektets `scripts/` visar inga skillnader efteråt). För att se att de nya testerna slår larm mot den gamla koden lades testerna från 60fbaa3 i en kopia av d667ab3.
+
+**Ord som används nedan.** En **dubblett** är samma underlag inläst två gånger. Ett **förväxlingstecken** ser ut som ett annat tecken men är ett annat tecken i datorn. Ett **skriftsystem** är en sorts bokstäver (latinska, kyrilliska, grekiska, cherokee och så vidare). **Normaliseringen** är `normalisera_for_jamforelse` i `normalisering.py`, som gör om en text till en fast form innan två texter jämförs. Ett **oavstämt** underlag är ett som ingen bankrad har matchats mot, och ser ut som en obetald faktura. Ett **kombinerande tecken** är ett tecken som läggs ovanpå eller under tecknet före, till exempel en accent. Ett **mutationstest** är att ta bort en kontroll i en kopia av koden och se att minst ett test slår larm. Ett tecken skrivs här med sin kod, till exempel U+00AD.
+
+Fynden heter **L1–L7**. Bokstaven K hoppas över, så att fynden inte förväxlas med kontrollerna K1–K17 i SPEC 6.
+
+Allvar: **hög** = kan ge fel bokföring, **medel** = onödig krasch eller otydligt fel (eller fel bokföring som kräver ovanliga omständigheter), **låg** = kosmetiskt eller kräver avsiktligt skriven kod.
+
+### Sammanfattning av nya fynd
+
+| Nr | Fynd | Allvar |
+|---|---|---|
+| L1 | J1 är bara delvis stängt. Åtgärdstabellen säger att en dubblett med förväxlingstecken "aldrig" blir ett oavstämt underlag utan ärende, men det gäller bara de nio fall som testas. Förväxlingar inom det latinska skriftsystemet (`F-l001`, `F-1OO1`, `F1001`, `LEV A`, `LEV-A AB`) och ett mjukt bindestreck i stället för bindestrecket ger fortfarande en dubblett utan ärende, och fakturanummerregeln matchar originalet när numret har minst 5 tecken. Byggaren nämner det under "Kvar att tänka på", men beslutet är fortfarande öppet | **Hög** |
+| L2 | Motparten har flera vägar förbi de nya kontrollerna: osynliga tecken som inte räknas som formattecken, streckliknande tecken som inte är bindestreck, ett "blandat ord" delat med ett hårfint mellanslag, och ett helt ord i cherokee som ser ut exakt som `LEV-A`. Alla ger en dubblett utan ärende | Medel |
+| L3 | J2 är delvis kvar: vilket ord som helst med minst 5 tecken i bankradens text avgör, till exempel ett kundnummer, en ort eller ett datum | Låg |
+| L4 | Kontrollen av blandade ord stoppar vanliga namn: `NTTドコモ`, `ABC有限公司`, `Oʻzbekiston`, `OʼBrien` och `µ-Tech` | Låg |
+| L5 | Gränsen 20 000 skyddar inte mot värsta fallet: med samma belopp på alla tar 20 000 uppskattningsvis 50 minuter | Låg |
+| L6 | Testluckor: att bedömningsdatumet jämförs med transaktionsdagen (beslut 3) och vilket underlag K4a/K4b jämför med prövas inte av något test | Låg |
+| L7 | Små saker: minustecknet står som det är i `normalisering.py`, "K4a och K4b" är en enda text i fältet `kontroll`, matchningens motpartsjämförelse använder fortfarande kassans normalisering | Låg (kosmetiskt) |
+
+### Fynd i detalj
+
+#### L1. J1 är bara delvis stängt. Allvar: hög
+
+**Vad jag körde:** två underlag, `U-1` och `U-2`, med samma motpart (`LEV-A`), samma belopp (125,00 kr) och samma datum. `U-1` har fakturanumret `F-1001`. `U-2` skiljer bara i fakturanumret. Sedan en bankrad på −125,00 kr med referensen `F-1001`.
+
+| Fakturanummer i U-2 | K4 | Matchningen |
+|---|---|---|
+| `F-1001` med U+2012, U+2015, U+FE58, U+05BE, U+30A0 (andra sorters streck), U+207B (upphöjt minus), matematisk eller upphöjd etta, hårfint mellanslag sist | Ärende "dublett av U-1" (rätt) | U-1 matchad, inget kvar (rätt) |
+| U+02D7, U+2796, U+2043 (streckliknande tecken), arabisk etta, kombinerande tecken, U+034F, U+FE0F, U+2800, U+3164, cherokee, punktlöst i | STOPPAD med tydligt meddelande (rätt) | – |
+| `F1001`, `F-l001` (litet L), `F-1OO1` (stora O), `F` + U+00AD (mjukt bindestreck) + `1001`, `F` + U+1680 + `1001` | **Båda behålls, inget ärende** | U-1 matchad. **U-2 oavstämd, inget ärende** |
+| `F-1001.` (punkt sist) | Båda behålls, inget ärende | "tvetydig" (en människa ser båda) |
+
+Granskarens egna prov från granskning 5 ger samma bild: `F-l`, `F 1`, `F1`, `F-01`, `LEV A` och `LEV-A AB` ger fortfarande inget ärende. Med de korta numren i granskning 5 (`F-1` och `F-l`) blir bankraden nu "tvetydig", eftersom ett nummer under 5 tecken inte får avgöra. Det är en förbättring, men med vanliga fakturanummer (5 tecken eller fler) matchar fakturanummerregeln originalet och dubbletten blir kvar som en obetald faktura, precis som i granskning 5.
+
+Två av fallen är inte "samma sak skriven olika" utan förväxlingstecken som normaliseringen gör värre: det **mjuka bindestrecket** (U+00AD) visas i vissa program som ett bindestreck och i andra inte alls, och **U+1680** räknas som ett blanksteg men ritas i många typsnitt som ett streck. Båda tas bort av normaliseringen i stället för att bli "-", så `F` + U+00AD + `1001` blir samma som `F1001` och inte som `F-1001`.
+
+**Varför det spelar roll:** samma som J1 i granskning 5. Förväxlingar som `1`/`l` och `0`/`O` är vanliga när text läses ur en bild, och dubbletten kan bokföras som en andra leverantörsskuld (dubbel kostnad) utan att något ärende visar det. Byggaren skriver detta öppet under "Kvar att tänka på", så fyndet gäller inte att något döljs. Det gäller att åtgärdstabellens rad "hamnar aldrig som ett oavstämt underlag utan ärende" säger mer än koden gör, och att J1 därmed fortfarande är hög tills Hugo har beslutat.
+
+**Vad som borde hända (förslag, beslut behövs):** granskning 5:s förslag, ett ärende "möjlig dublett" när belopp och datum är samma och motpart eller fakturanummer är samma efter normaliseringen. Ett enkelt komplement i matchningen: fakturanumret får inte avgöra mellan två kandidater med samma datum, eftersom det mer liknar en dubblett än två månadsfakturor. Då blir alla fallen ovan "tvetydig", och en människa ser båda fakturorna. Det rör inga skatteregler, bara hur strikt kontrollen ska vara.
+
+#### L2. Motparten har vägar förbi kontrollerna. Allvar: medel
+
+**Vad jag körde:** samma par som i L1, men nu skiljer bara motparten. `U-1` har motparten `LEV-A`.
+
+| Motpart i U-2 | Utfall |
+|---|---|
+| `LEV` + U+2012 + `A` (ett annat bindestreck), `LEV-` + matematiskt A | K4-ärende (rätt) |
+| `LEV-А` (kyrilliskt), `LEV-Ꭺ` (cherokee), `LEV-ꓮ` (lisu), `ᏞEV-A`, `LEV-` + U+200B eller U+2060 + kyrilliskt А, `LEV-A` + U+3164 direkt efter | STOPPAD, blandat ord (rätt) |
+| `LEV-A` + U+034F, U+FE0F, U+E0100 eller U+180B (osynliga tecken, kategori Mn) | **Dubblett utan ärende** |
+| `LEV-A` + U+2800 (blank blindskrift) | **Dubblett utan ärende** |
+| `LEV-A` + mellanslag + U+3164 eller U+115F (osynliga utfyllnadstecken som ett eget ord) | **Dubblett utan ärende** |
+| `LEV-A` + U+0332 (kombinerande understrykning) | **Dubblett utan ärende** |
+| `LEV` + U+02D7, U+2796, U+2043 eller U+1680 + `A` (streckliknande tecken som inte är bindestreck) | **Dubblett utan ärende** |
+| `LEV-` + U+200A (hårfint mellanslag) eller U+2009 (smalt mellanslag) + kyrilliskt `А` | **Dubblett utan ärende** |
+| `ᏞᎬᏙ-Ꭺ` (fyra cherokeebokstäver som ser ut som `LEV-A`) | **Dubblett utan ärende** |
+| `LEV-A АВ` (kyrilliskt eget ord, byggarens kända fall) | Dubblett utan ärende (känt) |
+
+I alla fallen med "dubblett utan ärende" ger K4 inget ärende, och matchningen ser inte `U-2` som en kandidat (motparten står inte i bankradens text). `U-1` matchas, och `U-2` blir oavstämd utan ärende.
+
+Tre saker förklarar det:
+
+- **Normaliseringen tar bara bort kategori Cc och Cf.** Projektets eget test `test_inga_dolda_tecken.py` räknar U+2800, U+3164, U+115F och variantväljarna U+FE00–U+FE0F och U+E0100–U+E01EF som tecken som "ser tomma ut", men normaliseringen tar inte bort dem, och de stoppas inte i en motpart.
+- **Kontrollen av blandade ord delar vid blanksteg.** Ett hårfint mellanslag (U+200A) är ett blanksteg, så `LEV-` och `А` blir två ord, och ett ord helt på kyrilliska godtas. På skärmen syns mellanslaget knappt.
+- **Bara blandade ord stoppas.** Cherokee har bokstäver som ser ut som L, E, V och A, så ett helt ord på cherokee kan se ut exakt som `LEV-A`. Byggaren nämner kyrilliska ord för sig själva, men inte att ett sådant ord kan se exakt likadant ut som det latinska namnet.
+
+Fakturanumret är däremot väl skyddat: av allt jag provade gick bara U+00AD och U+1680 igenom (L1).
+
+**Varför medel och inte hög:** följden är densamma som i J1, men nästan alla fallen kräver tecken som knappast kommer in av en slump. De passar däremot den som med flit vill få en faktura bokförd två gånger.
+
+**Förslag (beslut behövs):** låt normaliseringen också ta bort tecknen som `test_inga_dolda_tecken.py` räknar som osynliga, och kombinerande tecken som inte syns (U+034F och variantväljarna). Alternativt stoppas en motpart med sådana tecken, som ett fakturanummer. Det som återstår, ett helt ord i ett annat skriftsystem, fångas bäst av "möjlig dublett" i L1, om den jämför belopp, datum och fakturanummer utan motparten.
+
+#### L3. J2 är delvis kvar. Allvar: låg
+
+**Vad jag körde:** två fakturor från `LEV-A` med samma belopp, båda i tidsfönstret, och en bankrad vars text råkar innehålla ett ord som är den ena fakturans nummer.
+
+| U-1:s nummer | Bankradens text | Utfall |
+|---|---|---|
+| `12345` | `LEV-A KUNDNR 12345` | U-1 matchad, inget ärende |
+| `STHLM` | `LEV-A STHLM` | U-1 matchad, inget ärende |
+| `2025-01-20` | `LEV-A 2025-01-20` | U-1 matchad, inget ärende |
+| `BETAL` | referensen `BETAL` | U-1 matchad, inget ärende |
+
+Granskarens fem fall från granskning 5 blir nu alla rätt. Men den nya regeln (minst 5 tecken, inte motpartens namn, inte en del av ett annat nummer) är en annan än granskning 5 föreslog ("bara när referensen är exakt fakturanumret"), och ett längre ord som råkar stå i texten avgör fortfarande. Det kräver att en faktura har ett nummer som också står i bankradens text av en annan anledning, så risken är liten. Om Hugo har valt regeln med flit står det inte i åtgärdsavsnittet.
+
+#### L4. Vanliga namn stoppas. Allvar: låg
+
+| Motpart | Utfall |
+|---|---|
+| `NTTドコモ`, `ABC有限公司` (latinska bokstäver ihop med japanska eller kinesiska tecken) | STOPPAD, blandat ord |
+| `Oʻzbekiston Havo Yoʻllari`, `OʼBrien Ltd` (U+02BB och U+02BC, apostrofer som räknas som bokstäver) | STOPPAD, blandat ord |
+| `µ-Tech AB` (mikrotecknet blir grekiskt μ efter normaliseringen) | STOPPAD, blandat ord |
+| `Café Москва`, `D’Angelo AB`, `Straße GmbH` | GODKÄND |
+
+Det är den säkra riktningen, och meddelandet är tydligt. Men ett vanligt underlag från en asiatisk leverantör stoppar hela perioden. SPEC 7 godtar de milda riktningsmärkena just för att de förekommer i vanlig text. Samma resonemang kan gälla här. Ingen ändring behövs nu, men Hugo bör veta att det händer.
+
+#### L5. Gränsen 20 000 och tiden. Allvar: låg
+
+| Antal bankrader och underlag | Matchning (granskning 5) | Matchning (nu) |
+|---|---|---|
+| 1 000, samma belopp | 5,71 s | 7,00 s |
+| 2 000, samma belopp | 20,26 s | 30,10 s |
+| 4 000, olika belopp | 1,23 s | 1,37 s |
+| 8 000, olika belopp | 5,56 s | 6,51 s |
+
+Tiden växer fortfarande med antalet i kvadrat. Med olika belopp tar 20 000 ungefär 40 sekunder (uppskattat). Med samma belopp, motpart och tidsfönster på alla tar 20 000 ungefär **50 minuter** (uppskattat från 2 000, gånger 100). Det är något långsammare än i granskning 5. Troligen beror det på fakturanummerregeln, eftersom bankradens ord och kandidaternas nummer normaliseras för varje bankrad med flera kandidater. Kommentaren i koden ("100 000 av varje tar ungefär en kvart") gäller bara olika belopp. Gränsen stoppar 20 001 bankrader också när de kommer från två ihopslagna bankfiler (provat). Ett litet företag kommer aldrig nära, så det spelar ingen roll i dag.
+
+#### L6. Testluckor. Allvar: låg
+
+Se uppgift D. Mutation M1 (bedömningsdatumet jämförs med bokföringsdagen i stället för transaktionsdagen) gav **0** röda tester, eftersom testet för bedömningsdatumet har samma bokföringsdag och transaktionsdag på alla rader. Beslut 3 är alltså inte låst av något test. Mutation M7 (K4a/K4b jämför med det senast behållna underlaget i stället för det första) gav också 0 röda. Det ändrar bara texten i ärendet och vilket id som står i `jamfort_med`, men det är inte bestämt vad som är rätt.
+
+#### L7. Små saker. Allvar: låg (kosmetiskt)
+
+- **Minustecknet står som det är.** `normalisering.py` rad 19: `_MINUSTECKEN = "−"`. Tecknet är U+2212, inte ett vanligt bindestreck, men det ser likadant ut. Filen finns för att skydda mot just den sortens förväxling, och testerna skriver sådana tecken med `chr()` "så att det syns i koden vilket tecken som används". `test_inga_dolda_tecken.py` slår inte larm, eftersom tecknet syns. Förslag: `chr(0x2212)`.
+- **"K4a och K4b" är en text.** När både belopp och datum skiljer har ärendet `"kontroll": "K4a och K4b"`. Ett senare steg som letar efter ärenden med kontrollen `"K4a"` missar det. En lista med två kontroller vore säkrare (beslut 2).
+- **Två normaliseringar.** K4 och fakturanummerregeln använder den nya normaliseringen, men matchningen jämför fortfarande motparten med kassans (som inte gör alla streck till "-"). Ett ensamt underlag med motparten `LEV–A` (tankstreck) och en bankrad från `LEV-A` ger "saknat underlag" och ett oavstämt underlag. Det är den säkra riktningen, men reglerna skiljer sig.
+- **A/B/C i K4.** Med A (125 kr, dag 1), B (5 kr, dag 1) och C (5 kr, dag 2) får C ärendet "olika belopp och datum" jämfört med A, fast C bara skiljer i datum från B. Inget går förlorat.
+
+### Uppgift A: är J1–J9 rättade, och stämmer SPEC?
+
+| Fynd | Mitt omprov | Bedömning |
+|---|---|---|
+| J1 | Granskning 5:s tabell A: alla streck, fullbredd, osynligt tecken och mjukt bindestreck *efter* numret ger nu K4-ärende. Kyrilliskt `Ғ-1` och `LEV-А` stoppas. `F-l`, `F 1`, `F1`, `F-01`, `LEV A` och `LEV-A AB` ger fortfarande inget ärende. Tabell B: `F‐1` blir K4-ärende, `F-l` blir "tvetydig" | Delvis rättat, se L1 och L2 |
+| J2 | Alla fem fall i granskning 5 ger nu rätt utfall | Rättat för de fallen, se L3 |
+| J3 | U+200E, U+200F och U+061C godtas, som nya SPEC 7 säger. Koden har nio riktningstecken som stoppar, i `inlasning_skydd.py` | Löst genom SPEC, inte kod. Se nedan |
+| J5 | 20 001 stoppas, 20 000 godtas (byggarens test), 20 001 från två ihopslagna filer stoppas (mitt prov) | Rättat som gräns, se L5 |
+| J6 | `U-2.JSON`, `U-3.json.txt`, `U-4.txt`, undermapp, rörledning och symbolisk länk stoppar perioden. Rörledningen får inte inläsningen att stanna | Rättat |
+| J7 | `__new__` på Bankperiod, Underlagsperiod och båda ger `MatchningFel` | Rättat. `gc` och `inspect` medvetet inte rättat |
+| J8 | Testet finns. Det är grönt även mot den gamla koden, vilket är väntat (koden sökte redan i beskrivningen), och byggarens mutation n26 visar att det slår larm | Rättat |
+| J9 | K4, K4a, K4b och "K4a och K4b" stämmer. Bedömningsdatum före en bankrad stoppas, samma dag godtas. `U-9`/`U-10` och NFC/NFD är som förut (medvetet inte rättat) | Rättat enligt åtgärdsavsnittet, se L6 och L7 |
+
+**SPEC (d667ab3).** Commiten ändrar bara `SPEC.md`: fem rader. Statusraden, K3, två punkter i SPEC 7 och den nya raden Ö11. Inget annat är ändrat eller borttaget. Den gamla texten i SPEC 7 ("Riktningstecken stoppar filen" och "idag `las_bankfil` … och `las_kassaperiod`") är ersatt av den nya, som säger samma sak och mer. Statusraden stämmer med `git show 7133f15` (K4a, K4b, K13, `cd` och `tar`, minst en momsrad, Ö8–Ö10) och a7cb12f (matchningsformatet). K3 stämmer med koden och `matchning.json` (7 dagar, tre regler för pengar in, gräns för regler för pengar ut). SPEC 7 nämner nu alla fyra funktionerna. Ö11 stämmer med regeln `bankavgift`. Commit 60fbaa3 ändrar inte SPEC, testdatan, `foretag/`, `testforetag/` eller CLAUDE.md, och lägger bara till text i GRANSKNING.md (inga borttagna rader).
+
+Jag har inte sett Hugos egna ord i uppgiften, bara åtgärdsavsnittets "Uppgiften kom från Hugo". Därför kan jag inte pröva att SPEC säger exakt det Hugo bad om, bara att texten stämmer med åtgärdsavsnittet och koden. En sak bör Hugo veta: J3 löstes **tvärtom** mot granskning 5:s förslag. Tre riktningsmärken godtas nu i stället för att stoppas. Det är ett rimligt val, men det gör att SPEC 7:s krav "ska visas synligt i rapporten" nu bär säkerheten för dem. Kravet finns inte bland de öppna frågorna, så det bör noteras inför rapportsteget, tillsammans med Ö10.
+
+### Uppgift B: övrigt som provades och fungerade
+
+- **Fakturanumrets tecken:** alla tolv förväxlingstecken jag provade som inte normaliseras bort stoppades med ett tydligt meddelande som visar tecknets kod och namn (L1, andra raden).
+- **Fakturanummerregeln:** osynligt tecken och bindestreck U+2010 i referensen avgör rätt. `F_1001`, `F-1001;F-1002` och `F-1001/F-1002` blir "tvetydig" (säker riktning). Ett kommatecken i referensen förstörde min egen provfil (bankfilen stoppades med `BankfilFel`), samma provfel som byggaren nämner, inte ett fel i koden.
+- **Underlagsmappen:** socket, `Icon\r` (macOS ikonfil), `.ds_store` med små bokstäver, `'U-2.json '` med mellanslag sist, dold fil `.U-2.json`, fil utan läsrätt och AppleDouble-filen `._U-1.json`: alla STOPPADE med tydligt meddelande. En rörledning, mapp eller länk till `/dev/zero` som heter `.DS_Store` hoppas över utan att öppnas, ofarligt. En hård länk (en fil med två namn) läses, eftersom den är en vanlig fil i mappen. En underlagsmapp som själv är en symbolisk länk följs. En tom mapp ger en tom period.
+- **Bedömningsdatumet:** bokföringsdag efter bedömningsdatumet godtas (beslut 3). 9999-12-31 godtas och gör alla rader utan underlag till ärenden, den säkra riktningen. Ett underlag daterat efter bedömningsdatumet blir oavstämt.
+- **Tomma perioder:** se J7 ovan, alla tre STOPPADE.
+
+### Uppgift C: kontroll mot reglerna
+
+| Kontroll | Resultat |
+|---|---|
+| Företagsspecifikt i kärnan | Inget. `normalisering.py` har bara Unicode-namn och tecken. De nya talen är 5 (minsta längd), 20 000 (gräns) och tusentalsavgränsaren i `_med_mellanrum`, inga belopp, konton eller momssatser. `test_karnan_ar_generell.py` söker i alla kärnfiler, även den nya |
+| Flyttal | Inga. `float` står bara i tabellerna över sorter som stoppas |
+| Ny kärnfil och genvägstestet | `normalisering.py` importerar bara `unicodedata`. Genvägstestet går igenom alla `.py`-filer i `scripts/` utom `tests/`, så den nya filen omfattas (den står inte bland undantagen). `las_underlag.py` har fått `re` och `stat`, inga nätverks- eller körningsmoduler |
+| Dolda tecken | Inga osynliga tecken (testet är grönt). Ett synligt förväxlingstecken, U+2212, i `normalisering.py` (L7) |
+| Byggarens beslut | Uppgiften nämnde fem, men åtgärdsavsnittet har **sex**. 1 (kyrilliskt stoppas): rimligt och säkert, men skyddar bara blandade ord (L2). 2 ("K4a och K4b"): rimligt, men bättre som lista (L7). 3 (transaktionsdagen): rimligt och samma som resten av matchningen, men inte testat (L6). 4 (ny kärnfil): rimligt, och testerna omfattar den. 5 (helt ord mellan blanksteg): säker riktning. 6 (ett nummer som inte får avgöra räknas ändå): säker riktning |
+| Medvetet inte rättat | J4, matchningsformatet, NFC/NFD, "lägst id", momssats över 100 %, `gc`/`inspect` och snabbare matchning: rimligt att vänta med. Men "helt osynliga motparter" (J9) hänger ihop med L2: ett osynligt eget ord efter motparten är nu en väg till en dubblett utan ärende, så den punkten bör tas med när L2 rättas |
+
+### Uppgift D: mutationstester och antal tester
+
+**Antal tester:** egen körning i rena kopior: **1 248** i d667ab3 och **1 346** i 60fbaa3. Båda stämmer med åtgärdsavsnittet. Testerna från 60fbaa3 mot koden från d667ab3: **64 röda och 1 282 gröna**, som byggaren säger. Jag läste felorsaken för ett urval: "K4" i stället för "K4a", "DID NOT RAISE" för mappen, länkarna och gränserna, "inläsningen stannade och väntade på rörledningen", och fuzzen som hittade ett resultat för ett bedömningsdatum före en bankrad. Alla röda av rätt skäl, inget för att ett namn saknas. De ändrade befintliga testerna (`git show 60fbaa3`) stämmer med listan i åtgärdsavsnittet.
+
+**Mutationer.** Elva mutationer i en ren kopia, en i taget, alla andra än byggarens n01–n40:
+
+| Nr | Fil | Borttagen eller svagare kontroll | Röda tester |
+|---|---|---|---|
+| M1 | matcha_bank.py | Bedömningsdatumet jämförs med bokföringsdagen | **0** (L6) |
+| M2 | las_underlag.py | Ett enda främmande tecken i ett ord godtas | 5 |
+| M3 | las_underlag.py | Alla dolda filer hoppas över, inte bara `.DS_Store` | 2 |
+| M4 | matcha_bank.py | "Motparten i numret" i stället för "numret i motparten" | 1 |
+| M5 | matcha_bank.py | "Den andra kandidatens nummer i numret" i stället för tvärtom | 2 |
+| M6 | matcha_bank.py | Bankradens ord jämförs bara utan stora bokstäver, utan normaliseringen | 2 |
+| M7 | las_underlag.py | K4a/K4b jämför med det senast behållna underlaget | **0** (L6) |
+| M8 | normalisering.py | Bara vanligt mellanslag tas bort, inte andra blanksteg | **0** (nästan samma beteende: NFKC gör redan de flesta blanksteg till vanligt mellanslag. Skillnaden är bara U+1680, se L1) |
+| M9 | matcha_bank.py | Första av flera nummer i texten avgör | 2 |
+| M10 | las_underlag.py | Grekiska räknas som latinska | 1 |
+| M11 | las_underlag.py | Bara första ordet prövas för blandade bokstäver | 1 |
+
+8 av 11 gav minst ett rött test. M1 och M7 är testluckor (L6), M8 är nästan likvärdig med originalet.
+
+### Testsviten
+
+Kommando: `.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests`
+
+Resultat: **1 346 passed**, 0 misslyckade, i projektet och i den rena kopian, före och efter mutationstesterna. I provkopian, med mina två provfiler: 1 457 passed (provfilerna skriver utfall och slår inte larm). `git status` visade inga ändrade filer innan det här avsnittet skrevs.
+
+**Kommandon.** Jag använde listans kommandon och fil-verktygen. Kopior, provfiler och mutationer låg bara i den tillfälliga mappen, och Python kördes bara genom testsvitens kommando, inifrån kopiorna. Provfilerna skapade själva rörledningar, en socket, länkar och filer utan läsrätt i pytests egna tillfälliga mappar, och tog bort sin egen utfallsfil i kopian innan de skrev en ny. Utanför listan i SPEC 7.1, av misstag och bara för att läsa: `echo` en gång (för att skriva "SAMMA" efter `diff -r`), `tr` en gång (för att visa en lista på en rad), och `grep -c "" /dev/null` (meningslöst, läser en tom fil utanför projektet). `cd` användes också till projektmappen (listan tillåter `cd` bara till en tillfällig mapp), alltid för att köra listans kommandon där, samma misstag som i granskning 5. Kommandona kördes ibland efter varandra med `&&` och `;`. Inget av det ändrade något i projektet.
+
+### Beslut som behövs från Hugo
+
+1. **L1 (hög):** J1 är inte stängt. Ska K4 ge ett ärende "möjlig dublett" när belopp och datum är samma och motpart eller fakturanummer är samma (granskning 5:s beslut 1, fortfarande öppet)? Och ska fakturanumret sluta avgöra mellan kandidater med samma datum? Rekommendation: ja till båda, innan konteringen byggs.
+2. **L2 (medel):** ska normaliseringen ta bort, eller inläsningen stoppa, de osynliga tecken som projektets eget test redan räknar som osynliga (U+2800, U+3164, U+115F, variantväljare) och osynliga kombinerande tecken, även i motparten? Rekommendation: ja, samtidigt som L1.
+3. **L3:** ska fakturanumret få avgöra när det står var som helst i texten (dagens regel), eller bara när referensen är exakt numret? Rekommendation: behåll dagens regel tills riktiga bankfiler finns (Ö5), och pröva då.
+4. **L4:** är det godtagbart att namn som blandar latinska bokstäver med till exempel japanska tecken stoppar perioden? Rekommendation: ja för version 1, eftersom det är den säkra riktningen.
+5. **J3 och rapporten:** de tre milda riktningsmärkena godtas nu. Kravet att de ska "visas synligt i rapporten" bör skrivas in bland det som ska byggas i rapportsteget, så att det inte glöms.
+6. **L5–L7:** små rättelser som kan samlas: tester för transaktionsdagen och K4a/K4b (L6), `chr(0x2212)`, kontrollerna som lista och samma normalisering för motparten i matchningen (L7). Ingen av dem är bråttom.
