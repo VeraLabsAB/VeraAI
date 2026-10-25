@@ -144,7 +144,29 @@ def test_beloppen_ar_heltal_aldrig_float():
 
 # --- Facit: summorna per momssats ---
 
+def lagg_ihop(*summor_per_sats):
+    """Lägger ihop flera svar från summa_per_momssats."""
+    totalt = {}
+    for summor in summor_per_sats:
+        for sats, belopp in summor.items():
+            for nyckel, ore in belopp.items():
+                totalt.setdefault(sats, {}).setdefault(nyckel, 0)
+                totalt[sats][nyckel] += ore
+    return dict(sorted(totalt.items()))
+
+
+def delar_runt_luckan(rapporter):
+    """Delar rapporterna i två hela serier: före och efter den planterade luckan (Z-rapport 1011)."""
+    lucka = [f for f in facit()["planterade_fel"] if f["typ"] == "lucka_i_z_serien"][0]["z_nummer"]
+    fore = [rader for rader in rapporter if rader[0]["znummer"] < lucka]
+    efter = [rader for rader in rapporter if rader[0]["znummer"] > lucka]
+    assert fore and efter and len(fore) + len(efter) == len(rapporter)
+    return fore, efter
+
+
 def test_summorna_per_momssats_stammer_med_facit_per_manad_och_for_hela_perioden():
+    # summa_per_momssats kör seriekontrollen först (I2). Januari har en planterad lucka (Z-rapport
+    # 1011 saknas), så januari och hela kvartalet summeras i två hela delar: före och efter luckan.
     forsaljning = facit()["forsaljning"]
     rapporter = las_alla()
     per_manad = {}
@@ -156,14 +178,70 @@ def test_summorna_per_momssats_stammer_med_facit_per_manad_och_for_hela_perioden
     for manad, fakta in forsaljning.items():
         assert len(per_manad[manad]) == fakta["antal_z_rapporter"]
         ratt = {int(sats): summor for sats, summor in fakta["per_momssats"].items()}
-        assert summa_per_momssats(per_manad[manad]) == ratt
-        for sats, summor in ratt.items():
-            for nyckel, ore in summor.items():
-                kvartal.setdefault(sats, {}).setdefault(nyckel, 0)
-                kvartal[sats][nyckel] += ore
+        if manad == "2025-01":
+            assert lagg_ihop(*(summa_per_momssats(del_) for del_ in delar_runt_luckan(per_manad[manad]))) == ratt
+        else:
+            assert summa_per_momssats(per_manad[manad]) == ratt
+        kvartal = lagg_ihop(kvartal, ratt)
 
-    assert summa_per_momssats(rapporter) == kvartal
+    assert lagg_ihop(*(summa_per_momssats(del_) for del_ in delar_runt_luckan(rapporter))) == kvartal
     assert kvartal[12]["brutto_ore"] == 27583500
+
+
+# --- I2: summeringen kör seriekontrollen först ---
+
+def test_i2_testdatans_januari_och_kvartal_stoppas_av_den_planterade_luckan():
+    rapporter = las_alla()
+    januari = [rader for rader in rapporter if rader[0]["rapportdatum"].startswith("2025-01")]
+    for period in (januari, rapporter):
+        with pytest.raises(ZSerieFel) as fel:
+            summa_per_momssats(period)
+        assert fel.value.typ == "lucka"
+        assert fel.value.saknas_fran == fel.value.saknas_till == 1011
+
+
+def test_i2_samma_z_rapport_inlast_tva_ganger_summeras_inte(tmp_path):
+    # Granskarens fall: samma Z-rapport (112 kr med 12 %) i två mappar, den ena med kassan skriven
+    # tb-kassa-1. Var för sig är filerna felfria. Den gamla koden gav 224 kr i stället för 112 kr.
+    fran_a = z_rapport(tmp_path / "a", "2025-01-02", 1001, "TB-KASSA-1")
+    fran_b = z_rapport(tmp_path / "b", "2025-01-02", 1001, "tb-kassa-1")
+    assert summa_per_momssats([fran_a])[12]["brutto_ore"] == 11200  # skydd: en rapport ensam går bra
+    with pytest.raises(ZSerieFel) as fel:
+        summa_per_momssats([fran_a, fran_b])
+    assert fel.value.typ == "dubblett"
+    assert fel.value.kassaregister == "TB-KASSA-1"
+    assert "Z-rapport 1001 finns två gånger" in str(fel.value)
+
+
+def test_i2_samma_fil_tva_ganger_summeras_inte(tmp_path):
+    rapport = z_rapport(tmp_path, "2025-01-02", 1001)
+    with pytest.raises(ZSerieFel, match="samma fil är inläst två gånger") as fel:
+        summa_per_momssats([rapport, rapport])
+    assert fel.value.typ == "dubblett"
+
+
+def test_i2_lucka_summeras_inte(tmp_path):
+    rapporter = [z_rapport(tmp_path, "2025-01-02", 1001), z_rapport(tmp_path, "2025-01-04", 1003)]
+    with pytest.raises(ZSerieFel) as fel:
+        summa_per_momssats(rapporter)
+    assert fel.value.typ == "lucka"
+    assert fel.value.saknas_fran == fel.value.saknas_till == 1002
+    # Skydd: utan luckan summeras serien.
+    hel = rapporter[:1] + [z_rapport(tmp_path, "2025-01-03", 1002)] + rapporter[1:]
+    assert summa_per_momssats(hel) == {12: {"brutto_ore": 33600, "moms_ore": 3600, "netto_ore": 30000},
+                                       25: {"brutto_ore": 15000, "moms_ore": 3000, "netto_ore": 12000}}
+
+
+def test_i2_z_nummer_som_gar_bakat_summeras_inte(tmp_path):
+    rapporter = [z_rapport(tmp_path, "2025-01-02", 1002), z_rapport(tmp_path, "2025-01-03", 1001)]
+    with pytest.raises(ZSerieFel) as fel:
+        summa_per_momssats(rapporter)
+    assert fel.value.typ == "ordning"
+
+
+def test_i2_tom_lista_summeras_inte():
+    with pytest.raises(KassafilFel, match="det finns inga Z-rapporter att kontrollera"):
+        summa_per_momssats([])
 
 
 # --- Det planterade felet: lucka i Z-serien ---

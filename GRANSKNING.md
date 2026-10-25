@@ -949,3 +949,71 @@ Kommandon som kördes i granskningen: Python i projektets `.venv` (provskript oc
 1. **I1 och I2:** ska skyddstesterna byggas ut nu, så att ingen ny kärnfil kan använda `_tolka_kassarader` eller byggstenarna i `inlasning_skydd.py`, och ska summering av försäljning bara gå efter en godkänd seriekontroll? Rekommendation: ja, innan nästa byggsteg (matchning eller rapport) börjar använda inläsningen.
 2. **I3:** hur ska osynliga tecken och riktningstecken i bank- och Z-filernas text hanteras (stoppa, ta bort eller visa synligt i rapporten)? Behöver bestämmas senast när rapporten byggs. Hör ihop med K17.
 3. **I4–I7:** små rättelser (typkontroll av sökvägen, luckmeddelandet, teststrängar som `\u`-koder). Kan samlas till ett senare tillfälle.
+
+## Åtgärder efter granskning 4
+
+Rättat 2026-10-25 i en egen session. Granskarens text ovan är inte ändrad. GRANSKNING.md med granskning 4 committades först, som den var (commit 106a7ba). Hugo sa ja till att rätta I1 och I2. I3–I7 rättas inte nu.
+
+**Ord som används nedan.** **ast** är Pythons eget verktyg för att läsa kod som Python själv ser den (vilka namn som importeras, vilka funktioner som anropas), i stället för att söka efter text. Ett **alias** är ett annat namn för samma sak, till exempel `import las_bank as b`.
+
+| Nr | Åtgärdad | Test |
+|---|---|---|
+| I1 | Ja. Ett nytt skyddstest läser alla `.py`-filer i `scripts/` (även undermappar) utom `tests/`, `las_bank.py`, `las_kassa.py` och `inlasning_skydd.py` med ast. Det slår larm om en fil importerar `inlasning_skydd` på något sätt (även `from . import`, paketnamn och inuti en funktion), hämtar `_tolka_rader`, `_tolka_kassarader` eller en byggsten från `las_bank`/`las_kassa` (som import, som `las_bank.csv_rader`, via alias eller med `import *`), har ett förbjudet namn skrivet som text, eller slår upp ett namn som byggs ihop medan programmet kör (`getattr`, `hasattr`, `attrgetter` m.fl. med ett namn som inte är skrivet rakt ut, eller `eval`, `exec`, `__import__`, `importlib`, `vars`, `globals`, `sys.modules`, `__dict__`, `builtins`). Listan med förbjudna namn byggs från koden: allt som `inlasning_skydd.py` definierar, plus namn i `las_bank.py`/`las_kassa.py` som pekar på en genväg (importerade byggstenar under eget namn och alias som `TOLKA = _tolka_rader`, G8 punkt 5). En ny byggsten blir därför förbjuden utan att testet ändras. En ny inläsningsmodul (till exempel för kvitton) måste läggas till i listan över undantag med flit | `scripts/tests/test_inga_genvagar.py`: `test_i1_ingen_karnfil_anvander_en_genvag`, 50 fall i `test_i1_kontrollen_hittar_en_fil_som_anvander_en_genvag` (påhittad fil i `tmp_path`, bland dem granskarens tre rader och `getattr` med hopsatt text), `test_i1_kontrollen_hittar_alias_i_en_inlasningsmodul`, `test_i1_kontrollen_hittar_en_genvag_i_en_undermapp`, skyddstester: `test_i1_undantagen_och_testerna_far_anvanda_genvagarna`, `test_i1_de_undantagna_filerna_finns`, `test_i1_de_forbjudna_namnen_hittas`, 7 fall i `test_i1_vanlig_kod_slaps_igenom` |
+| I2 | Ja. `summa_per_momssats` kör `kontrollera_z_serien` först. En dubblett, lucka, ett Z-nummer som går bakåt eller en tom lista stoppas med samma fel som seriekontrollen ger, och ingen summa returneras. Beskrivningen överst i `las_kassa.py` säger det | `test_i2_samma_z_rapport_inlast_tva_ganger_summeras_inte` (granskarens fall: två mappar, `TB-KASSA-1` och `tb-kassa-1`), `test_i2_samma_fil_tva_ganger_summeras_inte`, `test_i2_lucka_summeras_inte`, `test_i2_z_nummer_som_gar_bakat_summeras_inte`, `test_i2_tom_lista_summeras_inte`, `test_i2_testdatans_januari_och_kvartal_stoppas_av_den_planterade_luckan` |
+| I3 | Nej, medvetet | Kräver Hugos beslut (beslut 2 i granskning 4): stoppa, ta bort eller visa osynliga tecken. Hör ihop med rapportsteget och K17 |
+| I4 | Nej, medvetet | Kräver ett programmeringsfel och fanns före flytten. Samlas med andra små rättelser (beslut 3) |
+| I5 | Nej, medvetet | Kräver ett programmeringsfel. Efter I1 kan ingen annan kärnfil än inläsningsmodulerna anropa byggstenarna, så det spelar mindre roll nu. Se förslaget nedan |
+| I6 | Nej, medvetet | Kosmetiskt, serien stoppas rätt. Samlas med andra små rättelser (beslut 3) |
+| I7 | Nej, medvetet | Gäller en siffra i en tidigare slutrapport, inte koden |
+
+**Testdatans planterade lucka och facit (I2).** Januari i testdatan har en planterad lucka: Z-rapport 1011 (2025-01-15) saknas. Efter I2 vägrar `summa_per_momssats` därför att summera januari och hela kvartalet i ett stycke, vilket är rätt. Det befintliga facittestet (`test_summorna_per_momssats_stammer_med_facit_per_manad_och_for_hela_perioden`) var det enda befintliga testet som anropade `summa_per_momssats` (kontrollerat med grep). Det summerar nu januari och kvartalet i två hela delar, före och efter luckan, och lägger ihop dem. Februari och mars summeras som förut. Facit stämmer fortfarande för alla tre månaderna och kvartalet. Det nya testet `test_i2_testdatans_januari_och_kvartal_stoppas_av_den_planterade_luckan` kräver att januari och kvartalet i ett stycke stoppas vid Z-rapport 1011. Facit och testdatan är inte ändrade.
+
+**Så bevisades testerna.** De nya testerna kördes i en kopia av projektet utanför projektmappen, med koden från commit 61a5946 (den granskade versionen).
+
+- I2: 6 nya tester blev röda av rätt skäl (`DID NOT RAISE`). Gamla koden gav 224 kr i stället för 112 kr för granskarens fall, och en tom summa (`{}`) för en tom lista. Alla andra 559 tester var gröna, även det ändrade facittestet.
+- I1: på gamla koden är det nya testet grönt, eftersom ingen kärnfil använder en genväg i dag. Granskarens försök (b) gjordes därför om: en ny fil `scripts/rapport.py` med en rad i taget lades till i kopian.
+
+| Rad i den nya filen `scripts/rapport.py` | Gamla testsviten (496) | Nya testet säger |
+|---|---|---|
+| `from las_bank import _tolka_rader` | 1 röd (F11) | röd: "hämtar _tolka_rader från las_bank" |
+| `from las_kassa import _tolka_kassarader` | **496 gröna** | röd: "hämtar _tolka_kassarader från las_kassa" |
+| `from inlasning_skydd import las_fil, avkoda, csv_rader` | **496 gröna** | röd: "importerar från inlasning_skydd" |
+| `from las_bank import csv_rader, las_fil, avkoda` | **496 gröna** | röd: "hämtar avkoda/csv_rader/las_fil från las_bank" |
+| `import las_bank as b; f = getattr(b, '_tolka_' + 'rader')` (G8 punkt 5) | **496 gröna** | röd: "getattr med ett namn som inte är skrivet rakt ut som text" |
+| `TOLKA = _tolka_rader` sist i `las_bank.py`, och `las_bank.TOLKA` i `rapport.py` (G8 punkt 5) | **496 gröna** | röd: "använder .TOLKA" |
+
+Dessutom gjordes ett mutationstest på den nya koden: en ny kontroll i taget togs bort i en kopia, och hela sviten kördes. Alla gav minst ett rött test. En regel (genvägarnas namn som fristående namn i koden) gav först inget rött test. Den visade sig fånga bara sådant som de andra reglerna redan fångar, och togs bort. Regeln mot `import builtins`/`importlib` gav först inget rött test och fick två egna testfall (`import builtins as b; b.vars(...)` och `import importlib.util as u`).
+
+| Borttagen kontroll (i en kopia) | Röda tester |
+|---|---|
+| I2: seriekontrollen i `summa_per_momssats` | 6 |
+| I1: `import inlasning_skydd` | 3 |
+| I1: `from inlasning_skydd import …` | 4 |
+| I1: `from . import inlasning_skydd` | 1 |
+| I1: `from las_bank import *` | 1 |
+| I1: förbjudet namn hämtat från `las_bank`/`las_kassa` | 10 |
+| I1: förbjudet namn som attribut (`las_bank.csv_rader`) | 8 |
+| I1: förbjudet namn skrivet som text | 2 |
+| I1: `getattr` m.fl. med hopsatt namn | 7 |
+| I1: `getattr` m.fl. använd som värde (`g = getattr`) | 1 |
+| I1: `getattr` m.fl. importerad under eget namn | 1 |
+| I1: `eval`, `vars`, `__import__`, `globals` m.fl. | 3 |
+| I1: `sys.modules` och `__dict__` | 2 |
+| I1: `import builtins`/`importlib` | 2 |
+| I1: `from importlib import …` | 1 |
+| I1: fil som inte går att läsa som Python | 1 |
+| I1: alias i inläsningsmodulerna (`TOLKA = _tolka_rader`) | 1 |
+| I1: byggstenar importerade under eget namn i inläsningsmodulerna | 1 |
+| I1: byggstenarna läses från `inlasning_skydd.py` | 1 |
+| I1: undermappar genomsöks | 1 |
+
+**Vad I1-testet inte klarar.** Det kan inte bevisa att ingen genväg finns. Den som medvetet skriver kod för att lura det kan lyckas i Python, till exempel genom att lägga modulen i en lista och läsa ut den med ett påhittat namn via en funktion som inte står i listan. Det kan inte heller se en ny genväg som skrivs inne i `las_bank.py` eller `las_kassa.py` (till exempel en ny funktion som anropar `_tolka_rader`), eftersom de filerna är undantagna. Testet stoppar misstag och de enkla sätten att lura det, och en ändring i de undantagna filerna syns i granskningen. Det förbjuder också `getattr` med hopsatt namn, `eval`, `exec` och dynamisk import i hela kärnan, vilket ingen kärnfil använder i dag (granskning 4, uppgift D).
+
+**Förslag (inte gjort).** Två sätt att göra skyddet starkare än ett test, att ta ställning till innan nästa inläsningsmodul byggs:
+
+1. Gör byggstenarna interna (`_las_fil`, `_avkoda` …) och låt `las_bank` och `las_kassa` sluta exportera dem. Det ändrar inget beteende men gör det tydligt i koden att de inte är till för annan kod.
+2. Samla byggstenarna i en enda funktion i `inlasning_skydd.py`, till exempel `las_csv(sokvag, filsort, …)`, som alltid kör alla skydd i rätt ordning (läsning, avkodning, NUL, styrtecken, rubrikrad, CSV-rader). Då kan en ny inläsningsmodul inte glömma ett steg, och I5 blir mindre viktigt. Detsamma för kassan: en funktion som läser en hel period (alla Z-filer, Z-kontroll a–e, seriekontrollen och summan) i stället för att anroparen sätter ihop stegen.
+
+**Ny iakttagelse under arbetet (inte rättad).** Efter I2 går en månad med en saknad Z-rapport inte att summera alls förrän den saknade rapporten är hämtad. Det är rätt för en inläsning, men testdatan säger att Z-rapport 1011 *inte finns* (butiken hade öppet, och dagens betalningar syns på banken). Hur en sådan månad ska hanteras i drift (ärende till människa, eller summering med ett godkänt undantag) behöver bestämmas när K10 och rapporten byggs.
+
+Testsviten efter rättelserna: 565 passed, 0 misslyckade (496 före, 63 nya i `test_inga_genvagar.py` och 6 nya i `test_las_kassa.py`).

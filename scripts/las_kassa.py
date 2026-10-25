@@ -38,6 +38,10 @@ kassaregister ska följa på varandra utan luckor och utan dubbletter, och datum
 bakåt när Z-numret ökar. Luckor beskrivs som ett intervall, både de saknade Z-numren och dagarna
 utan rapport, och ett Z-nummer som verkar ha börjat om ger ett eget meddelande (öppen fråga H4).
 
+summa_per_momssats summerar försäljningen per momssats för flera Z-rapporter. Den kör alltid
+kontrollera_z_serien först, så en dubblett, en lucka eller en tom lista stoppar summeringen (I2).
+Rapporterna som summeras måste alltså vara en hel serie utan luckor.
+
 Vid minsta fel stoppas hela filen: inga rader returneras, och ett KassafilFel kastas.
 """
 
@@ -665,7 +669,13 @@ def kontrollera_z_serien(rapporter):
 
 
 def summa_per_momssats(rapporter):
-    """Försäljning per momssats för flera Z-rapporter: {sats: {"brutto_ore", "moms_ore", "netto_ore"}}."""
+    """Försäljning per momssats för flera Z-rapporter: {sats: {"brutto_ore", "moms_ore", "netto_ore"}}.
+
+    Kör kontrollera_z_serien först, så att samma Z-rapport aldrig räknas två gånger och en period
+    med en lucka i Z-serien inte summeras (I2). En dubblett, lucka eller tom lista stoppas med samma
+    fel som seriekontrollen ger, och ingen summa returneras.
+    """
+    kontrollera_z_serien(rapporter)
     summor = {}
     for rader in rapporter:
         for rad in rader:
