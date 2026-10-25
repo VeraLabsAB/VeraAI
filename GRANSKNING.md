@@ -1281,3 +1281,14 @@ Testsviten efter del B: **1 037 passed**, 0 misslyckade (1 025 före).
 | m63 | Generalitetstestet: bankradstexten `KORTKOP` i en kommentar i `matcha_bank.py` | 1 |
 
 Testsviten efter del C: **1 203 passed**, 0 misslyckade (1 037 efter del B, alltså 166 nya tester i `test_matcha_bank.py`, `test_las_matchningsformat.py`, `test_inga_genvagar.py` och `test_karnan_ar_generell.py`). SPEC.md är inte ändrad i del B och C.
+
+### Hugos beslut om säkerhetsfrågorna i del C
+
+Beslutade 2026-10-25, efter del C. Ingen kod är ändrad av besluten än.
+
+| Fråga | Beslut | Görs |
+|---|---|---|
+| En borttagen bankrad syns inte | `las_bankfil` ska lämna ett resultat som inte går att ändra, som kassan och underlagen redan gör. Annars kan en bankrad tas bort efter inläsningen och aldrig bli ett ärende | Egen uppgift, **innan granskningen** av del B och C |
+| Bankens avgifter slipper underlag oavsett belopp | Nytt krav i konfigurationen: varje regel i `kraver_inte_underlag` för utgående rader måste ha en högsta summa per bankrad. En rad som passar regeln men ligger över summan blir ett ärende direkt, med en egen typ (till exempel "över gräns för regeln bankavgift"), och matchas inte först mot underlag. För Syntet Testbutik är gränsen för `bankavgift` 250 kr (avgifterna i testdatan är 125 och 199 kr) | Egen uppgift, nu. Bankens avgiftsspecifikation som riktigt underlag kommer senare: den kräver en ny dokumenttyp i SPEC (förslag till ny öppen fråga) |
+| `matchning.json` ligger där agenten kan skriva | Matchningsformatet skrivs in i SPEC avsnitt 7 bland filerna som ska ligga där agenten inte kan skriva | Gjort i SPEC.md (samma commit som det här avsnittet). Själva flytten görs i spärrsteget, som för bank- och kassaformatet |
+| Ett `Matchningsresultat` kan skapas av annan kod | **Krav på rapportsteget:** rapporten kör `matcha_period` själv och tar aldrig emot ett färdigt `Matchningsresultat`. När rapportsteget byggs får resultatet samma nyckelskydd som `Underlagsperiod`, och genvägstestet får ett undantag för det, med flit | Regeln gäller nu. Skyddet byggs i rapportsteget |

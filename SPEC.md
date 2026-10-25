@@ -156,7 +156,7 @@ En saknad Z-rapport blir ett ärende på nivå D (avsnitt 5). Månaden summeras 
 - **Inget bokförs utan godkännande** av en människa hos företaget, i båda lägena.
 - **Bara läsrätt** till bank, mejl och bokföringsprogram när Vera hämtar underlag. Skrivrätt till bokföringsprogrammet finns bara i själva bokföringssteget efter godkännande.
 - **En spärr läser aldrig från en mapp som agenten kan skriva i.** Det spärrarna jämför mot ska ligga skyddat.
-- **Bankformat, kassaformat och saldon ligger i en mapp som agenten inte kan skriva i**, och spärrarna läser bara därifrån. Byggs i spärrsteget. Fram till dess ligger formaten i `foretag/<namn>/`, som agenten kan skriva i.
+- **Bankformat, kassaformat, matchningsformat och saldon ligger i en mapp som agenten inte kan skriva i**, och spärrarna läser bara därifrån. Byggs i spärrsteget. Fram till dess ligger formaten i `foretag/<namn>/`, som agenten kan skriva i.
 - **Varje källa har en enda funktion som alltid kör alla kontroller** (idag `las_bankfil` för banken och `las_kassaperiod` för kassan). Genvägar förbi kontrollerna är förbjudna, och ett test slår larm om någon annan kod använder dem.
 - **Riktningstecken stoppar filen.** Riktningstecken är osynliga tecken som kan få en text att visas i en annan ordning än den är lagrad, så att till exempel en beskrivning ser ut som en annan. Andra osynliga **formattecken** (till exempel nollbreddsmellanslag) godtas, men ska visas synligt i rapporten så att godkännaren ser dem.
 - **Fast lista med kommandon.** Agenten får bara köra de kommandon som står uttryckligen på listan (7.1).
