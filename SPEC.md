@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Bolag | Vera Labs AB (produkt: Vera AI) |
-| Status | Godkänd av Hugo 2026-10-24 (utkast 1). Ändrad efter Hugos OK 2026-10-25: K1 kräver båda saldona, nya kontroller K11 och K12 (avsnitt 6), saldon och periodgränser (6.1), saknad Z-rapport (6.2), fyra nya säkerhetsgrunder (7), fast kommandolista (7.1), tillägg till Ö3 och Ö5 och momsfil för K5 (11). Senare samma dag, efter Hugos OK: K4a, K4b och K13 (6), `cd` och `tar` i 7.1, beslutet om minst en momsrad och Ö8–Ö10 (11) i commit 7133f15; matchningsformatet bland filerna som ska ligga skyddat (7) i commit a7cb12f; styrande och milda riktningstecken och en enda funktion per källa (7), K3 med väntetid och bankrader som inte kräver underlag (6) och Ö11 (11) efter granskning 5 (J10). Ändras bara efter Hugos OK |
+| Status | Godkänd av Hugo 2026-10-24 (utkast 1). Ändrad efter Hugos OK 2026-10-25: K1 kräver båda saldona, nya kontroller K11 och K12 (avsnitt 6), saldon och periodgränser (6.1), saknad Z-rapport (6.2), fyra nya säkerhetsgrunder (7), fast kommandolista (7.1), tillägg till Ö3 och Ö5 och momsfil för K5 (11). Senare samma dag, efter Hugos OK: K4a, K4b och K13 (6), `cd` och `tar` i 7.1, beslutet om minst en momsrad och Ö8–Ö10 (11) i commit 7133f15; matchningsformatet bland filerna som ska ligga skyddat (7) i commit a7cb12f; styrande och milda riktningstecken och en enda funktion per källa (7), K3 med väntetid och bankrader som inte kräver underlag (6) och Ö11 (11) efter granskning 5 (J10). Efter granskning 6 (L1), med Hugos OK: K4c, möjlig dublett (6). Ändras bara efter Hugos OK |
 | Ersätter | Den gamla specen för ett enskilt företag (ligger i arkivmappen) |
 
 Specen säger **vad** som ska byggas och **hur det ska bete sig**. Den är medvetet kort. Detaljer läggs i egna filer när vi kommer till respektive byggsteg.
@@ -125,6 +125,7 @@ Gränser för belopp ligger i konfigurationen och sätts lågt i början.
 | K4 | Inga dubbletter |
 | K4a | Samma motpart och fakturanummer men olika belopp. Blir ett ärende, och båda underlagen behålls |
 | K4b | Samma motpart och fakturanummer men olika datum. Blir ett ärende, och båda underlagen behålls |
+| K4c | Möjlig dublett: samma belopp och datum, och samma motpart eller samma fakturanummer, men inte båda (då är det en dublett, K4). Motpart och fakturanummer jämförs efter samma normalisering som i K4. Blir ett ärende, "möjlig dublett", och båda underlagen behålls. En människa avgör |
 | K5 | Momsen stämmer med underlaget och satsen finns för datumet |
 | K6 | Rätt period |
 | K7 | Ägare och närstående: alltid ärende |
