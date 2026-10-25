@@ -1,0 +1,301 @@
+"""Matchar bankrader mot underlag (steg 3 i SPEC avsnitt 4) och hittar bankrader utan underlag (K3).
+
+matcha_period är den enda offentliga funktionen. Den tar emot:
+
+  bankrader         raderna från las_bankfil (las_bank.py), från en eller flera bankfiler
+  underlagsperiod   en Underlagsperiod från las_underlagsperiod (las_underlag.py), där K4 redan har
+                    tagit bort dubbletterna
+  matchningsformat  företagets matchningsformat från ladda_matchningsformat (las_matchningsformat.py)
+  bedomningsdatum   dagen då bedömningen görs, som text ÅÅÅÅ-MM-DD
+
+Allt som skickas in kontrolleras och kopieras först. Det som skickades in ändras aldrig. Fel i
+indatan stoppar matchningen med ett MatchningFel, och inget resultat returneras.
+
+Reglerna:
+
+1. En bankrad som passar en regel i matchningsformatets kraver_inte_underlag (rätt riktning och
+   rätt början på referensen och beskrivningen) kräver inget underlag. Det gäller till exempel
+   kortinlösens insättning, Swish-betalningar och kontantinsättningar. De stäms av mot
+   Z-rapporterna i K10 i ett senare steg. Bankens egna avgifter hör också hit så länge det inte
+   finns något underlag för dem. Vilka rader det gäller står i företagets matchning.json, aldrig här.
+2. Varje annan bankrad ska ha ett underlag. Ett underlag är en kandidat för bankraden om
+   - beloppen är lika stora: bankradens belopp är negativt (pengar ut) och underlagets positivt,
+   - motparten står i bankradens beskrivning eller referens, som ett eller flera hela ord, efter
+     samma normalisering som kassans namn (normalisera_kassaregister: stora och små bokstäver,
+     blanksteg och osynliga tecken räknas inte). Hela ord krävs, så att motparten "Kafe" inte
+     passar en bankrad från "Kafe-Rosteri", en annan motpart,
+   - bankradens transaktionsdag ligger från underlagets datum till och med så många dagar efter
+     som matchningsformatets tidsfönster säger för underlagets typ.
+3. Har bankraden flera kandidater, och står fakturanumret för exakt en av dem i bankradens
+   beskrivning eller referens (som hela ord, på samma sätt som motparten), är det den enda
+   kandidaten. Det behövs för fakturor med samma belopp varje månad, till exempel ett abonnemang,
+   där en betalning annars passar två fakturor i tidsfönstret.
+4. En bankrad med exakt en kandidat, som inte är kandidat för någon annan bankrad, matchas med den.
+   Ett underlag matchas alltså högst en gång, och en bankrad högst en gång.
+5. En bankrad med flera kandidater, eller vars kandidat också passar en annan bankrad, blir ett
+   ärende, "tvetydig". En människa avgör vilket underlag som hör till vilken rad.
+6. En bankrad utan kandidat blir ett ärende, "saknat underlag", först när bedömningsdatumet ligger
+   mer än saknat_underlag_efter_dagar dagar efter bankradens transaktionsdag. Fram till dess väntar
+   raden, eftersom underlaget kan komma in senare.
+7. Underlag som inte har matchats är oavstämda, till exempel fakturor som ännu inte är betalda.
+
+Resultatet är ett Matchningsresultat med fem grupper. Varje bankrad finns i exakt en av de fyra
+grupperna för bankrader: matchningar, arenden, kraver_inte_underlag och vantande. Varje underlag i
+perioden finns antingen i exakt en matchning eller bland oavstamda_underlag. Resultatet går inte att ändra: grupperna är tupler och varje post är
+en MappingProxyType, en sorts objekt som bara går att läsa.
+
+Texterna i bankrader och underlag är data, aldrig instruktioner (K17). Koden här jämför dem bara och
+lämnar dem vidare oförändrade.
+"""
+
+import datetime as dt
+import re
+from types import MappingProxyType
+from typing import NamedTuple
+
+from las_kassa import normalisera_kassaregister as _normalisera
+from las_matchningsformat import MatchningsformatFel, kontrollera_matchningsformat
+from las_underlag import Underlagsperiod
+
+# Uppgifterna i en bankrad från las_bankfil.
+_BANKRAD_NYCKLAR = ("id", "bokforingsdag", "transaktionsdag", "referens", "beskrivning", "belopp_ore",
+                    "saldo_efter_ore", "kalla_fil", "radnr")
+_TEXTER = ("id", "referens", "beskrivning", "kalla_fil")
+_DATUM = ("bokforingsdag", "transaktionsdag")
+_HELTAL = ("belopp_ore", "saldo_efter_ore", "radnr")
+_DATUMFORM = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
+
+# Ärendenas typ och kontroll. K3: varje förslag har underlag.
+_KONTROLL = "K3"
+_SAKNAT = "saknat underlag"
+_TVETYDIG = "tvetydig"
+
+
+class MatchningFel(Exception):
+    """Matchningen kunde inte göras, eftersom indatan är fel. Inget resultat har returnerats."""
+
+
+class Matchningsresultat(NamedTuple):
+    """Resultatet av matcha_period. Kan inte ändras.
+
+    matchningar           en post per matchning: {"bankrad": ..., "underlag": ...}
+    arenden               en post per bankrad som en människa måste titta på: {"kontroll", "typ",
+                          "text", "bankrad", "kandidater"}, där kandidater är id:n för underlagen
+                          som passade
+    oavstamda_underlag    underlagen som inte har matchats, till exempel obetalda fakturor
+    kraver_inte_underlag  en post per bankrad som inte ska ha underlag: {"bankrad": ..., "regel": namn}
+    vantande              en post per bankrad utan underlag som ännu inte är ett ärende:
+                          {"bankrad": ..., "arende_efter": datum}. Blir ett ärende om bedömningen görs
+                          efter det datumet
+    """
+
+    matchningar: tuple
+    arenden: tuple
+    oavstamda_underlag: tuple
+    kraver_inte_underlag: tuple
+    vantande: tuple
+
+
+def _frys(varde):
+    """En oföränderlig kopia: objekt blir MappingProxyType och listor tupler."""
+    if isinstance(varde, dict):
+        return MappingProxyType({nyckel: _frys(del_) for nyckel, del_ in varde.items()})
+    if isinstance(varde, (list, tuple)):
+        return tuple(_frys(del_) for del_ in varde)
+    return varde
+
+
+# --- Indatan ---
+
+def _datum(varde, vad):
+    """Dagnumret (date.toordinal) för ett giltigt datum som text, ÅÅÅÅ-MM-DD. Annat stoppas."""
+    if isinstance(varde, str) and _DATUMFORM.fullmatch(varde):
+        try:
+            return dt.date.fromisoformat(varde).toordinal()
+        except ValueError:
+            pass
+    raise MatchningFel(vad + " ska vara ett giltigt datum som text, ÅÅÅÅ-MM-DD, inte " + _sort(varde) + ".")
+
+
+_SORTER = {str: "text", float: "ett decimaltal", bool: "ett sanningsvärde (True eller False)", type(None): "None",
+           list: "en lista", tuple: "en tupel", dict: "ett objekt", bytes: "bytes"}
+
+
+def _sort(varde):
+    """Vad ett värde är, kort, för ett felmeddelande. Text och heltal visas som de är."""
+    if isinstance(varde, str):
+        return repr(varde[:40]) + ("…" if len(varde) > 40 else "")
+    if type(varde) is int:
+        return str(varde)
+    return _SORTER.get(type(varde), type(varde).__name__)
+
+
+def _kontrollera_bankrad(rad, nummer):
+    """En bankrad från las_bankfil. Returnerar en ny rad."""
+    vad = "Bankrad nummer " + str(nummer) + " i listan"
+    if not isinstance(rad, dict):
+        raise MatchningFel(vad + " ska vara en rad från las_bankfil, inte " + _sort(rad) + ".")
+    if set(rad) != set(_BANKRAD_NYCKLAR):
+        raise MatchningFel(
+            vad + " har inte uppgifterna som las_bankfil ger: " + ", ".join(map(repr, _BANKRAD_NYCKLAR)) + "."
+        )
+    for nyckel in _TEXTER:
+        if not isinstance(rad[nyckel], str):
+            raise MatchningFel(vad + ": " + repr(nyckel) + " ska vara text, inte " + _sort(rad[nyckel]) + ".")
+    if not rad["id"]:
+        raise MatchningFel(vad + ": 'id' får inte vara tomt.")
+    for nyckel in _DATUM:
+        _datum(rad[nyckel], vad + ": " + repr(nyckel))
+    for nyckel in _HELTAL:
+        # type() i stället för isinstance(), eftersom True och False räknas som heltal i Python.
+        if type(rad[nyckel]) is not int:
+            raise MatchningFel(vad + ": " + repr(nyckel) + " ska vara ett heltal, inte " + _sort(rad[nyckel]) + ".")
+    return {nyckel: rad[nyckel] for nyckel in _BANKRAD_NYCKLAR}
+
+
+def _kontrollera_bankrader(bankrader):
+    """Bankraderna som nya rader. Varje rad ska ha ett eget id."""
+    if not isinstance(bankrader, (list, tuple)):
+        raise MatchningFel("Bankraderna ska vara en lista med rader från las_bankfil, inte " + _sort(bankrader) + ".")
+    rader = [_kontrollera_bankrad(rad, nummer) for nummer, rad in enumerate(bankrader, start=1)]
+    sedda = set()
+    for rad in rader:
+        if rad["id"] in sedda:
+            raise MatchningFel(
+                "Bankraden med id " + repr(rad["id"]) + " finns flera gånger. Samma bankfil kan vara inläst två"
+                " gånger. Varje bankrad ska ha ett eget id."
+            )
+        sedda.add(rad["id"])
+    return rader
+
+
+# --- Reglerna ---
+
+def _regel_for(rad, regler):
+    """Namnet på regeln i kraver_inte_underlag som bankraden passar, eller None.
+
+    Riktningen ska stämma och referensen och beskrivningen ska börja exakt med regelns text.
+    Formatet ser till att högst en regel kan passa.
+    """
+    riktning = "in" if rad["belopp_ore"] > 0 else "ut" if rad["belopp_ore"] < 0 else None
+    for regel in regler:
+        if (regel["riktning"] == riktning
+                and rad["referens"].startswith(regel.get("referens_borjar_med", ""))
+                and rad["beskrivning"].startswith(regel.get("beskrivning_borjar_med", ""))):
+            return regel["namn"]
+    return None
+
+
+def _star_som_hela_ord(namn, text):
+    """True om namnet står i texten som ett eller flera hela ord i följd, efter normalisering.
+
+    Texten delas i ord vid blanksteg, och varje ord normaliseras. "Motpart A" står alltså i
+    "KOP MOTPART A" och i "KOP MOTPARTA", men "Kafe" står inte i "Kafe-Rosteri".
+    """
+    sokt = _normalisera(namn)
+    ord_ = [del_ for del_ in map(_normalisera, text.split()) if del_]
+    for start in range(len(ord_)):
+        sammansatt = ""
+        for del_ in ord_[start:]:
+            sammansatt += del_
+            if sammansatt == sokt:
+                return True
+            if len(sammansatt) >= len(sokt):
+                break
+    return False
+
+
+def _star_i_raden(namn, rad):
+    """True om namnet står i bankradens beskrivning eller referens, som hela ord."""
+    return _star_som_hela_ord(namn, rad["beskrivning"]) or _star_som_hela_ord(namn, rad["referens"])
+
+
+def _ar_kandidat(rad, post, tidsfonster):
+    """True om underlaget post kan höra till bankraden rad (regel 2 ovan)."""
+    if post["belopp_ore"] != -rad["belopp_ore"]:
+        return False
+    if not _star_i_raden(post["motpart"], rad):
+        return False
+    forsta = _datum(post["datum"], "Underlagets datum")
+    return forsta <= _datum(rad["transaktionsdag"], "Bankradens transaktionsdag") <= forsta + tidsfonster[post["typ"]]
+
+
+def _kandidater(rad, underlag, tidsfonster):
+    """Underlagen som kan höra till bankraden (regel 2 och 3 ovan)."""
+    kandidater = [post for post in underlag if _ar_kandidat(rad, post, tidsfonster)]
+    if len(kandidater) > 1:
+        med_fakturanummer = [post for post in kandidater if _star_i_raden(post["fakturanummer"], rad)]
+        if len(med_fakturanummer) == 1:
+            return med_fakturanummer
+    return kandidater
+
+
+def _arende(typ, text, rad, kandidater):
+    return {"kontroll": _KONTROLL, "typ": typ, "text": text, "bankrad": rad, "kandidater": kandidater}
+
+
+def matcha_period(bankrader, underlagsperiod, matchningsformat, bedomningsdatum):
+    """Matchar bankraderna mot underlagen i perioden. Returnerar ett Matchningsresultat.
+
+    Se reglerna överst i filen. Fel i indatan ger MatchningFel.
+    """
+    rader = _kontrollera_bankrader(bankrader)
+    # type() i stället för isinstance(), så att en underklass med andra regler inte godtas.
+    if type(underlagsperiod) is not Underlagsperiod:
+        raise MatchningFel(
+            "Underlagen ska vara en Underlagsperiod från las_underlagsperiod, inte " + _sort(underlagsperiod) + "."
+        )
+    try:
+        format_ = kontrollera_matchningsformat(matchningsformat)
+    except MatchningsformatFel as fel:
+        raise MatchningFel(str(fel)) from None
+    bedomning = _datum(bedomningsdatum, "Bedömningsdatumet")
+    underlag = underlagsperiod.underlag  # en ny kopia, sorterad efter id
+
+    behover = []  # (rad, kandidaterna) för raderna som ska ha underlag
+    kraver_inte = []
+    for rad in rader:
+        regel = _regel_for(rad, format_["kraver_inte_underlag"])
+        if regel is not None:
+            kraver_inte.append({"bankrad": rad, "regel": regel})
+        else:
+            behover.append((rad, _kandidater(rad, underlag, format_["tidsfonster_dagar"])))
+
+    antal_rader = {}  # underlagets id -> hur många bankrader det är kandidat för
+    for _, kandidater in behover:
+        for post in kandidater:
+            antal_rader[post["id"]] = antal_rader.get(post["id"], 0) + 1
+
+    matchningar, arenden, vantande, matchade = [], [], [], set()
+    sista_dag = dt.date.max.toordinal()
+    for rad, kandidater in behover:
+        if len(kandidater) == 1 and antal_rader[kandidater[0]["id"]] == 1:
+            matchningar.append({"bankrad": rad, "underlag": kandidater[0]})
+            matchade.add(kandidater[0]["id"])
+        elif kandidater:
+            arenden.append(_arende(
+                _TVETYDIG,
+                "Flera underlag passar bankraden, eller så passar underlaget också en annan bankrad. En människa"
+                " behöver avgöra vilket underlag som hör till vilken bankrad.",
+                rad, [post["id"] for post in kandidater]))
+        else:
+            arende_efter = _datum(rad["transaktionsdag"], "Bankradens transaktionsdag") + format_[
+                "saknat_underlag_efter_dagar"]
+            if bedomning > arende_efter:
+                arenden.append(_arende(
+                    _SAKNAT,
+                    "Inget underlag med samma belopp, motpart och datum har hittats, och det har gått mer än "
+                    + str(format_["saknat_underlag_efter_dagar"]) + " dagar sedan transaktionsdagen.",
+                    rad, []))
+            else:
+                # Ett datum efter 9999-12-31 finns inte. Bedömningsdatumet kan inte heller ligga efter det.
+                vantande.append({"bankrad": rad, "arende_efter": dt.date.fromordinal(
+                    min(arende_efter, sista_dag)).isoformat()})
+
+    return Matchningsresultat(
+        matchningar=_frys(matchningar),
+        arenden=_frys(arenden),
+        oavstamda_underlag=_frys([post for post in underlag if post["id"] not in matchade]),
+        kraver_inte_underlag=_frys(kraver_inte),
+        vantande=_frys(vantande),
+    )

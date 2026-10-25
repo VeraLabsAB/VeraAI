@@ -149,17 +149,20 @@ def test_karnans_egna_ord_ar_verkligen_karnans_nycklar():
 
 # Underlagets nycklar är kärnans egen form för underlag (las_underlag.py), gemensam för alla
 # företag. Några av dem ("datum", "moms", "momssats") råkar också vara namn i testbutikens
-# kassaformat. De godtas som textsträngar bara i las_underlag.py, där formen beskrivs. Alla andra
-# kärnfiler prövas som förut.
+# kassaformat. De godtas som textsträngar bara i las_underlag.py, där formen beskrivs, och i
+# matcha_bank.py, som läser underlagens uppgifter (till exempel "datum"). Alla andra kärnfiler
+# prövas som förut.
 UNDERLAGSMODULEN = SCRIPTS / "las_underlag.py"
+MATCHNINGSMODULEN = SCRIPTS / "matcha_bank.py"
+UNDERLAGETS_ANVANDARE = (UNDERLAGSMODULEN, MATCHNINGSMODULEN)
 UNDERLAGETS_EGNA_ORD = set(las_underlag.NYCKLAR) | set(las_underlag.MOMSRAD_NYCKLAR)
 
 
 def test_karnan_innehaller_inga_namn_fran_kassaformaten():
     """Kassaformatet hör till företagets konfiguration, inte till kärnan."""
     namn = namn_i_kassaformaten()
-    fynd = kassanamn_i_filer([fil for fil in karnans_filer() if fil != UNDERLAGSMODULEN], namn)
-    fynd += kassanamn_i_filer([UNDERLAGSMODULEN], namn, KARNANS_EGNA_ORD | UNDERLAGETS_EGNA_ORD)
+    fynd = kassanamn_i_filer([fil for fil in karnans_filer() if fil not in UNDERLAGETS_ANVANDARE], namn)
+    fynd += kassanamn_i_filer(list(UNDERLAGETS_ANVANDARE), namn, KARNANS_EGNA_ORD | UNDERLAGETS_EGNA_ORD)
     assert not fynd, "Kolumnnamn, postnamn eller kassaregister från kassaformatet i kärnan:\n" + "\n".join(fynd)
 
 
@@ -259,3 +262,63 @@ def test_inlasning_skydd_namner_ingen_sorts_fil():
     text = (SCRIPTS / "inlasning_skydd.py").read_text(encoding="utf-8").casefold()
     fynd = [ord for ord in ("bank", "kassa", "z-rapport", "z-fil") if ord in text]
     assert not fynd, "inlasning_skydd.py nämner " + ", ".join(map(repr, fynd))
+
+
+# --- Matchningen mot banken ---
+
+def namn_i_matchningsformaten():
+    """Regelnamn och mönster ur alla företags matchning.json."""
+    namn = set()
+    for fil in sorted(FORETAG.glob("*/matchning.json")):
+        for regel in json.loads(fil.read_text(encoding="utf-8"))["kraver_inte_underlag"]:
+            namn.add(regel["namn"])
+            namn.update(regel[nyckel] for nyckel in ("referens_borjar_med", "beskrivning_borjar_med") if nyckel in regel)
+    return sorted(namn)
+
+
+def texter_i_testdatans_bankfiler():
+    """Beskrivningar och referenser ur testdatans bankfiler, utan siffrorna sist (AVR-20250102 blir AVR).
+
+    Kolumnernas namn hämtas ur företagets bankformat.json, så att testet inte heller har dem inbyggda.
+    """
+    import csv
+
+    texter = set()
+    for fil in sorted((SCRIPTS.parent / "testdata").glob("*/*/bank_*.csv")):
+        kolumner = json.loads((FORETAG / fil.parent.parent.name / "bankformat.json").read_text(
+            encoding="utf-8"))["kolumner"]
+        with open(fil, encoding="utf-8", newline="") as csvfil:
+            for rad in csv.DictReader(csvfil):
+                for nyckel in ("referens", "beskrivning"):
+                    text = re.sub(r"[\d\s-]+$", "", rad[kolumner[nyckel]])
+                    if text:
+                        texter.add(text)
+    return sorted(texter)
+
+
+def test_matchningen_och_bankfilerna_har_namn_att_soka_efter():
+    # Skydd mot att testet nedan blir grönt för att det inte hittar några namn alls.
+    assert {"kortinlosen", "bankavgift", "AVR-", "BET-SWISH INBETALNING", "BANK AVGIFT"} <= set(
+        namn_i_matchningsformaten())
+    assert {"AVR", "SWISH", "INS", "KORTKOP", "BET-KORT AVRAKNING", "KONTANTINSATTNING", "LEV-TELE", "SYNT-TE",
+            "KORTKOP BUTIK-FORBRUKNING"} <= set(texter_i_testdatans_bankfiler())
+    assert SCRIPTS / "matcha_bank.py" in karnans_filer() and SCRIPTS / "las_matchningsformat.py" in karnans_filer()
+
+
+def test_karnan_innehaller_inga_bankradstexter_eller_regler_ur_matchningen():
+    """Vilka bankrader som inte kräver underlag, och hur bankradernas texter ser ut, hör till företaget.
+
+    Gäller hela kärnan, även matcha_bank.py och las_matchningsformat.py, och även kommentarer.
+    """
+    fynd = namn_ur_testdatan_i_filer(karnans_filer(), namn_i_matchningsformaten() + texter_i_testdatans_bankfiler())
+    assert not fynd, "Regler ur matchning.json eller texter ur testdatans bankfiler i kärnan:\n" + "\n".join(fynd)
+
+
+def test_bankradstext_kontrollen_hittar_inbyggda_texter(tmp_path):
+    fil = tmp_path / "x.py"
+    fil.write_text('# kortinlosen kräver inget underlag\nif rad["referens"].startswith("AVR-"):\n    pass\n'
+                   'x = "KONTANTINSATTNING"\ny = "BET-KORT AVRAKNING 2025-01-02"\nz = "AVRUNDA"\n', encoding="utf-8")
+    namn = namn_i_matchningsformaten() + texter_i_testdatans_bankfiler()
+    assert namn_ur_testdatan_i_filer([fil], namn) == [
+        "x.py:1 innehåller 'kortinlosen'", "x.py:2 innehåller 'AVR-'", "x.py:4 innehåller 'KONTANTINSATTNING'",
+        "x.py:5 innehåller 'BET-KORT AVRAKNING'"]

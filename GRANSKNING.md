@@ -1149,3 +1149,135 @@ Gjort i en egen session, i tre commits: SPEC.md (del A, commit 7133f15, med Hugo
 | Generatorn ger försäkringsfakturan en tom lista igen | 1 |
 
 Testsviten efter del B: **1 037 passed**, 0 misslyckade (1 025 före).
+
+### Del C: matchning mot banken
+
+**Ord som används nedan.** Att **matcha** är att para ihop en bankrad med underlaget som förklarar den, till exempel en betalning med fakturan. En **kandidat** är ett underlag som kan höra till en bankrad. Ett **tidsfönster** är hur många dagar efter underlagets datum betalningen får ligga. Ett **oavstämt** underlag är ett som ingen bankrad har matchats mot än, till exempel en obetald faktura.
+
+**Nya filer.**
+
+- `scripts/matcha_bank.py` med en enda offentlig funktion, `matcha_period(bankrader, underlagsperiod, matchningsformat, bedomningsdatum)`, och klasserna `MatchningFel` och `Matchningsresultat`.
+- `scripts/las_matchningsformat.py` med `ladda_matchningsformat` (läser filen) och `kontrollera_matchningsformat` (kontrollerar innehållet, används också av `matcha_period`). Den ligger i en egen modul eftersom `matcha_bank.py` bara ska ha en offentlig funktion, och eftersom filen läses med de gemensamma skydden i `inlasning_skydd.py`, som bara inläsningsmodulerna får använda.
+- `foretag/syntet-testbutik/matchning.json`: fyra regler för bankrader som inte kräver underlag (kortinlösen, Swish, kontantinsättning, bankens avgifter), tidsfönster 40 dagar för leverantörsfakturor och 3 dagar för kvitton, och 7 dagar innan en bankrad utan underlag blir ett ärende. Allt är antaget utifrån testdatan och står som SYNTETISKT i filen.
+- Tester: `scripts/tests/test_matcha_bank.py` och `scripts/tests/test_las_matchningsformat.py`.
+
+**Reglerna, som de är byggda.**
+
+| Regel | Test |
+|---|---|
+| Indatan kontrolleras först: bankraderna ska vara en lista (eller tupel) med rader som har exakt uppgifterna från `las_bankfil`, med rätt typ (text, giltiga datum, heltal och inte True/False), ett id som inte är tomt och inga dubbla id. Underlagen ska vara en `Underlagsperiod` (inte en underklass). Formatet kontrolleras igen. Bedömningsdatumet ska vara ett giltigt datum som text. Fel ger `MatchningFel` | `test_bankrader_av_fel_typ_stoppas` (6 fall), `test_trasiga_bankrader_stoppas` (15), `test_samma_bankrad_tva_ganger_stoppas`, `test_underlagen_ska_vara_en_underlagsperiod`, `test_bedomningsdatum_ska_vara_ett_giltigt_datum` (9), `test_trasigt_format_stoppas_aven_nar_det_skickas_direkt` (5) |
+| En bankrad som passar en regel i `kraver_inte_underlag` hamnar i gruppen `kraver_inte_underlag`, med regelns namn. Riktningen (in eller ut) ska stämma, och referensen och beskrivningen ska börja exakt med regelns text, utan normalisering | 11 fall i `test_bankrader_som_inte_kraver_underlag`, `test_rad_som_inte_kraver_underlag_matchas_inte_mot_ett_underlag` |
+| Ett underlag är en kandidat om beloppet är exakt bankradens med omvänt tecken, motparten står i bankradens beskrivning eller referens som hela ord (efter samma normalisering som kassans namn), och bankradens transaktionsdag ligger från underlagets datum till och med tidsfönstret för underlagets typ | `test_samma_belopp_motpart_och_datum_matchas`, `test_annat_belopp_eller_fel_tecken_matchas_inte` (4), `test_motparten_i_bankradens_text_matchas` (8), `test_motpart_som_inte_star_som_hela_ord_matchas_inte` (5), `test_tidsfonstret_per_underlagstyp` (6), `test_tidsfonstret_galler_transaktionsdagen_inte_bokforingsdagen` |
+| Flera kandidater, och fakturanumret för exakt en av dem står i bankradens text: den är den enda kandidaten | `test_fakturanumret_avgor_nar_flera_underlag_passar` (5 referenser), `test_fakturanumret_ensamt_racker_inte` |
+| Exakt en kandidat som inte passar någon annan bankrad: matchad. Ett underlag och en bankrad matchas högst en gång | `test_varje_underlag_och_varje_bankrad_matchas_hogst_en_gang`, `test_tvetydigt_ett_underlag_och_tva_bankrader`, `test_tvetydigt_nar_en_kandidat_ocksa_passar_en_annan_bankrad` |
+| Flera kandidater, eller en kandidat som också passar en annan bankrad: ärende "tvetydig" (K3) med kandidaternas id | `test_tvetydigt_tva_lika_underlag_och_en_bankrad` och de två ovan |
+| Ingen kandidat: ärende "saknat underlag" (K3) först när bedömningsdatumet ligger mer än `saknat_underlag_efter_dagar` dagar efter transaktionsdagen. Annars hamnar raden i gruppen `vantande`, med dagen då den blir ett ärende | `test_saknat_underlag_blir_arende_forst_efter_antalet_dagar_i_formatet`, `test_saknat_underlag_text_namner_dagarna_men_inga_texter_ur_bankraden`, `test_sista_dagen_som_finns_ger_inget_fel` |
+| Underlag som inte matchas är oavstämda | `test_obetalt_underlag_ar_oavstamt`, `test_kvartalets_matchningar_ar_ratt` |
+| Varje bankrad finns i exakt en grupp, och varje underlag i perioden i exakt en matchning eller bland de oavstämda | `kontrollera_grupperna` körs i alla små fall och i fuzzen, och `test_varje_bankrad_i_testdatan_finns_i_exakt_en_grupp` (alla 395 bankrader i kvartalet, fem bedömningsdatum) |
+| Indatan ändras aldrig, och resultatet går inte att ändra: grupperna är tupler och posterna `MappingProxyType` | `test_indatan_andras_aldrig`, `test_resultatet_gar_inte_att_andra`, och fuzzen jämför indatan före och efter |
+| `matcha_period` är den enda offentliga funktionen | `test_det_finns_bara_en_offentlig_funktion` |
+
+**Testdatan.** Hela kvartalet läses med `las_bankfil` i samma kedja som i `test_las_bank.py` (varje månads ingående saldo är förra månadens utgående, och saldona kommer från facit). Mars stoppas av K1 på den planterade raden 74, så den raden rättas i en kopia i en tillfällig mapp: saldot byts mot det rätta enligt facit, och inget annat ändras. Underlagen läses med `las_underlagsperiod` för 2025-01-01–2025-03-31.
+
+- `test_kvartalet_ger_exakt_det_planterade_felet_som_saknat_underlag`: med bedömningsdatum 2025-04-30 blir det exakt ett ärende, "saknat underlag" för februarifilens bankrad 85 (−351,00 kr, KORTKOP BUTIK-FORBRUKNING), och inga andra ärenden och inga väntande rader.
+- `test_kvartalet_fore_sju_dagar_ger_inget_arende_bara_att_raden_vantar`: 2025-02-18, 2025-02-20 och 2025-02-25 ger inget ärende, bara att raden väntar till 2025-02-25. 2025-02-26 ger ärendet.
+- `test_dubbletten_kommer_fran_k4_och_inte_fran_matchningen`: `SYNT-U-2025-004` är ett K4-ärende i underlagsperioden och finns inte någonstans i matchningens resultat. Originalet `SYNT-U-2025-003` matchas med den enda betalningen.
+- `test_kvartalets_matchningar_ar_ratt`: 23 matchningar (16 leverantörsbetalningar, var och en mot fakturan med samma fakturanummer, och 7 kortköp mot sitt kvitto), 371 rader som inte kräver underlag (74 kortinlösen, 278 Swish, 13 kontantinsättningar och 6 avgifter), och de oavstämda är bara fakturor som förfaller efter 31 mars.
+- `test_en_manad_i_taget_ger_samma_planterade_fel` och skyddet `test_utan_underlagen_fran_januari_blir_februaris_betalningar_arenden`.
+
+**Fuzz.** `test_fuzz_skadade_indata_ger_ratt_resultat_eller_matchningfel`: 600 körningar, hälften på testdatans kvartal och hälften på små påhittade fall där även underlagen skadas och läses in igen. Skadorna: värden av fel typ eller med farligt innehåll i bankraderna, borttagna och nya nycklar, dubbla rader, rader som inte är rader, hela listan utbytt, ändrade belopp, datum, motparter och referenser, omkastade och borttagna rader, trasiga och krockande regler, tidsfönster och antal dagar utanför gränserna, och ogiltiga bedömningsdatum. Varje körning ger antingen ett resultat som följer alla regler ovan, eller `MatchningFel` (eller `UnderlagFilFel` när ett skadat underlag läses in), och indatan är oförändrad. Inget annat Python-fel. `test_fuzz_skadad_matchningsfil_laddas_ratt_eller_stoppas`: 300 skadade `matchning.json`, som ger ett kontrollerat format eller `MatchningsformatFel`.
+
+**Skydden mot genvägar och företagsspecifikt i kärnan.** `las_matchningsformat.py` är en inläsningsmodul och lagd till i undantagen i `test_inga_genvagar.py`, med flit, eftersom den använder de gemensamma skydden. `matcha_bank.py` är inte undantagen, så förbuden gäller den: `test_matchningen_omfattas_av_skyddet` och 6 fall i `test_i1_kontrollen_hittar_genvagar_i_matchningen`. I `test_karnan_ar_generell.py` får `matcha_bank.py` använda underlagets egna nycklar som text (till exempel `"datum"`, som också är ett kolumnnamn i testbutikens kassaformat), precis som `las_underlag.py`. Det nya testet `test_karnan_innehaller_inga_bankradstexter_eller_regler_ur_matchningen` söker i hela kärnan, även i kommentarer, efter regelnamn och mönster ur alla `matchning.json` och efter beskrivningar och referenser ur testdatans bankfiler (utan siffrorna sist). Det hittade mina egna exempel `LEV-TE` och `LEV-TELE` i en kommentar i `matcha_bank.py` medan jag byggde, och de är utbytta mot påhittade namn.
+
+**Skillnader mot uppgiften och mot SPEC K3.** Det här är byggt annorlunda än uppgiften säger, eller står inte i SPEC:
+
+1. **Fem grupper, inte fyra.** En bankrad utan underlag som ännu inte är ett ärende (före 7 dagar) måste finnas i en grupp, eftersom varje bankrad ska finnas i exakt en. Den ligger i en femte grupp, `vantande`.
+2. **Fakturanumret avgör mellan flera kandidater.** Med bara belopp, motpart och tidsfönster gav testdatan två extra ärenden "tvetydig": telefonfakturorna (LEV-TELE) har samma belopp varje månad, och betalningen av januarifakturan den 3 februari ligger också i februarifakturans tidsfönster (februarifakturan är daterad samma dag). Därför väljs den kandidat vars fakturanummer står i bankradens text, om det är exakt en. Fakturanumret ensamt räcker aldrig: belopp, motpart och tidsfönster krävs ändå.
+3. **Motparten ska stå som hela ord.** "Förekommer i texten" tolkat som delsträng skulle göra LEV-TE till kandidat för bankrader från LEV-TELE. Hela ord krävs därför, efter samma normalisering som kassans namn.
+4. **Regler för rader utan underlag har riktning och exakt text.** En regel gäller bara pengar in eller pengar ut, och texten jämförs exakt (inga osynliga tecken, samma stora och små bokstäver). Annars kunde en utgående betalning med en referens som börjar som en Swish-betalning slippa underlag. Två regler som kan passa samma rad stoppar formatet.
+5. **Bankradens datum är transaktionsdagen**, både för tidsfönstret och för de 7 dagarna. För ett kortköp är transaktionsdagen köpdagen, som kvittot har, medan bokföringsdagen kan vara några dagar senare.
+6. **SPEC K3** säger bara "Varje förslag har underlag". Att en bankrad utan underlag blir ett ärende efter 7 dagar står inte i SPEC, bara i facit och i `testforetag/FIKTIVT_FORETAG.md` (avsnitt 8). Inte heller att vissa bankrader (kortinlösen, Swish, kontanter, bankens avgifter) inte kräver underlag. SPEC är inte ändrad i del C.
+7. **testdata/README.md** säger att bankens specifikation av avgifterna och kortinlösarens avgiftsspecifikation läggs till "när matchningen byggs" (beslut av Hugo). Enligt uppgiften hör bankens avgifter i stället till `kraver_inte_underlag` tills vidare, och det står i `matchning.json` och i `matcha_bank.py`.
+
+**Säkerhet (inte rättat, behöver beslut).**
+
+- **En borttagen bankrad syns inte.** `las_bankfil` returnerar en vanlig lista. Tar annan kod bort en rad efter inläsningen kan matchningen inte se det, och raden blir aldrig ett ärende. Förslag: en skyddad typ för bankrader, som `Underlagsperiod` och `Kassaperiod`.
+- **Bankens avgifter slipper underlag oavsett belopp.** Regeln `bankavgift` undantar varje utgående rad som börjar med `AVG-` och `BANK AVGIFT`, även en stor betalning. Förslag: en beloppsgräns per regel, eller att avgiftsspecifikationen läggs till som underlag snart.
+- **`matchning.json` ligger där agenten kan skriva**, som bank- och kassaformatet. Den hör till spärrsteget.
+- **Ett `Matchningsresultat` kan skapas av annan kod.** Det är en `NamedTuple` utan nyckel (koden i `matcha_bank.py` får inte använda `object.__setattr__`, som nyckelmönstret i `las_underlag.py` behöver, eftersom I1-testet förbjuder det utanför inläsningsmodulerna). Rapportsteget bör därför köra `matcha_period` självt, inte ta emot ett färdigt resultat.
+
+**Kommandon utanför den fasta listan.** Under del A och B redigerade jag några filer med ett litet Python-skript i terminalen i stället för med fil-verktygen, och läste filer med `sed`, `cut` och `uniq`. Det står inte på listan i SPEC 7.1. I del C användes listans kommandon och fil-verktygen, plus `echo` och `printf` (som bara skriver ut text) i en slinga som körde testsviten i varje mutationskopia. Generatorn kördes med kommandot i `testdata/README.md`, eftersom uppgiften sa att den skulle köras om. Inget av det ändrade något utanför projektet utom kopiorna i den tillfälliga mappen.
+
+**Mutationstest.** I 63 kopior utanför projektet togs en ny kontroll bort (eller gjordes svagare) i var och en, och hela sviten kördes. 60 gav direkt minst ett rött test. Tre gav först inget rött test:
+
+- **Datumets form (m14).** Python 3.9 stoppar själv allt som inte är ÅÅÅÅ-MM-DD, så kontrollen syntes inte. Python 3.11 och senare godtar fler skrivsätt (till exempel `20251231`). Nytt test: `test_datumets_form_kontrolleras_aven_med_nyare_python`, som efterliknar nyare Python. Nu rött.
+- **Fakturanumret, "exakt en" (m31).** Prövades bara med två kandidater. Nytt test: `test_fakturanumret_avgor_bara_nar_det_pekar_ut_exakt_ett_underlag`, med tre kandidater där två fakturanummer står i texten. Nu rött.
+- **Kopian av varje bankrad (m38).** Ger fortfarande inget rött test, och kan inte göra det: koden ändrar aldrig raderna, och resultatet fryses ändå som en ny kopia. Kopian ligger kvar som ett extra skydd, eftersom uppgiften säger att indatan ska kopieras. Det är ingen kontroll som kan tas bort, så den räknas inte som en kontroll utan test.
+
+| Nr | Borttagen eller svagare kontroll (i en kopia) | Röda tester |
+|---|---|---|
+| m01 | Bankraderna ska vara en lista | 5 |
+| m02 | Varje rad ska vara ett objekt | 3 |
+| m03 | Raden har exakt uppgifterna från `las_bankfil` | 4 |
+| m04 | Textfälten är text | 5 |
+| m05 | Id får inte vara tomt | 1 |
+| m06 | Radens datum kontrolleras | 3 |
+| m07 | Talen är heltal | 5 |
+| m08 | Talen: True/False godtas | 1 |
+| m09 | Dubbla id | 1 |
+| m10 | Underlagen ska vara en `Underlagsperiod` | 1 |
+| m11 | Underklass av `Underlagsperiod` godtas | 1 |
+| m12 | Formatet kontrolleras inte igen i `matcha_period` | 6 |
+| m13 | Formatets fel blir inte `MatchningFel` | 6 |
+| m14 | Datumets form (ÅÅÅÅ-MM-DD) | 0, efter nytt test 1 |
+| m15 | Datumet behöver inte vara text | 5 |
+| m16 | Regelns riktning | 3 |
+| m17 | Regelns referens | 8 |
+| m18 | Regelns beskrivning | 38 |
+| m19 | 0 kr räknas som pengar in | 1 |
+| m20 | Beloppets tecken | 1 |
+| m21 | Beloppet | 5 |
+| m22 | Motparten | 7 |
+| m23 | Motparten söks bara i beskrivningen | 7 |
+| m24 | Motparten som delsträng i stället för hela ord | 4 |
+| m25 | Ingen normalisering av motparten | 6 |
+| m26 | Tidsfönstrets början (underlagets datum) | 3 |
+| m27 | Tidsfönstrets slut | 4 |
+| m28 | Tidsfönstret räknas från bokföringsdagen | 2 |
+| m29 | Samma tidsfönster för alla underlagstyper | 3 |
+| m30 | Fakturanumret avgör inte | 6 |
+| m31 | Fakturanumret avgör när det pekar ut minst ett (i stället för exakt ett) | 0, efter nytt test 1 |
+| m32 | Ett underlag kan matchas mot flera bankrader | 2 |
+| m33 | Ärende redan på dag 7 (i stället för efter) | 2 |
+| m34 | Ärende direkt, ingen väntan | 5 |
+| m35 | Väntan efter 9999-12-31 kraschar | 2 |
+| m36 | De 7 dagarna räknas från bokföringsdagen | 1 |
+| m37 | Resultatet fryses inte | 29 |
+| m38 | Raderna kopieras inte | 0 (ändrar inget beteende, se ovan) |
+| m39 | Matchade underlag räknas också som oavstämda | 21 |
+| m40 | Flera kandidater blir "saknat underlag" i stället för "tvetydig" | 4 |
+| m41 | Formatet: nycklar som inte är text | 2 |
+| m42 | Formatet: True/False som antal dagar | 2 |
+| m43 | Formatet: antal dagar utan gränser | 4 |
+| m44 | Formatet: ingen övre gräns för antal dagar | 2 |
+| m45 | Formatet: regelns riktning | 3 |
+| m46 | Formatet: minst ett mönster per regel | 1 |
+| m47 | Formatet: mönstren kontrolleras inte | 5 |
+| m48 | Formatet: regelns namn kontrolleras inte | 2 |
+| m49 | Formatet: samma regelnamn två gånger | 1 |
+| m50 | Formatet: regler som kan passa samma rad | 6 |
+| m51 | Formatet: krock oavsett riktning | 79 |
+| m52 | Formatet: krock bara åt ena hållet | 2 |
+| m53 | Formatet: krock om något mönster passar (i stället för alla) | 65 |
+| m54 | Formatet: tidsfönstrens nycklar | 6 |
+| m55 | Formatet: anteckning överst | 1 |
+| m56 | Formatet: anteckning i en regel | 1 |
+| m57 | Formatet: regelns nycklar | 6 |
+| m58 | Formatet: reglerna ska vara en lista | 2 |
+| m59 | Formatet: nycklarna överst | 10 |
+| m60 | Genvägstestet: `las_matchningsformat` inte bland inläsningsmodulerna | 2 |
+| m61 | Generalitetstestet: mönstret `AVR-` i en kommentar i `matcha_bank.py` | 1 |
+| m62 | Genvägstestet: `matcha_bank.py` importerar `_las_underlagsfil` | 2 |
+| m63 | Generalitetstestet: bankradstexten `KORTKOP` i en kommentar i `matcha_bank.py` | 1 |
+
+Testsviten efter del C: **1 203 passed**, 0 misslyckade (1 037 efter del B, alltså 166 nya tester i `test_matcha_bank.py`, `test_las_matchningsformat.py`, `test_inga_genvagar.py` och `test_karnan_ar_generell.py`). SPEC.md är inte ändrad i del B och C.

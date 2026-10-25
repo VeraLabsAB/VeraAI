@@ -16,7 +16,9 @@ En genväg är en funktion som läser en fil men hoppar över en kontroll:
 All annan kod ska läsa filer med las_bankfil, las_kassafil, las_kassaperiod och
 las_underlagsperiod, som alltid kör alla kontroller, och summera med summa_per_momssats, som bara
 tar emot en Kassaperiod. Bara inläsningsmodulerna själva (UNDANTAGNA) och testerna får använda
-genvägarna. En ny inläsningsmodul måste läggas till i UNDANTAGNA med flit.
+genvägarna. En ny inläsningsmodul måste läggas till i UNDANTAGNA med flit. las_matchningsformat.py
+läser matchning.json med de gemensamma skydden och är därför en inläsningsmodul. matcha_bank.py
+läser inga filer och är inte undantagen: förbudet gäller den som alla andra kärnfiler.
 
 Kontrollen läser koden med Pythons ast-modul, alltså som Python själv ser den, och inte som text.
 Den klarar därför alias (import ... as, x = las_bank) och kod som bygger ihop namn medan
@@ -35,9 +37,9 @@ SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 
 # Filer i scripts/ som får använda genvägarna: inläsningsmodulerna själva.
-UNDANTAGNA = ("las_bank.py", "las_kassa.py", "las_underlag.py", "inlasning_skydd.py")
+UNDANTAGNA = ("las_bank.py", "las_kassa.py", "las_underlag.py", "las_matchningsformat.py", "inlasning_skydd.py")
 SKYDDSMODUL = "inlasning_skydd"
-INLASNINGSMODULER = ("las_bank", "las_kassa", "las_underlag")
+INLASNINGSMODULER = ("las_bank", "las_kassa", "las_underlag", "las_matchningsformat")
 GENVAGAR = ("_tolka_rader", "_tolka_kassarader", "_las_underlagsfil")
 # Det inre i en Kassaperiod och en Underlagsperiod: nyckeln som skapar en, och det som ligger i den.
 PERIODENS_INRE = ("_PERIODNYCKEL", "_rapporter", "_fran_datum", "_till_datum", "_underlag", "_arenden")
@@ -207,7 +209,8 @@ def test_i1_de_forbjudna_namnen_hittas():
     for namn in ["las_bankfil", "las_kassafil", "las_kassaperiod", "Kassaperiod", "ladda_bankformat",
                  "ladda_kassaformat", "kontrollera_k1", "kontrollera_z_serien", "summa_per_momssats", "kronor",
                  "BankfilFel", "KassafilFel", "rapporter", "fran_datum", "till_datum", "las_underlagsperiod",
-                 "Underlagsperiod", "UnderlagFilFel", "underlag", "arenden"]:
+                 "Underlagsperiod", "UnderlagFilFel", "underlag", "arenden", "ladda_matchningsformat",
+                 "kontrollera_matchningsformat", "MatchningsformatFel", "matcha_period", "MatchningFel"]:
         assert namn not in forbjudna, namn
 
 
@@ -275,7 +278,10 @@ def test_inlasningsmodulerna_har_inga_byggstenar_under_offentligt_namn():
     import las_kassa
     import las_underlag
 
-    assert offentliga_namn_for_byggstenar([las_bank, las_kassa, las_underlag]) == []
+    import las_matchningsformat
+    import matcha_bank
+
+    assert offentliga_namn_for_byggstenar([las_bank, las_kassa, las_underlag, las_matchningsformat, matcha_bank]) == []
 
 
 def test_kontrollen_hittar_byggstenar_under_offentligt_namn_nar_programmet_kor():
@@ -335,6 +341,8 @@ def projekt(tmp_path):
     (tmp_path / "las_underlag.py").write_text(
         "from inlasning_skydd import _las_fil, _nul_fel\nfrom las_kassa import normalisera_kassaregister as _n\n"
         "def _las_underlagsfil(sokvag): ...\n_PERIODNYCKEL = object()\n", encoding="utf-8")
+    (tmp_path / "las_matchningsformat.py").write_text(
+        "from inlasning_skydd import _ladda_json\ndef ladda_matchningsformat(sokvag): ...\n", encoding="utf-8")
     (tmp_path / "inlasning_skydd.py").write_text("def _las_fil(sokvag, filsort): ...\n", encoding="utf-8")
     (tmp_path / "belopp.py").write_text("def tolka_belopp(text): ...\n", encoding="utf-8")
     return tmp_path
@@ -447,6 +455,33 @@ def test_i1_kontrollen_hittar_genvagar_forbi_underlagets_kontroller(projekt, kod
     assert fynd and all(rad.startswith("rapport.py:") for rad in fynd), fynd
 
 
+def test_matchningen_omfattas_av_skyddet():
+    # matcha_bank.py är en vanlig kärnfil: den är inte undantagen, så alla förbud gäller den, och den
+    # använder ingen genväg. Bankrader och underlag får den bara från las_bankfil och las_underlagsperiod.
+    matchning = SCRIPTS / "matcha_bank.py"
+    assert matchning in karnfiler(SCRIPTS) and matchning.name not in UNDANTAGNA
+    assert genvagar_i_fil(matchning, forbjudna_namn()) == []
+
+
+MATCHNINGENS_GENVAGSKOD = {
+    "byggsten_via_matchningsformat": "from las_matchningsformat import _ladda_json\n",
+    "byggsten_via_matchningsformat_attribut": "import las_matchningsformat as m\nd = m._kontrollera_namn('x')\n",
+    "byggsten_via_matchningsformat_stjarna": "from las_matchningsformat import *\n",
+    "matchningen_importerar_skyddet": "import inlasning_skydd\n",
+    "matchningen_anvander_underlagets_genvag": "import las_underlag\nu = las_underlag._las_underlagsfil('U-1.json')\n",
+    "matchningen_skapar_en_underlagsperiod": ("import las_underlag\np = las_underlag.Underlagsperiod("
+                                              "las_underlag._PERIODNYCKEL, [], [], 'a', 'b')\n"),
+}
+
+
+@pytest.mark.parametrize("kod", MATCHNINGENS_GENVAGSKOD.values(), ids=MATCHNINGENS_GENVAGSKOD.keys())
+def test_i1_kontrollen_hittar_genvagar_i_matchningen(projekt, kod):
+    # En påhittad matcha_bank.py i det påhittade projektet. Den är inte undantagen, så genvägarna hittas.
+    (projekt / "matcha_bank.py").write_text(kod, encoding="utf-8")
+    fynd = genvagar_i(projekt)
+    assert fynd and all(rad.startswith("matcha_bank.py:") for rad in fynd), fynd
+
+
 def test_i1_kontrollen_hittar_en_genvag_i_en_undermapp(projekt):
     (projekt / "matchning").mkdir()
     (projekt / "matchning" / "las_bank.py").write_text("from las_kassa import _tolka_kassarader\n", encoding="utf-8")
@@ -476,6 +511,8 @@ VANLIG_KOD = {
     "las_underlagsperiod": "from las_underlag import las_underlagsperiod, UnderlagFilFel\n"
                            "period = las_underlagsperiod('underlag', '2025-01-01', '2025-01-31')\n"
                            "poster = period.underlag + period.arenden\n",
+    "matcha_period": "from las_matchningsformat import ladda_matchningsformat\nfrom matcha_bank import matcha_period\n"
+                     "resultat = matcha_period([], None, ladda_matchningsformat('m.json'), '2025-01-31')\n",
     "getattr_med_vanlig_text": "f = getattr(object(), 'namn', None)\n",
     "beskrivning": '"""Läser bankfilen med las_bankfil, som använder inlasning_skydd och kör K1."""\n',
     "egen_funktion": "def tolka(rader):\n    return [rad for rad in rader]\n",

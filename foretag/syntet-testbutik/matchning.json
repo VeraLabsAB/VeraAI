@@ -1,0 +1,38 @@
+{
+  "anteckning": "Hur bankraderna matchas mot underlag för Syntet Testbutik AB. SYNTETISKT: reglerna och antalet dagar är antagna utifrån testdatan (testdata/README.md) och INTE jämförda med en riktig bankfil (Ö5). Läses av ladda_matchningsformat i scripts/las_matchningsformat.py.",
+  "kraver_inte_underlag": [
+    {
+      "namn": "kortinlosen",
+      "riktning": "in",
+      "referens_borjar_med": "AVR-",
+      "beskrivning_borjar_med": "BET-KORT AVRAKNING",
+      "anteckning": "Kortinlösarens insättning av en dags kortförsäljning, minus avgiften. Har inget eget underlag. Stäms av mot Z-rapporternas kortförsäljning i K10 (senare steg)."
+    },
+    {
+      "namn": "swish",
+      "riktning": "in",
+      "referens_borjar_med": "SWISH-",
+      "beskrivning_borjar_med": "BET-SWISH INBETALNING",
+      "anteckning": "En kunds Swish-betalning i butiken. Har inget eget underlag. Stäms av mot Z-rapporternas Swish i K10 (senare steg)."
+    },
+    {
+      "namn": "kontantinsattning",
+      "riktning": "in",
+      "referens_borjar_med": "INS-",
+      "beskrivning_borjar_med": "KONTANTINSATTNING",
+      "anteckning": "Insättning av kontanterna från kassan. Har inget eget underlag. Stäms av mot Z-rapporternas kontanter i K10 (senare steg)."
+    },
+    {
+      "namn": "bankavgift",
+      "riktning": "ut",
+      "referens_borjar_med": "AVG-",
+      "beskrivning_borjar_med": "BANK AVGIFT",
+      "anteckning": "Bankens egna avgifter. Det finns inget underlag för dem än: bankens specifikation av avgifterna saknas i testdatan (testdata/README.md). Hugo har bestämt att raderna hör hit tills specifikationen finns. När den finns ska den här regeln tas bort, så att avgifterna matchas mot den som andra underlag. Obs: regeln undantar varje utgående rad som börjar med AVG- och BANK AVGIFT, oavsett belopp."
+    }
+  ],
+  "tidsfonster_dagar": {
+    "leverantorsfaktura": 40,
+    "kvitto": 3
+  },
+  "saknat_underlag_efter_dagar": 7
+}
