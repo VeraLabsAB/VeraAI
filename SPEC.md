@@ -123,6 +123,8 @@ Gränser för belopp ligger i konfigurationen och sätts lågt i början.
 | K2 | Debet = kredit per verifikation |
 | K3 | Varje förslag har underlag |
 | K4 | Inga dubbletter |
+| K4a | Samma motpart och fakturanummer men olika belopp. Blir ett ärende, och båda underlagen behålls |
+| K4b | Samma motpart och fakturanummer men olika datum. Blir ett ärende, och båda underlagen behålls |
 | K5 | Momsen stämmer med underlaget och satsen finns för datumet |
 | K6 | Rätt period |
 | K7 | Ägare och närstående: alltid ärende |
@@ -131,6 +133,7 @@ Gränser för belopp ligger i konfigurationen och sätts lågt i början.
 | K10 | Månadsavstämning: bank, kassa, skattekonto, leverantörsskulder, moms, försäljning mot kassa |
 | K11 | Z-rapportens interna kontroller. En **Z-rapport** är kassans dagsavslut: försäljningen per momssats, momsen, hur kunderna betalade och dagens totalsumma. Varje Z-rapport har ett löpnummer, **Z-numret**. Kontrollen prövar att datumet i filen stämmer med datumet i filnamnet, att filen har ett enda Z-nummer och en enda kassa, att försäljningen summerar till totalsumman, att betalsätten summerar till totalsumman och att momsen stämmer med försäljningen och momssatsen |
 | K12 | Z-serien, per kassa: Z-numren följer på varandra utan luckor eller dubbletter, och datumen går framåt |
+| K13 | Underlagets interna kontroll: summan av momsraderna (belopp utan moms plus moms) är lika med underlagets belopp |
 | K17 | Text i underlag som försöker styra agenten: flaggas, underlaget används inte |
 
 ### 6.1 Saldon och periodgränser
@@ -187,8 +190,10 @@ Listan gäller byggarbetet i Claude Code, inklusive granskningar. Veras egen lis
 | `sort` | Sortera rader, till exempel för att jämföra två listor |
 | `mkdir` | Skapa en mapp, bara i en tillfällig mapp utanför projektet (se nedan) |
 | `cp -R` | Kopiera filer och mappar, bara till en tillfällig mapp utanför projektet (se nedan) |
+| `cd` | Byta mapp, bara till en tillfällig mapp utanför projektet (se nedan) |
+| `tar` | Packa upp eller packa ihop filer, bara med mål i en tillfällig mapp utanför projektet (se nedan) |
 
-- `mkdir`, `cp -R` och `git archive` får bara ha mål i en tillfällig mapp utanför projektet (till exempel scratchpad-mappen), aldrig inne i projektmappen.
+- `mkdir`, `cp -R` och `git archive` får bara ha mål i en tillfällig mapp utanför projektet (till exempel scratchpad-mappen), aldrig inne i projektmappen. Samma gräns gäller `cd` och `tar`.
 - `find` används bara för att söka. Tilläggen `-delete` och `-exec`, som raderar filer eller kör andra kommandon, är förbjudna.
 - Testsviten (pytest-kommandot ovan) får också köras mot en sådan kopia, och då inifrån kopian. Det är det enda undantaget från att allt körs inifrån projektmappen.
 - Nya filer i projektet skapas med Claudes fil-verktyg (Write och Edit), inte med skalkommandon (kommandon i terminalen).
@@ -240,6 +245,8 @@ Varje testföretag beskrivs i en egen fil och är skrivskyddat för agenten. Tes
 
 **Avgjort:** kontrollen K5 (momssatsen finns för datumet) kräver en momsfil i företagets konfiguration (`foretag/<namn>/`), med momssatser per varugrupp och datum. Vad som står i filen hänger på Ö3.
 
+**Avgjort:** varje underlag har minst en momsrad. Ett momsfritt underlag har en rad med sats 0 och moms 0.
+
 | # | Fråga | Ägare |
 |---|---|---|
 | Ö1 | **Produktionsarkitektur.** Version 1 körs lokalt som referensprodukt. Hur och var kundens data ska lagras säkert när Vera blir en tjänst är inte bestämt | Hugo |
@@ -248,3 +255,6 @@ Varje testföretag beskrivs i en egen fil och är skrivskyddat för agenten. Tes
 | Ö4 | Får rutinposter i kassa bokföras samlat per vecka? | Konsult |
 | Ö5 | Vilka kassasystem och bankformat ska stödjas först. Bankformatet, kassaformatet och att bankfilens rader numreras 1, 2, 3 … är **antaget** för testföretaget och ska jämföras mot riktiga exportfiler innan de används på riktiga underlag | Hugo |
 | Ö7 | Hur får Vera tillgång till bank, mejl och bokföringsprogram i automatiskt läge, och hur säkras det? | Hugo |
+| Ö8 | **Kreditnotor:** en egen dokumenttyp där alla belopp är negativa. Ingen annan typ får vara negativ | Hugo |
+| Ö9 | K4 (dubbletter) ska också jämföra mot underlag från tidigare perioder (arkivet), inte bara inom perioden | Hugo |
+| Ö10 | K17: att känna igen instruktionsliknande text i underlag och flagga den byggs i rapportsteget | Hugo |
