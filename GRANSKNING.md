@@ -2327,6 +2327,8 @@ Regel a ensam stoppar alla fyra proven. Regel b lades till för ett fel som a in
 4. **Täckningen körs sist**, efter kopplingarna. Ett förslag som har flera fel visar därför de tidigare felen först (till exempel bankkontot med `skillnad`), som förut.
 5. **Momsen i ett underlag räknas alltid som ingående moms.** I dag är alla underlag inköp (fakturor och kvitton). När kundfakturor kommer (utgående moms ur ett underlag) behöver regeln ändras, och det är ett nytt beslut.
 
+**Bekräftat av Hugo 2026-10-26:** "Täckningsregeln a och b och de fem besluten i uppgiften är bekräftade. Nästa steg är uppgift 4."
+
 **Medvetet inte rättat.**
 
 - **Sidan på momskontona** prövas inte (ingående moms i debet, utgående i kredit). Det kräver att det är bestämt hur kreditnotor ska bokföras (D16, Ö8).

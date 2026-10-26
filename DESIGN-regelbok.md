@@ -780,8 +780,9 @@ Börja i en ny session med en täckningskontroll och separata regler för ingåe
 Byggt i ursprungskontrollen (avsnitt 3, punkt 5 och 7):
 
 1. **Täckningen** (punkt 7): varje del av en källa används 0 eller 1 gång per sida, räknat med tecken,
-   och ett underlag används helt eller inte alls på varje sida. Den exakta regeln är formulerad i
-   uppgiften och bör bekräftas (GRANSKNING.md, "Åtgärder efter granskning 7").
+   och ett underlag används helt eller inte alls på varje sida. Den exakta regeln formulerades i
+   uppgiften och är bekräftad av Hugo 2026-10-26, med de fem besluten i GRANSKNING.md ("Åtgärder efter
+   granskning 7").
 2. **Ingående och utgående moms** (punkt 5): kontot för ingående moms tar bara moms ur underlag, och
    kontona för utgående moms bara moms ur Z-rapporter. Sidan prövas inte förrän kreditnotorna är bestämda
    (D16).
