@@ -206,3 +206,21 @@ Dessutom stoppas filen om:
 Gränserna är Hugos beslut D18 och D19: A-gräns 20 000 kr (`2000000` öre), B-gräns 40 000 kr (`4000000` öre), 3 godkännanden innan nivå A, och K9 med 3 / 300 % / 33 %. Konton och varugrupper är SYNTETISKA och inte verifierade av en redovisningskonsult (D1–D16).
 
 Regelboken ligger där agenten kan skriva. Tills spärrsteget flyttar den till en skyddad mapp är det kontrollsumman som visar om den har ändrats (DESIGN-regelbok.md, säkerhetsavsnittet).
+
+## Konteringsförslaget och konfigurationen
+
+Ett **konteringsförslag** är en verifikation som Vera föreslår men som ännu inte är bokförd (DESIGN-regelbok.md avsnitt 3). Det är ingen fil här, utan skapas av kärnan med `skapa_konteringsforslag` i `scripts/konteringsforslag.py`. Funktionen läser ingen fil själv. Den tar emot regelboken (`las_regelbok`), kontoplanen (`las_kontoplan`) och perioderna med underlag, bankrader och Z-rapporter, och kör alltid två kontroller. Allt som inte går ihop stoppar förslaget med ett tydligt fel, och inget förslag skapas.
+
+- **K2 (debet = kredit):** minst två rader, varje belopp ett heltal i öre (aldrig decimaltal, `True` eller `False`, och aldrig negativt), exakt ett av debet och kredit på varje rad, summan av debet lika med summan av kredit, och varje konto finns i kontoplanen och gäller på verifikationens datum.
+- **Ursprunget:** varje rad säger var beloppet kommer ifrån (ett värde i ett underlag, en bankrad eller en post i en Z-rapport) och hur det räknas (`lika`, `summa` eller `skillnad`). Kärnan räknar själv om beloppet ur källorna, och det ska bli exakt radens belopp. Så kan ingen siffra komma från modellen. Ingen avrundning görs: det är bara addition och subtraktion av heltal.
+
+Det här i konfigurationen används av förslaget:
+
+| Fil | Vad förslaget använder |
+|---|---|
+| `kontoplan.json` | Att kontot finns och gäller på datumet. Rollerna `ingaende_moms` och `utgaende_moms_per_sats`: en rad på ett **momskonto** får bara ha momsen ur en momsrad eller en momspost i en Z-rapport som ursprung, och på ett konto för utgående moms ska momsen ha kontots sats. Rollen `bank`: en rad på **bankkontot** får bara komma från bankrader, och pengar in står i debet, pengar ut i kredit. Rollerna slås upp med `kontots_roller`, så att kärnan aldrig har ett kontonummer i sin kod |
+| `regelbok.json` | Regeln som förslaget bygger på ska finnas i regelboken, och **regelbokens kontrollsumma** står i varje förslag. Ändras regelboken med ett enda tecken får nya förslag en annan summa (förberedelse för spärrtestet "ändrad regelbok", SPEC 7) |
+
+Förslaget får också kontrollsumman för varje fil det bygger på: underlagets, bankfilens och Z-filens. Summorna kommer från inläsningen, aldrig från den som skapar förslaget. Förslaget går inte att ändra efteråt och har **inget fält för att vara bokfört eller godkänt**. Det bokförs aldrig i det här steget.
+
+Vilka konton ett flöde ska använda (till exempel leverantörsfakturan eller Z-rapporten) bestäms inte här. Det byggs i nästa steg, och kräver Hugos eller konsultens val (DESIGN-regelbok.md avsnitt 4 och 8).
