@@ -149,3 +149,56 @@ Perioderna står i tidsordning och ska följa direkt på varandra: nästa period
 **Ingen sats i filen är en skatteregel.** Satserna i `syntet-testbutik/` är SYNTETISKA, utlästa ur `testdata/README.md`, och inte verifierade mot Skatteverket eller en redovisningskonsult (Ö3). Kontonumren i `syntet-testbutik/kontoplan.json` liknar BAS men är SYNTETISKA och inte verifierade (D2). Båda filerna är exakt exemplen i DESIGN-regelbok.md avsnitt 2, och ett test kontrollerar det.
 
 Båda filerna ligger där agenten kan skriva, som de andra formatfilerna. Flytten till en skyddad mapp hör till spärrsteget (SPEC 7).
+
+## regelbok.json
+
+Företagets **regelbok**: för varje känd motpart, kassa eller sorts bankrad, vilka konton det ska konteras på och på vilken nivå (A–D, SPEC 5). Formatet är Hugos beslut D17 (DESIGN-regelbok.md avsnitt 1). Läses och kontrolleras av `las_regelbok` i `scripts/las_regelbok.py`, som också tar emot den redan inlästa kontoplanen (`las_kontoplan`), momsfilen (`las_momssatser`) och matchningsformatet (`ladda_matchningsformat`), så att varje konto, varugrupp och regel i matchningen som regelboken nämner kan kontrolleras. Resultatet går inte att ändra efteråt. **Hela filen stoppas vid minsta fel**, på samma sätt som för kontoplanen och momsfilen ovan (okänd eller saknad nyckel, fel typ, tomt värde, dolt tecken var som helst, trasig JSON).
+
+**Agenten får aldrig ändra regelboken** (SPEC 3). En ny motpart blir ett ärende, och svaret blir ett regelförslag som en människa själv lägger in.
+
+| Nyckel | Krävs | Innehåll |
+|---|---|---|
+| `foretag` | Ja | Företagets namn. Visas för människor och i loggen |
+| `version` | Ja | Regelbokens version, ett heltal från 1 |
+| `godkand` | Ja | Vem som godkände regelboken och när: `{"av": "...", "datum": "ÅÅÅÅ-MM-DD"}`. Det som skyddar är kontrollsumman, inte det här fältet |
+| `granser` | Ja | Företagets gränser i **öre**: `a_hogst_ore` (högsta belopp för nivå A) och `b_hogst_ore` (för nivå B). Heltal större än 0. A-gränsen får inte vara högre än B-gränsen |
+| `k9` | Ja | Värdena för K9 (ovanliga belopp): `minst_historik` (heltal från 1), `hogst_procent_av_median` (från 100) och `lagst_procent_av_median` (0–100). `minst_historik` är också hur många gånger en regel ska ha godkänts innan den kan ge nivå A (DESIGN avsnitt 5) |
+| `oppettider` | Ja | Företagets stängda dagar, för varningssignalen i K8 (Hugos beslut D21): `stangda_veckodagar` (en lista med `mandag`, `tisdag`, `onsdag`, `torsdag`, `fredag`, `lordag`, `sondag`) och `stangda_datum` (en lista med datum). Varje dag får stå en gång. En lista får vara tom, om företaget inte har sådana stängda dagar. Läses och kontrolleras, men används inte än |
+| `regler` | Ja | Lista med minst en regel, se nedan |
+| `anteckning` | Nej | Fri text för människor. Används inte av koden |
+
+En regel:
+
+| Nyckel | Krävs | Innehåll |
+|---|---|---|
+| `id` | Ja | Regelns fasta id, till exempel `R-LEV-TE`. Står i varje förslag. Två id som blir lika efter normalisering (stora och små bokstäver, bindestreck och osynliga tecken räknas inte) stoppar filen |
+| `galler` | Ja | Vad regeln gäller. `kalla` är `underlag`, `z_rapport` eller `bankrad`. För `underlag` krävs också `typ` (`leverantorsfaktura` eller `kvitto`) och `motpart`. För `z_rapport` krävs `kassaregister`. För `bankrad` krävs `matchningsregel`: namnet på en regel i `matchning.json` |
+| `kontering` | Ja | Kontona. För `underlag`: ett konto per varugrupp, till exempel `{"livsmedel": "4010"}`. För `z_rapport`: `forsaljning` (ett konto per varugrupp) och `betalsatt` (ett konto per betalsätt, med postnamnet i kassaformatet). För `bankrad`: en eller flera av `motkonto`, `avgift` och `kostnad` |
+| `villkor` | Ja | `giltig_fran` (krävs), och valfritt `giltig_till` (eller `null`, tills vidare), `hogst_belopp_ore` (regelns egen gräns i öre) och `avdragsbegransad` (`true` eller `false`, K8) |
+| `niva` | Ja | Den lägsta nivån ett förslag med regeln kan få: `A`, `B`, `C` eller `D` |
+| `anteckning` | Nej | Fri text för människor |
+
+Dessutom stoppas filen om:
+
+- **två regler kan passa samma sak**: samma källa och samma värden i `galler` (motpart och kassaregister jämförs efter samma normalisering som i K4), och datum som överlappar med minst en dag. Högst en regel får passa,
+- ett konto inte finns i kontoplanen, eller inte gäller under hela tiden regeln gäller,
+- en varugrupp saknar sats i momsfilen för någon dag regeln gäller,
+- en regel för `bankrad` pekar på en regel som inte finns i `matchning.json`,
+- en regel för bankrader med **pengar ut** saknar `hogst_belopp_ore`, eller har en högre gräns än regeln i `matchning.json`,
+- en regels `hogst_belopp_ore` är högre än företagets `b_hogst_ore`. **En regel kan bara skärpa företagets gränser, aldrig höja dem** (Hugos beslut D20),
+- en regel för `bankrad` har nivå `A`. Bankrader utan underlag blir aldrig nivå A (D20).
+
+### Kontrollsumman
+
+`las_regelbok` räknar ut en **kontrollsumma** (SHA-256, ett "fingeravtryck" på 64 tecken) av filens innehåll, byte för byte, och den följer med i resultatet. Den ska senare visas i varje förslag, så att godkännaren ser vilken regelbok som användes, och användas i spärrtestet "ändrad regelbok" (SPEC 7). Samma fil ger alltid samma summa. Minsta ändring, även ett mellanslag eller en radbrytning, ger en annan. Summan räknas på exakt de bytes som sedan tolkas, så filen kan inte bytas mellan summan och kontrollerna.
+
+### Testbutikens regelbok
+
+`syntet-testbutik/regelbok.json` är **SYNTETISK**. Den är exemplet i DESIGN-regelbok.md avsnitt 1 med två tillägg, båda med redan bestämda värden (ett test kontrollerar det):
+
+- `oppettider`, med testbutikens stängda dagar ur `testdata/README.md` (söndagar, 1 januari och 6 januari 2025),
+- `hogst_belopp_ore` 25000 (250 kr) i `R-BANK-AVGIFT`. Bankavgiften är pengar ut och måste därför ha en gräns. Värdet är gränsen i `matchning.json` som Hugo bestämde 2026-10-25.
+
+Gränserna är Hugos beslut D18 och D19: A-gräns 20 000 kr (`2000000` öre), B-gräns 40 000 kr (`4000000` öre), 3 godkännanden innan nivå A, och K9 med 3 / 300 % / 33 %. Konton och varugrupper är SYNTETISKA och inte verifierade av en redovisningskonsult (D1–D16).
+
+Regelboken ligger där agenten kan skriva. Tills spärrsteget flyttar den till en skyddad mapp är det kontrollsumman som visar om den har ändrats (DESIGN-regelbok.md, säkerhetsavsnittet).
