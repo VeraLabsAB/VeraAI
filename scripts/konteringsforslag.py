@@ -75,11 +75,39 @@ Ursprunget, direkt efter K2:
   3. beloppet som kontrollen själv räknar fram ur källorna är exakt radens belopp,
   4. varje underlag, bankrad och Z-rapport som en rad använder står i kopplingar, var och en en gång,
      och varje som står i kopplingar används av minst en rad. Regeln finns i regelboken,
-  5. en rad på ett momskonto (rollerna ingaende_moms och utgaende_moms_per_sats i kontoplanen) har bara
-     momsbelopp som källor: moms_ore i en momsrad eller en momspost i en Z-rapport. På ett konto för
-     utgående moms ska källans sats vara en av kontots satser,
+  5. en rad på ett momskonto har bara momsbelopp som källor, och rätt sorts moms. På kontot för
+     ingående moms (rollen ingaende_moms i kontoplanen) är källan moms_ore i en momsrad i ett underlag.
+     På ett konto för utgående moms (rollen utgaende_moms_per_sats) är källan en momspost i en
+     Z-rapport, med en av kontots satser. Sidan (debet eller kredit) prövas inte, eftersom det inte är
+     bestämt hur kreditnotor ska bokföras,
   6. en rad på bankkontot (rollen bank i kontoplanen) har bara bankrader som källor, räknade med lika
-     eller summa, och står på rätt sida: pengar in i debet och pengar ut i kredit.
+     eller summa, och står på rätt sida: pengar in i debet och pengar ut i kredit,
+  7. täckningen: raderna tillsammans använder varje värde i källorna högst en gång per sida, så att
+     inget räknas två gånger (se nedan).
+
+Täckningen. Varje källa består av delar:
+
+  underlag   en del per momsrad och fält: underlag_ore och moms_ore. belopp_ore består av alla
+             underlagets delar (summan av momsraderna, K13)
+  bankrad    en del, bankradens belopp
+  z_rapport  försäljningen med en sats består av två delar: försäljningen utan moms och momsen med
+             samma sats. Momsposten är bara momsdelen, och totalsumman består av alla
+             försäljningens delar. Ett betalsätt är en egen del
+
+För debet och för kredit räknas hur många gånger varje del används, med tecken: på en rad som räknas
+med skillnad dras källorna efter den första ifrån (minus en gång), annars läggs de till (plus en
+gång). Regeln:
+
+  a. varje del används 0 eller 1 gång i debet, och 0 eller 1 gång i kredit,
+  b. på varje sida är det som kommer från ett underlag antingen 0 eller hela belopp_ore: underlaget
+     används helt eller inte alls på en sida.
+
+a stoppar samma värde två gånger på en sida (dubbel moms, samma bankrad två gånger, moms både i
+bruttot och för sig) och en skillnad som drar ifrån något som sidan inte tar med (ett belopp ur två
+orelaterade underlag). b stoppar ett underlag där en del saknas, till exempel momsen. Kortavgiften
+(DESIGN 4d: kortförsäljningen minus bankraden) godtas: bankraden läggs till och dras ifrån i debet och
+används där 0 gånger. Samma del får stå en gång i debet och en gång i kredit (till exempel bankraden
+på både bankkontot och kostnaden i 4e).
 
 Kopplingarna i förslaget får regelbokens kontrollsumma och kontrollsumman för varje fil förslaget
 bygger på (underlaget, bankfilen och Z-filen). Summorna kommer från inläsningen, aldrig från indata.
@@ -133,8 +161,15 @@ _BANK = "bank"
 _INGAENDE_MOMS = "ingaende_moms"
 _UTGAENDE_MOMS = "utgaende_moms_per_sats"
 _MOMSPOST = "moms_per_sats"
-# Fältet i en momsrad som är momsen.
+_FORSALJNINGSPOST = "forsaljning_per_sats"
+_TOTALSUMMA = "totalsumma"
+# Fälten i en momsrad: beloppet utan moms och momsen.
+_UNDERLAGSFALT = "underlag_ore"
 _MOMSFALT = "moms_ore"
+# Sidorna i täckningen.
+_SIDOR = ("debet", "kredit")
+_DELARNA = ("Ett underlags 'belopp_ore' räknas som alla dess momsraders '" + _UNDERLAGSFALT + "' och '" + _MOMSFALT
+            + "', och en Z-rapports försäljning med en sats som försäljningen utan moms plus momsen med samma sats.")
 
 _DATUMFORM = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
 
@@ -343,16 +378,26 @@ def _kontrollera_k2(verifikation, kontoplan):
 
 # --- Ursprunget ---
 
+class _Del(NamedTuple):
+    """En del av en källa, som täckningen räknar (punkt 7 överst i filen)."""
+
+    nyckel: tuple  # vilken del det är
+    visas: str     # delen i ett felmeddelande
+    belopp: int    # delens värde i öre
+
+
 class _Varde(NamedTuple):
     """Ett värde ur en källa, som kontrollen själv har slagit upp i perioderna."""
 
     nyckel: tuple          # vilket värde det är, för att hitta en källa som står två gånger
     visas: str             # källan i ett felmeddelande
     belopp: int            # värdet i öre, aldrig negativt
-    moms: bool             # True om värdet är moms (moms_ore i en momsrad, eller en momspost i en Z-rapport)
+    moms: object           # vilken sorts moms värdet är: "underlag" (moms_ore i en momsrad i ett underlag),
+                           # "z_rapport" (en momspost i en Z-rapport), eller None om det inte är moms
     sats: object           # momssatsen, eller None om källan inte har någon
     koppling: tuple        # (typen i kopplingar, vad som står där): ("underlag", id) och så vidare
     bankens_belopp: object  # bankradens belopp med tecken (in är positivt, ut negativt), annars None
+    delar: tuple           # delarna som värdet består av (_Del), för täckningen
 
 
 class _Kallorna(NamedTuple):
@@ -393,8 +438,9 @@ def _underlagets_varde(kalla, vad, underlagen):
         if "momssats" in kalla:
             raise _fel(_URSPRUNG, vad + " har 'momssats', men " + repr(falt) + " står inte i en momsrad. 'momssats'"
                        " hör bara till fälten " + ", ".join(map(repr, MOMSRADENS_FALT)) + ".")
+        # belopp_ore är summan av momsraderna (K13), så det består av alla underlagets delar.
         return _Varde(("underlag", id_, None, falt), "underlaget " + repr(id_) + ", " + repr(falt), underlag[falt],
-                      False, None, ("underlag", id_), None)
+                      None, None, ("underlag", id_), None, _underlagets_delar(id_, underlag))
     if "momssats" not in kalla:
         raise _fel(_URSPRUNG, vad + " pekar på " + repr(falt) + " i en momsrad men saknar 'momssats', som säger"
                    " vilken momsrad det är.")
@@ -404,8 +450,20 @@ def _underlagets_varde(kalla, vad, underlagen):
         raise _fel(_URSPRUNG, vad + ": underlaget " + repr(id_) + " har ingen momsrad med satsen " + str(sats) + " %."
                    " Satserna i underlaget är " + ", ".join(str(rad["momssats"]) + " %" for rad in underlag["moms"])
                    + ".")
-    return _Varde(("underlag", id_, sats, falt), "underlaget " + repr(id_) + ", momsraden med satsen " + str(sats)
-                  + " %, " + repr(falt), momsrader[0][falt], falt == _MOMSFALT, sats, ("underlag", id_), None)
+    del_ = _momsradens_del(id_, momsrader[0], falt)
+    return _Varde(del_.nyckel, del_.visas, del_.belopp, "underlag" if falt == _MOMSFALT else None, sats,
+                  ("underlag", id_), None, (del_,))
+
+
+def _momsradens_del(id_, momsrad, falt):
+    """Fältet falt i en momsrad i underlaget id_, som en del för täckningen."""
+    return _Del(("underlag", id_, momsrad["momssats"], falt), "underlaget " + repr(id_) + ", momsraden med satsen "
+                + str(momsrad["momssats"]) + " %, " + repr(falt), momsrad[falt])
+
+
+def _underlagets_delar(id_, underlag):
+    """Alla delar i underlaget: underlag_ore och moms_ore i varje momsrad."""
+    return tuple(_momsradens_del(id_, momsrad, falt) for momsrad in underlag["moms"] for falt in MOMSRADENS_FALT)
 
 
 def _bankradens_varde(kalla, vad, bankrader):
@@ -417,8 +475,9 @@ def _bankradens_varde(kalla, vad, bankrader):
         raise _fel(_URSPRUNG, vad + " pekar på bankraden " + repr(id_) + ", som inte finns i bankperioden.")
     belopp = bankrader[id_][falt]
     # Pengar ut har ett negativt belopp. På vilken sida raden står visar riktningen.
-    return _Varde(("bankrad", id_, falt), "bankraden " + repr(id_) + " (radnummer " + str(bankrader[id_]["radnr"])
-                  + ")", abs(belopp), False, None, ("bankrader", id_), belopp)
+    del_ = _Del(("bankrad", id_, falt), "bankraden " + repr(id_) + " (radnummer " + str(bankrader[id_]["radnr"]) + ")",
+                abs(belopp))
+    return _Varde(del_.nyckel, del_.visas, del_.belopp, None, None, ("bankrader", id_), belopp, (del_,))
 
 
 def _z_postens_varde(kalla, vad, rapporterna):
@@ -444,7 +503,32 @@ def _z_postens_varde(kalla, vad, rapporterna):
         raise _fel(_URSPRUNG, vad + ": " + visas + " är negativ (" + kronor(post["belopp_ore"]) + "). Hur returer"
                    " och andra negativa poster i kassan ska bokföras är inte bestämt.")
     return _Varde(("z_rapport", kassaregister, znummer, postnamn, sats), visas, post["belopp_ore"],
-                  post["posttyp"] == _MOMSPOST, post["sats"], ("z_rapporter", (kassaregister, znummer)), None)
+                  "z_rapport" if post["posttyp"] == _MOMSPOST else None, post["sats"],
+                  ("z_rapporter", (kassaregister, znummer)), None, _z_postens_delar(post, rapport))
+
+
+def _z_postens_delar(post, rapport):
+    """Delarna i en post i Z-rapporten (rapport är alla dess rader), för täckningen.
+
+    Försäljningen med en sats är försäljningen utan moms plus momsen med samma sats (Z-kontroll e).
+    Totalsumman är all försäljning (Z-kontroll c). En annan post är en egen del.
+    """
+    rapporten = "Z-rapport " + str(post["znummer"]) + " (" + post["kassaregister"] + "), "
+    borjan = ("z_rapport", post["kassaregister"], post["znummer"])
+    if post["posttyp"] == _TOTALSUMMA:
+        return tuple(del_ for rad in rapport if rad["posttyp"] == _FORSALJNINGSPOST
+                     for del_ in _z_postens_delar(rad, rapport))
+    if post["posttyp"] not in (_FORSALJNINGSPOST, _MOMSPOST):
+        return (_Del(borjan + (post["posttyp"], post["postnamn"]), rapporten + "posten " + repr(post["postnamn"]),
+                     post["belopp_ore"]),)
+    sats = post["sats"]
+    # En sats utan momspost har momsen 0 (Z-kontroll e).
+    moms = sum(rad["belopp_ore"] for rad in rapport if rad["posttyp"] == _MOMSPOST and rad["sats"] == sats)
+    momsdelen = _Del(borjan + (_MOMSPOST, sats), rapporten + "momsen med satsen " + str(sats) + " %", moms)
+    if post["posttyp"] == _MOMSPOST:
+        return (momsdelen,)
+    return (_Del(borjan + (_FORSALJNINGSPOST, sats), rapporten + "försäljningen utan moms med satsen " + str(sats)
+                 + " %", post["belopp_ore"] - moms), momsdelen)
 
 
 def _sla_upp(kalla, vad, kallorna):
@@ -474,20 +558,34 @@ def _rakna(berakning, belopp):
 
 
 def _kontrollera_momskonto(roller, varden, vad):
-    """En rad på ett momskonto har bara momsbelopp som källor, och på utgående moms rätt sats."""
-    momsroller = [(roll, sats) for roll, sats in roller if roll in (_INGAENDE_MOMS, _UTGAENDE_MOMS)]
-    if not momsroller:
+    """En rad på ett momskonto har bara momsbelopp som källor, av rätt sort och med rätt sats.
+
+    Ingående moms kommer bara från moms_ore i en momsrad i ett underlag, och utgående moms bara från
+    en momspost i en Z-rapport med en av kontots satser. Sidan prövas inte (kreditnotor är inte bestämda).
+    """
+    ingaende = (_INGAENDE_MOMS, None) in roller
+    satser = [sats for roll, sats in roller if roll == _UTGAENDE_MOMS]
+    if not ingaende and not satser:
         return
+    utgaende = "kontot för utgående moms med satsen " + " och ".join(str(sats) + " %" for sats in satser)
     for varde in varden:
-        if not varde.moms:
+        if varde.moms is None:
             raise _fel(_URSPRUNG, vad + " är ett momskonto, men källan " + varde.visas + " är inte ett momsbelopp. En"
                        " rad på ett momskonto ska ha momsen i en momsrad ('" + _MOMSFALT + "') eller en momspost i en"
                        " Z-rapport som ursprung.")
-        if (_INGAENDE_MOMS, None) not in momsroller and (_UTGAENDE_MOMS, varde.sats) not in momsroller:
-            satser = [sats for roll, sats in momsroller if roll == _UTGAENDE_MOMS]
-            raise _fel(_URSPRUNG, vad + " är kontot för utgående moms med satsen " + " och ".join(
-                str(sats) + " %" for sats in satser) + ", men källan " + varde.visas + " har satsen "
-                + str(varde.sats) + " %.")
+        if varde.moms == "underlag" and ingaende:
+            continue
+        if varde.moms == "z_rapport" and varde.sats in satser:
+            continue
+        if varde.moms == "underlag":
+            raise _fel(_URSPRUNG, vad + " är " + utgaende + ", men källan " + varde.visas + " är momsen i ett"
+                       " underlag. Utgående moms ska komma från en momspost i en Z-rapport.")
+        if not satser:
+            raise _fel(_URSPRUNG, vad + " är kontot för ingående moms, men källan " + varde.visas + " är momsen i en"
+                       " Z-rapport. Ingående moms ska komma från momsen i en momsrad i ett underlag ('" + _MOMSFALT
+                       + "').")
+        raise _fel(_URSPRUNG, vad + " är " + utgaende + ", men källan " + varde.visas + " har satsen "
+                   + str(varde.sats) + " %.")
 
 
 def _kontrollera_bankkonto(rad, roller, berakning, varden, vad):
@@ -551,9 +649,55 @@ def _kontrollera_kopplingar(kopplingar, anvanda, regelbok, kallorna):
     return nya
 
 
+def _visa_rader(nummer):
+    """Radnumren i ett felmeddelande, till exempel "rad 2" eller "rad 1, 2 och 4"."""
+    nummer = [str(tal) for tal in sorted(set(nummer))]
+    return "rad " + (nummer[0] if len(nummer) == 1 else ", ".join(nummer[:-1]) + " och " + nummer[-1])
+
+
+def _kontrollera_tackning(raderna, underlagen, kallorna):
+    """Täckningen, punkt 7 överst i filen.
+
+    raderna är (radnummer, sida, berakning, värdena) för varje rad, och underlagen är id för
+    underlagen som raderna använder.
+    """
+    for sida in _SIDOR:
+        antal = {}  # delens nyckel: [delen, antal gånger med tecken, radnumren]
+        for nummer, radens_sida, berakning, varden in raderna:
+            if radens_sida != sida:
+                continue
+            for plats, varde in enumerate(varden):
+                tecken = -1 if berakning == "skillnad" and plats > 0 else 1
+                for del_ in varde.delar:
+                    rakning = antal.setdefault(del_.nyckel, [del_, 0, []])
+                    rakning[1] += tecken
+                    rakning[2].append(nummer)
+        for del_, ganger, nummer in antal.values():
+            if ganger > 1:
+                raise _fel(_URSPRUNG, "i " + sida + " används " + del_.visas + " " + str(ganger) + " gånger ("
+                           + _visa_rader(nummer) + "). Varje del av en källa får användas högst en gång i debet och"
+                           " en gång i kredit, så att inget värde räknas två gånger. " + _DELARNA)
+            if ganger < 0:
+                raise _fel(_URSPRUNG, "i " + sida + " dras " + del_.visas + " ifrån " + str(-ganger) + " gång"
+                           + ("" if ganger == -1 else "er") + " mer än den läggs till (" + _visa_rader(nummer) + "). En"
+                           " skillnad får bara dra ifrån något som samma sida också tar med. " + _DELARNA)
+        for id_ in underlagen:
+            underlag = kallorna.underlag[id_]
+            delar = _underlagets_delar(id_, underlag)
+            anvanda = [del_ for del_ in delar if del_.nyckel in antal and antal[del_.nyckel][1] == 1]
+            anvant = sum(del_.belopp for del_ in anvanda)
+            if anvant not in (0, underlag["belopp_ore"]):
+                saknas = [del_ for del_ in delar if del_ not in anvanda and del_.belopp]
+                raise _fel(_URSPRUNG, "i " + sida + " används " + kronor(anvant) + " av underlaget " + repr(id_)
+                           + ", men ett underlag ska användas helt eller inte alls på varje sida: 0 kr eller hela"
+                           " 'belopp_ore', " + kronor(underlag["belopp_ore"]) + ". Det som saknas är " + "; ".join(
+                               del_.visas + ": " + kronor(del_.belopp) for del_ in saknas) + ".")
+
+
 def _kontrollera_ursprung(forslag, regelbok, kontoplan, kallorna):
-    """Ursprungskontrollen, punkt 1–6 överst i filen. Returnerar kopplingarna med kontrollsummorna."""
+    """Ursprungskontrollen, punkt 1–7 överst i filen. Returnerar kopplingarna med kontrollsummorna."""
     anvanda = {typ: [] for typ in KOPPLINGARNAS_NYCKLAR}
+    raderna = []
     for nummer, rad in enumerate(forslag["verifikation"]["rader"], start=1):
         vad = "rad " + str(nummer) + " (konto " + rad["konto"] + ")"
         berakning, fran = rad["ursprung"]["berakning"], rad["ursprung"]["fran"]
@@ -584,7 +728,10 @@ def _kontrollera_ursprung(forslag, regelbok, kontoplan, kallorna):
         roller = kontoplan.kontots_roller(rad["konto"])
         _kontrollera_momskonto(roller, varden, vad)
         _kontrollera_bankkonto(rad, roller, berakning, varden, vad)
-    return _kontrollera_kopplingar(forslag["kopplingar"], anvanda, regelbok, kallorna)
+        raderna.append((nummer, _SIDOR[0] if rad["debet_ore"] > 0 else _SIDOR[1], berakning, varden))
+    kopplingar = _kontrollera_kopplingar(forslag["kopplingar"], anvanda, regelbok, kallorna)
+    _kontrollera_tackning(raderna, anvanda["underlag"], kallorna)
+    return kopplingar
 
 
 # --- Förslaget ---

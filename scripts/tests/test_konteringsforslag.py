@@ -824,6 +824,178 @@ def test_forslag_som_inte_ar_ett_objekt_stoppas(kallor):
         assert fel.value.kontroll == "indata" and sort in str(fel.value)
 
 
+# --- Täckningen (punkt 7, granskning 7 M1) ---
+# Förslag där varje rad för sig kan räknas fram ur riktiga värden och debet = kredit, men där ett värde
+# räknas två gånger eller ett belopp inte finns i någon källa. P01–P03 och P10 är granskarens prov.
+
+U5 = "SYNT-U-2025-005"
+
+
+def p01_dubbel_ingaende_moms():
+    return forslag("2025-01-07", "Faktura LEV-TE, SYNT-TE-761", [
+        rad("4010", 1493800, 0, "lika", underlag(U3, "underlag_ore", 12)),
+        rad("2641", 179256, 0, "lika", underlag(U3, "moms_ore", 12)),
+        rad("2641", 179256, 0, "lika", underlag(U3, "moms_ore", 12)),
+        rad("2440", 0, 1852312, "summa", underlag(U3, "belopp_ore"), underlag(U3, "moms_ore", 12)),
+    ], "R-LEV-TE", underlag_=[U3])
+
+
+def p02_moms_bade_som_kostnad_och_avdrag():
+    return forslag("2025-01-07", "Faktura LEV-TE, SYNT-TE-761", [
+        rad("4010", 1673056, 0, "lika", underlag(U3, "belopp_ore")),
+        rad("2641", 179256, 0, "lika", underlag(U3, "moms_ore", 12)),
+        rad("2440", 0, 1852312, "summa", underlag(U3, "belopp_ore"), underlag(U3, "moms_ore", 12)),
+    ], "R-LEV-TE", underlag_=[U3])
+
+
+def p03_samma_bankrad_tva_ganger(kallor):
+    bank = kallor.bankrad(kallor.januari, 3)
+    return forslag("2025-01-03", "Kortinlösen för 2025-01-02", [
+        rad("1940", 406562, 0, "lika", bankrad(bank)),
+        rad("1940", 406562, 0, "lika", bankrad(bank)),
+        rad("1580", 0, 406562, "lika", bankrad(bank)),
+        rad("1581", 0, 406562, "lika", bankrad(bank)),
+    ], "R-BANK-KORTINLOSEN", bankrader=[bank])
+
+
+def p10_skillnad_mellan_tva_underlag():
+    # 16 730,56 kr (SYNT-U-2025-003) minus 9 600,00 kr (SYNT-U-2025-005): ett belopp som inte finns i något underlag.
+    return forslag("2025-01-07", "Skillnad mellan två fakturor", [
+        rad("4010", 713056, 0, "skillnad", underlag(U3, "belopp_ore"), underlag(U5, "belopp_ore")),
+        rad("2440", 0, 713056, "skillnad", underlag(U3, "belopp_ore"), underlag(U5, "belopp_ore")),
+    ], "R-LEV-TE", underlag_=[U3, U5])
+
+
+def underlaget_utan_momsen():
+    # Fakturan utan momsraden: leverantörsskulden blir beloppet utan moms. Varje del används högst en
+    # gång, men underlaget används inte helt.
+    return forslag("2025-01-07", "Faktura LEV-TE, SYNT-TE-761", [
+        rad("4010", 1493800, 0, "lika", underlag(U3, "underlag_ore", 12)),
+        rad("2440", 0, 1493800, "lika", underlag(U3, "underlag_ore", 12)),
+    ], "R-LEV-TE", underlag_=[U3])
+
+
+def z_forsaljningen_med_moms_och_momsen():
+    # Z 1001 med försäljningen 12 % inklusive moms på 3002 och momsen dessutom på 2621: momsen i kredit två
+    # gånger. Debet har momsen på kassan för att summorna ska gå ihop.
+    return forslag("2025-01-02", "Kassa Z 1001", [
+        rad("1910", 95600, 0, "lika", z("betalsatt_kontant")),
+        rad("1580", 411500, 0, "lika", z("betalsatt_kort")),
+        rad("1581", 89400, 0, "lika", z("betalsatt_swish")),
+        rad("1910", 45450, 0, "lika", z("moms", 12)),
+        rad("3002", 0, 424200, "lika", z("forsaljning", 12)),
+        rad("2621", 0, 45450, "lika", z("moms", 12)),
+        rad("3001", 0, 137840, "skillnad", z("forsaljning", 25), z("moms", 25)),
+        rad("2611", 0, 34460, "lika", z("moms", 25)),
+    ], "R-Z-TB-KASSA-1", z_rapporter=[1001])
+
+
+def z_totalsumman_och_forsaljningen():
+    # Z 1001 med totalsumman i kredit och dessutom försäljningen per sats: försäljningen två gånger.
+    return forslag("2025-01-02", "Kassa Z 1001", [
+        rad("1910", 95600, 0, "lika", z("betalsatt_kontant")),
+        rad("1580", 411500, 0, "lika", z("betalsatt_kort")),
+        rad("1581", 89400, 0, "lika", z("betalsatt_swish")),
+        rad("1910", 596500, 0, "lika", z("summa_brutto")),
+        rad("3002", 0, 596500, "lika", z("summa_brutto")),
+        rad("3002", 0, 378750, "skillnad", z("forsaljning", 12), z("moms", 12)),
+        rad("2621", 0, 45450, "lika", z("moms", 12)),
+        rad("3001", 0, 137840, "skillnad", z("forsaljning", 25), z("moms", 25)),
+        rad("2611", 0, 34460, "lika", z("moms", 25)),
+    ], "R-Z-TB-KASSA-1", z_rapporter=[1001])
+
+
+TACKNING = {
+    "p01_dubbel_ingaende_moms": (
+        lambda kallor: p01_dubbel_ingaende_moms(),
+        "i debet används underlaget 'SYNT-U-2025-003', momsraden med satsen 12 %, 'moms_ore' 2 gånger (rad 2 och 3)",
+        "högst en gång i debet och en gång i kredit"),
+    "p02_moms_bade_som_kostnad_och_avdrag": (
+        lambda kallor: p02_moms_bade_som_kostnad_och_avdrag(),
+        "i debet används underlaget 'SYNT-U-2025-003', momsraden med satsen 12 %, 'moms_ore' 2 gånger (rad 1 och 2)",
+        "Ett underlags 'belopp_ore' räknas som alla dess momsraders 'underlag_ore' och 'moms_ore'"),
+    "p03_samma_bankrad_tva_ganger": (
+        p03_samma_bankrad_tva_ganger, "i debet används bankraden", "(radnummer 3) 2 gånger (rad 1 och 2)"),
+    "p10_skillnad_mellan_tva_underlag": (
+        lambda kallor: p10_skillnad_mellan_tva_underlag(),
+        "i debet dras underlaget 'SYNT-U-2025-005', momsraden med satsen 0 %, 'underlag_ore' ifrån 1 gång mer än den"
+        " läggs till (rad 1)", "En skillnad får bara dra ifrån något som samma sida också tar med"),
+    "underlaget_utan_momsen": (
+        lambda kallor: underlaget_utan_momsen(),
+        "i debet används 14938,00 kr av underlaget 'SYNT-U-2025-003', men ett underlag ska användas helt eller inte"
+        " alls på varje sida: 0 kr eller hela 'belopp_ore', 16730,56 kr. Det som saknas är underlaget"
+        " 'SYNT-U-2025-003', momsraden med satsen 12 %, 'moms_ore': 1792,56 kr."),
+    "z_forsaljningen_med_moms_och_momsen": (
+        lambda kallor: z_forsaljningen_med_moms_och_momsen(),
+        "i kredit används Z-rapport 1001 (TB-KASSA-1), momsen med satsen 12 % 2 gånger (rad 5 och 6)"),
+    "z_totalsumman_och_forsaljningen": (
+        lambda kallor: z_totalsumman_och_forsaljningen(),
+        "i kredit används Z-rapport 1001 (TB-KASSA-1), försäljningen utan moms med satsen 12 % 2 gånger (rad 5"
+        " och 6)"),
+}
+
+
+@pytest.mark.parametrize("fall", TACKNING.values(), ids=TACKNING.keys())
+def test_tackningen_stoppar(kallor, fall):
+    bygg, *texter = fall
+    stoppas(kallor, bygg(kallor), "ursprung", *texter)
+
+
+def test_tackningen_godtar_samma_del_i_debet_och_kredit(kallor):
+    # 4e: bankraden står både på kostnaden (debet) och på bankkontot (kredit), en gång på varje sida.
+    # 4d: bankraden läggs till och dras ifrån i debet (0 gånger), och kortförsäljningen står en gång per sida.
+    assert skapa(kallor, bankavgiften(kallor))
+    assert skapa(kallor, kortinlosen(kallor))
+
+
+def test_tackningen_godtar_underlaget_som_skillnad_mellan_beloppet_och_momsen(kallor):
+    # Kostnaden räknad som 'belopp_ore' minus momsen: underlaget används ändå helt, en gång per sida.
+    data = fakturan()
+    rader(data)[0]["ursprung"] = {"berakning": "skillnad",
+                                  "fran": [underlag(U3, "belopp_ore"), underlag(U3, "moms_ore", 12)]}
+    assert skapa(kallor, data)
+
+
+def test_tackningen_godtar_totalsumman_mot_betalsatten(kallor):
+    # Totalsumman i kredit och betalsätten i debet: varje del en gång per sida.
+    data = forslag("2025-01-02", "Kassa Z 1001", [
+        rad("1910", 95600, 0, "lika", z("betalsatt_kontant")),
+        rad("1580", 411500, 0, "lika", z("betalsatt_kort")),
+        rad("1581", 89400, 0, "lika", z("betalsatt_swish")),
+        rad("3002", 0, 596500, "lika", z("summa_brutto")),
+    ], "R-Z-TB-KASSA-1", z_rapporter=[1001])
+    assert skapa(kallor, data)
+
+
+# --- Momskontona (punkt 5, granskning 7 M2) ---
+
+def p04_kassans_moms_pa_ingaende_moms():
+    data = z_1001()
+    rader(data)[4]["konto"] = "2641"
+    rader(data)[6]["konto"] = "2641"
+    return data
+
+
+def p05_fakturans_moms_pa_utgaende_moms():
+    data = fakturan()
+    rader(data)[1]["konto"] = "2621"
+    return data
+
+
+def test_p04_kassans_moms_pa_kontot_for_ingaende_moms_stoppas(kallor):
+    stoppas(kallor, p04_kassans_moms_pa_ingaende_moms(), "ursprung",
+            "rad 5 (konto 2641) är kontot för ingående moms, men källan Z-rapport 1001 (TB-KASSA-1), posten 'moms' med"
+            " satsen 12 % är momsen i en Z-rapport. Ingående moms ska komma från momsen i en momsrad i ett underlag"
+            " ('moms_ore')")
+
+
+def test_p05_fakturans_moms_pa_kontot_for_utgaende_moms_stoppas(kallor):
+    stoppas(kallor, p05_fakturans_moms_pa_utgaende_moms(), "ursprung",
+            "rad 2 (konto 2621) är kontot för utgående moms med satsen 12 %, men källan underlaget 'SYNT-U-2025-003',"
+            " momsraden med satsen 12 %, 'moms_ore' är momsen i ett underlag. Utgående moms ska komma från en momspost"
+            " i en Z-rapport")
+
+
 def test_k2_kors_fore_ursprunget(kallor):
     # En rad utan källor och med obalans: K2 stoppar först, som i DESIGN avsnitt 3.
     data = fakturan()
