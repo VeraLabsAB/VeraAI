@@ -1,3 +1,5 @@
+# Mappar där agenten skriver utdata eller tar emot underlag.
+# Här kan riktiga kunduppgifter hamna, så inget av det får följa med.
 inkorg/
 arkiv/
 forslag/
@@ -5,6 +7,62 @@ godkant/
 arenden/
 rapporter/
 logg/
+
+# Hemligheter: miljöfiler, nycklar, lösenord och inloggningar
+# (till exempel till Fortnox eller banken).
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+hemligheter/
+*secret*
+*credentials*
+*losenord*
+*lösenord*
+*token*
+*api_key*
+*apikey*
+
+# Riktiga underlag: kontoutdrag, kvitton, Z-rapporter och
+# allt från gamla Shop and Go-projektet.
+*kontoutdrag*
+*kvitto*
+*kvitton*
+*z-rapport*
+*Z-rapport*
+*shop*and*go*
+*Shop*and*Go*
+*shopandgo*
+*ShopAndGo*
+
+# Inskannade underlag och exporterad bokföring (SIE-filer).
+# Fiktiva underlag i testdata/ får följa med.
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.se
+*.si
+*.sie
+!testdata/**/*.pdf
+!testdata/**/*.jpg
+!testdata/**/*.jpeg
+!testdata/**/*.png
+!testdata/**/*.heic
+
+# Python och verktyg
 .venv/
 __pycache__/
+*.pyc
+.pytest_cache/
+
+# Claude Codes lokala inställningar för den här datorn
+.claude/settings.local.json
+
+# macOS
 .DS_Store
