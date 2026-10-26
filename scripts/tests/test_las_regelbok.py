@@ -147,6 +147,11 @@ def med_regel(ny):
     return bok(regler=regler() + [ny])
 
 
+def med_agare(agare, *nya_regler):
+    """En felfri regelbok med listan agare_och_narstaende och reglerna nya_regler till sist."""
+    return bok(agare_och_narstaende=agare, regler=regler() + list(nya_regler))
+
+
 def skriv(mapp, data, ascii=False):
     fil = mapp / "regelbok.json"
     fil.write_text(json.dumps(data, ensure_ascii=ascii), encoding="utf-8")
@@ -194,16 +199,23 @@ def test_testforetagets_fil_laddas():
     assert regelbok.regel_for_underlag("leverantorsfaktura", "HYRESVARD", datum) is None
     # Före regelns första dag finns ingen regel.
     assert regelbok.regel_for_underlag("leverantorsfaktura", "LEV-TE", "2024-12-31") is None
+    # Ägare och närstående (K7). Testbutiken har ingen regel för ägaren än.
+    assert regelbok.agare_och_narstaende == ["AGARE-1"]
+    assert regelbok.ar_agare_eller_narstaende("AGARE-1") is True
+    assert regelbok.ar_agare_eller_narstaende("LEV-TE") is False
 
 
-def test_testforetagets_fil_har_exakt_vardena_i_design_och_tva_tillagg():
-    # Inga nya värden har hittats på: filen är exemplet i DESIGN-regelbok.md avsnitt 1, med två
-    # tillägg som uppgiften kräver och som båda kommer från redan bestämda värden:
+def test_testforetagets_fil_har_exakt_vardena_i_design_och_tre_tillagg():
+    # Inga nya värden har hittats på: filen är exemplet i DESIGN-regelbok.md avsnitt 1, med tre
+    # tillägg som Hugo har godkänt och som alla kommer från redan bestämda värden:
     # - 'oppettider' (Hugos beslut D21), med testbutikens stängda dagar ur testdata/README.md,
     # - gränsen för bankavgiften, som är en regel för pengar ut och därför måste ha
-    #   'hogst_belopp_ore'. Värdet är gränsen i matchning.json, som Hugo bestämde 2026-10-25.
+    #   'hogst_belopp_ore'. Värdet är gränsen i matchning.json, som Hugo bestämde 2026-10-25,
+    # - 'agare_och_narstaende' (Hugos beslut 2026-10-26), med det syntetiska värdet AGARE-1 ur
+    #   DESIGN-regelbok.md avsnitt 1 och testforetag/FIKTIVT_FORETAG.md.
     design = json_block_i_design("regler")
     design["oppettider"] = {"stangda_veckodagar": ["sondag"], "stangda_datum": ["2025-01-01", "2025-01-06"]}
+    design["agare_och_narstaende"] = ["AGARE-1"]
     avgift = [regel_ for regel_ in design["regler"] if regel_["id"] == "R-BANK-AVGIFT"]
     assert len(avgift) == 1 and "hogst_belopp_ore" not in avgift[0]["villkor"]
     avgift[0]["villkor"]["hogst_belopp_ore"] = 25000
@@ -213,6 +225,9 @@ def test_testforetagets_fil_har_exakt_vardena_i_design_och_tva_tillagg():
     bankavgift = [r for r in ladda_matchningsformat(TESTBUTIKEN / "matchning.json")["kraver_inte_underlag"]
                   if r["namn"] == "bankavgift"]
     assert bankavgift[0]["hogst_belopp_ore"] == 25000
+    assert "En regel med motparten `AGARE-1` får bara" in (AGENT / "DESIGN-regelbok.md").read_text(encoding="utf-8")
+    assert "| AGARE-1 | Ägare 1 (påhittad person)" in (AGENT / "testforetag" / "FIKTIVT_FORETAG.md").read_text(
+        encoding="utf-8")
 
 
 def test_testforetagets_fil_ar_markt_syntetisk():
@@ -331,6 +346,42 @@ def test_uppslag_med_annat_an_text_stoppar(tmp_path, konfiguration, varde):
         regelbok.regel_for_bankrad(varde, "2025-01-01")
 
 
+def test_uppslaget_for_agare_och_narstaende(tmp_path, konfiguration):
+    # Motparten jämförs efter normaliseringen, som i K4 och regel_for_underlag (DESIGN avsnitt 1).
+    data = bok(agare_och_narstaende=["AGARE-X", "NARSTAENDE-Y"])
+    data["regler"].append(regel("R-6", underlag("kvitto", "agare" + chr(0x2010) + "x"), {"grupp_a": "9002"}, niva="D"))
+    regelbok = las(tmp_path, data, konfiguration)
+    assert regelbok.agare_och_narstaende == ["AGARE-X", "NARSTAENDE-Y"]
+    for motpart in ["AGARE-X", "agare-x", "AGARE" + chr(0x2010) + "X", "AGARE-X" + chr(0x200B), " AGARE-X ",
+                    "narstaende-y"]:
+        assert regelbok.ar_agare_eller_narstaende(motpart) is True, motpart
+    for motpart in ["MOTPART-A", "AGARE-XY", "AGARE", "", "NARSTAENDE-X"]:
+        assert regelbok.ar_agare_eller_narstaende(motpart) is False, motpart
+
+
+def test_utan_agare_och_narstaende_ar_listan_tom(tmp_path, konfiguration):
+    for data in (bok(), bok(agare_och_narstaende=[])):
+        regelbok = las(tmp_path, data, konfiguration)
+        assert regelbok.agare_och_narstaende == []
+        assert regelbok.ar_agare_eller_narstaende("MOTPART-A") is False
+
+
+@pytest.mark.parametrize("varde", [None, 5, True, ["AGARE-X"]])
+def test_uppslag_av_agare_med_annat_an_text_stoppar(tmp_path, konfiguration, varde):
+    regelbok = las(tmp_path, bok(agare_och_narstaende=["AGARE-X"]), konfiguration)
+    with pytest.raises(RegelbokFel, match="Uppslaget i regelboken: motpart ska vara text"):
+        regelbok.ar_agare_eller_narstaende(varde)
+
+
+def test_regel_for_agare_med_niva_d_godtas(tmp_path, konfiguration):
+    # Båda typerna av underlag. Regler för Z-rapporter och bankrader har ingen motpart.
+    data = bok(agare_och_narstaende=["AGARE-X"])
+    data["regler"].append(regel("R-6", underlag(motpart="AGARE-X"), {"grupp_a": "9001"}, niva="D"))
+    data["regler"].append(regel("R-7", underlag("kvitto", "AGARE-X"), {"grupp_a": "9002"}, niva="D"))
+    regelbok = las(tmp_path, data, konfiguration)
+    assert regelbok.regel_for_underlag("kvitto", "AGARE-X", "2025-01-01")["niva"] == "D"
+
+
 def test_resultatets_form(tmp_path, konfiguration):
     regelbok = las(tmp_path, bok(), konfiguration)
     assert regelbok.godkand == {"av": "Påhittad godkännare", "datum": "2025-01-01"}
@@ -435,6 +486,16 @@ def test_regelboken_kan_inte_andras(tmp_path, konfiguration):
     assert regelbok.oppettider["stangda_veckodagar"] == ["sondag"]
 
 
+def test_listan_med_agare_kan_inte_andras(tmp_path, konfiguration):
+    regelbok = las(tmp_path, bok(agare_och_narstaende=["AGARE-X"]), konfiguration)
+    with pytest.raises(AttributeError):
+        regelbok._regelboken["agare_och_narstaende"].append("MOTPART-A")
+    regelbok.agare_och_narstaende.append("MOTPART-A")
+    regelbok.agare_och_narstaende.clear()
+    assert regelbok.agare_och_narstaende == ["AGARE-X"]
+    assert regelbok.ar_agare_eller_narstaende("MOTPART-A") is False
+
+
 def test_regelboken_kan_bara_skapas_av_las_regelbok():
     with pytest.raises(RegelbokFel, match="kan bara skapas av las_regelbok"):
         Regelbok(object(), "0" * 64, {})
@@ -474,7 +535,7 @@ def test_matchningsformatet_kontrolleras_igen(tmp_path, konfiguration):
 @pytest.mark.parametrize("ascii", [False, True], ids=["som_tecken", "som_kod_i_json"])
 @pytest.mark.parametrize("tecken", DOLDA.values(), ids=DOLDA.keys())
 @pytest.mark.parametrize("plats", ["anteckning", "foretag", "id", "motpart", "konto", "varugrupp", "veckodag",
-                                   "nyckel"])
+                                   "nyckel", "agare"])
 def test_dolt_tecken_var_som_helst_stoppar(tmp_path, konfiguration, tecken, ascii, plats):
     data = bok()
     if plats == "anteckning":
@@ -491,6 +552,8 @@ def test_dolt_tecken_var_som_helst_stoppar(tmp_path, konfiguration, tecken, asci
         data["regler"][1]["kontering"] = {"grupp" + tecken + "_a": "9002"}
     elif plats == "veckodag":
         data["oppettider"]["stangda_veckodagar"] = ["son" + tecken + "dag"]
+    elif plats == "agare":
+        data["agare_och_narstaende"] = ["AGARE-X", "AGARE" + tecken + "-Y"]
     else:
         data["granser"] = {**data["granser"], "a" + tecken: 1}
     stoppas(tmp_path, data, konfiguration, "U+" + format(ord(tecken), "04X"), "inte syns", ascii=ascii)
@@ -725,6 +788,40 @@ STOPPAS = {
                                                       ((R, 0, "villkor", "giltig_till"), "2026-01-01")),
                                                "ingen sats för varugruppen 'grupp_d' på 2026-01-01"),
     "varugrupp_stor_bokstav": (andrad(((R, 1, "kontering"), {"Grupp_a": "9002"})), "varugruppen 'Grupp_a'"),
+    # Ägare och närstående (K7, Hugos beslut 2026-10-26)
+    "agare_text": (bok(agare_och_narstaende="AGARE-X"), "'agare_och_narstaende' ska vara en lista, inte text"),
+    "agare_objekt": (bok(agare_och_narstaende={"AGARE-X": True}), "'agare_och_narstaende' ska vara en lista, inte"
+                     " ett objekt"),
+    "agare_null": (bok(agare_och_narstaende=None), "'agare_och_narstaende' ska vara en lista", "inte null"),
+    "agare_heltal": (bok(agare_och_narstaende=["AGARE-X", 1]), "motpart nummer 2 i 'agare_och_narstaende' ska vara"
+                     " text, inte heltal"),
+    "agare_null_i_listan": (bok(agare_och_narstaende=[None]), "motpart nummer 1 i 'agare_och_narstaende'",
+                            "inte null"),
+    "agare_lista_i_listan": (bok(agare_och_narstaende=[["AGARE-X"]]), "motpart nummer 1", "inte en lista"),
+    "agare_tom": (bok(agare_och_narstaende=[""]), "motpart nummer 1 i 'agare_och_narstaende' får inte vara tom"),
+    "agare_blanksteg": (bok(agare_och_narstaende=["AGARE-X", "   "]), "motpart nummer 2 i 'agare_och_narstaende' får"
+                        " inte vara tom"),
+    "agare_blanksteg_sist": (bok(agare_och_narstaende=["AGARE-X "]), "blanksteg först eller sist"),
+    "agare_dubblett": (bok(agare_och_narstaende=["AGARE-X", "NARSTAENDE-Y", "AGARE-X"]),
+                       "'AGARE-X' står flera gånger i 'agare_och_narstaende' (som 'AGARE-X')"),
+    "agare_dubblett_efter_normalisering": (bok(agare_och_narstaende=["AGARE-X", "agare" + chr(0x2010) + "x"]),
+                                           "står flera gånger i 'agare_och_narstaende' (som 'AGARE-X')"),
+    "agarregel_niva_b": (med_agare(["AGARE-X"], regel("R-6", underlag(motpart="AGARE-X"), {"grupp_a": "9001"})),
+                         "regel nummer 6 (R-6) gäller motparten 'AGARE-X', som står i 'agare_och_narstaende' (som"
+                         " 'AGARE-X'), och har nivå 'B'", "ska alltid ha nivå D"),
+    "agarregel_niva_a": (med_agare(["AGARE-X"], regel("R-6", underlag("kvitto", "AGARE-X"), {"grupp_a": "9001"},
+                                                      niva="A")), "och har nivå 'A'"),
+    "agarregel_niva_c": (med_agare(["NARSTAENDE-Y", "AGARE-X"], regel("R-6", underlag(motpart="AGARE-X"),
+                                                                      {"grupp_a": "9001"}, niva="C")),
+                         "och har nivå 'C'"),
+    "agarregel_efter_normalisering": (med_agare(["AGARE-X"], regel("R-6", underlag(motpart="agare - x"),
+                                                                   {"grupp_a": "9001"})),
+                                      "gäller motparten 'agare - x', som står i 'agare_och_narstaende' (som 'AGARE-X')"),
+    "agarregel_bland_andra": (med_agare(["AGARE-X"], regel("R-6", underlag(motpart="AGARE-X"), {"grupp_a": "9001"},
+                                                           niva="D", giltig_till="2024-12-31"),
+                                        regel("R-7", underlag(motpart="AGARE-X"), {"grupp_a": "9001"},
+                                              giltig_fran="2025-01-01")),
+                              "regel nummer 7 (R-7) gäller motparten 'AGARE-X'"),
 }
 
 

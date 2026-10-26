@@ -439,7 +439,8 @@ def test_konto_och_satskontrollerna_hittar_inbyggda_varden(tmp_path):
 # --- Regelboken ---
 
 def namn_i_regelbockerna():
-    """Regel-id, motparter, kassaregister, regler i matchning.json, betalsätt och konton ur alla företags regelbok.json.
+    """Regel-id, motparter, kassaregister, regler i matchning.json, betalsätt, konton och ägare och närstående
+    ur alla företags regelbok.json.
 
     Varugrupperna ur konteringen finns redan i kontrollen av momsfilerna. Källorna och typerna
     (till exempel "underlag" och "kvitto") och konteringens egna nycklar (till exempel "motkonto")
@@ -447,7 +448,9 @@ def namn_i_regelbockerna():
     """
     namn = set()
     for fil in sorted(FORETAG.glob("*/regelbok.json")):
-        for regel in json.loads(fil.read_text(encoding="utf-8"))["regler"]:
+        data = json.loads(fil.read_text(encoding="utf-8"))
+        namn.update(data.get("agare_och_narstaende", []))
+        for regel in data["regler"]:
             namn.add(regel["id"])
             namn.update(varde for nyckel, varde in regel["galler"].items() if nyckel not in ("kalla", "typ"))
             kontering = regel["kontering"]
@@ -464,7 +467,7 @@ def test_regelbockerna_har_namn_att_soka_efter():
     # Skydd mot att testet nedan blir grönt för att det inte hittar några namn alls.
     namn = set(namn_i_regelbockerna())
     assert {"R-LEV-TE", "R-Z-TB-KASSA-1", "R-BANK-AVGIFT", "LEV-TE", "RESTAURANG-1", "TB-KASSA-1", "bankavgift",
-            "betalsatt_swish", "4010", "6570"} <= namn
+            "betalsatt_swish", "4010", "6570", "AGARE-1"} <= namn
     assert not namn & {"underlag", "kvitto", "leverantorsfaktura", "motkonto", "kostnad", "livsmedel"}
     assert REGELBOKSMODULEN in karnans_filer()
 

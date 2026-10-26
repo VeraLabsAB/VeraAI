@@ -62,7 +62,8 @@ GENVAGAR = ("_tolka_rader", "_tolka_kassarader", "_las_underlagsfil",
             "_kontrollera_regelbok", "_kontrollera_regelbokens_regler", "_kontrollera_regelboksregel",
             "_kontrollera_galler", "_kontrollera_villkor", "_kontrollera_kontering", "_kontrollera_bankradsregel",
             "_kontrollera_varugrupp", "_kontrollera_granser", "_kontrollera_k9", "_kontrollera_oppettider",
-            "_kontrollera_godkand", "_konfigurationen", "_konto_per_varugrupp")
+            "_kontrollera_godkand", "_konfigurationen", "_konto_per_varugrupp", "_kontrollera_agare_och_narstaende",
+            "_kontrollera_agarregel")
 # Nycklarna som skapar en Kontoplan, Momssatser eller en Regelbok, och det som ligger i dem.
 KONFIGURATIONENS_INRE = ("_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_REGELBOKSNYCKEL", "_status", "_konton", "_roller",
                          "_varugrupper", "_tolerans_ore_per_rad", "_kontrollsumma", "_regelboken")
@@ -250,7 +251,8 @@ def test_i1_de_forbjudna_namnen_hittas():
                  "konton", "status", "las_momssatser", "Momssatser", "MomssatsFel", "sats", "period", "varugrupper",
                  "tolerans_ore_per_rad", "ROLLER", "HOGSTA_SATS", "las_regelbok", "Regelbok", "RegelbokFel",
                  "regel_for_underlag", "regel_for_z_rapport", "regel_for_bankrad", "kontrollsumma", "regler",
-                 "granser", "oppettider", "REGELBOK_NYCKLAR", "KALLOR", "NIVAER"]:
+                 "granser", "oppettider", "REGELBOK_NYCKLAR", "KALLOR", "NIVAER", "agare_och_narstaende",
+                 "ar_agare_eller_narstaende"]:
         assert namn not in forbjudna, namn
 
 

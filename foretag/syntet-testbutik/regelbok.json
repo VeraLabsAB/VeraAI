@@ -9,6 +9,7 @@
   },
   "k9": {"minst_historik": 3, "hogst_procent_av_median": 300, "lagst_procent_av_median": 33},
   "oppettider": {"stangda_veckodagar": ["sondag"], "stangda_datum": ["2025-01-01", "2025-01-06"]},
+  "agare_och_narstaende": ["AGARE-1"],
   "regler": [
     {
       "id": "R-LEV-TE",

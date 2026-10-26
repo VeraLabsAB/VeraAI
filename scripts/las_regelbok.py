@@ -23,6 +23,12 @@ Filen ska ha exakt nycklarna i REGELBOK_NYCKLAR, och får ha nycklarna i REGELBO
               kontrolleras, men används inte än
   regler      en lista med minst en regel, se nedan
   anteckning  fri text för människor. Används inte av koden
+  agare_och_narstaende
+              valfri lista med motparter som är ägare eller närstående (K7, Hugos beslut
+              2026-10-26). Varje motpart är text och får stå en gång: två motparter som blir samma
+              efter normaliseringen (normalisering.py) räknas som samma och stoppar filen. Saknas
+              nyckeln är listan tom, och en tom lista godtas. Uppslaget ar_agare_eller_narstaende
+              säger om en motpart står i listan, så att nivåsteget kan använda det
 
 En regel har exakt nycklarna i REGEL_NYCKLAR, och får ha nycklarna i REGEL_VALFRIA_NYCKLAR:
 
@@ -64,11 +70,15 @@ Regler för regelboken som helhet:
   gränsen i matchning.json.
 - En regel för bankrader får aldrig ha nivå A, eftersom bankrader utan underlag aldrig blir A
   (Hugos beslut D20).
+- En regel för underlag vars motpart står i agare_och_narstaende (efter normaliseringen) måste
+  ha nivå D (K7). Annars stoppas filen.
 
 Hela filen stoppas vid minsta fel med ett RegelbokFel: okänd eller saknad nyckel, fel typ (till
 exempel ett decimaltal i ett belopp), ett tomt värde, ett dolt tecken någonstans i filen (även i
 nycklar och anteckningar), en regel som står två gånger eller kan passa samma sak som en annan,
-ett konto som inte finns i kontoplanen, eller en varugrupp som saknar sats i momsfilen. Filen läses
+ett konto som inte finns i kontoplanen, en varugrupp som saknar sats i momsfilen, en motpart som
+står två gånger i agare_och_narstaende, eller en regel för en ägare eller närstående som inte har
+nivå D. Filen läses
 med de gemensamma skydden i inlasning_skydd.py (UTF-8, dubbla nycklar, för djup nästling och för
 långa tal), som de andra formatfilerna.
 
@@ -95,7 +105,7 @@ from las_underlag import HELTAL_HOGST_SIFFROR, TYPER
 from normalisering import normalisera_for_jamforelse
 
 REGELBOK_NYCKLAR = ("foretag", "version", "godkand", "granser", "k9", "oppettider", "regler")
-REGELBOK_VALFRIA_NYCKLAR = ("anteckning",)
+REGELBOK_VALFRIA_NYCKLAR = ("anteckning", "agare_och_narstaende")
 GODKAND_NYCKLAR = ("av", "datum")
 GRANSER_NYCKLAR = ("a_hogst_ore", "b_hogst_ore")
 K9_NYCKLAR = ("minst_historik", "hogst_procent_av_median", "lagst_procent_av_median")
@@ -207,6 +217,22 @@ def _kontrollera_oppettider(oppettider, var):
              for nummer, dag in enumerate(_lista(oppettider["stangda_datum"], "'stangda_datum'", var), start=1)]
     return {"stangda_veckodagar": _inga_dubbletter(veckodagar, "'stangda_veckodagar'", var),
             "stangda_datum": _inga_dubbletter(datum, "'stangda_datum'", var)}
+
+
+def _kontrollera_agare_och_narstaende(agare, var):
+    """Motparterna som är ägare eller närstående (K7). Varje motpart en gång, efter normaliseringen."""
+    vad = "'agare_och_narstaende'"
+    resultat = []
+    for nummer, motpart in enumerate(_lista(agare, vad, var), start=1):
+        ny = _text_i_json(motpart, "motpart nummer " + str(nummer) + " i " + vad, var, _REGELBOK)
+        for annan in resultat:
+            if normalisera_for_jamforelse(annan) == normalisera_for_jamforelse(ny):
+                raise RegelbokFel(
+                    var + ": " + repr(ny) + " står flera gånger i " + vad + " (som " + repr(annan) + "). Varje"
+                    " motpart ska stå en gång."
+                )
+        resultat.append(ny)
+    return resultat
 
 
 def _kontrollera_galler(galler, vad, var):
@@ -376,7 +402,19 @@ def _kontrollera_bankradsregel(regel, vad, matchningsregler, var):
         )
 
 
-def _kontrollera_regelboksregel(regel, nummer, granser, konton, momssatser, matchningsregler, var):
+def _kontrollera_agarregel(regel, vad, agare, var):
+    """En regel för underlag från en ägare eller närstående (efter normaliseringen) ska ha nivå D (K7)."""
+    motpart = normalisera_for_jamforelse(regel["galler"]["motpart"])
+    for namn in agare:
+        if normalisera_for_jamforelse(namn) == motpart and regel["niva"] != "D":
+            raise RegelbokFel(
+                var + ": " + vad + " gäller motparten " + repr(regel["galler"]["motpart"]) + ", som står i"
+                " 'agare_och_narstaende' (som " + repr(namn) + "), och har nivå " + repr(regel["niva"]) + ". En regel"
+                " för ägare och närstående ska alltid ha nivå D."
+            )
+
+
+def _kontrollera_regelboksregel(regel, nummer, granser, agare, konton, momssatser, matchningsregler, var):
     """En regel i 'regler'. Returnerar den som ett nytt objekt."""
     vad = "regel nummer " + str(nummer)
     _objekt(regel, vad, var)
@@ -394,6 +432,8 @@ def _kontrollera_regelboksregel(regel, nummer, granser, konton, momssatser, matc
         nytt["anteckning"] = _text_i_json(regel["anteckning"], "'anteckning' i " + vad, var, _REGELBOK)
     if nytt["galler"]["kalla"] == "bankrad":
         _kontrollera_bankradsregel(nytt, vad, matchningsregler, var)
+    if nytt["galler"]["kalla"] == "underlag":
+        _kontrollera_agarregel(nytt, vad, agare, var)
     return nytt
 
 
@@ -408,7 +448,7 @@ def _overlappar(en, annan):
             and (annan["giltig_till"] is None or en["giltig_fran"] <= annan["giltig_till"]))
 
 
-def _kontrollera_regelbokens_regler(regler, granser, konton, momssatser, matchningsregler, var):
+def _kontrollera_regelbokens_regler(regler, granser, agare, konton, momssatser, matchningsregler, var):
     """Alla regler: minst en, varje id en gång, och ingen regel som kan passa samma sak som en annan."""
     if not isinstance(regler, list):
         raise RegelbokFel(var + ": 'regler' ska vara en lista med regler, inte " + _json_typ(regler) + ".")
@@ -416,7 +456,7 @@ def _kontrollera_regelbokens_regler(regler, granser, konton, momssatser, matchni
         raise RegelbokFel(var + ": 'regler' är tom. Regelboken ska ha minst en regel.")
     resultat = []
     for nummer, regel in enumerate(regler, start=1):
-        ny = _kontrollera_regelboksregel(regel, nummer, granser, konton, momssatser, matchningsregler, var)
+        ny = _kontrollera_regelboksregel(regel, nummer, granser, agare, konton, momssatser, matchningsregler, var)
         for annan in resultat:
             if normalisera_for_jamforelse(annan["id"]) == normalisera_for_jamforelse(ny["id"]):
                 raise RegelbokFel(
@@ -459,6 +499,8 @@ def _kontrollera_regelbok(data, kontoplan, momssatser, matchningsformat, var):
     if "anteckning" in data:
         _text_i_json(data["anteckning"], "'anteckning'", var, _REGELBOK)
     granser = _kontrollera_granser(data["granser"], var)
+    # Saknas nyckeln är listan tom (Hugos beslut 2026-10-26).
+    agare = _kontrollera_agare_och_narstaende(data.get("agare_och_narstaende", []), var)
     return {
         "foretag": _text_i_json(data["foretag"], "'foretag'", var, _REGELBOK),
         "version": _heltal_i_json(data["version"], "'version'", 1, _HOGSTA_TAL, var, _REGELBOK),
@@ -466,7 +508,9 @@ def _kontrollera_regelbok(data, kontoplan, momssatser, matchningsformat, var):
         "granser": granser,
         "k9": _kontrollera_k9(data["k9"], var),
         "oppettider": _kontrollera_oppettider(data["oppettider"], var),
-        "regler": _kontrollera_regelbokens_regler(data["regler"], granser, konton, momssatser, matchningsregler, var),
+        "agare_och_narstaende": agare,
+        "regler": _kontrollera_regelbokens_regler(data["regler"], granser, agare, konton, momssatser, matchningsregler,
+                                                  var),
     }
 
 
@@ -541,9 +585,24 @@ class Regelbok:
         return _kopia(self._regelboken["oppettider"])
 
     @property
+    def agare_och_narstaende(self):
+        """Motparterna som är ägare eller närstående, som de står i filen. En tom lista om nyckeln saknas."""
+        return _kopia(self._regelboken["agare_och_narstaende"])
+
+    @property
     def regler(self):
         """Reglerna i filens ordning, som nya kopior."""
         return _kopia(self._regelboken["regler"])
+
+    def ar_agare_eller_narstaende(self, motpart):
+        """True om motparten står i 'agare_och_narstaende', annars False (K7).
+
+        Motparten jämförs efter normaliseringen (normalisering.py), som i K4 och regel_for_underlag.
+        """
+        if not isinstance(motpart, str):
+            raise RegelbokFel("Uppslaget i regelboken: motpart ska vara text, inte " + _json_typ(motpart) + ".")
+        sokt = normalisera_for_jamforelse(motpart)
+        return any(normalisera_for_jamforelse(namn) == sokt for namn in self._regelboken["agare_och_narstaende"])
 
     def _regel_for(self, galler, datum):
         """Regeln som gäller samma sak på datumet, som en ny kopia, eller None om ingen regel passar."""
