@@ -163,7 +163,8 @@ Företagets **regelbok**: för varje känd motpart, kassa eller sorts bankrad, v
 | `godkand` | Ja | Vem som godkände regelboken och när: `{"av": "...", "datum": "ÅÅÅÅ-MM-DD"}`. Det som skyddar är kontrollsumman, inte det här fältet |
 | `granser` | Ja | Företagets gränser i **öre**: `a_hogst_ore` (högsta belopp för nivå A) och `b_hogst_ore` (för nivå B). Heltal större än 0. A-gränsen får inte vara högre än B-gränsen |
 | `k9` | Ja | Värdena för K9 (ovanliga belopp): `minst_historik` (heltal från 1), `hogst_procent_av_median` (från 100) och `lagst_procent_av_median` (0–100). `minst_historik` är också hur många gånger en regel ska ha godkänts innan den kan ge nivå A (DESIGN avsnitt 5) |
-| `oppettider` | Ja | Företagets stängda dagar, för varningssignalen i K8 (Hugos beslut D21): `stangda_veckodagar` (en lista med `mandag`, `tisdag`, `onsdag`, `torsdag`, `fredag`, `lordag`, `sondag`) och `stangda_datum` (en lista med datum). Varje dag får stå en gång. En lista får vara tom, om företaget inte har sådana stängda dagar. Läses och kontrolleras, men används inte än |
+| `oppettider` | Ja | Företagets stängda dagar, för varningssignalen i K8 (Hugos beslut D21): `stangda_veckodagar` (en lista med `mandag`, `tisdag`, `onsdag`, `torsdag`, `fredag`, `lordag`, `sondag`) och `stangda_datum` (en lista med hela datum, `ÅÅÅÅ-MM-DD`). Det finns ingen återkommande dag utan år (Hugos beslut 2026-10-26), så en helgdag skrivs in för varje år. Varje dag får stå en gång. En lista får vara tom, om företaget inte har sådana stängda dagar. Läses och kontrolleras, men används inte än |
+| `agare_och_narstaende` | Nej | Lista med motparter som är **ägare eller närstående** (K7, Hugos beslut 2026-10-26), till exempel `["AGARE-1"]`. Saknas nyckeln är listan tom, och en tom lista godtas. Varje motpart är text och får stå en gång. Motparterna jämförs efter samma normalisering som i K4 (stora och små bokstäver, bindestreck och osynliga tecken räknas inte), så `AGARE-1` och `agare-1` räknas som samma och stoppar filen. Uppslaget `ar_agare_eller_narstaende` säger om en motpart står i listan, och ska användas av nivåsteget |
 | `regler` | Ja | Lista med minst en regel, se nedan |
 | `anteckning` | Nej | Fri text för människor. Används inte av koden |
 
@@ -186,7 +187,9 @@ Dessutom stoppas filen om:
 - en regel för `bankrad` pekar på en regel som inte finns i `matchning.json`,
 - en regel för bankrader med **pengar ut** saknar `hogst_belopp_ore`, eller har en högre gräns än regeln i `matchning.json`,
 - en regels `hogst_belopp_ore` är högre än företagets `b_hogst_ore`. **En regel kan bara skärpa företagets gränser, aldrig höja dem** (Hugos beslut D20),
-- en regel för `bankrad` har nivå `A`. Bankrader utan underlag blir aldrig nivå A (D20).
+- en regel för `bankrad` har nivå `A`. Bankrader utan underlag blir aldrig nivå A (D20),
+- en regel för `underlag` vars motpart står i `agare_och_narstaende` (efter normaliseringen) har en annan nivå än `D`. **En regel för ägare och närstående har alltid nivå D** (K7, Hugos beslut 2026-10-26),
+- samma motpart står två gånger i `agare_och_narstaende`, eller en motpart där är tom eller inte text.
 
 ### Kontrollsumman
 
@@ -194,10 +197,11 @@ Dessutom stoppas filen om:
 
 ### Testbutikens regelbok
 
-`syntet-testbutik/regelbok.json` är **SYNTETISK**. Den är exemplet i DESIGN-regelbok.md avsnitt 1 med två tillägg, båda med redan bestämda värden (ett test kontrollerar det):
+`syntet-testbutik/regelbok.json` är **SYNTETISK**. Den är exemplet i DESIGN-regelbok.md avsnitt 1 med tre tillägg, alla med redan bestämda värden och godkända av Hugo 2026-10-26 (ett test kontrollerar det):
 
 - `oppettider`, med testbutikens stängda dagar ur `testdata/README.md` (söndagar, 1 januari och 6 januari 2025),
-- `hogst_belopp_ore` 25000 (250 kr) i `R-BANK-AVGIFT`. Bankavgiften är pengar ut och måste därför ha en gräns. Värdet är gränsen i `matchning.json` som Hugo bestämde 2026-10-25.
+- `hogst_belopp_ore` 25000 (250 kr) i `R-BANK-AVGIFT`. Bankavgiften är pengar ut och måste därför ha en gräns. Värdet är gränsen i `matchning.json` som Hugo bestämde 2026-10-25,
+- `agare_och_narstaende` med `AGARE-1`, det syntetiska värdet ur DESIGN-regelbok.md avsnitt 1 och `testforetag/FIKTIVT_FORETAG.md` (Ägare 1, en påhittad person). Testbutiken har ingen regel för ägaren än.
 
 Gränserna är Hugos beslut D18 och D19: A-gräns 20 000 kr (`2000000` öre), B-gräns 40 000 kr (`4000000` öre), 3 godkännanden innan nivå A, och K9 med 3 / 300 % / 33 %. Konton och varugrupper är SYNTETISKA och inte verifierade av en redovisningskonsult (D1–D16).
 

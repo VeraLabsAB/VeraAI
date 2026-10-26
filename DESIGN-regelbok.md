@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil, avsnitt 7) är byggd. Ändrar inget i SPEC.md |
+| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil) och uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) i avsnitt 7 är byggda. Hugos beslut efter uppgift 2 står i avsnitt 8. Ändrar inget i SPEC.md |
 | Gäller | Steg 4 i arbetsflödet (SPEC avsnitt 4): kontera enligt företagets regelbok, och kontrollerna K2, K5, K8 och K9 |
 | Exempel | Bara Syntet Testbutik AB och testdatan för 2025-Q1. **Allt är SYNTETISKT** |
 
@@ -195,7 +195,9 @@ Några saker att lägga märke till:
   alltså ihop: matchningen säger *att* raden inte kräver underlag, regelboken säger *hur* den bokförs.
 - `godkand` och `version` är till för människor och för loggen. Det som skyddar är kontrollsumman.
 - Ägartransaktioner (K7) har ingen regel som kan ge annat än D. En regel med motparten `AGARE-1` får bara
-  ha nivå D, annars stoppas regelboken.
+  ha nivå D, annars stoppas regelboken. Vilka motparter som är ägare eller närstående står i den valfria
+  nyckeln `agare_och_narstaende`, en lista med motparter (för testbutiken `["AGARE-1"]`). Motparterna
+  jämförs efter samma normalisering som ovan (Hugos beslut 2026-10-26, avsnitt 8).
 
 ---
 
@@ -699,6 +701,20 @@ konfigurationen.
 - **D20:** ny motpart är alltid ett ärende; en regel kan bara skärpa företagets gränser; bankrader utan underlag
   blir aldrig nivå A.
 - **D21:** lista över stängda dagar för K8 ligger i regelboken under nyckeln `oppettider`.
+
+**Hugos beslut 2026-10-26, efter uppgift 2:**
+
+1. **Ägare och närstående (K7).** Regelboken får en ny, valfri nyckel `agare_och_narstaende`: en lista med
+   motparter. En regel som gäller en motpart i listan måste ha nivå D, annars stoppas hela filen. Saknas
+   nyckeln är listan tom. Dubbletter, tomma värden och dolda tecken i listan stoppar filen. Motparterna
+   jämförs efter samma normalisering som i K4 och i resten av regelboken (avsnitt 1), så `AGARE-1` och
+   `agare-1` är samma motpart. Uppslaget `ar_agare_eller_narstaende` säger om en motpart är ägare eller
+   närstående, så att nivåsteget (uppgift 6) kan använda det. Byggt som ett tillägg till uppgift 2.
+2. **Öppettider.** `oppettider` har `stangda_veckodagar` och `stangda_datum`. Datumen är hela datum
+   (ÅÅÅÅ-MM-DD). Det finns ingen återkommande dag utan år, så en helgdag skrivs in för varje år.
+3. **Testbutikens regelbok.** De två tilläggen till exemplet i avsnitt 1 är godkända: `oppettider` och
+   gränsen 25000 öre i `R-BANK-AVGIFT`. Dessutom har den `agare_och_narstaende` med det syntetiska värdet
+   `AGARE-1` ur exemplen ovan.
 
 Det som Hugo bestämmer gäller bara testföretaget och produktens beteende. För en riktig kund ska varje
 konto, sats och metod komma från kunden och dess redovisningskonsult, och stå som källa i konfigurationen.
