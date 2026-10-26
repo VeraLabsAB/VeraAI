@@ -40,10 +40,20 @@ Minsta fel stoppar formatet med ett MatchningsformatFel.
 
 Filen läses med de gemensamma skydden i inlasning_skydd.py (UTF-8, dubbla nycklar, för djup
 nästling och för långa tal), på samma sätt som bankformat.json och kassaformat.json.
+
+las_matchningsformat är den enda funktionen som läser filen. Den returnerar ett Matchningsformat,
+som inte går att ändra och bara kan skapas av las_matchningsformat. Det har en kontrollsumma (SHA-256
+av filens bytes, som text med 64 tecken), räknad på exakt de bytes som sedan tolkas och kontrolleras,
+så att regelboken och varje konteringsförslag kan visa vilket matchningsformat som användes.
+ladda_matchningsformat ger samma innehåll som ett vanligt objekt (dict), för matcha_period.
+matchningsregel_for_bankrad säger vilken regel i kraver_inte_underlag en bankrad passar.
 """
 
+import hashlib
+from types import MappingProxyType
+
 from inlasning_skydd import (
-    _Filsort, _kontrollera_anteckning, _kontrollera_namn, _kontrollera_nycklar, _ladda_json,
+    _Filsort, _kontrollera_anteckning, _kontrollera_namn, _kontrollera_nycklar, _las_jsonfil, _tolka_json,
 )
 from las_underlag import HELTAL_HOGST_SIFFROR, TYPER
 
@@ -204,7 +214,92 @@ def kontrollera_matchningsformat(data, var="Matchningsformatet"):
     return {"kraver_inte_underlag": regler, "tidsfonster_dagar": tidsfonster, "saknat_underlag_efter_dagar": saknat}
 
 
+def matchningsregel_for_bankrad(rad, regler):
+    """Regeln i kraver_inte_underlag (regler, från ett kontrollerat format) som bankraden passar, eller None.
+
+    Riktningen ska stämma och referensen och beskrivningen ska börja exakt med regelns text.
+    Formatet ser till att högst en regel kan passa. Beloppsgränsen prövas inte här.
+    """
+    riktning = "in" if rad["belopp_ore"] > 0 else "ut" if rad["belopp_ore"] < 0 else None
+    for regel in regler:
+        if (regel["riktning"] == riktning
+                and rad["referens"].startswith(regel.get("referens_borjar_med", ""))
+                and rad["beskrivning"].startswith(regel.get("beskrivning_borjar_med", ""))):
+            return regel
+    return None
+
+
+def _frys(varde):
+    """En oföränderlig kopia: objekt blir MappingProxyType och listor blir tupler."""
+    if isinstance(varde, dict):
+        return MappingProxyType({nyckel: _frys(del_) for nyckel, del_ in varde.items()})
+    if isinstance(varde, list):
+        return tuple(_frys(del_) for del_ in varde)
+    return varde
+
+
+def _kopia(varde):
+    """En vanlig kopia av ett fryst värde, som anroparen får ändra utan att formatet ändras."""
+    if isinstance(varde, MappingProxyType):
+        return {nyckel: _kopia(del_) for nyckel, del_ in varde.items()}
+    if isinstance(varde, tuple):
+        return [_kopia(del_) for del_ in varde]
+    return varde
+
+
+# Nyckeln som bara las_matchningsformat har. Utan den går det inte att skapa ett Matchningsformat som
+# inte har gått igenom kontrollerna. Ett test (test_inga_genvagar.py) stoppar annan kärnkod från att använda den.
+_MATCHNINGSNYCKEL = object()
+
+
+class Matchningsformat:
+    """Ett företags matchningsformat, från las_matchningsformat. Kan bara skapas där och kan inte ändras."""
+
+    __slots__ = ("_kontrollsumma", "_matchningsformatet")
+
+    def __init__(self, nyckel, kontrollsumma, matchningsformatet):
+        if nyckel is not _MATCHNINGSNYCKEL:
+            raise MatchningsformatFel("Ett Matchningsformat kan bara skapas av las_matchningsformat, som kör alla"
+                                      " kontroller först.")
+        # object.__setattr__ behövs eftersom vanlig tilldelning är spärrad nedan.
+        object.__setattr__(self, "_kontrollsumma", kontrollsumma)
+        object.__setattr__(self, "_matchningsformatet", _frys(matchningsformatet))
+
+    def __setattr__(self, namn, varde):
+        raise AttributeError("Ett Matchningsformat kan inte ändras.")
+
+    def __delattr__(self, namn):
+        raise AttributeError("Ett Matchningsformat kan inte ändras.")
+
+    @property
+    def kontrollsumma(self):
+        """SHA-256 av matchningsformatets fil, som text med 64 tecken. Ändras om ett enda tecken i filen ändras."""
+        return self._kontrollsumma
+
+    @property
+    def innehall(self):
+        """Det kontrollerade formatet, utan anteckningar, som en ny kopia (samma som kontrollera_matchningsformat)."""
+        return _kopia(self._matchningsformatet)
+
+    def __repr__(self):
+        return ("Matchningsformat(" + str(len(self._matchningsformatet["kraver_inte_underlag"])) + " regler,"
+                " kontrollsumma " + self._kontrollsumma[:12] + "…)")
+
+
+def las_matchningsformat(sokvag):
+    """Läser och kontrollerar ett företags matchning.json. Returnerar ett Matchningsformat, annars MatchningsformatFel.
+
+    Kontrollsumman räknas på exakt de bytes som tolkas.
+    """
+    data, var = _las_jsonfil(sokvag, _MATCHNINGSFORMAT)
+    kontrollsumma = hashlib.sha256(data).hexdigest()
+    innehall = _tolka_json(data, var, _MATCHNINGSFORMAT)
+    return Matchningsformat(_MATCHNINGSNYCKEL, kontrollsumma, kontrollera_matchningsformat(innehall, var))
+
+
 def ladda_matchningsformat(sokvag):
-    """Läser och kontrollerar ett företags matchning.json. Fel ger MatchningsformatFel."""
-    innehall, var = _ladda_json(sokvag, _MATCHNINGSFORMAT)
-    return kontrollera_matchningsformat(innehall, var)
+    """Läser och kontrollerar ett företags matchning.json med las_matchningsformat. Fel ger MatchningsformatFel.
+
+    Returnerar innehållet som ett vanligt objekt (dict), för matcha_period.
+    """
+    return las_matchningsformat(sokvag).innehall

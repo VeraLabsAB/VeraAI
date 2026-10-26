@@ -5,6 +5,7 @@ Momsfilen för testföretaget är SYNTETISK. De små filerna nedan är påhittad
 """
 
 import copy
+import hashlib
 import json
 import re
 import sys
@@ -162,6 +163,20 @@ def test_momssatser_kan_inte_andras(tmp_path):
 def test_momssatser_kan_bara_skapas_av_las_momssatser():
     with pytest.raises(MomssatsFel, match="kan bara skapas av las_momssatser"):
         Momssatser(object(), "PÅHITTAD", {"grupp_a": [period()]}, 1)
+
+
+def test_kontrollsumman_ar_sha256_av_filen(tmp_path):
+    # Granskning 7, M4: summan räknas på exakt de bytes som tolkas, så samma innehåll med ett
+    # blanksteg till ger en annan summa.
+    fil = skriv(tmp_path, moms())
+    fore = las_momssatser(fil)
+    assert fore.kontrollsumma == hashlib.sha256(fil.read_bytes()).hexdigest()
+    assert las_momssatser(MOMS_FIL).kontrollsumma == hashlib.sha256(MOMS_FIL.read_bytes()).hexdigest()
+    fil.write_bytes(fil.read_bytes() + b" ")
+    efter = las_momssatser(fil)
+    assert efter.varugrupper == fore.varugrupper and efter.kontrollsumma != fore.kontrollsumma
+    with pytest.raises(AttributeError):
+        efter._kontrollsumma = fore.kontrollsumma
 
 
 def test_filen_andras_inte_av_inlasningen(tmp_path):

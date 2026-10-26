@@ -6,6 +6,7 @@ mapp för varje test.
 """
 
 import copy
+import hashlib
 import json
 import re
 import sys
@@ -204,6 +205,20 @@ def test_kontoplanen_kan_inte_andras(tmp_path):
 def test_kontoplanen_kan_bara_skapas_av_las_kontoplan():
     with pytest.raises(KontoplanFel, match="kan bara skapas av las_kontoplan"):
         Kontoplan(object(), "PÅHITTAD", {}, {})
+
+
+def test_kontrollsumman_ar_sha256_av_filen(tmp_path):
+    # Granskning 7, M4: summan räknas på exakt de bytes som tolkas, så samma innehåll med ett
+    # blanksteg till ger en annan summa.
+    fil = skriv(tmp_path, plan())
+    fore = las_kontoplan(fil)
+    assert fore.kontrollsumma == hashlib.sha256(fil.read_bytes()).hexdigest()
+    assert las_kontoplan(KONTOPLAN_FIL).kontrollsumma == hashlib.sha256(KONTOPLAN_FIL.read_bytes()).hexdigest()
+    fil.write_bytes(fil.read_bytes() + b" ")
+    efter = las_kontoplan(fil)
+    assert efter.konton == fore.konton and efter.kontrollsumma != fore.kontrollsumma
+    with pytest.raises(AttributeError):
+        efter._kontrollsumma = fore.kontrollsumma
 
 
 def test_filen_andras_inte_av_inlasningen(tmp_path):

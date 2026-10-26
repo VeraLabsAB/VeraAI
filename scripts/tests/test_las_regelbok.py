@@ -21,7 +21,7 @@ REGELBOK_FIL = TESTBUTIKEN / "regelbok.json"
 sys.path.insert(0, str(AGENT / "scripts"))
 
 from las_kontoplan import las_kontoplan  # noqa: E402
-from las_matchningsformat import ladda_matchningsformat  # noqa: E402
+from las_matchningsformat import ladda_matchningsformat, las_matchningsformat  # noqa: E402
 from las_momssatser import las_momssatser  # noqa: E402
 from las_regelbok import REGELBOK_NYCKLAR, Regelbok, RegelbokFel, las_regelbok  # noqa: E402
 from test_las_momssatser import DOLDA, json_block_i_design  # noqa: E402
@@ -78,7 +78,7 @@ def konfiguration(tmp_path):
     for namn, data in [("kontoplan", KONTOPLAN), ("momssatser", MOMSSATSER), ("matchning", MATCHNING)]:
         (mapp / (namn + ".json")).write_text(json.dumps(data), encoding="utf-8")
     return (las_kontoplan(mapp / "kontoplan.json"), las_momssatser(mapp / "momssatser.json"),
-            ladda_matchningsformat(mapp / "matchning.json"))
+            las_matchningsformat(mapp / "matchning.json"))
 
 
 def regel(id_, galler, kontering, niva="B", **villkor):
@@ -179,7 +179,7 @@ def stoppas(mapp, data, konfiguration, *texter, ascii=False):
 def las_testbutikens_regelbok(fil=REGELBOK_FIL):
     return las_regelbok(fil, las_kontoplan(TESTBUTIKEN / "kontoplan.json"),
                         las_momssatser(TESTBUTIKEN / "momssatser.json"),
-                        ladda_matchningsformat(TESTBUTIKEN / "matchning.json"))
+                        las_matchningsformat(TESTBUTIKEN / "matchning.json"))
 
 
 def test_testforetagets_fil_laddas():
@@ -522,12 +522,73 @@ def test_momssatserna_ska_komma_fran_las_momssatser(tmp_path, konfiguration):
         las_regelbok(skriv(tmp_path, bok()), kontoplan, copy.deepcopy(MOMSSATSER), matchning)
 
 
-def test_matchningsformatet_kontrolleras_igen(tmp_path, konfiguration):
+def test_matchningsformatet_ska_komma_fran_las_matchningsformat(tmp_path, konfiguration):
+    # Granskning 7, M4: ett vanligt objekt (dict) har ingen kontrollsumma, så regelboken kan inte visa
+    # vilket matchningsformat den kontrollerades mot. Det stoppas, även när innehållet är rätt. Ett
+    # trasigt innehåll (testet hette förut test_matchningsformatet_kontrolleras_igen) stoppas också.
     kontoplan, momssatser, matchning = konfiguration
-    trasigt = copy.deepcopy(matchning)
+    ratt = matchning.innehall
+    trasigt = matchning.innehall
     del trasigt["kraver_inte_underlag"][1]["hogst_belopp_ore"]
-    with pytest.raises(RegelbokFel, match="matchningsformatet är fel.*saknar 'hogst_belopp_ore'"):
-        las_regelbok(skriv(tmp_path, bok()), kontoplan, momssatser, trasigt)
+    for innehall in (ratt, trasigt, ladda_matchningsformat(TESTBUTIKEN / "matchning.json")):
+        with pytest.raises(RegelbokFel, match="matchningsformatet ska komma från las_matchningsformat, inte vara dict"):
+            las_regelbok(skriv(tmp_path, bok()), kontoplan, momssatser, innehall)
+
+
+def test_ett_paihittat_matchningsformat_stoppas(tmp_path, konfiguration):
+    # Ett objekt med samma delar som ett Matchningsformat (innehall och kontrollsumma), men som inte
+    # kommer från las_matchningsformat, och en underklass. Båda stoppas, så att ingen kan välja summan själv.
+    import las_matchningsformat as modulen
+
+    kontoplan, momssatser, matchning = konfiguration
+
+    class Paihittat:
+        innehall = matchning.innehall
+        kontrollsumma = "0" * 64
+
+    class Underklass(modulen.Matchningsformat):
+        __slots__ = ()
+
+    for falskt, namn in ((Paihittat(), "Paihittat"), (object.__new__(Underklass), "Underklass")):
+        with pytest.raises(RegelbokFel, match="matchningsformatet ska komma från las_matchningsformat, inte vara " + namn):
+            las_regelbok(skriv(tmp_path, bok()), kontoplan, momssatser, falskt)
+
+
+def test_regelboken_vet_vilka_filer_den_kontrollerades_mot(tmp_path, konfiguration):
+    # Granskning 7, M4: kontrollsummorna kommer från de inlästa objekten, och kan inte ändras.
+    kontoplan, momssatser, matchning = konfiguration
+    regelbok = las(tmp_path, bok(), konfiguration)
+    mapp = tmp_path / "konfiguration"
+    assert regelbok.kontrollerad_mot == {
+        "kontoplan": hashlib.sha256((mapp / "kontoplan.json").read_bytes()).hexdigest(),
+        "momssatser": hashlib.sha256((mapp / "momssatser.json").read_bytes()).hexdigest(),
+        "matchningsformat": hashlib.sha256((mapp / "matchning.json").read_bytes()).hexdigest()}
+    assert regelbok.kontrollerad_mot == {"kontoplan": kontoplan.kontrollsumma, "momssatser": momssatser.kontrollsumma,
+                                         "matchningsformat": matchning.kontrollsumma}
+    regelbok.kontrollerad_mot["kontoplan"] = "0" * 64
+    assert regelbok.kontrollerad_mot["kontoplan"] == kontoplan.kontrollsumma
+    with pytest.raises(TypeError):
+        regelbok._regelboken["kontrollerad_mot"]["kontoplan"] = "0" * 64
+
+
+def test_en_annan_kontoplan_ger_en_annan_kontrollsumma_i_regelboken(tmp_path, konfiguration):
+    _, momssatser, matchning = konfiguration
+    data = copy.deepcopy(KONTOPLAN)
+    data["konton"][4]["namn"] = "ett annat namn"
+    fil = tmp_path / "annan_kontoplan.json"
+    fil.write_text(json.dumps(data), encoding="utf-8")
+    fore = las(tmp_path, bok(), konfiguration)
+    efter = las_regelbok(skriv(tmp_path, bok()), las_kontoplan(fil), momssatser, matchning)
+    assert efter.kontrollsumma == fore.kontrollsumma
+    assert efter.kontrollerad_mot["kontoplan"] != fore.kontrollerad_mot["kontoplan"]
+    assert efter.kontrollerad_mot["momssatser"] == fore.kontrollerad_mot["momssatser"]
+
+
+def test_matchningsregel_for_bankrad_i_regelboken(tmp_path, konfiguration):
+    regelbok = las(tmp_path, bok(), konfiguration)
+    assert regelbok.matchningsregel_for_bankrad({"belopp_ore": 100, "referens": "IN-7", "beskrivning": "x"}) == "regel_in"
+    assert regelbok.matchningsregel_for_bankrad({"belopp_ore": -100, "referens": "UT-7", "beskrivning": "x"}) == "regel_ut"
+    assert regelbok.matchningsregel_for_bankrad({"belopp_ore": -100, "referens": "IN-7", "beskrivning": "x"}) is None
 
 
 # --- Stoppregler ---

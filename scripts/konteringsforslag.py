@@ -33,7 +33,9 @@ Förslaget som objekt har exakt nycklarna i FORSLAG_NYCKLAR:
                                        BERAKNINGAR) och fran (en lista med källor)
   kopplingar    exakt nycklarna i KOPPLINGAR_NYCKLAR: underlag och bankrader (listor med objekt med
                 nyckeln id), z_rapporter (en lista med objekt med nycklarna kassaregister och
-                znummer) och regel (ett objekt med nyckeln id, regelns id i regelboken)
+                znummer) och regel (ett objekt med exakt nycklarna i REGELNS_NYCKLAR: id, regelns id
+                i regelboken, och kontrollsummorna för regelboken, kontoplanen, momsfilen och
+                matchningsformatet som förslaget är byggt mot)
   motivering    varför förslaget ser ut som det gör, text för godkännaren
 
 Allt i förslaget ska vara objekt (dict), listor, text och heltal. En text får inte vara tom, inte ha
@@ -60,12 +62,17 @@ Sätten att räkna (berakning):
 
 K2 (debet = kredit), i Python:
 
-  1. verifikationen har minst två rader,
-  2. varje belopp är ett heltal (inte True eller False, som annars räknas som 1 och 0 i Python), inte
+  1. förslaget är byggt mot just de filer som det kontrolleras mot: kontoplanen är den som regelboken
+     kontrollerades mot (samma kontrollsumma), och förslagets fyra kontrollsummor i 'regel' är de som
+     regelboken, kontoplanen, och momsfilen och matchningsformatet som regelboken kontrollerades mot,
+     faktiskt har. Summorna jämförs bara med de inlästa objekten, inte med något sparat godkänt värde
+     (det hör till spärrsteget),
+  2. verifikationen har minst två rader,
+  3. varje belopp är ett heltal (inte True eller False, som annars räknas som 1 och 0 i Python), inte
      negativt och har högst HELTAL_HOGST_SIFFROR siffror,
-  3. på varje rad är exakt ett av debet_ore och kredit_ore större än 0,
-  4. summan av all debet är lika med summan av all kredit,
-  5. varje konto finns i kontoplanen och gäller på verifikationens datum.
+  4. på varje rad är exakt ett av debet_ore och kredit_ore större än 0,
+  5. summan av all debet är lika med summan av all kredit,
+  6. varje konto finns i kontoplanen och gäller på verifikationens datum.
 
 Ursprunget, direkt efter K2:
 
@@ -83,7 +90,13 @@ Ursprunget, direkt efter K2:
   6. en rad på bankkontot (rollen bank i kontoplanen) har bara bankrader som källor, räknade med lika
      eller summa, och står på rätt sida: pengar in i debet och pengar ut i kredit,
   7. täckningen: raderna tillsammans använder varje värde i källorna högst en gång per sida, så att
-     inget räknas två gånger (se nedan).
+     inget räknas två gånger (se nedan),
+  8. regeln passar förslaget (granskning 7, M3): verifikationens datum ligger inom regelns giltighet,
+     förslaget har minst en källa av det slag regeln gäller (underlag, Z-rapport eller bankrad), och
+     varje sådan källa i kopplingar har just den här regeln i regelboken på verifikationens datum.
+     För ett underlag avgör typen och motparten, för en Z-rapport kassaregistret och för en bankrad
+     regeln i matchningsformatet som raden passar. Varje konto på raderna står i regelns kontering
+     eller har en roll i kontoplanen (bankkontot, leverantörsskulderna och momskontona).
 
 Täckningen. Varje källa består av delar:
 
@@ -109,8 +122,9 @@ orelaterade underlag). b stoppar ett underlag där en del saknas, till exempel m
 används där 0 gånger. Samma del får stå en gång i debet och en gång i kredit (till exempel bankraden
 på både bankkontot och kostnaden i 4e).
 
-Kopplingarna i förslaget får regelbokens kontrollsumma och kontrollsumman för varje fil förslaget
-bygger på (underlaget, bankfilen och Z-filen). Summorna kommer från inläsningen, aldrig från indata.
+Kopplingarna i förslaget får kontrollsummorna för regelboken, kontoplanen, momsfilen och
+matchningsformatet, och kontrollsumman för varje fil förslaget bygger på (underlaget, bankfilen och
+Z-filen). Summorna kommer från inläsningen, aldrig från indata: de som står i indata jämförs bara (K2).
 """
 
 import datetime as dt
@@ -136,6 +150,12 @@ BERAKNINGAR = ("lika", "summa", "skillnad")
 KOPPLINGAR_NYCKLAR = ("underlag", "bankrader", "z_rapporter", "regel")
 # Nycklarna i varje post i kopplingarnas listor.
 KOPPLINGARNAS_NYCKLAR = {"underlag": ("id",), "bankrader": ("id",), "z_rapporter": ("kassaregister", "znummer")}
+# Nycklarna i 'regel' i kopplingarna: regelns id och kontrollsummorna för filerna förslaget är byggt mot.
+REGELNS_NYCKLAR = ("id", "regelbokens_kontrollsumma", "kontoplanens_kontrollsumma", "momsfilens_kontrollsumma",
+                   "matchningsformatets_kontrollsumma")
+# Källan som en regel gäller (las_regelbok.KALLOR), och var källorna står i kopplingarna.
+_REGELNS_KALLOR = {"underlag": ("underlag", "underlag"), "z_rapport": ("z_rapporter", "Z-rapporter"),
+                   "bankrad": ("bankrader", "bankrader")}
 # Källorna en rad kan räknas ur: nycklarna utöver "kalla", och de valfria nycklarna.
 KALLOR = {
     "underlag": (("id", "falt"), ("momssats",)),
@@ -313,7 +333,9 @@ def _kontrollera_formen(forslag):
                     _heltal(post[nyckel], repr(nyckel) + " i " + vad, _INDATA)
                 else:
                     _text(post[nyckel], repr(nyckel) + " i " + vad)
-    _text(_nycklar(kopplingar["regel"], ("id",), (), "'regel' i 'kopplingar'")["id"], "'id' i 'regel' i 'kopplingar'")
+    regel = _nycklar(kopplingar["regel"], REGELNS_NYCKLAR, (), "'regel' i 'kopplingar'")
+    for nyckel in REGELNS_NYCKLAR:
+        _text(regel[nyckel], repr(nyckel) + " i 'regel' i 'kopplingar'")
     return forslag
 
 
@@ -339,8 +361,38 @@ def _radens_belopp(rad):
     return rad["debet_ore"] or rad["kredit_ore"]
 
 
+# Så många tecken av en kontrollsumma visas i ett felmeddelande.
+_VISADE_TECKEN = 16
+
+
+def _kort(summa):
+    """En kontrollsumma i ett felmeddelande: de första _VISADE_TECKEN tecknen."""
+    return repr(summa[:_VISADE_TECKEN] + ("…" if len(summa) > _VISADE_TECKEN else ""))
+
+
+def _kontrollera_kontrollsummor(regel, regelbok, kontoplan):
+    """K2 punkt 1: förslaget är byggt mot just de filer som det kontrolleras mot (granskning 7, M4).
+
+    regel är 'regel' i förslagets kopplingar. Summorna jämförs bara med de inlästa objekten.
+    """
+    mot = regelbok.kontrollerad_mot
+    if kontoplan.kontrollsumma != mot["kontoplan"]:
+        raise _fel(_K2, "kontoplanen är inte den som regelboken kontrollerades mot. Kontoplanens kontrollsumma är "
+                   + _kort(kontoplan.kontrollsumma) + ", men regelboken kontrollerades mot en kontoplan med "
+                   + _kort(mot["kontoplan"]) + ". Regelboken och förslaget ska kontrolleras mot samma kontoplan.")
+    for nyckel, vad, faktisk in (
+            ("regelbokens_kontrollsumma", "regelboken", regelbok.kontrollsumma),
+            ("kontoplanens_kontrollsumma", "kontoplanen", kontoplan.kontrollsumma),
+            ("momsfilens_kontrollsumma", "momsfilen som regelboken kontrollerades mot", mot["momssatser"]),
+            ("matchningsformatets_kontrollsumma", "matchningsformatet som regelboken kontrollerades mot",
+             mot["matchningsformat"])):
+        if regel[nyckel] != faktisk:
+            raise _fel(_K2, "förslaget är byggt mot en annan fil: " + repr(nyckel) + " i 'regel' i 'kopplingar' är "
+                       + _kort(regel[nyckel]) + ", men " + vad + " har kontrollsumman " + _kort(faktisk) + ".")
+
+
 def _kontrollera_k2(verifikation, kontoplan):
-    """K2: minst två rader, rätta belopp, en sida per rad, debet = kredit och konton som finns på datumet."""
+    """K2 punkt 2–6: minst två rader, rätta belopp, en sida per rad, debet = kredit och konton som finns på datumet."""
     rader = verifikation["rader"]
     if len(rader) < 2:
         raise _fel(_K2, "verifikationen har " + str(len(rader)) + " rad" + ("" if len(rader) == 1 else "er")
@@ -623,7 +675,7 @@ def _visa_koppling(typ, vad):
     return ("underlaget " if typ == "underlag" else "bankraden ") + repr(vad)
 
 
-def _kontrollera_kopplingar(kopplingar, anvanda, regelbok, kallorna):
+def _kontrollera_kopplingar(kopplingar, anvanda, regelbok, kontoplan, kallorna):
     """Kopplingarna och raderna använder samma källor, och regeln finns. Returnerar de nya kopplingarna."""
     nya = {}
     for typ, nycklar in KOPPLINGARNAS_NYCKLAR.items():
@@ -645,8 +697,64 @@ def _kontrollera_kopplingar(kopplingar, anvanda, regelbok, kallorna):
     regelns_id = kopplingar["regel"]["id"]
     if not any(regel["id"] == regelns_id for regel in regelbok.regler):
         raise _fel(_URSPRUNG, "regeln " + repr(regelns_id) + " i 'kopplingar' finns inte i regelboken.")
-    nya["regel"] = {"id": regelns_id, "regelbokens_kontrollsumma": regelbok.kontrollsumma}
+    # Summorna tas från de inlästa objekten. Att de är samma som i förslaget har K2 redan prövat.
+    mot = regelbok.kontrollerad_mot
+    nya["regel"] = {"id": regelns_id, "regelbokens_kontrollsumma": regelbok.kontrollsumma,
+                    "kontoplanens_kontrollsumma": kontoplan.kontrollsumma,
+                    "momsfilens_kontrollsumma": mot["momssatser"],
+                    "matchningsformatets_kontrollsumma": mot["matchningsformat"]}
     return nya
+
+
+def _regelns_konton(kontering):
+    """Alla konton i en regels kontering. Formen beror på källan (las_regelbok), med ett eller två steg."""
+    konton = set()
+    for varde in kontering.values():
+        konton |= _regelns_konton(varde) if type(varde) is dict else {varde}
+    return konton
+
+
+def _kallans_regel(typ, vad, regelbok, kallorna, datum):
+    """(regeln som regelboken ger källan på datumet, eller None; källan i ett felmeddelande)."""
+    if typ == "underlag":
+        underlag = kallorna.underlag[vad]
+        return (regelbok.regel_for_underlag(underlag["typ"], underlag["motpart"], datum),
+                "underlaget " + repr(vad) + " (" + underlag["typ"] + " från " + repr(underlag["motpart"]) + ")")
+    if typ == "z_rapporter":
+        return regelbok.regel_for_z_rapport(vad[0], datum), _visa_koppling(typ, vad)
+    rad = kallorna.bankrader[vad]
+    visas = "bankraden " + repr(vad) + " (radnummer " + str(rad["radnr"]) + ")"
+    namn = regelbok.matchningsregel_for_bankrad(rad)
+    if namn is None:
+        return None, visas + ", som inte passar någon regel för bankrader utan underlag i matchningsformatet,"
+    return regelbok.regel_for_bankrad(namn, datum), visas + " (regeln " + repr(namn) + " i matchningsformatet)"
+
+
+def _kontrollera_regeln(forslag, anvanda, regelbok, kontoplan, kallorna):
+    """Ursprunget punkt 8: regeln passar förslagets datum, källor och konton (granskning 7, M3)."""
+    regelns_id = forslag["kopplingar"]["regel"]["id"]
+    # Att regeln finns har _kontrollera_kopplingar redan prövat.
+    regel = [en for en in regelbok.regler if en["id"] == regelns_id][0]
+    datum, villkor = forslag["verifikation"]["datum"], regel["villkor"]
+    if datum < villkor["giltig_fran"] or (villkor["giltig_till"] is not None and datum > villkor["giltig_till"]):
+        raise _fel(_URSPRUNG, "regeln " + repr(regelns_id) + " gäller från " + villkor["giltig_fran"] + " till "
+                   + (villkor["giltig_till"] or "tills vidare") + ", men verifikationens datum är " + datum + ".")
+    typ, sorten = _REGELNS_KALLOR[regel["galler"]["kalla"]]
+    if not anvanda[typ]:
+        raise _fel(_URSPRUNG, "regeln " + repr(regelns_id) + " gäller " + sorten + ", men förslaget har inga "
+                   + sorten + " i " + repr(typ) + " i 'kopplingar'. Regeln passar inte förslaget.")
+    for vad in anvanda[typ]:
+        kallans, visas = _kallans_regel(typ, vad, regelbok, kallorna, datum)
+        if kallans is None or kallans["id"] != regelns_id:
+            raise _fel(_URSPRUNG, "regeln i 'kopplingar' är " + repr(regelns_id) + ", men " + visas + " har "
+                       + ("ingen regel i regelboken" if kallans is None else "regeln " + repr(kallans["id"]))
+                       + " på " + datum + ". Regeln ska vara den som regelboken ger källan.")
+    konton = _regelns_konton(regel["kontering"])
+    for nummer, rad in enumerate(forslag["verifikation"]["rader"], start=1):
+        if rad["konto"] not in konton and not kontoplan.kontots_roller(rad["konto"]):
+            raise _fel(_URSPRUNG, "rad " + str(nummer) + " (konto " + rad["konto"] + "): kontot står inte i regeln "
+                       + repr(regelns_id) + " och har ingen roll i kontoplanen. Regelns konton är "
+                       + ", ".join(sorted(konton)) + ".")
 
 
 def _visa_rader(nummer):
@@ -695,7 +803,7 @@ def _kontrollera_tackning(raderna, underlagen, kallorna):
 
 
 def _kontrollera_ursprung(forslag, regelbok, kontoplan, kallorna):
-    """Ursprungskontrollen, punkt 1–7 överst i filen. Returnerar kopplingarna med kontrollsummorna."""
+    """Ursprungskontrollen, punkt 1–8 överst i filen. Returnerar kopplingarna med kontrollsummorna."""
     anvanda = {typ: [] for typ in KOPPLINGARNAS_NYCKLAR}
     raderna = []
     for nummer, rad in enumerate(forslag["verifikation"]["rader"], start=1):
@@ -729,8 +837,10 @@ def _kontrollera_ursprung(forslag, regelbok, kontoplan, kallorna):
         _kontrollera_momskonto(roller, varden, vad)
         _kontrollera_bankkonto(rad, roller, berakning, varden, vad)
         raderna.append((nummer, _SIDOR[0] if rad["debet_ore"] > 0 else _SIDOR[1], berakning, varden))
-    kopplingar = _kontrollera_kopplingar(forslag["kopplingar"], anvanda, regelbok, kallorna)
+    kopplingar = _kontrollera_kopplingar(forslag["kopplingar"], anvanda, regelbok, kontoplan, kallorna)
     _kontrollera_tackning(raderna, anvanda["underlag"], kallorna)
+    # Efter täckningen, så att ett förslag med ett värde som räknas två gånger visar det felet först.
+    _kontrollera_regeln(forslag, anvanda, regelbok, kontoplan, kallorna)
     return kopplingar
 
 
@@ -837,6 +947,7 @@ def skapa_konteringsforslag(forslag, regelbok, kontoplan, underlagsperiod=None, 
     """
     _kontrollera_indatans_typer(regelbok, kontoplan, underlagsperiod, bankperiod, kassaperiod)
     nytt = _kontrollera_formen(forslag)
+    _kontrollera_kontrollsummor(nytt["kopplingar"]["regel"], regelbok, kontoplan)
     _kontrollera_k2(nytt["verifikation"], kontoplan)
     kopplingar = _kontrollera_ursprung(nytt, regelbok, kontoplan, _kallorna(underlagsperiod, bankperiod, kassaperiod))
     return Konteringsforslag(_FORSLAGSNYCKEL, {

@@ -78,7 +78,7 @@ from typing import NamedTuple
 from belopp import formatera_ore as _kronor
 from las_bank import Bankperiod
 from las_kassa import normalisera_kassaregister as _normalisera
-from las_matchningsformat import MatchningsformatFel, kontrollera_matchningsformat
+from las_matchningsformat import MatchningsformatFel, kontrollera_matchningsformat, matchningsregel_for_bankrad
 from las_underlag import Underlagsperiod
 from normalisering import normalisera_for_jamforelse as _jamforbar
 
@@ -166,21 +166,6 @@ def _sort(varde):
 
 
 # --- Reglerna ---
-
-def _regel_for(rad, regler):
-    """Regeln i kraver_inte_underlag som bankraden passar, eller None.
-
-    Riktningen ska stämma och referensen och beskrivningen ska börja exakt med regelns text.
-    Formatet ser till att högst en regel kan passa. Beloppsgränsen prövas inte här.
-    """
-    riktning = "in" if rad["belopp_ore"] > 0 else "ut" if rad["belopp_ore"] < 0 else None
-    for regel in regler:
-        if (regel["riktning"] == riktning
-                and rad["referens"].startswith(regel.get("referens_borjar_med", ""))
-                and rad["beskrivning"].startswith(regel.get("beskrivning_borjar_med", ""))):
-            return regel
-    return None
-
 
 def _over_grans(rad, regel):
     """True om bankraden är större än regelns gräns. Exakt på gränsen räknas som inom.
@@ -307,7 +292,8 @@ def matcha_period(bankperiod, underlagsperiod, matchningsformat, bedomningsdatum
     behover = []  # (rad, kandidaterna) för raderna som ska ha underlag
     kraver_inte, arenden = [], []
     for rad in rader:
-        regel = _regel_for(rad, format_["kraver_inte_underlag"])
+        # Samma uppslag som konteringsförslaget gör för en regel för bankrader (las_matchningsformat).
+        regel = matchningsregel_for_bankrad(rad, format_["kraver_inte_underlag"])
         if regel is None:
             behover.append((rad, _kandidater(rad, underlag, format_["tidsfonster_dagar"])))
         elif _over_grans(rad, regel):

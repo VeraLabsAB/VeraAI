@@ -5,6 +5,7 @@ tillfällig mapp för varje test.
 """
 
 import copy
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -17,7 +18,8 @@ MATCHNING_FIL = AGENT / "foretag" / "syntet-testbutik" / "matchning.json"
 sys.path.insert(0, str(AGENT / "scripts"))
 
 from las_matchningsformat import (  # noqa: E402
-    HOGST_DAGAR, MatchningsformatFel, kontrollera_matchningsformat, ladda_matchningsformat,
+    HOGST_DAGAR, Matchningsformat, MatchningsformatFel, kontrollera_matchningsformat, ladda_matchningsformat,
+    las_matchningsformat, matchningsregel_for_bankrad,
 )
 
 # Osynliga tecken byggs med chr(), så att de syns i koden (test_inga_dolda_tecken.py).
@@ -101,6 +103,60 @@ def test_varfor_bankens_avgifter_har_gransen_250_kr_star_i_formatet():
     for text in ("250 kr", "Hugo", "aldrig undantar en stor betalning", "125 och 199 kr", "'över gräns'"):
         assert text in avgift["anteckning"], text
     assert "oavsett belopp" not in avgift["anteckning"]  # den gamla varningen gäller inte längre
+
+
+# --- Matchningsformatet med kontrollsumma (granskning 7, M4) ---
+
+def test_kontrollsumman_ar_sha256_av_filen_och_innehallet_ar_det_kontrollerade(tmp_path):
+    fil = skriv(tmp_path, format_())
+    resultat = las_matchningsformat(fil)
+    assert type(resultat) is Matchningsformat
+    assert resultat.kontrollsumma == hashlib.sha256(fil.read_bytes()).hexdigest()
+    assert resultat.innehall == kontrollera_matchningsformat(format_()) == ladda_matchningsformat(fil)
+    assert las_matchningsformat(MATCHNING_FIL).kontrollsumma == hashlib.sha256(MATCHNING_FIL.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize("andring", [b" ", b"\n"])
+def test_minsta_andring_ger_en_annan_kontrollsumma(tmp_path, andring):
+    # Samma innehåll, men ett blanksteg eller en radbrytning till i filen: summan räknas på filens bytes.
+    fil = skriv(tmp_path, format_())
+    fore = las_matchningsformat(fil)
+    fil.write_bytes(fil.read_bytes() + andring)
+    efter = las_matchningsformat(fil)
+    assert efter.innehall == fore.innehall and efter.kontrollsumma != fore.kontrollsumma
+
+
+def test_matchningsformatet_kan_inte_andras(tmp_path):
+    resultat = las_matchningsformat(skriv(tmp_path, format_()))
+    for namn in ("_kontrollsumma", "_matchningsformatet", "kontrollsumma", "x"):
+        with pytest.raises(AttributeError, match="Ett Matchningsformat kan inte ändras"):
+            setattr(resultat, namn, None)
+        with pytest.raises(AttributeError, match="Ett Matchningsformat kan inte ändras"):
+            delattr(resultat, namn)
+    with pytest.raises(TypeError):
+        resultat._matchningsformatet["saknat_underlag_efter_dagar"] = 99
+    kopia = resultat.innehall
+    kopia["kraver_inte_underlag"].clear()
+    assert len(resultat.innehall["kraver_inte_underlag"]) == 2
+    assert repr(resultat) == "Matchningsformat(2 regler, kontrollsumma " + resultat.kontrollsumma[:12] + "…)"
+
+
+def test_matchningsformatet_kan_bara_skapas_av_las_matchningsformat():
+    with pytest.raises(MatchningsformatFel, match="kan bara skapas av las_matchningsformat"):
+        Matchningsformat(object(), "0" * 64, format_())
+
+
+def test_matchningsregel_for_bankrad():
+    regler_ = kontrollera_matchningsformat(format_())["kraver_inte_underlag"]
+
+    def rad(belopp, referens="", beskrivning=""):
+        return {"belopp_ore": belopp, "referens": referens, "beskrivning": beskrivning}
+
+    assert matchningsregel_for_bankrad(rad(100, "IN-1"), regler_)["namn"] == "insattning"
+    assert matchningsregel_for_bankrad(rad(-100, "x", "AVGIFT JAN"), regler_)["namn"] == "avgift"
+    assert matchningsregel_for_bankrad(rad(-100, "IN-1"), regler_) is None  # fel riktning
+    assert matchningsregel_for_bankrad(rad(100, "in-1"), regler_) is None  # texten jämförs exakt
+    assert matchningsregel_for_bankrad(rad(0, "IN-1"), regler_) is None
 
 
 def test_kontrollen_ger_en_ny_kopia_utan_anteckningar():

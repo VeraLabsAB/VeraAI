@@ -19,6 +19,8 @@ En genväg är en funktion som läser en fil men hoppar över en kontroll:
   glapp mellan perioder). _KONTOPLANSNYCKEL och _MOMSNYCKEL skapar en Kontoplan eller Momssatser
   med vilket innehåll som helst, och deras inre (_konton, _roller, _varugrupper m.fl.) är det som
   uppslagen läser,
+- las_matchningsformat: _MATCHNINGSNYCKEL skapar ett Matchningsformat med vilket innehåll och vilken
+  kontrollsumma som helst, och dess inre (_matchningsformatet, _kontrollsumma) är det som regelboken läser,
 - las_regelbok: _kontrollera_regelboksregel, _kontrollera_villkor och de andra delkontrollerna gör
   var sin del av kontrollerna och hoppar över resten (till exempel tvetydiga regler och regler som
   höjer företagets gränser). _REGELBOKSNYCKEL skapar en Regelbok med vilket innehåll och vilken
@@ -74,9 +76,10 @@ GENVAGAR = ("_tolka_rader", "_tolka_kassarader", "_las_underlagsfil",
             "_kontrollera_varugrupp", "_kontrollera_granser", "_kontrollera_k9", "_kontrollera_oppettider",
             "_kontrollera_godkand", "_konfigurationen", "_konto_per_varugrupp", "_kontrollera_agare_och_narstaende",
             "_kontrollera_agarregel")
-# Nycklarna som skapar en Kontoplan, Momssatser eller en Regelbok, och det som ligger i dem.
-KONFIGURATIONENS_INRE = ("_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_REGELBOKSNYCKEL", "_status", "_konton", "_roller",
-                         "_varugrupper", "_tolerans_ore_per_rad", "_kontrollsumma", "_regelboken")
+# Nycklarna som skapar en Kontoplan, Momssatser, ett Matchningsformat eller en Regelbok, och det som ligger i dem.
+KONFIGURATIONENS_INRE = ("_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_MATCHNINGSNYCKEL", "_REGELBOKSNYCKEL", "_status",
+                         "_konton", "_roller", "_varugrupper", "_tolerans_ore_per_rad", "_kontrollsumma",
+                         "_matchningsformatet", "_regelboken")
 # Det inre i en Kassaperiod, en Underlagsperiod och en Bankperiod: nyckeln som skapar en (den heter
 # _PERIODNYCKEL i alla tre modulerna), och det som ligger i den.
 PERIODENS_INRE = ("_PERIODNYCKEL", "_rapporter", "_fran_datum", "_till_datum", "_underlag", "_arenden", "_rader",
@@ -275,16 +278,18 @@ def test_konfigurationens_inre_finns_i_modulerna_och_ar_forbjudet():
     # las_momssatser.py och las_regelbok.py. Annars förbjuder testerna namn som ingen använder, medan
     # det verkliga heter något annat.
     import las_kontoplan
+    import las_matchningsformat
     import las_momssatser
     import las_regelbok
 
+    nycklar = {"_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_MATCHNINGSNYCKEL", "_REGELBOKSNYCKEL"}
     toppnamn_i_modulerna = (toppnamn(SCRIPTS / "las_kontoplan.py") | toppnamn(SCRIPTS / "las_momssatser.py")
-                            | toppnamn(SCRIPTS / "las_regelbok.py"))
-    assert {"_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_REGELBOKSNYCKEL"} <= toppnamn_i_modulerna
+                            | toppnamn(SCRIPTS / "las_matchningsformat.py") | toppnamn(SCRIPTS / "las_regelbok.py"))
+    assert nycklar <= toppnamn_i_modulerna
     assert set(GENVAGAR[3:]) <= toppnamn_i_modulerna
     inre = (set(las_kontoplan.Kontoplan.__slots__) | set(las_momssatser.Momssatser.__slots__)
-            | set(las_regelbok.Regelbok.__slots__))
-    assert inre | {"_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_REGELBOKSNYCKEL"} == set(KONFIGURATIONENS_INRE)
+            | set(las_matchningsformat.Matchningsformat.__slots__) | set(las_regelbok.Regelbok.__slots__))
+    assert inre | nycklar == set(KONFIGURATIONENS_INRE)
     assert set(KONFIGURATIONENS_INRE) <= forbjudna_namn()
 
 
@@ -616,6 +621,13 @@ KONFIGURATIONENS_GENVAGSKOD = {
     "momsfilens_byggsten": "from las_momssatser import _datumtext\n",
     "momsfilens_stjarna": "from las_momssatser import *\n",
     "nya_byggstenar_direkt": "from inlasning_skydd import _inga_dolda_tecken_i_json\n",
+    # Matchningsformatet med kontrollsumma (granskning 7, M4)
+    "matchningsformatets_nyckel": "from las_matchningsformat import _MATCHNINGSNYCKEL\n",
+    "matchningsformatets_nyckel_attribut": ("import las_matchningsformat as m\n"
+                                            "f = m.Matchningsformat(m._MATCHNINGSNYCKEL, '0' * 64, {})\n"),
+    "matchningsformatets_inre": "def f(format_):\n    return format_._matchningsformatet\n",
+    "matchningsformatets_kontrollsumma_setattr": "def f(format_):\n    object.__setattr__(format_, '_kontrollsumma', '')\n",
+    "kontoplanens_kontrollsumma": "def f(plan):\n    return plan._kontrollsumma\n",
 }
 
 
@@ -800,6 +812,8 @@ VANLIG_KOD = {
                            "poster = period.underlag + period.arenden\n",
     "matcha_period": "from las_matchningsformat import ladda_matchningsformat\nfrom matcha_bank import matcha_period\n"
                      "resultat = matcha_period(None, None, ladda_matchningsformat('m.json'), '2025-01-31')\n",
+    "las_matchningsformat": "from las_matchningsformat import las_matchningsformat, Matchningsformat\n"
+                            "f = las_matchningsformat('m.json')\nx = (f.kontrollsumma, f.innehall)\n",
     "bankperiod": "from las_bank import Bankperiod, las_bankfil, sla_ihop_bankperioder\n"
                   "januari = las_bankfil('bank.csv', {}, 0, 100)\nkvartal = sla_ihop_bankperioder([januari])\n"
                   "rader = kvartal.rader\nsaldon = (kvartal.ingaende_saldo_ore, kvartal.utgaende_saldo_ore)\n"

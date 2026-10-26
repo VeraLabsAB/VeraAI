@@ -40,17 +40,20 @@ nästling och för långa tal), som de andra formatfilerna.
 
 las_momssatser är den enda offentliga funktionen som läser filen. Den kör alltid alla kontroller
 och returnerar Momssatser, som inte går att ändra och bara kan skapas av las_momssatser.
-Momssatser.sats slår upp satsen för en varugrupp på ett datum. Finns ingen sats för datumet
+Momssatser har en kontrollsumma (SHA-256 av filens bytes, som text med 64 tecken), räknad på exakt
+de bytes som sedan tolkas och kontrolleras, så att regelboken och varje konteringsförslag kan visa
+vilken momsfil som användes. Momssatser.sats slår upp satsen för en varugrupp på ett datum. Finns ingen sats för datumet
 stoppas uppslaget med ett MomssatsFel. Satsen gissas aldrig.
 """
 
 import datetime as dt
+import hashlib
 import re
 from types import MappingProxyType
 
 from inlasning_skydd import (
-    _Filsort, _datumtext, _heltal_i_json, _inga_dolda_tecken_i_json, _json_typ, _kontrollera_nycklar, _ladda_json,
-    _text_i_json,
+    _Filsort, _datumtext, _heltal_i_json, _inga_dolda_tecken_i_json, _json_typ, _kontrollera_nycklar, _las_jsonfil,
+    _text_i_json, _tolka_json,
 )
 from las_underlag import HELTAL_HOGST_SIFFROR
 
@@ -166,9 +169,11 @@ _MOMSNYCKEL = object()
 class Momssatser:
     """Ett företags momssatser, från las_momssatser. Kan bara skapas där och kan inte ändras."""
 
-    __slots__ = ("_status", "_varugrupper", "_tolerans_ore_per_rad")
+    __slots__ = ("_status", "_varugrupper", "_tolerans_ore_per_rad", "_kontrollsumma")
 
-    def __init__(self, nyckel, status, varugrupper, tolerans_ore_per_rad):
+    # kontrollsumma har ett standardvärde bara så att ett anrop utan nyckeln stoppas med MomssatsFel
+    # i stället för TypeError. las_momssatser skickar alltid med den.
+    def __init__(self, nyckel, status, varugrupper, tolerans_ore_per_rad, kontrollsumma=None):
         if nyckel is not _MOMSNYCKEL:
             raise MomssatsFel("Momssatser kan bara skapas av las_momssatser, som kör alla kontroller först.")
         # object.__setattr__ behövs eftersom vanlig tilldelning är spärrad nedan.
@@ -177,6 +182,7 @@ class Momssatser:
             namn: tuple(MappingProxyType(dict(period)) for period in perioder) for namn, perioder in varugrupper.items()
         }))
         object.__setattr__(self, "_tolerans_ore_per_rad", tolerans_ore_per_rad)
+        object.__setattr__(self, "_kontrollsumma", kontrollsumma)
 
     def __setattr__(self, namn, varde):
         raise AttributeError("Momssatser kan inte ändras.")
@@ -191,6 +197,11 @@ class Momssatser:
     @property
     def tolerans_ore_per_rad(self):
         return self._tolerans_ore_per_rad
+
+    @property
+    def kontrollsumma(self):
+        """SHA-256 av momsfilen, som text med 64 tecken. Ändras om ett enda tecken i filen ändras."""
+        return self._kontrollsumma
 
     @property
     def varugrupper(self):
@@ -226,7 +237,11 @@ class Momssatser:
 
 
 def las_momssatser(sokvag):
-    """Läser och kontrollerar ett företags momssatser.json. Returnerar Momssatser, annars MomssatsFel."""
-    innehall, var = _ladda_json(sokvag, _MOMSSATSER)
-    status, varugrupper, tolerans = _kontrollera_momssatser(innehall, var)
-    return Momssatser(_MOMSNYCKEL, status, varugrupper, tolerans)
+    """Läser och kontrollerar ett företags momssatser.json. Returnerar Momssatser, annars MomssatsFel.
+
+    Kontrollsumman räknas på exakt de bytes som tolkas.
+    """
+    data, var = _las_jsonfil(sokvag, _MOMSSATSER)
+    kontrollsumma = hashlib.sha256(data).hexdigest()
+    status, varugrupper, tolerans = _kontrollera_momssatser(_tolka_json(data, var, _MOMSSATSER), var)
+    return Momssatser(_MOMSNYCKEL, status, varugrupper, tolerans, kontrollsumma)

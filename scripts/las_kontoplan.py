@@ -31,18 +31,23 @@ ett konto som inte finns. Filen läses med de gemensamma skydden i inlasning_sky
 nycklar, för djup nästling och för långa tal), som de andra formatfilerna.
 
 las_kontoplan är den enda offentliga funktionen som läser filen. Den kör alltid alla kontroller och
-returnerar en Kontoplan, som inte går att ändra och bara kan skapas av las_kontoplan. Varje uppslag
+returnerar en Kontoplan, som inte går att ändra och bara kan skapas av las_kontoplan. Kontoplanen har
+en kontrollsumma (SHA-256 av filens bytes, som text med 64 tecken), räknad på exakt de bytes som
+sedan tolkas och kontrolleras, så att regelboken och varje konteringsförslag kan visa vilken
+kontoplan som användes. Varje uppslag
 av ett konto i Kontoplan görs för ett datum. Ett konto som inte finns, eller inte gäller på datumet,
 stoppar uppslaget med ett KontoplanFel. Kontot gissas aldrig. kontots_roller säger vilka roller ett
 konto har, så att konteringsförslaget kan känna igen bankkontot och momskontona utan att ha något
 kontonummer i sin kod.
 """
 
+import hashlib
 import re
 from types import MappingProxyType
 
 from inlasning_skydd import (
-    _Filsort, _datumtext, _inga_dolda_tecken_i_json, _json_typ, _kontrollera_nycklar, _ladda_json, _text_i_json,
+    _Filsort, _datumtext, _inga_dolda_tecken_i_json, _json_typ, _kontrollera_nycklar, _las_jsonfil, _text_i_json,
+    _tolka_json,
 )
 from las_momssatser import HOGSTA_SATS
 from las_underlag import HELTAL_HOGST_SIFFROR
@@ -195,15 +200,18 @@ _KONTOPLANSNYCKEL = object()
 class Kontoplan:
     """Ett företags kontoplan, från las_kontoplan. Kan bara skapas där och kan inte ändras."""
 
-    __slots__ = ("_status", "_konton", "_roller")
+    __slots__ = ("_status", "_konton", "_roller", "_kontrollsumma")
 
-    def __init__(self, nyckel, status, konton, roller):
+    # kontrollsumma har ett standardvärde bara så att ett anrop utan nyckeln stoppas med KontoplanFel
+    # i stället för TypeError. las_kontoplan skickar alltid med den.
+    def __init__(self, nyckel, status, konton, roller, kontrollsumma=None):
         if nyckel is not _KONTOPLANSNYCKEL:
             raise KontoplanFel("En Kontoplan kan bara skapas av las_kontoplan, som kör alla kontroller först.")
         # object.__setattr__ behövs eftersom vanlig tilldelning är spärrad nedan.
         object.__setattr__(self, "_status", status)
         object.__setattr__(self, "_konton", _frys(konton))
         object.__setattr__(self, "_roller", _frys(roller))
+        object.__setattr__(self, "_kontrollsumma", kontrollsumma)
 
     def __setattr__(self, namn, varde):
         raise AttributeError("En Kontoplan kan inte ändras.")
@@ -214,6 +222,11 @@ class Kontoplan:
     @property
     def status(self):
         return self._status
+
+    @property
+    def kontrollsumma(self):
+        """SHA-256 av kontoplanens fil, som text med 64 tecken. Ändras om ett enda tecken i filen ändras."""
+        return self._kontrollsumma
 
     @property
     def konton(self):
@@ -281,7 +294,11 @@ class Kontoplan:
 
 
 def las_kontoplan(sokvag):
-    """Läser och kontrollerar ett företags kontoplan.json. Returnerar en Kontoplan, annars KontoplanFel."""
-    innehall, var = _ladda_json(sokvag, _KONTOPLAN)
-    status, konton, roller = _kontrollera_kontoplan(innehall, var)
-    return Kontoplan(_KONTOPLANSNYCKEL, status, konton, roller)
+    """Läser och kontrollerar ett företags kontoplan.json. Returnerar en Kontoplan, annars KontoplanFel.
+
+    Kontrollsumman räknas på exakt de bytes som tolkas.
+    """
+    data, var = _las_jsonfil(sokvag, _KONTOPLAN)
+    kontrollsumma = hashlib.sha256(data).hexdigest()
+    status, konton, roller = _kontrollera_kontoplan(_tolka_json(data, var, _KONTOPLAN), var)
+    return Kontoplan(_KONTOPLANSNYCKEL, status, konton, roller, kontrollsumma)

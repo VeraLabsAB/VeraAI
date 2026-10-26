@@ -24,7 +24,7 @@ sys.path.insert(0, str(AGENT / "scripts"))
 from las_bank import ladda_bankformat, las_bankfil, sla_ihop_bankperioder  # noqa: E402
 from las_kassa import ladda_kassaformat, las_kassaperiod  # noqa: E402
 from las_kontoplan import las_kontoplan  # noqa: E402
-from las_matchningsformat import ladda_matchningsformat  # noqa: E402
+from las_matchningsformat import las_matchningsformat  # noqa: E402
 from las_momssatser import las_momssatser  # noqa: E402
 from las_regelbok import las_regelbok  # noqa: E402
 from las_underlag import las_underlagsperiod  # noqa: E402
@@ -44,7 +44,7 @@ class Kallor:
         bank = json.loads((DATAMAPP / "facit.json").read_text(encoding="utf-8"))["bank"]
         self.kontoplan = las_kontoplan(TESTBUTIKEN / "kontoplan.json")
         self.momssatser = las_momssatser(TESTBUTIKEN / "momssatser.json")
-        self.matchning = ladda_matchningsformat(TESTBUTIKEN / "matchning.json")
+        self.matchning = las_matchningsformat(TESTBUTIKEN / "matchning.json")
         self.regelbok = las_regelbok(TESTBUTIKEN / "regelbok.json", self.kontoplan, self.momssatser, self.matchning)
         bankformat = ladda_bankformat(TESTBUTIKEN / "bankformat.json")
         self.januari = las_bankfil(DATAMAPP / "bank_2025-01.csv", bankformat, bank["2025-01"]["ingaende_saldo_ore"],
@@ -81,6 +81,17 @@ def skapa(kallor, forslag, **perioder):
 
 # --- Förslag byggda för hand ---
 
+def sha256(fil):
+    return hashlib.sha256(fil.read_bytes()).hexdigest()
+
+
+def kontrollsummor(regelbok=TESTBUTIKEN / "regelbok.json", kontoplan=TESTBUTIKEN / "kontoplan.json"):
+    """Kontrollsummorna i 'regel' i kopplingarna: filerna som förslaget är byggt mot (granskning 7, M4)."""
+    return {"regelbokens_kontrollsumma": sha256(regelbok), "kontoplanens_kontrollsumma": sha256(kontoplan),
+            "momsfilens_kontrollsumma": sha256(TESTBUTIKEN / "momssatser.json"),
+            "matchningsformatets_kontrollsumma": sha256(TESTBUTIKEN / "matchning.json")}
+
+
 def underlag(id_, falt, momssats=None):
     kalla = {"kalla": "underlag", "id": id_, "falt": falt}
     if momssats is not None:
@@ -111,7 +122,7 @@ def forslag(datum, text, rader, regel, underlag_=(), bankrader=(), z_rapporter=(
         "kopplingar": {"underlag": [{"id": id_} for id_ in underlag_],
                        "bankrader": [{"id": id_} for id_ in bankrader],
                        "z_rapporter": [{"kassaregister": KASSAREGISTER, "znummer": nummer} for nummer in z_rapporter],
-                       "regel": {"id": regel}},
+                       "regel": {"id": regel, **kontrollsummor()}},
         "motivering": "Byggt för hand i ett test.",
     }
 
@@ -169,10 +180,6 @@ def bankavgiften(kallor):
     ], "R-BANK-AVGIFT", bankrader=[bank])
 
 
-def sha256(fil):
-    return hashlib.sha256(fil.read_bytes()).hexdigest()
-
-
 # --- Exemplen i DESIGN avsnitt 4 ---
 
 def test_4a_fakturan(kallor):
@@ -185,7 +192,10 @@ def test_4a_fakturan(kallor):
     assert resultat.kopplingar == {
         "underlag": [{"id": U3, "kontrollsumma": sha256(DATAMAPP / "underlag" / (U3 + ".json"))}],
         "bankrader": [], "z_rapporter": [],
-        "regel": {"id": "R-LEV-TE", "regelbokens_kontrollsumma": sha256(TESTBUTIKEN / "regelbok.json")},
+        "regel": {"id": "R-LEV-TE", "regelbokens_kontrollsumma": sha256(TESTBUTIKEN / "regelbok.json"),
+                  "kontoplanens_kontrollsumma": sha256(TESTBUTIKEN / "kontoplan.json"),
+                  "momsfilens_kontrollsumma": sha256(TESTBUTIKEN / "momssatser.json"),
+                  "matchningsformatets_kontrollsumma": sha256(TESTBUTIKEN / "matchning.json")},
     }
     assert resultat.kontroller == {"K2": "ok", "ursprung": "ok"}
     assert resultat.forslag_id == "F-TEST-0001" and resultat.motivering == "Byggt för hand i ett test."
@@ -250,7 +260,9 @@ def test_en_andrad_regelbok_ger_en_annan_kontrollsumma_i_forslaget(kallor, tmp_p
     fil = tmp_path / "regelbok.json"
     fil.write_bytes((TESTBUTIKEN / "regelbok.json").read_bytes() + b" ")
     andrad = las_regelbok(fil, kallor.kontoplan, kallor.momssatser, kallor.matchning)
-    resultat = skapa_konteringsforslag(fakturan(), andrad, kallor.kontoplan, **kallor.perioder())
+    data = fakturan()
+    data["kopplingar"]["regel"]["regelbokens_kontrollsumma"] = sha256(fil)
+    resultat = skapa_konteringsforslag(data, andrad, kallor.kontoplan, **kallor.perioder())
     summa = resultat.kopplingar["regel"]["regelbokens_kontrollsumma"]
     assert summa == sha256(fil) != skapa(kallor, fakturan()).kopplingar["regel"]["regelbokens_kontrollsumma"]
 
@@ -747,9 +759,14 @@ def test_konto_som_inte_galler_pa_datumet_stoppas(kallor, tmp_path):
     fil = tmp_path / "kontoplan.json"
     fil.write_text(json.dumps(data), encoding="utf-8")
     kontoplan = las_kontoplan(fil)
-    assert skapa_konteringsforslag(bankavgiften(kallor), kallor.regelbok, kontoplan, **kallor.perioder())
+    # Regelboken läses med samma kontoplan som förslaget (K2 punkt 1, granskning 7 M4).
+    regelbok = las_regelbok(TESTBUTIKEN / "regelbok.json", kontoplan, kallor.momssatser, kallor.matchning)
+    avgiften, betalningen_ = bankavgiften(kallor), betalningen(kallor)
+    for data in (avgiften, betalningen_):
+        data["kopplingar"]["regel"]["kontoplanens_kontrollsumma"] = sha256(fil)
+    assert skapa_konteringsforslag(avgiften, regelbok, kontoplan, **kallor.perioder())
     with pytest.raises(KonteringsforslagFel, match="rad 2: Kontot 1940 gäller inte på 2025-02-06") as fel:
-        skapa_konteringsforslag(betalningen(kallor), kallor.regelbok, kontoplan, **kallor.perioder())
+        skapa_konteringsforslag(betalningen_, regelbok, kontoplan, **kallor.perioder())
     assert fel.value.kontroll == "K2"
 
 
@@ -1002,3 +1019,193 @@ def test_k2_kors_fore_ursprunget(kallor):
     rader(data)[0]["debet_ore"] += 1
     rader(data)[0]["ursprung"]["fran"] = []
     stoppas(kallor, data, "K2", "summan av debet")
+
+
+# --- Regeln passar förslaget (punkt 8, granskning 7 M3) ---
+# P06a, P06b och P07 är granskarens prov. Varje förslag har riktiga källor, och debet = kredit.
+
+REGELN = {
+    # P06a: LEV-TE-fakturan med en regel för bankrader.
+    "p06a_regel_for_bankrader_pa_fakturan": (fakturan, satt("kopplingar", "regel", "id", varde="R-BANK-AVGIFT"),
+                                             "regeln 'R-BANK-AVGIFT' gäller bankrader, men förslaget har inga"
+                                             " bankrader i 'bankrader' i 'kopplingar'. Regeln passar inte förslaget"),
+    # P06b: kostnaden på 6071 Representation, men regeln R-LEV-TE säger 4010.
+    "p06b_konto_som_regeln_inte_har": (fakturan, satt("verifikation", "rader", 0, "konto", varde="6071"),
+                                       "rad 1 (konto 6071): kontot står inte i regeln 'R-LEV-TE' och har ingen roll i"
+                                       " kontoplanen. Regelns konton är 4010."),
+    # P07: verifikationen före regelns första dag (fakturan är daterad 2025-01-07).
+    "p07_datum_fore_regelns_forsta_dag": (fakturan, satt("verifikation", "datum", varde="2024-06-01"),
+                                          "regeln 'R-LEV-TE' gäller från 2025-01-01 till tills vidare, men"
+                                          " verifikationens datum är 2024-06-01."),
+    "underlag_med_en_annan_motparts_regel": (fakturan, satt("kopplingar", "regel", "id", varde="R-LEV-FORSAKRING"),
+                                             "regeln i 'kopplingar' är 'R-LEV-FORSAKRING', men underlaget"
+                                             " 'SYNT-U-2025-003' (leverantorsfaktura från 'LEV-TE') har regeln"
+                                             " 'R-LEV-TE' på 2025-01-07"),
+    "z_rapport_med_en_regel_for_underlag": (z_1001, satt("kopplingar", "regel", "id", varde="R-LEV-TE"),
+                                            "regeln 'R-LEV-TE' gäller underlag, men förslaget har inga underlag i"
+                                            " 'underlag' i 'kopplingar'"),
+    "z_rapport_med_en_regel_for_bankrader": (z_1001, satt("kopplingar", "regel", "id", varde="R-BANK-SWISH"),
+                                             "regeln 'R-BANK-SWISH' gäller bankrader, men förslaget har inga"
+                                             " bankrader"),
+    "bankrad_med_en_annan_regel": (bankavgiften, satt("kopplingar", "regel", "id", varde="R-BANK-SWISH"),
+                                   "regeln i 'kopplingar' är 'R-BANK-SWISH', men bankraden",
+                                   "(radnummer 117) (regeln 'bankavgift' i matchningsformatet) har regeln"
+                                   " 'R-BANK-AVGIFT' på 2025-01-31"),
+    "bankrad_som_inte_passar_matchningsformatet": (betalningen, satt("kopplingar", "regel", "id",
+                                                                     varde="R-BANK-AVGIFT"),
+                                                   "(radnummer 26), som inte passar någon regel för bankrader utan"
+                                                   " underlag i matchningsformatet, har ingen regel i regelboken på"
+                                                   " 2025-02-06"),
+    "bankrad_med_konto_som_regeln_inte_har": (bankavgiften, satt("verifikation", "rader", 0, "konto", varde="4010"),
+                                              "rad 1 (konto 4010): kontot står inte i regeln 'R-BANK-AVGIFT' och har"
+                                              " ingen roll i kontoplanen. Regelns konton är 6570."),
+    "z_rapport_med_konto_som_regeln_inte_har": (z_1001, satt("verifikation", "rader", 3, "konto", varde="6570"),
+                                                "rad 4 (konto 6570): kontot står inte i regeln 'R-Z-TB-KASSA-1' och har"
+                                                " ingen roll i kontoplanen. Regelns konton är 1580, 1581, 1910, 3001,"
+                                                " 3002."),
+}
+
+
+@pytest.mark.parametrize("fall", REGELN.values(), ids=REGELN.keys())
+def test_stoppregel_regeln(kallor, fall):
+    bygg, texter = bygg_fall(fall)
+    stoppas(kallor, bygg(kallor), "ursprung", *texter)
+
+
+def regelbok_med(kallor, tmp_path, andring):
+    """Testbutikens regelbok med andring(regelboken) gjord, och dess kontrollsumma."""
+    data = json.loads((TESTBUTIKEN / "regelbok.json").read_text(encoding="utf-8"))
+    andring(data)
+    fil = tmp_path / "regelbok.json"
+    fil.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return las_regelbok(fil, kallor.kontoplan, kallor.momssatser, kallor.matchning), sha256(fil)
+
+
+def skapa_med_regelboken(kallor, data, regelbok, summa):
+    data["kopplingar"]["regel"]["regelbokens_kontrollsumma"] = summa
+    return skapa_konteringsforslag(data, regelbok, kallor.kontoplan, **kallor.perioder())
+
+
+def regeln(data, regelns_id):
+    return [regel for regel in data["regler"] if regel["id"] == regelns_id][0]
+
+
+def test_datum_efter_regelns_sista_dag_stoppas(kallor, tmp_path):
+    # R-LEV-TE slutar 2025-01-31: fakturan (2025-01-07) godtas, betalningen (2025-02-06) stoppas.
+    regelbok, summa = regelbok_med(kallor, tmp_path,
+                                   lambda d: regeln(d, "R-LEV-TE")["villkor"].update(giltig_till="2025-01-31"))
+    assert skapa_med_regelboken(kallor, fakturan(), regelbok, summa)
+    with pytest.raises(KonteringsforslagFel) as fel:
+        skapa_med_regelboken(kallor, betalningen(kallor), regelbok, summa)
+    assert fel.value.kontroll == "ursprung"
+    assert ("regeln 'R-LEV-TE' gäller från 2025-01-01 till 2025-01-31, men verifikationens datum är 2025-02-06."
+            in str(fel.value))
+
+
+def test_z_rapport_med_ett_annat_kassaregisters_regel_stoppas(kallor, tmp_path):
+    # En regel till för ett annat kassaregister, med samma kontering. Z 1001 kommer från TB-KASSA-1.
+    def ny_regel(data):
+        ny = copy.deepcopy(regeln(data, "R-Z-TB-KASSA-1"))
+        ny.update(id="R-Z-ANNAN-KASSA", galler={"kalla": "z_rapport", "kassaregister": "ANNAN-KASSA"})
+        data["regler"].append(ny)
+
+    regelbok, summa = regelbok_med(kallor, tmp_path, ny_regel)
+    assert skapa_med_regelboken(kallor, z_1001(), regelbok, summa)
+    data = z_1001()
+    data["kopplingar"]["regel"]["id"] = "R-Z-ANNAN-KASSA"
+    with pytest.raises(KonteringsforslagFel) as fel:
+        skapa_med_regelboken(kallor, data, regelbok, summa)
+    assert fel.value.kontroll == "ursprung"
+    assert ("regeln i 'kopplingar' är 'R-Z-ANNAN-KASSA', men Z-rapport 1001 (TB-KASSA-1) har regeln 'R-Z-TB-KASSA-1'"
+            " på 2025-01-02" in str(fel.value))
+
+
+def test_regeln_godtar_rollkontona_och_regelns_egna_konton(kallor):
+    # Skydd: exemplen i DESIGN 4 använder både regelns konton och rollkontona (bank, leverantörsskulder,
+    # ingående och utgående moms), och alla godtas.
+    for data in (fakturan(), betalningen(kallor), z_1001(), kortinlosen(kallor), bankavgiften(kallor)):
+        assert skapa(kallor, data)
+
+
+# --- Kontrollsummorna (K2 punkt 1, granskning 7 M4) ---
+
+def kontoplan_med(tmp_path, andring):
+    """Testbutikens kontoplan med andring(kontoplanen) gjord, läst med las_kontoplan, och filen."""
+    data = json.loads((TESTBUTIKEN / "kontoplan.json").read_text(encoding="utf-8"))
+    andring(data)
+    fil = tmp_path / "kontoplan.json"
+    fil.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return las_kontoplan(fil), fil
+
+
+def bankkontot_fran_fakturan():
+    """P08: 1940 i debet ur fakturans belopp_ore, och leverantörsskulden i kredit."""
+    return forslag("2025-01-07", "Faktura LEV-TE, SYNT-TE-761", [
+        rad("1940", 1673056, 0, "lika", underlag(U3, "belopp_ore")),
+        rad("2440", 0, 1673056, "lika", underlag(U3, "belopp_ore")),
+    ], "R-LEV-TE", underlag_=[U3])
+
+
+def test_p08b_en_annan_kontoplan_an_regelbokens_stoppas(kallor, tmp_path):
+    # P08: med testbutikens kontoplan stoppas förslaget, eftersom 1940 är bankkontot och ska ha en bankrad.
+    stoppas(kallor, bankkontot_fran_fakturan(), "ursprung", "rad 1 (konto 1940) är bankkontot")
+    # P08b: med en kontoplan där rollen bank är 1910 godtog den gamla koden samma förslag, med
+    # testbutikens regelbok. Kontoplanen är inte den som regelboken kontrollerades mot.
+    annan, fil = kontoplan_med(tmp_path, lambda d: d["roller"].update(bank="1910"))
+    data = bankkontot_fran_fakturan()
+    data["kopplingar"]["regel"]["kontoplanens_kontrollsumma"] = sha256(fil)
+    with pytest.raises(KonteringsforslagFel) as fel:
+        skapa_konteringsforslag(data, kallor.regelbok, annan, **kallor.perioder())
+    assert fel.value.kontroll == "K2"
+    assert str(fel.value).startswith("Konteringsförslaget skapas inte (K2): kontoplanen är inte den som regelboken"
+                                     " kontrollerades mot. Kontoplanens kontrollsumma är '" + sha256(fil)[:16] + "…'")
+
+
+@pytest.mark.parametrize("nyckel, vad, filnamn", [
+    ("regelbokens_kontrollsumma", "regelboken", "regelbok.json"),
+    ("kontoplanens_kontrollsumma", "kontoplanen", "kontoplan.json"),
+    ("momsfilens_kontrollsumma", "momsfilen som regelboken kontrollerades mot", "momssatser.json"),
+    ("matchningsformatets_kontrollsumma", "matchningsformatet som regelboken kontrollerades mot", "matchning.json"),
+])
+def test_en_kontrollsumma_som_inte_ar_den_inlasta_filens_stoppas(kallor, nyckel, vad, filnamn):
+    fil = TESTBUTIKEN / filnamn
+    stoppas(kallor, andrat(fakturan, satt("kopplingar", "regel", nyckel, varde="0" * 64))(kallor), "K2",
+            "förslaget är byggt mot en annan fil: '" + nyckel + "' i 'regel' i 'kopplingar' är '" + "0" * 16 + "…', men "
+            + vad + " har kontrollsumman '" + sha256(fil)[:16] + "…'.")
+
+
+def test_kontrollsummorna_i_forslaget_kommer_fran_de_inlasta_filerna(kallor):
+    regel = skapa(kallor, fakturan()).kopplingar["regel"]
+    assert regel == {"id": "R-LEV-TE", **kontrollsummor()}
+    assert regel["kontoplanens_kontrollsumma"] == kallor.kontoplan.kontrollsumma
+    assert regel["momsfilens_kontrollsumma"] == kallor.momssatser.kontrollsumma
+    assert regel["matchningsformatets_kontrollsumma"] == kallor.matchning.kontrollsumma
+
+
+def test_p15_en_andrad_kontoplan_ger_en_annan_kontrollsumma_i_forslaget(kallor, tmp_path):
+    # P15: samma regelbok, men en kontoplan där 4010 heter "Eget uttag". Regelboken godtar den, men
+    # kontrollsumman i regelboken och i förslaget är en annan.
+    def nytt_namn(data):
+        [konto for konto in data["konton"] if konto["nummer"] == "4010"][0]["namn"] = "Eget uttag"
+
+    andrad, fil = kontoplan_med(tmp_path, nytt_namn)
+    regelbok = las_regelbok(TESTBUTIKEN / "regelbok.json", andrad, kallor.momssatser, kallor.matchning)
+    assert regelbok.kontrollsumma == kallor.regelbok.kontrollsumma
+    assert regelbok.kontrollerad_mot["kontoplan"] == sha256(fil) != kallor.regelbok.kontrollerad_mot["kontoplan"]
+    data = fakturan()
+    data["kopplingar"]["regel"]["kontoplanens_kontrollsumma"] = sha256(fil)
+    resultat = skapa_konteringsforslag(data, regelbok, andrad, **kallor.perioder())
+    assert resultat.kopplingar["regel"]["kontoplanens_kontrollsumma"] == sha256(fil) != sha256(
+        TESTBUTIKEN / "kontoplan.json")
+    # Den ändrade kontoplanen med testbutikens regelbok stoppas.
+    with pytest.raises(KonteringsforslagFel, match="kontoplanen är inte den som regelboken kontrollerades mot"):
+        skapa_konteringsforslag(data, kallor.regelbok, andrad, **kallor.perioder())
+
+
+@pytest.mark.parametrize("nyckel", ["regelbokens_kontrollsumma", "kontoplanens_kontrollsumma",
+                                    "momsfilens_kontrollsumma", "matchningsformatets_kontrollsumma"])
+def test_en_kontrollsumma_som_saknas_eller_inte_ar_text_stoppas(kallor, nyckel):
+    stoppas(kallor, andrat(fakturan, ta_bort("kopplingar", "regel", nyckel))(kallor), "indata",
+            "'regel' i 'kopplingar' saknar nyckeln '" + nyckel + "'")
+    stoppas(kallor, andrat(fakturan, satt("kopplingar", "regel", nyckel, varde=None))(kallor), "indata",
+            "'" + nyckel + "' i 'regel' i 'kopplingar' ska vara text, inte None")

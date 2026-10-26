@@ -84,10 +84,15 @@ långa tal), som de andra formatfilerna.
 
 las_regelbok är den enda offentliga funktionen som läser filen. Den tar emot kontoplanen från
 las_kontoplan, momssatserna från las_momssatser och matchningsformatet från
-ladda_matchningsformat, och kör alltid alla kontroller. Den returnerar en Regelbok, som inte går
+las_matchningsformat, och kör alltid alla kontroller. Den returnerar en Regelbok, som inte går
 att ändra och bara kan skapas av las_regelbok. Regelboken har en kontrollsumma (SHA-256 av filens
 bytes, som text med 64 tecken), så att varje förslag kan visa vilken regelbok som användes. Samma
-fil ger alltid samma summa, och minsta ändring ger en annan.
+fil ger alltid samma summa, och minsta ändring ger en annan. Regelbokens innebörd beror på de tre
+andra filerna, så Regelbok.kontrollerad_mot säger vilken kontoplan, momsfil och vilket
+matchningsformat den kontrollerades mot (deras kontrollsummor). Ett konteringsförslag kan bara
+kontrolleras mot samma kontoplan (granskning 7, M4). Regelboken kommer också ihåg reglerna i
+matchningsformatets kraver_inte_underlag, så att matchningsregel_for_bankrad kan säga vilken av dem
+en bankrad passar.
 """
 
 import datetime as dt
@@ -99,7 +104,9 @@ from inlasning_skydd import (
     _text_i_json, _tolka_json,
 )
 from las_kontoplan import Kontoplan
-from las_matchningsformat import MatchningsformatFel, kontrollera_matchningsformat
+from las_matchningsformat import (
+    Matchningsformat, MatchningsformatFel, kontrollera_matchningsformat, matchningsregel_for_bankrad,
+)
 from las_momssatser import Momssatser, MomssatsFel
 from las_underlag import HELTAL_HOGST_SIFFROR, TYPER
 from normalisering import normalisera_for_jamforelse
@@ -474,7 +481,7 @@ def _kontrollera_regelbokens_regler(regler, granser, agare, konton, momssatser, 
 
 
 def _konfigurationen(kontoplan, momssatser, matchningsformat):
-    """Kontrollerar indata och returnerar (konton, matchningsregler) i den form kontrollerna använder."""
+    """Kontrollerar indata och returnerar (konton, matchningsreglerna som lista) i den form kontrollerna använder."""
     # type() i stället för isinstance(), så att en underklass med egna regler inte släpps igenom.
     if type(kontoplan) is not Kontoplan:
         raise RegelbokFel("Regelboken kan inte kontrolleras: kontoplanen ska komma från las_kontoplan, inte vara "
@@ -482,17 +489,22 @@ def _konfigurationen(kontoplan, momssatser, matchningsformat):
     if type(momssatser) is not Momssatser:
         raise RegelbokFel("Regelboken kan inte kontrolleras: momssatserna ska komma från las_momssatser, inte vara "
                           + type(momssatser).__name__ + ".")
+    # Ett Matchningsformat och inte ett vanligt objekt, eftersom bara det har en kontrollsumma (M4).
+    if type(matchningsformat) is not Matchningsformat:
+        raise RegelbokFel("Regelboken kan inte kontrolleras: matchningsformatet ska komma från las_matchningsformat,"
+                          " inte vara " + type(matchningsformat).__name__ + ".")
     try:
-        matchning = kontrollera_matchningsformat(matchningsformat)
+        matchning = kontrollera_matchningsformat(matchningsformat.innehall)
     except MatchningsformatFel as fel:
         raise RegelbokFel("Regelboken kan inte kontrolleras: matchningsformatet är fel. " + str(fel)) from None
     konton = {konto["nummer"]: konto for konto in kontoplan.konton}
-    return konton, {regel["namn"]: regel for regel in matchning["kraver_inte_underlag"]}
+    return konton, matchning["kraver_inte_underlag"]
 
 
 def _kontrollera_regelbok(data, kontoplan, momssatser, matchningsformat, var):
     """Kontrollerar hela regelboken och returnerar den som ett nytt objekt i den form kärnan använder."""
-    konton, matchningsregler = _konfigurationen(kontoplan, momssatser, matchningsformat)
+    konton, matchningslistan = _konfigurationen(kontoplan, momssatser, matchningsformat)
+    matchningsregler = {regel["namn"]: regel for regel in matchningslistan}
     _inga_dolda_tecken_i_json(data, var, _REGELBOK)
     _objekt(data, "filen", var)
     _kontrollera_nycklar(data, REGELBOK_NYCKLAR, REGELBOK_VALFRIA_NYCKLAR, var, _REGELBOK)
@@ -511,6 +523,10 @@ def _kontrollera_regelbok(data, kontoplan, momssatser, matchningsformat, var):
         "agare_och_narstaende": agare,
         "regler": _kontrollera_regelbokens_regler(data["regler"], granser, agare, konton, momssatser, matchningsregler,
                                                   var),
+        # Filerna regelboken kontrollerades mot, och matchningsformatets regler för bankrader utan underlag.
+        "kontrollerad_mot": {"kontoplan": kontoplan.kontrollsumma, "momssatser": momssatser.kontrollsumma,
+                             "matchningsformat": matchningsformat.kontrollsumma},
+        "matchningsregler": matchningslistan,
     }
 
 
@@ -594,6 +610,24 @@ class Regelbok:
         """Reglerna i filens ordning, som nya kopior."""
         return _kopia(self._regelboken["regler"])
 
+    @property
+    def kontrollerad_mot(self):
+        """Kontrollsummorna för filerna regelboken kontrollerades mot, som en ny kopia.
+
+        Nycklarna är kontoplan, momssatser och matchningsformat. Kontrollsummorna kommer från
+        las_kontoplan, las_momssatser och las_matchningsformat, aldrig från regelbokens fil.
+        """
+        return _kopia(self._regelboken["kontrollerad_mot"])
+
+    def matchningsregel_for_bankrad(self, rad):
+        """Namnet på regeln i matchningsformatets kraver_inte_underlag som bankraden passar, eller None.
+
+        Samma uppslag som matchningen gör (las_matchningsformat.matchningsregel_for_bankrad), mot
+        matchningsformatet som regelboken kontrollerades mot. Beloppsgränsen prövas inte här.
+        """
+        regel = matchningsregel_for_bankrad(rad, self._regelboken["matchningsregler"])
+        return None if regel is None else regel["namn"]
+
     def ar_agare_eller_narstaende(self, motpart):
         """True om motparten står i 'agare_och_narstaende', annars False (K7).
 
@@ -642,7 +676,7 @@ def las_regelbok(sokvag, kontoplan, momssatser, matchningsformat):
     """Läser och kontrollerar ett företags regelbok.json. Returnerar en Regelbok, annars RegelbokFel.
 
     kontoplan ska komma från las_kontoplan, momssatser från las_momssatser och matchningsformat från
-    ladda_matchningsformat (det kontrolleras igen här). Kontrollsumman räknas på exakt de bytes som tolkas.
+    las_matchningsformat (det kontrolleras igen här). Kontrollsumman räknas på exakt de bytes som tolkas.
     """
     data, var = _las_jsonfil(sokvag, _REGELBOK)
     kontrollsumma = hashlib.sha256(data).hexdigest()
