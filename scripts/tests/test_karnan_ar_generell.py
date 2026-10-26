@@ -149,12 +149,14 @@ def test_karnans_egna_ord_ar_verkligen_karnans_nycklar():
 
 # Underlagets nycklar är kärnans egen form för underlag (las_underlag.py), gemensam för alla
 # företag. Några av dem ("datum", "moms", "momssats") råkar också vara namn i testbutikens
-# kassaformat. De godtas som textsträngar bara i las_underlag.py, där formen beskrivs, och i
-# matcha_bank.py, som läser underlagens uppgifter (till exempel "datum"). Alla andra kärnfiler
-# prövas som förut.
+# kassaformat. De godtas som textsträngar bara i las_underlag.py, där formen beskrivs, i
+# matcha_bank.py, som läser underlagens uppgifter (till exempel "datum"), och i
+# konteringsforslag.py, som läser underlagens momsrader ("moms" och "momssats") och har samma ord
+# "datum" för verifikationens datum. Alla andra kärnfiler prövas som förut.
 UNDERLAGSMODULEN = SCRIPTS / "las_underlag.py"
 MATCHNINGSMODULEN = SCRIPTS / "matcha_bank.py"
-UNDERLAGETS_ANVANDARE = (UNDERLAGSMODULEN, MATCHNINGSMODULEN)
+FORSLAGSMODULEN = SCRIPTS / "konteringsforslag.py"
+UNDERLAGETS_ANVANDARE = (UNDERLAGSMODULEN, MATCHNINGSMODULEN, FORSLAGSMODULEN)
 UNDERLAGETS_EGNA_ORD = set(las_underlag.NYCKLAR) | set(las_underlag.MOMSRAD_NYCKLAR)
 
 # Regelbokens nycklar är kärnans egen form för regelboken (las_regelbok.py), gemensam för alla
@@ -497,3 +499,75 @@ def test_bankradstext_kontrollen_hittar_inbyggda_texter(tmp_path):
     assert namn_ur_testdatan_i_filer([fil], namn) == [
         "x.py:1 innehåller 'kortinlosen'", "x.py:2 innehåller 'AVR-'", "x.py:4 innehåller 'KONTANTINSATTNING'",
         "x.py:5 innehåller 'BET-KORT AVRAKNING'"]
+
+
+# --- Konteringsförslaget ---
+
+def test_forslagsmodulen_provas_av_alla_kontroller():
+    # Skydd: konteringsforslag.py är en kärnfil, så att alla sökningar i filen (företagsnamn, konton,
+    # momssatser, kassaformatens, regelbökernas och testdatans namn) gäller den. Undantaget för
+    # underlagets nycklar släpper bara igenom de nycklarna, och förslagets egna nycklar som också är
+    # namn i kassaformaten är bara underlagets ord "datum".
+    import konteringsforslag
+
+    assert FORSLAGSMODULEN in karnans_filer() and FORSLAGSMODULEN in UNDERLAGETS_ANVANDARE
+    egna = (set(konteringsforslag.FORSLAG_NYCKLAR) | set(konteringsforslag.VERIFIKATION_NYCKLAR)
+            | set(konteringsforslag.RAD_NYCKLAR) | set(konteringsforslag.KOPPLINGAR_NYCKLAR)
+            | {nyckel for nycklar, valfria in konteringsforslag.KALLOR.values() for nyckel in nycklar + valfria})
+    assert egna & set(namn_i_kassaformaten()) == {"datum", "momssats"} <= UNDERLAGETS_EGNA_ORD
+    assert kassanamn_i_filer([FORSLAGSMODULEN], namn_i_kassaformaten()) != []
+
+
+def znummer_i_testdatans_kassafiler():
+    """Alla Z-nummer i testdatans Z-filer, som heltal. Kolumnens namn hämtas ur företagets kassaformat.json."""
+    import csv
+
+    nummer = set()
+    for fil in sorted((SCRIPTS.parent / "testdata").glob("*/*/kassa/*.csv")):
+        kolumn = json.loads((FORETAG / fil.parents[2].name / "kassaformat.json").read_text(
+            encoding="utf-8"))["kolumner"]["znummer"]
+        with open(fil, encoding="utf-8", newline="") as csvfil:
+            nummer.update(int(rad[kolumn]) for rad in csv.DictReader(csvfil))
+    return sorted(nummer)
+
+
+def referenser_i_testdatans_bankfiler():
+    """Hela referenserna ur testdatans bankfiler, med siffrorna, till exempel AVR-20250102."""
+    import csv
+
+    referenser = set()
+    for fil in sorted((SCRIPTS.parent / "testdata").glob("*/*/bank_*.csv")):
+        kolumn = json.loads((FORETAG / fil.parents[1].name / "bankformat.json").read_text(
+            encoding="utf-8"))["kolumner"]["referens"]
+        with open(fil, encoding="utf-8", newline="") as csvfil:
+            referenser.update(rad[kolumn] for rad in csv.DictReader(csvfil) if rad[kolumn])
+    return sorted(referenser)
+
+
+def test_testdatans_znummer_och_bankreferenser_finns_att_soka_efter():
+    # Skydd mot att testet nedan blir grönt för att det inte hittar några Z-nummer eller referenser alls.
+    znummer = znummer_i_testdatans_kassafiler()
+    assert {1001, 1010, 1012} <= set(znummer) and 1011 not in znummer
+    assert {"AVR-20250102", "INS-20250107", "AVG-2025-01", "SWISH-20250102-1", "SYNT-TE-761"} <= set(
+        referenser_i_testdatans_bankfiler())
+
+
+def test_karnan_innehaller_inga_znummer_eller_bankreferenser_ur_testdatan():
+    """Ett förslag pekar på en Z-rapport eller en bankrad i perioderna, aldrig på en som är inbyggd i koden.
+
+    Z-numren söks som tal och som textsträngar i koden, som momssatserna. Referenserna söks som hela
+    ord var de än står, även i kommentarer och förklarande text.
+    """
+    fynd = satser_i_filer(karnans_filer(), znummer_i_testdatans_kassafiler())
+    fynd += namn_ur_testdatan_i_filer(karnans_filer(), referenser_i_testdatans_bankfiler())
+    assert not fynd, "Z-nummer eller bankreferenser ur testdatan i kärnan:\n" + "\n".join(fynd)
+
+
+def test_znummer_och_referenskontrollen_hittar_inbyggda_varden(tmp_path):
+    fil = tmp_path / "x.py"
+    fil.write_text('Z = 1001\nx = "1012"\n# bankraden AVR-20250102\ny = text[:1010]\nz = "AVR-2025"\n',
+                   encoding="utf-8")
+    assert sorted(satser_i_filer([fil], znummer_i_testdatans_kassafiler())) == [
+        "x.py:1 har talet 1001", "x.py:2 har textsträngen '1012'"]
+    assert namn_ur_testdatan_i_filer([fil], referenser_i_testdatans_bankfiler()) == [
+        "x.py:3 innehåller 'AVR-20250102'"]

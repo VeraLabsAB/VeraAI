@@ -151,6 +151,26 @@ def test_sats_utan_konto_stoppar(tmp_path, sats, meddelande):
         kontoplan.utgaende_moms_konto(sats, "2025-01-01")
 
 
+def test_kontots_roller(tmp_path):
+    kontoplan = las_kontoplan(skriv(tmp_path, roller(leverantorsskulder="0101",
+                                                     utgaende_moms_per_sats={"9": "0707", "7": "0707", "0": "0909"})))
+    assert kontoplan.kontots_roller("0101") == [("bank", None), ("leverantorsskulder", None)]
+    assert kontoplan.kontots_roller("0303") == [("ingaende_moms", None)]
+    assert kontoplan.kontots_roller("0707") == [("utgaende_moms_per_sats", 7), ("utgaende_moms_per_sats", 9)]
+    assert kontoplan.kontots_roller("0909") == [("utgaende_moms_per_sats", 0)]
+    assert kontoplan.kontots_roller("9001") == [] == kontoplan.kontots_roller("0202")
+    testbutiken = las_kontoplan(KONTOPLAN_FIL)
+    assert testbutiken.kontots_roller("1940") == [("bank", None)]
+    assert testbutiken.kontots_roller("2621") == [("utgaende_moms_per_sats", 12)]
+
+
+@pytest.mark.parametrize("nummer", ["1234", "0101 ", 101, None])
+def test_kontots_roller_for_okant_konto_stoppar(tmp_path, nummer):
+    kontoplan = las_kontoplan(skriv(tmp_path, plan()))
+    with pytest.raises(KontoplanFel, match="inget konto"):
+        kontoplan.kontots_roller(nummer)
+
+
 @pytest.mark.parametrize("datum", ["2025-02-30", "2025-1-01", None, 20250101])
 def test_ogiltigt_datum_i_uppslaget_stoppar(tmp_path, datum):
     kontoplan = las_kontoplan(skriv(tmp_path, plan()))

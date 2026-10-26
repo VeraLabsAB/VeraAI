@@ -32,8 +32,10 @@ nycklar, för djup nästling och för långa tal), som de andra formatfilerna.
 
 las_kontoplan är den enda offentliga funktionen som läser filen. Den kör alltid alla kontroller och
 returnerar en Kontoplan, som inte går att ändra och bara kan skapas av las_kontoplan. Varje uppslag
-i Kontoplan görs för ett datum. Ett konto som inte finns, eller inte gäller på datumet, stoppar
-uppslaget med ett KontoplanFel. Kontot gissas aldrig.
+av ett konto i Kontoplan görs för ett datum. Ett konto som inte finns, eller inte gäller på datumet,
+stoppar uppslaget med ett KontoplanFel. Kontot gissas aldrig. kontots_roller säger vilka roller ett
+konto har, så att konteringsförslaget kan känna igen bankkontot och momskontona utan att ha något
+kontonummer i sin kod.
 """
 
 import re
@@ -255,6 +257,24 @@ class Kontoplan:
         nummer = per_sats[str(sats)]
         self.kontots_namn(nummer, datum)
         return nummer
+
+    def kontots_roller(self, nummer):
+        """Rollerna som kontot har, som en lista med (roll, sats), i ordningen i ROLLER.
+
+        sats är None, utom för rollerna i ROLLER_PER_SATS. Där är den momssatsen som heltal, med en
+        post per sats och satserna i storleksordning. En tom lista betyder att kontot inte har någon
+        roll. Ett konto som inte finns stoppar med KontoplanFel. Uppslaget görs utan datum: om kontot
+        gäller på ett datum prövas med kontots_namn.
+        """
+        if not isinstance(nummer, str) or nummer not in self._konton:
+            raise KontoplanFel("Kontoplanen har inget konto " + repr(nummer) + ". Kontot gissas inte.")
+        roller = []
+        for roll in ROLLER:
+            if roll in ROLLER_PER_SATS:
+                roller += sorted((roll, int(sats)) for sats, konto in self._roller[roll].items() if konto == nummer)
+            elif self._roller[roll] == nummer:
+                roller.append((roll, None))
+        return roller
 
     def __repr__(self):
         return "Kontoplan(" + repr(self._status) + ", " + str(len(self._konton)) + " konton)"

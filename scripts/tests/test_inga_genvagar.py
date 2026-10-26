@@ -22,15 +22,22 @@ En genväg är en funktion som läser en fil men hoppar över en kontroll:
 - las_regelbok: _kontrollera_regelboksregel, _kontrollera_villkor och de andra delkontrollerna gör
   var sin del av kontrollerna och hoppar över resten (till exempel tvetydiga regler och regler som
   höjer företagets gränser). _REGELBOKSNYCKEL skapar en Regelbok med vilket innehåll och vilken
-  kontrollsumma som helst, och dess inre (_regelboken, _kontrollsumma) är det som uppslagen läser.
+  kontrollsumma som helst, och dess inre (_regelboken, _kontrollsumma) är det som uppslagen läser,
+- konteringsforslag: alla namn i modulen som börjar med understreck är byggstenar. _kontrollera_k2,
+  _kontrollera_ursprung och de andra delkontrollerna gör var sin del av kontrollerna och hoppar över
+  resten. _FORSLAGSNYCKEL skapar ett Konteringsforslag med vilket innehåll som helst, och _FORSLAGEN
+  är innehållet i alla förslag.
 
 All annan kod ska läsa filer med las_bankfil, las_kassafil, las_kassaperiod,
 las_underlagsperiod, las_kontoplan, las_momssatser och las_regelbok, som alltid kör alla kontroller, summera med summa_per_momssats, som bara
-tar emot en Kassaperiod, och matcha med matcha_period, som bara tar emot en Bankperiod. Bara inläsningsmodulerna själva (UNDANTAGNA) och testerna får använda
+tar emot en Kassaperiod, matcha med matcha_period, som bara tar emot en Bankperiod, och skapa förslag med
+skapa_konteringsforslag, som alltid kör K2 och ursprungskontrollen. Bara inläsningsmodulerna själva (UNDANTAGNA) och testerna får använda
 genvägarna. En ny inläsningsmodul måste läggas till i UNDANTAGNA med flit. las_matchningsformat.py,
 las_kontoplan.py, las_momssatser.py och las_regelbok.py läser JSON-format med de gemensamma skydden och är därför
-inläsningsmoduler. matcha_bank.py
-läser inga filer och är inte undantagen: förbudet gäller den som alla andra kärnfiler.
+inläsningsmoduler. matcha_bank.py och konteringsforslag.py
+läser inga filer och är inte undantagna: förbudet gäller dem som alla andra kärnfiler.
+konteringsforslag.py använder sina egna byggstenar bara som vanliga namn, aldrig som attribut eller
+text, och klarar sig därför utan undantag.
 
 Kontrollen läser koden med Pythons ast-modul, alltså som Python själv ser den, och inte som text.
 Den klarar därför alias (import ... as, x = las_bank) och kod som bygger ihop namn medan
@@ -54,6 +61,9 @@ UNDANTAGNA = ("las_bank.py", "las_kassa.py", "las_underlag.py", "las_matchningsf
 SKYDDSMODUL = "inlasning_skydd"
 INLASNINGSMODULER = ("las_bank", "las_kassa", "las_underlag", "las_matchningsformat", "las_kontoplan", "las_momssatser",
                      "las_regelbok")
+# Kärnmoduler som inte läser filer men har egna byggstenar: alla deras namn som börjar med understreck.
+FORSLAGSMODUL = "konteringsforslag"
+MODULER_MED_BYGGSTENAR = INLASNINGSMODULER + (FORSLAGSMODUL,)
 GENVAGAR = ("_tolka_rader", "_tolka_kassarader", "_las_underlagsfil",
             # Kontoplanens och momsfilens delkontroller, och kontrollerna som ger ett ofryst resultat
             "_kontrollera_kontoplan", "_kontrollera_konton", "_kontrollera_konto", "_kontrollera_roller",
@@ -125,8 +135,9 @@ def namn_som_leder_till_genvagar(inlasningsmodul, forbjudna):
 def forbjudna_namn(mapp=SCRIPTS):
     """Alla namn som leder till en genväg: genvägarna, byggstenarna och deras alias."""
     forbjudna = (set(GENVAGAR) | set(PERIODENS_INRE) | set(KONFIGURATIONENS_INRE) | {SKYDDSMODUL}
-                 | toppnamn(mapp / (SKYDDSMODUL + ".py")))
-    for modul in INLASNINGSMODULER:
+                 | toppnamn(mapp / (SKYDDSMODUL + ".py"))
+                 | {namn for namn in toppnamn(mapp / (FORSLAGSMODUL + ".py")) if namn.startswith("_")})
+    for modul in MODULER_MED_BYGGSTENAR:
         forbjudna |= namn_som_leder_till_genvagar(mapp / (modul + ".py"), forbjudna)
     return forbjudna
 
@@ -171,9 +182,9 @@ def genvagar_i_fil(fil, forbjudna):
                     fynd.append((rad, "importerar " + alias.name + ", så namnet den slår upp kan inte granskas"))
                 if alias.name == SKYDDSMODUL:
                     fynd.append((rad, "importerar " + SKYDDSMODUL))
-                elif moduldelar[-1] in INLASNINGSMODULER and alias.name == "*":
+                elif moduldelar[-1] in MODULER_MED_BYGGSTENAR and alias.name == "*":
                     fynd.append((rad, "importerar allt från " + nod.module + ", även byggstenarna"))
-                elif moduldelar[-1] in INLASNINGSMODULER and alias.name in forbjudna:
+                elif moduldelar[-1] in MODULER_MED_BYGGSTENAR and alias.name in forbjudna:
                     fynd.append((rad, "hämtar " + alias.name + " från " + nod.module))
         elif isinstance(nod, ast.Attribute):
             if nod.attr in forbjudna:
@@ -238,7 +249,8 @@ def test_i1_de_forbjudna_namnen_hittas():
                  "_varugrupper", "_status", "_tolerans_ore_per_rad", "_kontrollera_konto", "_kontrollera_period",
                  "_kontrollera_perioder", "_KONTOPLAN", "_MOMSSATSER", "_REGELBOKSNYCKEL", "_regelboken",
                  "_kontrollsumma", "_REGELBOK", "_las_jsonfil", "_tolka_json", "_kontrollera_regelbok",
-                 "_kontrollera_regelboksregel", "_konfigurationen"]:
+                 "_kontrollera_regelboksregel", "_konfigurationen", "_FORSLAGSNYCKEL", "_FORSLAGEN", "_kontrollera_k2",
+                 "_kontrollera_ursprung", "_kontrollera_formen", "_sla_upp", "_innehallet"]:
         assert namn in forbjudna, namn
     # Det som annan kod ska använda är inte förbjudet.
     for namn in ["las_bankfil", "las_kassafil", "las_kassaperiod", "Kassaperiod", "ladda_bankformat",
@@ -252,7 +264,9 @@ def test_i1_de_forbjudna_namnen_hittas():
                  "tolerans_ore_per_rad", "ROLLER", "HOGSTA_SATS", "las_regelbok", "Regelbok", "RegelbokFel",
                  "regel_for_underlag", "regel_for_z_rapport", "regel_for_bankrad", "kontrollsumma", "regler",
                  "granser", "oppettider", "REGELBOK_NYCKLAR", "KALLOR", "NIVAER", "agare_och_narstaende",
-                 "ar_agare_eller_narstaende"]:
+                 "ar_agare_eller_narstaende", "kontots_roller", "skapa_konteringsforslag", "Konteringsforslag",
+                 "KonteringsforslagFel", "verifikation", "kopplingar", "motivering", "kontroller", "forslag_id",
+                 "FORSLAG_NYCKLAR", "BERAKNINGAR"]:
         assert namn not in forbjudna, namn
 
 
@@ -313,7 +327,7 @@ def offentliga_byggstenar(mapp):
     fynd = [SKYDDSMODUL + ".py binder " + namn for namn in sorted(toppnamn(mapp / (SKYDDSMODUL + ".py")))
             if not namn.startswith("_")]
     forbjudna = forbjudna_namn(mapp)
-    for modul in INLASNINGSMODULER:
+    for modul in MODULER_MED_BYGGSTENAR:
         trad = ast.parse((mapp / (modul + ".py")).read_text(encoding="utf-8"))
         for nod in ast.walk(trad):
             if isinstance(nod, ast.ImportFrom) and (nod.module or "").split(".")[-1] == SKYDDSMODUL:
@@ -362,8 +376,10 @@ def test_inlasningsmodulerna_har_inga_byggstenar_under_offentligt_namn():
     import las_regelbok
     import matcha_bank
 
+    import konteringsforslag
+
     assert offentliga_namn_for_byggstenar([las_bank, las_kassa, las_underlag, las_matchningsformat, matcha_bank,
-                                           las_kontoplan, las_momssatser, las_regelbok]) == []
+                                           las_kontoplan, las_momssatser, las_regelbok, konteringsforslag]) == []
 
 
 def test_kontrollen_hittar_byggstenar_under_offentligt_namn_nar_programmet_kor():
@@ -434,6 +450,9 @@ def projekt(tmp_path):
     (tmp_path / "las_regelbok.py").write_text(
         "from inlasning_skydd import _las_jsonfil, _tolka_json\n_REGELBOKSNYCKEL = object()\n"
         "def las_regelbok(sokvag, kontoplan, momssatser, matchningsformat): ...\n", encoding="utf-8")
+    (tmp_path / "konteringsforslag.py").write_text(
+        "_FORSLAGSNYCKEL = object()\n_FORSLAGEN = {}\ndef _kontrollera_k2(verifikation, kontoplan): ...\n"
+        "def skapa_konteringsforslag(forslag, regelbok, kontoplan): ...\n", encoding="utf-8")
     (tmp_path / "inlasning_skydd.py").write_text("def _las_fil(sokvag, filsort): ...\n", encoding="utf-8")
     (tmp_path / "belopp.py").write_text("def tolka_belopp(text): ...\n", encoding="utf-8")
     return tmp_path
@@ -638,6 +657,71 @@ def test_i1_kontrollen_hittar_genvagar_forbi_regelbokens_kontroller(projekt, kod
     assert fynd and all(rad.startswith("rapport.py:") for rad in fynd), fynd
 
 
+# Genvägar förbi konteringsförslagets kontroller. konteringsforslag.py är inte undantagen, så förbudet
+# gäller alla andra kärnfiler.
+FORSLAGETS_GENVAGSKOD = {
+    "forslagets_nyckel": "from konteringsforslag import _FORSLAGSNYCKEL\n",
+    "forslagets_nyckel_alias": "from konteringsforslag import _FORSLAGSNYCKEL as nyckel\n",
+    "forslagets_nyckel_attribut": ("import konteringsforslag as k\n"
+                                   "f = k.Konteringsforslag(k._FORSLAGSNYCKEL, {'forslag_id': 'F-1'})\n"),
+    "forslagets_nyckel_getattr": "import konteringsforslag\nn = getattr(konteringsforslag, '_FORSLAGS' + 'NYCKEL')\n",
+    "forslagets_nyckel_getattr_text": "import konteringsforslag\nn = getattr(konteringsforslag, '_FORSLAGSNYCKEL')\n",
+    "forslagets_nyckel_paketnamn": "from scripts.konteringsforslag import _FORSLAGSNYCKEL\n",
+    "forslagens_innehall": "from konteringsforslag import _FORSLAGEN\n",
+    "forslagens_innehall_attribut": "import konteringsforslag\nkonteringsforslag._FORSLAGEN.clear()\n",
+    "forslagens_innehall_andras": "import konteringsforslag as k\ndef f(forslag, nytt):\n    k._FORSLAGEN[forslag] = nytt\n",
+    "forslagets_innehall_las": "import konteringsforslag\ni = konteringsforslag._innehallet(None)\n",
+    "k2_hoppas_over": "from konteringsforslag import _kontrollera_ursprung\n",
+    "ursprunget_hoppas_over": "from konteringsforslag import _kontrollera_k2\n",
+    "ursprunget_hoppas_over_attribut": "import konteringsforslag\nk = konteringsforslag._kontrollera_k2({}, None)\n",
+    "formen_hoppas_over": "from konteringsforslag import _kontrollera_formen\n",
+    "kallan_slas_upp_utan_kontroll": "from konteringsforslag import _sla_upp, _Kallorna\n",
+    "forslagets_stjarna": "from konteringsforslag import *\n",
+    "forslagets_text": "def f(forslag):\n    return '_FORSLAGEN'\n",
+}
+
+
+@pytest.mark.parametrize("kod", FORSLAGETS_GENVAGSKOD.values(), ids=FORSLAGETS_GENVAGSKOD.keys())
+def test_i1_kontrollen_hittar_genvagar_forbi_konteringsforslagets_kontroller(projekt, kod):
+    # Skydd: namnen finns verkligen i den riktiga modulen, så att förbudet gäller den verkliga genvägen.
+    assert {"_FORSLAGSNYCKEL", "_FORSLAGEN", "_kontrollera_k2", "_kontrollera_ursprung", "_kontrollera_formen",
+            "_sla_upp", "_Kallorna", "_innehallet"} <= toppnamn(SCRIPTS / "konteringsforslag.py")
+    (projekt / "rapport.py").write_text(kod, encoding="utf-8")
+    fynd = genvagar_i(projekt)
+    assert fynd and all(rad.startswith("rapport.py:") for rad in fynd), fynd
+
+
+def test_konteringsforslagets_alla_byggstenar_ar_forbjudna():
+    # Skydd: varje namn i konteringsforslag.py som börjar med understreck är förbjudet för annan kärnkod.
+    # En ny byggsten blir alltså förbjuden från början.
+    privata = {namn for namn in toppnamn(SCRIPTS / "konteringsforslag.py") if namn.startswith("_")}
+    assert len(privata) > 20
+    assert {namn for namn in privata if namn.startswith("_kontrollera_")} >= {
+        "_kontrollera_k2", "_kontrollera_ursprung", "_kontrollera_formen", "_kontrollera_kopplingar",
+        "_kontrollera_momskonto", "_kontrollera_bankkonto", "_kontrollera_indatans_typer"}
+    assert privata <= forbjudna_namn()
+
+
+def test_konteringsforslaget_omfattas_av_skyddet():
+    # konteringsforslag.py är en vanlig kärnfil: den är inte undantagen, så alla förbud gäller den, och den
+    # använder ingen genväg. Perioderna, kontoplanen och regelboken får den bara som färdiga objekt.
+    modul = SCRIPTS / "konteringsforslag.py"
+    assert modul in karnfiler(SCRIPTS) and modul.name not in UNDANTAGNA
+    assert genvagar_i_fil(modul, forbjudna_namn()) == []
+
+
+def test_kontrollen_hittar_alias_for_konteringsforslagets_byggstenar(projekt):
+    (projekt / "konteringsforslag.py").write_text(
+        "_FORSLAGSNYCKEL = object()\nNYCKEL = _FORSLAGSNYCKEL\ndef _kontrollera_k2(v, k): ...\nK2 = _kontrollera_k2\n",
+        encoding="utf-8")
+    forbjudna = forbjudna_namn(projekt)
+    assert {"NYCKEL", "K2"} <= forbjudna
+    assert offentliga_byggstenar(projekt) == ["konteringsforslag.py gör NYCKEL till ett alias",
+                                              "konteringsforslag.py gör K2 till ett alias"]
+    (projekt / "rapport.py").write_text("from konteringsforslag import NYCKEL\n", encoding="utf-8")
+    assert genvagar_i(projekt, forbjudna) == ["rapport.py:1 hämtar NYCKEL från konteringsforslag"]
+
+
 @pytest.mark.parametrize("kod", [
     "from las_kontoplan import las_kontoplan, Kontoplan, KontoplanFel, ROLLER\n"
     "plan = las_kontoplan('k.json')\nkonto = plan.rollens_konto('bank', '2025-01-01')\nx = plan.konton\n",
@@ -646,7 +730,10 @@ def test_i1_kontrollen_hittar_genvagar_forbi_regelbokens_kontroller(projekt, kod
     "from las_regelbok import las_regelbok, Regelbok, RegelbokFel, KALLOR\n"
     "bok = las_regelbok('r.json', None, None, None)\nregel = bok.regel_for_underlag('kvitto', 'x', '2025-01-01')\n"
     "summa = bok.kontrollsumma\ngranser = (bok.granser, bok.k9, bok.oppettider, bok.regler)\n",
-], ids=["kontoplan", "momssatser", "regelbok"])
+    "from konteringsforslag import skapa_konteringsforslag, Konteringsforslag, KonteringsforslagFel, KALLOR\n"
+    "f = skapa_konteringsforslag({}, None, None, None, None, None)\nv = (f.verifikation, f.kopplingar, f.kontroller)\n"
+    "ok = type(f) is Konteringsforslag\nroller = None.kontots_roller('1')\n",
+], ids=["kontoplan", "momssatser", "regelbok", "konteringsforslag"])
 def test_i1_kontoplanen_och_momsfilen_las_pa_ratt_satt_slapps_igenom(projekt, kod):
     (projekt / "rapport.py").write_text(kod, encoding="utf-8")
     assert genvagar_i(projekt) == []
