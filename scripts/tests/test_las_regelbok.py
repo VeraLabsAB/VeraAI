@@ -359,6 +359,13 @@ def test_uppslaget_for_agare_och_narstaende(tmp_path, konfiguration):
         assert regelbok.ar_agare_eller_narstaende(motpart) is False, motpart
 
 
+def test_m8_agare_med_osynligt_tecken_fore_accenten_kanns_igen(tmp_path, konfiguration):
+    # M8 (granskning 7): "A" + osynligt tecken + trema ser ut som "Ä". Förut kändes ägaren inte igen.
+    regelbok = las(tmp_path, bok(agare_och_narstaende=["ÄGARE-X"]), konfiguration)
+    for osynligt in (chr(0x034F), chr(0x200B), chr(0xFE00)):
+        assert regelbok.ar_agare_eller_narstaende("A" + osynligt + chr(0x0308) + "GARE-X") is True
+
+
 def test_utan_agare_och_narstaende_ar_listan_tom(tmp_path, konfiguration):
     for data in (bok(), bok(agare_och_narstaende=[])):
         regelbok = las(tmp_path, data, konfiguration)
@@ -932,3 +939,277 @@ def test_fil_som_saknas_stoppar(tmp_path, konfiguration):
 def test_mapp_i_stallet_for_fil_stoppar(tmp_path, konfiguration):
     with pytest.raises(RegelbokFel, match="är en mapp, inte en fil"):
         las_regelbok(tmp_path, *konfiguration)
+
+
+# --- Granskning 7, M5: förväxlingstecken i regelbokens namn ---
+# En förväxlingsbokstav ser ut som en latinsk bokstav men är en annan, så att namnet jämförs som ett
+# annat namn. Granskarens prov med testbutikens ägare AGARE-1 och en regel med nivå A.
+
+KYRILLISKT_A = chr(0x0410)
+KYRILLISKT_E = chr(0x0415)
+GREKISKT_OMIKRON = chr(0x039F)
+CHEROKEE_AGARE = "".join(map(chr, (0x13AA, 0x13C0, 0x13AA, 0x13D2, 0x13AC)))  # ser ut som "AGARE"
+ARABISK_ETTA = chr(0x0661)
+
+
+def regelbok_fran_testbutiken_med(tmp_path, *nya_regler, agare=None):
+    """Testbutikens regelbok med nya_regler till sist och, om agare anges, en annan lista med ägare."""
+    data = json.loads(REGELBOK_FIL.read_text(encoding="utf-8"))
+    data["regler"] += list(nya_regler)
+    if agare is not None:
+        data["agare_och_narstaende"] = agare
+    fil = tmp_path / "regelbok.json"
+    fil.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return fil
+
+
+def leverantorsregel(id_, motpart, konto="4010", niva="A"):
+    return {"id": id_, "galler": {"kalla": "underlag", "typ": "leverantorsfaktura", "motpart": motpart},
+            "kontering": {"livsmedel": konto}, "villkor": {"giltig_fran": "2025-01-01"}, "niva": niva}
+
+
+@pytest.mark.parametrize("motpart, tecken", [
+    (KYRILLISKT_A + "GARE-1", "U+0410 (CYRILLIC CAPITAL LETTER A)"),
+    (CHEROKEE_AGARE + "-1", "U+13AA (CHEROKEE LETTER GO)"),
+    ("AGARE-" + ARABISK_ETTA, "U+0661 (ARABIC-INDIC DIGIT ONE)"),
+], ids=["kyrilliskt_a", "cherokee", "arabisk_etta"])
+def test_m5_regel_for_agaren_med_forvaxlingstecken_stoppar_filen(tmp_path, motpart, tecken):
+    # Förut godtogs regeln med nivå A, och ar_agare_eller_narstaende sade False: ägaren kändes inte igen.
+    fil = regelbok_fran_testbutiken_med(tmp_path, leverantorsregel("R-AGARE-X", motpart))
+    with pytest.raises(RegelbokFel) as fel:
+        las_testbutikens_regelbok(fil)
+    meddelande = str(fel.value)
+    assert "'motpart' i 'galler' i regel nummer 11 (R-AGARE-X)" in meddelande and tecken in meddelande, meddelande
+
+
+def test_m5_p12_tva_regler_som_ser_likadana_ut_stoppar_filen(tmp_path):
+    # P12: en andra regel med id R-LEV-TЕ och motparten LEV-TЕ (kyrilliskt Е sist), konto 6071, bredvid
+    # den vanliga R-LEV-TE. Förut godtogs den. Nu stoppas både id:t och motparten var för sig.
+    for id_, motpart, vad in (("R-LEV-T" + KYRILLISKT_E, "LEV-T" + KYRILLISKT_E, "'id' i regel nummer 11"),
+                              ("R-LEV-TE-2", "LEV-T" + KYRILLISKT_E, "'motpart' i 'galler' i regel nummer 11"),
+                              ("R-LEV-T" + KYRILLISKT_E, "LEV-TE-2", "'id' i regel nummer 11")):
+        fil = regelbok_fran_testbutiken_med(tmp_path, leverantorsregel(id_, motpart, konto="6071"))
+        with pytest.raises(RegelbokFel) as fel:
+            las_testbutikens_regelbok(fil)
+        assert vad in str(fel.value) and "U+0415 (CYRILLIC CAPITAL LETTER IE)" in str(fel.value), str(fel.value)
+
+
+@pytest.mark.parametrize("agare, tecken", [
+    (["AGARE-1", CHEROKEE_AGARE + "-1"], "U+13AA (CHEROKEE LETTER GO)"),
+    (["AGARE-1", "N" + KYRILLISKT_A + "RSTAENDE-2"], "U+0410 (CYRILLIC CAPITAL LETTER A)"),
+], ids=["cherokee", "kyrilliskt_a"])
+def test_m5_forvaxlingstecken_i_listan_med_agare_stoppar_filen(tmp_path, agare, tecken):
+    fil = regelbok_fran_testbutiken_med(tmp_path, agare=agare)
+    with pytest.raises(RegelbokFel) as fel:
+        las_testbutikens_regelbok(fil)
+    assert "motpart nummer 2 i 'agare_och_narstaende'" in str(fel.value) and tecken in str(fel.value), str(fel.value)
+
+
+M5_STOPPAS = {
+    # Ett ord som blandar latinska och andra bokstäver, som i underlagen (J1).
+    "motpart_blandad": (andrad(((R, 0, "galler", "motpart"), "MOTPART-" + KYRILLISKT_A)), "'motpart' i 'galler' i"
+                        " regel nummer 1 (R-1) har ordet 'MOTPART-" + KYRILLISKT_A + "', som blandar latinska"
+                        " bokstäver med bokstaven U+0410 (CYRILLIC CAPITAL LETTER A) från ett annat skriftsystem"),
+    "motpart_grekisk": (andrad(((R, 0, "galler", "motpart"), GREKISKT_OMIKRON + "K HANDEL")),
+                        "U+039F (GREEK CAPITAL LETTER OMICRON)", "blandar latinska bokstäver"),
+    # Regelboken är strängare än underlagen: ett helt ord i ett annat skriftsystem stoppas också.
+    "motpart_helt_cherokee": (andrad(((R, 0, "galler", "motpart"), CHEROKEE_AGARE)), "'motpart' i 'galler' i regel"
+                              " nummer 1 (R-1) har bokstaven U+13AA (CHEROKEE LETTER GO), som inte är en latinsk"
+                              " bokstav", "får bara ha latinska bokstäver"),
+    "motpart_helt_kyrillisk": (andrad(((R, 0, "galler", "motpart"), "МОСКВА")), "U+041C (CYRILLIC CAPITAL LETTER EM)",
+                               "inte är en latinsk bokstav"),
+    "motpart_arabisk_siffra": (andrad(((R, 0, "galler", "motpart"), "MOTPART-" + ARABISK_ETTA)),
+                               "har siffran U+0661 (ARABIC-INDIC DIGIT ONE)", "siffrorna 0–9"),
+    "kassaregister_blandat": (andrad(((R, 2, "galler", "kassaregister"), "K" + KYRILLISKT_A + "SSA-X")),
+                              "'kassaregister' i 'galler' i regel nummer 3 (R-3)", "U+0410"),
+    "kassaregister_cherokee": (andrad(((R, 2, "galler", "kassaregister"), CHEROKEE_AGARE)),
+                               "'kassaregister' i 'galler' i regel nummer 3 (R-3) har bokstaven U+13AA"),
+    "agare_cherokee": (bok(agare_och_narstaende=[CHEROKEE_AGARE + "-1"]), "motpart nummer 1 i"
+                       " 'agare_och_narstaende' har bokstaven U+13AA (CHEROKEE LETTER GO)"),
+    # Regel-id: bara a–z, siffror och bindestreck efter normaliseringen, som fakturanumret i underlagen.
+    "id_kyrilliskt": (andrad(((R, 0, "id"), "R-" + KYRILLISKT_A)), "'id' i regel nummer 1 innehåller tecknet U+0410"
+                      " (CYRILLIC CAPITAL LETTER A). Ett regel-id får bara innehålla bokstäverna a–z, siffror och"
+                      " bindestreck"),
+    "id_cherokee": (andrad(((R, 0, "id"), "R-" + CHEROKEE_AGARE)), "U+13AA (CHEROKEE LETTER GO)"),
+    "id_a_med_accent": (andrad(((R, 0, "id"), "R-" + chr(0x00C5))), "U+00C5 (LATIN CAPITAL LETTER A WITH RING ABOVE)"),
+    "id_understreck": (andrad(((R, 0, "id"), "R_1")), "U+005F (LOW LINE)"),
+    "id_arabisk_siffra": (andrad(((R, 0, "id"), "R-" + ARABISK_ETTA)), "U+0661 (ARABIC-INDIC DIGIT ONE)"),
+    # Konton och varugrupper var redan skyddade: de ska finnas i kontoplanen (bara 0–9) och momsfilen
+    # (bara a–z, siffror och understreck). Testerna låser det.
+    "konto_arabiska_siffror": (andrad(((R, 0, "kontering", "grupp_a"), ARABISK_ETTA + "001")),
+                               "som inte finns i kontoplanen"),
+    "konto_fullbredd": (andrad(((R, 0, "kontering", "grupp_a"), chr(0xFF19) + "001")), "som inte finns i kontoplanen"),
+    "varugrupp_kyrillisk": (andrad(((R, 1, "kontering"), {"grupp_" + chr(0x0430): "9002"})),
+                            "ingen varugrupp 'grupp_" + chr(0x0430) + "'"),
+}
+
+
+@pytest.mark.parametrize("data, texter", [(fall[0], fall[1:]) for fall in M5_STOPPAS.values()], ids=M5_STOPPAS.keys())
+def test_m5_stoppregel(tmp_path, konfiguration, data, texter):
+    stoppas(tmp_path, data, konfiguration, *texter)
+
+
+def test_m5_latinska_namn_godtas(tmp_path, konfiguration):
+    # Skydd: svenska och andra latinska bokstäver, fullbreddsbokstäver (som är latinska efter NFKC),
+    # vanliga tecken och olika sorters bindestreck i ett id godtas, och namnen sparas som de står.
+    data = bok(agare_och_narstaende=["Ägare Åström", "Ølhus Straße"])
+    data["regler"][0]["galler"]["motpart"] = "Café Ölund & Söner AB"
+    data["regler"][2]["galler"]["kassaregister"] = "Ｋａｓｓａ-7"
+    data["regler"][0]["id"] = "r" + chr(0x2010) + "LEV-1"
+    regelbok = las(tmp_path, data, konfiguration)
+    assert regelbok.regler[0]["galler"]["motpart"] == "Café Ölund & Söner AB"
+    assert regelbok.regler[0]["id"] == "r" + chr(0x2010) + "LEV-1"
+    assert regelbok.ar_agare_eller_narstaende("ÄGARE ÅSTRÖM") is True
+
+
+def test_m5_testbutikens_regelbok_godtas_fortfarande():
+    # Skydd: testbutikens regelbok har bara latinska namn och vanliga id.
+    assert len(las_testbutikens_regelbok().regler) == 10
+
+
+# --- Granskning 7, M6: en egen variant av kontoplanen eller momsfilen ---
+
+def test_m6_egen_variant_av_kontoplanen_stoppas(tmp_path, konfiguration):
+    # Mut7: med isinstance() i stället för type() släpptes en egen variant av Kontoplan igenom. Den här
+    # är skapad med object.__new__ och svarar som den riktiga kontoplanen, men med ett konto till, så att
+    # regelboken godtar ett konto som inte finns i filen.
+    from las_kontoplan import Kontoplan
+
+    kontoplan, momssatser, matchning = konfiguration
+    riktig = kontoplan
+
+    class EgenKontoplan(Kontoplan):
+        __slots__ = ()
+
+        @property
+        def konton(self):
+            return riktig.konton + [{"nummer": "9999", "namn": "påhittat", "fran": None, "till": None}]
+
+        @property
+        def kontrollsumma(self):
+            return riktig.kontrollsumma
+
+    data = andrad(((R, 0, "kontering", "grupp_a"), "9999"))
+    stoppas(tmp_path, data, konfiguration, "'9999', som inte finns i kontoplanen")
+    with pytest.raises(RegelbokFel, match="kontoplanen ska komma från las_kontoplan, inte vara EgenKontoplan"):
+        las_regelbok(skriv(tmp_path, data), object.__new__(EgenKontoplan), momssatser, matchning)
+
+
+def test_m6_egen_variant_av_momsfilen_stoppas(tmp_path, konfiguration):
+    # Samma sak för momsfilen: en variant med en varugrupp till.
+    from las_momssatser import Momssatser
+
+    kontoplan, momssatser, matchning = konfiguration
+    riktig = momssatser
+
+    class EgnaMomssatser(Momssatser):
+        __slots__ = ()
+
+        @property
+        def kontrollsumma(self):
+            return riktig.kontrollsumma
+
+        def period(self, varugrupp, datum):
+            if varugrupp == "grupp_x":
+                return {"fran": "2024-01-01", "till": None, "sats": 7, "kalla": "påhittad"}
+            return riktig.period(varugrupp, datum)
+
+    data = andrad(((R, 0, "kontering", "grupp_x"), "9001"))
+    stoppas(tmp_path, data, konfiguration, "ingen varugrupp 'grupp_x'")
+    with pytest.raises(RegelbokFel, match="momssatserna ska komma från las_momssatser, inte vara EgnaMomssatser"):
+        las_regelbok(skriv(tmp_path, data), kontoplan, object.__new__(EgnaMomssatser), matchning)
+
+
+# --- Granskning 7, M12: kontoplan, momsfil eller matchningsformat skapade med __new__ ---
+
+@pytest.mark.parametrize("plats, text", [
+    (0, "kontoplanen är tom eller trasig. Den har inte skapats av las_kontoplan."),
+    (1, "momsfilen är tom eller trasig. Den har inte skapats av las_momssatser."),
+    (2, "matchningsformatet är tomt eller trasigt. Det har inte skapats av las_matchningsformat."),
+], ids=["kontoplan", "momsfil", "matchningsformat"])
+def test_m12_tom_konfiguration_ger_ett_tydligt_fel(tmp_path, konfiguration, plats, text):
+    # Förut gav ett objekt utan innehåll (skapat med __new__) ett AttributeError, som inte förklarar något.
+    argument = list(konfiguration)
+    argument[plats] = object.__new__(type(argument[plats]))
+    with pytest.raises(RegelbokFel, match=re.escape("Regelboken kan inte kontrolleras: " + text)):
+        las_regelbok(skriv(tmp_path, bok()), *argument)
+
+
+# --- Granskning 7, M10: en regel som gäller en enda dag ---
+
+def test_m10_regel_som_galler_en_enda_dag_godtas(tmp_path, konfiguration):
+    # Mut3: en regel där giltig_fran och giltig_till är samma dag gäller just den dagen.
+    data = andrad(((R, 0, "villkor", "giltig_fran"), "2025-03-01"), ((R, 0, "villkor", "giltig_till"), "2025-03-01"))
+    regelbok = las(tmp_path, data, konfiguration)
+    assert regelbok.regel_for_underlag("leverantorsfaktura", "MOTPART-A", "2025-03-01")["id"] == "R-1"
+    for datum in ("2025-02-28", "2025-03-02"):
+        assert regelbok.regel_for_underlag("leverantorsfaktura", "MOTPART-A", datum) is None
+
+
+# --- Granskning 7, M7: bankrader mot en ägare eller närstående ---
+
+def test_m7_uppslaget_pekar_ut_agarens_bankrader(tmp_path):
+    # En påhittad bankfil med testbutikens format, läst med las_bankfil, och testbutikens regelbok
+    # (agare_och_narstaende är ["AGARE-1"]). Raderna 1, 3 och 5 är mot ägaren: i beskrivningen, i
+    # referensen och med ett annat bindestreck och små bokstäver. Rad 4 är en annan motpart (AGARE-12),
+    # och rad 2 en vanlig Swish-rad. Rad 1 passar ingen regel i matchningsformatet, men uppslaget gäller
+    # alla bankrader.
+    from las_bank import ladda_bankformat, las_bankfil
+
+    rader = [
+        "Radnummer,Bokföringsdag,Transaktionsdag,Referens,Beskrivning,Belopp,Bokfört saldo",
+        "1,2025-04-01,2025-04-01,UTTAG-1,UTTAG AGARE-1,-500.00,9500.00",
+        "2,2025-04-01,2025-04-01,SWISH-20250401-1,BET-SWISH INBETALNING,100.00,9600.00",
+        "3,2025-04-02,2025-04-02,AGARE-1,OVERFORING,-100.00,9500.00",
+        "4,2025-04-02,2025-04-02,KOP-1,KOP AGARE-12 AB,-50.00,9450.00",
+        "5,2025-04-03,2025-04-03,UTL-1,UTLAGG agare" + chr(0x2013) + "1,-20.00,9430.00",
+    ]
+    fil = tmp_path / "bank.csv"
+    fil.write_text("\n".join(rader) + "\n", encoding="utf-8")
+    period = las_bankfil(fil, ladda_bankformat(TESTBUTIKEN / "bankformat.json"), 1000000, 943000)
+    regelbok = las_testbutikens_regelbok()
+    assert [rad["radnr"] for rad in period.rader if regelbok.ar_bankrad_mot_agare_eller_narstaende(rad)] == [1, 3, 5]
+
+
+def test_m7_inga_av_testdatans_bankrader_i_q1_ar_mot_agaren():
+    # Skydd: ägaren förekommer först från Q2 i testdatan (testforetag/FIKTIVT_FORETAG.md), så inget i Q1
+    # pekas ut. Utan ägare i regelboken pekas ingen bankrad ut alls.
+    from las_bank import ladda_bankformat, las_bankfil
+
+    datamapp = AGENT / "testdata" / "syntet-testbutik" / "2025-Q1"
+    bank = json.loads((datamapp / "facit.json").read_text(encoding="utf-8"))["bank"]
+    regelbok = las_testbutikens_regelbok()
+    antal = 0
+    for manad in ("2025-01", "2025-02"):
+        period = las_bankfil(datamapp / ("bank_" + manad + ".csv"), ladda_bankformat(TESTBUTIKEN / "bankformat.json"),
+                             bank[manad]["ingaende_saldo_ore"], bank[manad]["utgaende_saldo_ore"])
+        antal += len(period.rader)
+        assert not any(regelbok.ar_bankrad_mot_agare_eller_narstaende(rad) for rad in period.rader)
+    assert antal > 100
+
+
+def test_m7_uppslaget_for_bankrader(tmp_path, konfiguration):
+    regelbok = las(tmp_path, bok(agare_och_narstaende=["AGARE-X", "Anna Nilsson"]), konfiguration)
+    ja = [("UTTAG AGARE-X", ""), ("", "AGARE-X"), ("BET agare - x", "R-1"), ("LON ANNA NILSSON", ""),
+          ("KOP ANNANILSSON", ""), ("UTTAG AGARE-X" + chr(0x200B), "")]
+    nej = [("UTTAG AGARE-XY", ""), ("UTTAGAGARE-X", ""), ("ANNA", "NILSSONS"), ("", "")]
+    for beskrivning, referens in ja:
+        assert regelbok.ar_bankrad_mot_agare_eller_narstaende({"beskrivning": beskrivning, "referens": referens}), (
+            beskrivning, referens)
+    for beskrivning, referens in nej:
+        assert not regelbok.ar_bankrad_mot_agare_eller_narstaende({"beskrivning": beskrivning, "referens": referens}), (
+            beskrivning, referens)
+    utan = las(tmp_path, bok(), konfiguration)
+    assert utan.ar_bankrad_mot_agare_eller_narstaende({"beskrivning": "UTTAG AGARE-X", "referens": ""}) is False
+
+
+@pytest.mark.parametrize("rad, text", [
+    (None, "bankraden ska vara ett objekt med nycklar, inte null"),
+    (["UTTAG AGARE-X"], "bankraden ska vara ett objekt med nycklar, inte en lista"),
+    ({"beskrivning": "UTTAG AGARE-X"}, "bankradens 'referens' ska vara text, inte null"),
+    ({"beskrivning": 5, "referens": ""}, "bankradens 'beskrivning' ska vara text, inte heltal"),
+])
+def test_m7_uppslag_med_fel_bankrad_stoppar(tmp_path, konfiguration, rad, text):
+    regelbok = las(tmp_path, bok(agare_och_narstaende=["AGARE-X"]), konfiguration)
+    with pytest.raises(RegelbokFel, match=re.escape("Uppslaget i regelboken: " + text)):
+        regelbok.ar_bankrad_mot_agare_eller_narstaende(rad)

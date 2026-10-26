@@ -82,7 +82,9 @@ from inlasning_skydd import (
 )
 from las_bank import kronor as _kronor
 from las_kassa import normalisera_kassaregister as _normalisera
+from normalisering import blandat_ord as _blandat_ord
 from normalisering import normalisera_for_jamforelse as _jamforbar
+from normalisering import tecken_med_namn as _tecken_med_namn
 
 # Underlagets form. Gemensam för alla företag.
 NYCKLAR = ("id", "typ", "datum", "motpart", "fakturanummer", "belopp_ore", "moms", "flaggor")
@@ -255,34 +257,20 @@ def _kontrollera_text(varde, vad, var, filsort):
     return varde
 
 
-def _tecken_med_namn(tecken):
-    """Ett tecken för ett felmeddelande: koden och namnet, till exempel "U+0410 (CYRILLIC CAPITAL LETTER A)"."""
-    return "U+" + format(ord(tecken), "04X") + " (" + unicodedata.name(tecken, "utan namn") + ")"
-
-
-def _skriftsystem(bokstav):
-    """Skriftsystemet för en bokstav, ur tecknets namn i Unicode: till exempel LATIN, CYRILLIC eller GREEK.
-
-    Python har inget eget sätt att slå upp skriftsystemet. Namnets första ord räcker här: en bokstav
-    vars namn inte börjar med LATIN räknas som ett annat skriftsystem.
-    """
-    return unicodedata.name(bokstav, "").split(" ")[0]
-
-
 def _inga_blandade_ord(text, vad, var, filsort):
     """Inget ord i texten får blanda latinska bokstäver med bokstäver från ett annat skriftsystem (J1).
 
     Texten Unicode-normaliseras först (NFKC), så att till exempel fullbreddsbokstäver räknas som latinska.
+    Samma prövning som regelboken gör (normalisering.blandat_ord).
     """
-    for ord_ in unicodedata.normalize("NFKC", text).split():
-        bokstaver = [tecken for tecken in ord_ if unicodedata.category(tecken).startswith("L")]
-        andra = [tecken for tecken in bokstaver if _skriftsystem(tecken) != "LATIN"]
-        if andra and len(andra) < len(bokstaver):
-            raise filsort.fel(
-                var + ": " + vad + " har ordet " + _visa(ord_) + ", som blandar latinska bokstäver med bokstaven "
-                + _tecken_med_namn(andra[0]) + " från ett annat skriftsystem. En sådan bokstav kan se ut precis som"
-                " en latinsk bokstav och dölja att två underlag är samma (en dublett)."
-            )
+    blandat = _blandat_ord(text)
+    if blandat:
+        ord_, bokstav = blandat
+        raise filsort.fel(
+            var + ": " + vad + " har ordet " + _visa(ord_) + ", som blandar latinska bokstäver med bokstaven "
+            + _tecken_med_namn(bokstav) + " från ett annat skriftsystem. En sådan bokstav kan se ut precis som"
+            " en latinsk bokstav och dölja att två underlag är samma (en dublett)."
+        )
 
 
 def _kontrollera_fakturanumrets_tecken(fakturanummer, var, filsort):

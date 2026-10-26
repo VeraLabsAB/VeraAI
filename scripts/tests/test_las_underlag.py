@@ -1070,6 +1070,14 @@ def test_minustecknet_skrivs_som_kod_i_normaliseringen():
     assert normalisera_for_jamforelse("F" + MINUSTECKEN + "1") == "f-1"
 
 
+@pytest.mark.parametrize("osynligt", [chr(0x034F), chr(0x200B), chr(0xFE00)],
+                         ids=["teckenbindare", "nollbreddsmellanslag", "variantvaljare"])
+def test_m8_osynligt_tecken_mellan_bokstaven_och_accenten(osynligt):
+    # M8 (granskning 7, P20): förut togs det osynliga tecknet bort efter Unicode-normaliseringen, så
+    # "E" och accenten U+0301 sattes aldrig ihop. Texten såg ut som "CAFÉ" men jämfördes som en annan.
+    assert normalisera_for_jamforelse("CAFE" + osynligt + chr(0x0301)) == normalisera_for_jamforelse("CAFÉ") == "café"
+
+
 @pytest.mark.parametrize("tecken", OSYNLIGA_ANDRA.values(), ids=OSYNLIGA_ANDRA.keys())
 def test_k4_dublett_med_tecken_som_ser_tomma_ut_i_motparten(tmp_path, tecken):
     # L2: förut blev "LEV-A" med ett sådant tecken sist (eller som ett eget ord) en annan motpart,

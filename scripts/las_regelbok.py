@@ -28,12 +28,14 @@ Filen ska ha exakt nycklarna i REGELBOK_NYCKLAR, och får ha nycklarna i REGELBO
               2026-10-26). Varje motpart är text och får stå en gång: två motparter som blir samma
               efter normaliseringen (normalisering.py) räknas som samma och stoppar filen. Saknas
               nyckeln är listan tom, och en tom lista godtas. Uppslaget ar_agare_eller_narstaende
-              säger om en motpart står i listan, så att nivåsteget kan använda det
+              säger om en motpart står i listan, och ar_bankrad_mot_agare_eller_narstaende om en
+              motpart i listan står i en bankrad (M7), så att nivåsteget kan använda det
 
 En regel har exakt nycklarna i REGEL_NYCKLAR, och får ha nycklarna i REGEL_VALFRIA_NYCKLAR:
 
   id          regelns fasta id, text. Står i varje förslag. Två id som blir samma efter
-              normaliseringen (normalisering.py) räknas som samma och stoppar filen
+              normaliseringen (normalisering.py) räknas som samma och stoppar filen. Efter
+              normaliseringen får ett id bara ha a–z, siffror och bindestreck (M5)
   galler      vad regeln gäller. Nyckeln kalla säger vilken källa, en av KALLOR, och de andra
               nycklarna beror på källan (KALLOR):
                 underlag   typ (en av las_underlag.TYPER) och motpart
@@ -72,13 +74,20 @@ Regler för regelboken som helhet:
   (Hugos beslut D20).
 - En regel för underlag vars motpart står i agare_och_narstaende (efter normaliseringen) måste
   ha nivå D (K7). Annars stoppas filen.
+- Förväxlingstecken (M5, granskning 7): en motpart (i 'galler' och i agare_och_narstaende) och ett
+  kassaregister får bara ha latinska bokstäver och siffrorna 0–9, efter Unicode-normaliseringen
+  (NFKC). Ett ord som blandar latinska bokstäver med till exempel kyrilliska stoppas som i
+  underlagen, och regelboken är dessutom strängare: ett helt ord i ett annat skriftsystem (till
+  exempel cherokee-bokstäver som ser ut som ett latinskt namn) stoppas också. Konton och
+  varugrupper är redan skyddade: de ska finnas i kontoplanen och momsfilen, där ett konto bara har
+  siffrorna 0–9 och en varugrupp bara a–z, siffror och understreck.
 
 Hela filen stoppas vid minsta fel med ett RegelbokFel: okänd eller saknad nyckel, fel typ (till
 exempel ett decimaltal i ett belopp), ett tomt värde, ett dolt tecken någonstans i filen (även i
 nycklar och anteckningar), en regel som står två gånger eller kan passa samma sak som en annan,
 ett konto som inte finns i kontoplanen, en varugrupp som saknar sats i momsfilen, en motpart som
-står två gånger i agare_och_narstaende, eller en regel för en ägare eller närstående som inte har
-nivå D. Filen läses
+står två gånger i agare_och_narstaende, en regel för en ägare eller närstående som inte har nivå D,
+eller ett förväxlingstecken i ett regel-id, en motpart eller ett kassaregister. Filen läses
 med de gemensamma skydden i inlasning_skydd.py (UTF-8, dubbla nycklar, för djup nästling och för
 långa tal), som de andra formatfilerna.
 
@@ -97,6 +106,8 @@ en bankrad passar.
 
 import datetime as dt
 import hashlib
+import re
+import unicodedata
 from types import MappingProxyType
 
 from inlasning_skydd import (
@@ -109,7 +120,7 @@ from las_matchningsformat import (
 )
 from las_momssatser import Momssatser, MomssatsFel
 from las_underlag import HELTAL_HOGST_SIFFROR, TYPER
-from normalisering import normalisera_for_jamforelse
+from normalisering import andra_skriftsystem, blandat_ord, normalisera_for_jamforelse, star_som_hela_ord, tecken_med_namn
 
 REGELBOK_NYCKLAR = ("foretag", "version", "godkand", "granser", "k9", "oppettider", "regler")
 REGELBOK_VALFRIA_NYCKLAR = ("anteckning", "agare_och_narstaende")
@@ -130,6 +141,13 @@ NIVAER = ("A", "B", "C", "D")
 
 # Det största heltalet i filen, som för talen i underlagen.
 _HOGSTA_TAL = 10 ** HELTAL_HOGST_SIFFROR - 1
+
+# Ett tecken som ett regel-id får innehålla efter normaliseringen för jämförelser (M5): a–z, siffror
+# och bindestreck.
+_REGEL_ID_TECKEN = re.compile(r"[a-z0-9-]", re.ASCII)
+# Nycklarna i 'galler' som är namn på en motpart eller ett kassaregister, och som prövas mot
+# förväxlingstecken (M5). typ och matchningsregel ska vara exakt ett känt namn och prövas så.
+_NAMN_I_GALLER = ("motpart", "kassaregister")
 
 
 class RegelbokFel(Exception):
@@ -209,6 +227,58 @@ def _inga_dubbletter(varden, vad, var):
     return list(varden)
 
 
+def _inga_forvaxlingstecken(namn, vad, var):
+    """Ett namn på en motpart eller ett kassaregister får bara ha latinska bokstäver och siffrorna 0–9 (M5).
+
+    Förväxlingstecken ser ut som latinska bokstäver eller siffror men är andra tecken, till exempel ett
+    kyrilliskt "А" eller cherokee-bokstäver som tillsammans ser ut som ett latinskt namn. Ett sådant namn
+    jämförs som ett annat namn, så att en regel eller en ägare som ser rätt ut på skärmen inte känns
+    igen. Ett ord som blandar latinska och andra bokstäver stoppas som i underlagen (J1). Regelboken är
+    konfiguration och därför strängare än underlagen: där stoppas också ett helt ord i ett annat
+    skriftsystem, och siffror som inte är 0–9. Texten prövas efter Unicode-normaliseringen (NFKC), så
+    att till exempel fullbreddsbokstäver räknas som latinska.
+    """
+    blandat = blandat_ord(namn)
+    if blandat:
+        raise RegelbokFel(
+            var + ": " + vad + " har ordet " + repr(blandat[0]) + ", som blandar latinska bokstäver med bokstaven "
+            + tecken_med_namn(blandat[1]) + " från ett annat skriftsystem. En sådan bokstav kan se ut precis som en"
+            " latinsk bokstav, så att namnet jämförs som ett annat namn än det ser ut att vara."
+        )
+    andra = andra_skriftsystem(namn)
+    if andra:
+        raise RegelbokFel(
+            var + ": " + vad + " har bokstaven " + tecken_med_namn(andra[0]) + ", som inte är en latinsk bokstav."
+            " Bokstäver från andra skriftsystem kan se ut precis som latinska, så att namnet jämförs som ett annat"
+            " namn än det ser ut att vara. Ett namn i regelboken får bara ha latinska bokstäver."
+        )
+    siffror = [tecken for tecken in unicodedata.normalize("NFKC", namn)
+               if unicodedata.category(tecken) == "Nd" and not "0" <= tecken <= "9"]
+    if siffror:
+        raise RegelbokFel(
+            var + ": " + vad + " har siffran " + tecken_med_namn(siffror[0]) + ". Ett namn i regelboken får bara ha"
+            " siffrorna 0–9, eftersom andra siffror kan se ut som dem."
+        )
+    return namn
+
+
+def _regel_id(id_, vad, var):
+    """Ett regel-id får bara ha a–z, siffror och bindestreck, efter normaliseringen för jämförelser (M5).
+
+    Som fakturanumret i underlagen (J1): stora och små bokstäver är samma, blanksteg räknas inte och
+    alla sorters bindestreck räknas som "-". Andra tecken, till exempel ett kyrilliskt "Е", kan få två
+    regler att se ut att ha samma id. Returnerar id:t som det står i filen.
+    """
+    for tecken in id_:
+        if not all(_REGEL_ID_TECKEN.fullmatch(del_) for del_ in normalisera_for_jamforelse(tecken)):
+            raise RegelbokFel(
+                var + ": " + vad + " innehåller tecknet " + tecken_med_namn(tecken) + ". Ett regel-id får bara"
+                " innehålla bokstäverna a–z, siffror och bindestreck. Andra tecken kan se ut som vanliga tecken, så"
+                " att två regler ser ut att ha samma id."
+            )
+    return id_
+
+
 def _kontrollera_oppettider(oppettider, var):
     """Företagets stängda veckodagar och datum (D21). Läses och kontrolleras, men används inte än."""
     _objekt(oppettider, "'oppettider'", var)
@@ -232,6 +302,7 @@ def _kontrollera_agare_och_narstaende(agare, var):
     resultat = []
     for nummer, motpart in enumerate(_lista(agare, vad, var), start=1):
         ny = _text_i_json(motpart, "motpart nummer " + str(nummer) + " i " + vad, var, _REGELBOK)
+        _inga_forvaxlingstecken(ny, "motpart nummer " + str(nummer) + " i " + vad, var)
         for annan in resultat:
             if normalisera_for_jamforelse(annan) == normalisera_for_jamforelse(ny):
                 raise RegelbokFel(
@@ -257,6 +328,8 @@ def _kontrollera_galler(galler, vad, var):
     nytt = {"kalla": kalla}
     for nyckel in KALLOR[kalla]:
         nytt[nyckel] = _text_i_json(galler[nyckel], repr(nyckel) + " i 'galler' i " + vad, var, _REGELBOK)
+        if nyckel in _NAMN_I_GALLER:
+            _inga_forvaxlingstecken(nytt[nyckel], repr(nyckel) + " i 'galler' i " + vad, var)
     if "typ" in nytt and nytt["typ"] not in TYPER:
         raise RegelbokFel(
             var + ": 'typ' i 'galler' i " + vad + " ska vara en av " + ", ".join(map(repr, TYPER)) + ", inte "
@@ -426,7 +499,7 @@ def _kontrollera_regelboksregel(regel, nummer, granser, agare, konton, momssatse
     vad = "regel nummer " + str(nummer)
     _objekt(regel, vad, var)
     _kontrollera_nycklar(regel, REGEL_NYCKLAR, REGEL_VALFRIA_NYCKLAR, var + ", " + vad + ",", _REGELBOK)
-    nytt = {"id": _text_i_json(regel["id"], "'id' i " + vad, var, _REGELBOK)}
+    nytt = {"id": _regel_id(_text_i_json(regel["id"], "'id' i " + vad, var, _REGELBOK), "'id' i " + vad, var)}
     vad = vad + " (" + nytt["id"] + ")"
     nytt["galler"] = _kontrollera_galler(regel["galler"], vad, var)
     nytt["villkor"] = _kontrollera_villkor(regel["villkor"], vad, granser, var)
@@ -480,8 +553,22 @@ def _kontrollera_regelbokens_regler(regler, granser, agare, konton, momssatser, 
     return resultat
 
 
+def _innehallet_i(hamta, vad, funktion, tom="tom eller trasig. Den"):
+    """hamta(), eller ett tydligt fel om objektet saknar sitt innehåll (M12, granskning 7).
+
+    Ett objekt som har skapats förbi sin inläsningsfunktion, till exempel med __new__, saknar sitt
+    innehåll, och då ger Python ett AttributeError i stället för ett fel som förklarar något. tom är
+    meningen i rätt form för vad, till exempel "tomt eller trasigt. Det" för matchningsformatet.
+    """
+    try:
+        return hamta()
+    except AttributeError:
+        raise RegelbokFel("Regelboken kan inte kontrolleras: " + vad + " är " + tom + " har inte skapats av " + funktion
+                          + ".") from None
+
+
 def _konfigurationen(kontoplan, momssatser, matchningsformat):
-    """Kontrollerar indata och returnerar (konton, matchningsreglerna som lista) i den form kontrollerna använder."""
+    """Kontrollerar indata. Returnerar (konton, matchningsreglerna som lista, kontrollsummorna för kontrollerad_mot)."""
     # type() i stället för isinstance(), så att en underklass med egna regler inte släpps igenom.
     if type(kontoplan) is not Kontoplan:
         raise RegelbokFel("Regelboken kan inte kontrolleras: kontoplanen ska komma från las_kontoplan, inte vara "
@@ -493,17 +580,22 @@ def _konfigurationen(kontoplan, momssatser, matchningsformat):
     if type(matchningsformat) is not Matchningsformat:
         raise RegelbokFel("Regelboken kan inte kontrolleras: matchningsformatet ska komma från las_matchningsformat,"
                           " inte vara " + type(matchningsformat).__name__ + ".")
+    konton = _innehallet_i(lambda: {konto["nummer"]: konto for konto in kontoplan.konton}, "kontoplanen",
+                           "las_kontoplan")
+    summor = {"kontoplan": _innehallet_i(lambda: kontoplan.kontrollsumma, "kontoplanen", "las_kontoplan"),
+              "momssatser": _innehallet_i(lambda: momssatser.kontrollsumma, "momsfilen", "las_momssatser"),
+              "matchningsformat": _innehallet_i(lambda: matchningsformat.kontrollsumma, "matchningsformatet",
+                                                "las_matchningsformat", "tomt eller trasigt. Det")}
     try:
         matchning = kontrollera_matchningsformat(matchningsformat.innehall)
     except MatchningsformatFel as fel:
         raise RegelbokFel("Regelboken kan inte kontrolleras: matchningsformatet är fel. " + str(fel)) from None
-    konton = {konto["nummer"]: konto for konto in kontoplan.konton}
-    return konton, matchning["kraver_inte_underlag"]
+    return konton, matchning["kraver_inte_underlag"], summor
 
 
 def _kontrollera_regelbok(data, kontoplan, momssatser, matchningsformat, var):
     """Kontrollerar hela regelboken och returnerar den som ett nytt objekt i den form kärnan använder."""
-    konton, matchningslistan = _konfigurationen(kontoplan, momssatser, matchningsformat)
+    konton, matchningslistan, summor = _konfigurationen(kontoplan, momssatser, matchningsformat)
     matchningsregler = {regel["namn"]: regel for regel in matchningslistan}
     _inga_dolda_tecken_i_json(data, var, _REGELBOK)
     _objekt(data, "filen", var)
@@ -524,8 +616,7 @@ def _kontrollera_regelbok(data, kontoplan, momssatser, matchningsformat, var):
         "regler": _kontrollera_regelbokens_regler(data["regler"], granser, agare, konton, momssatser, matchningsregler,
                                                   var),
         # Filerna regelboken kontrollerades mot, och matchningsformatets regler för bankrader utan underlag.
-        "kontrollerad_mot": {"kontoplan": kontoplan.kontrollsumma, "momssatser": momssatser.kontrollsumma,
-                             "matchningsformat": matchningsformat.kontrollsumma},
+        "kontrollerad_mot": summor,
         "matchningsregler": matchningslistan,
     }
 
@@ -637,6 +728,28 @@ class Regelbok:
             raise RegelbokFel("Uppslaget i regelboken: motpart ska vara text, inte " + _json_typ(motpart) + ".")
         sokt = normalisera_for_jamforelse(motpart)
         return any(normalisera_for_jamforelse(namn) == sokt for namn in self._regelboken["agare_och_narstaende"])
+
+    def ar_bankrad_mot_agare_eller_narstaende(self, rad):
+        """True om en motpart i 'agare_och_narstaende' står i bankradens beskrivning eller referens (K7, M7).
+
+        rad är en bankrad från las_bankfil (en dict eller en MappingProxyType med beskrivning och
+        referens). Motparten ska stå som ett eller flera hela ord, efter normaliseringen för jämförelser
+        (normalisering.star_som_hela_ord). Uppslaget gäller alla bankrader, även de som en regel i
+        matchningsformatet undantar från underlag, så att till exempel ett uttag till ägaren pekas ut
+        oavsett vilken regel det passar. En sådan bankrad ska aldrig få lägre nivå än D. Nivåerna sätts i
+        nivåsteget (DESIGN-regelbok.md avsnitt 7, uppgift 6, och SPEC Ö13).
+        """
+        if not isinstance(rad, (dict, MappingProxyType)):
+            raise RegelbokFel("Uppslaget i regelboken: bankraden ska vara ett objekt med nycklar, inte "
+                              + _json_typ(rad) + ".")
+        texter = []
+        for nyckel in ("beskrivning", "referens"):
+            if not isinstance(rad.get(nyckel), str):
+                raise RegelbokFel("Uppslaget i regelboken: bankradens " + repr(nyckel) + " ska vara text, inte "
+                                  + _json_typ(rad.get(nyckel)) + ".")
+            texter.append(rad[nyckel])
+        return any(star_som_hela_ord(namn, text) for namn in self._regelboken["agare_och_narstaende"]
+                   for text in texter)
 
     def _regel_for(self, galler, datum):
         """Regeln som gäller samma sak på datumet, som en ny kopia, eller None om ingen regel passar."""

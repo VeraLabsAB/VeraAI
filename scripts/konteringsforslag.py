@@ -353,6 +353,19 @@ def _kontrollera_indatans_typer(regelbok, kontoplan, underlagsperiod, bankperiod
         if period is not None and type(period) is not klass:
             raise _fel(_INDATA, vad + " ska komma från " + funktion + " (eller vara None), inte vara "
                        + type(period).__name__ + ".")
+    # Ett objekt av rätt typ som har skapats förbi sin inläsningsfunktion, till exempel med __new__,
+    # saknar sitt innehåll, och då ger Python ett AttributeError i stället för ett fel som förklarar
+    # något (M12, granskning 7).
+    for hamta, vad, funktion in (
+            (lambda: regelbok.kontrollsumma, "regelboken", "las_regelbok"),
+            (lambda: kontoplan.kontrollsumma, "kontoplanen", "las_kontoplan"),
+            (lambda: underlagsperiod is None or underlagsperiod.underlag, "underlagsperioden", "las_underlagsperiod"),
+            (lambda: bankperiod is None or bankperiod.rader, "bankperioden", "las_bankfil eller sla_ihop_bankperioder"),
+            (lambda: kassaperiod is None or kassaperiod.rapporter, "kassaperioden", "las_kassaperiod")):
+        try:
+            hamta()
+        except AttributeError:
+            raise _fel(_INDATA, vad + " är tom eller trasig: den har inte skapats av " + funktion + ".") from None
 
 
 # --- K2 ---

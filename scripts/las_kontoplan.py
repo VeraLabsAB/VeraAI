@@ -21,14 +21,16 @@ Filen ska ha exakt nycklarna i KONTOPLAN_NYCKLAR, och får ha nycklarna i KONTOP
                         den null gäller kontot tills vidare
   roller      ett objekt med exakt rollerna i ROLLER. Varje roll pekar på ett konto i 'konton'.
               Rollen utgaende_moms_per_sats är ett objekt med minst en momssats (som text, till
-              exempel "25") och kontot för utgående moms med den satsen
+              exempel "25") och kontot för utgående moms med den satsen. Ett konto får bara ha en
+              roll, men får vara kontot för utgående moms med flera satser (M12, granskning 7)
   anteckning  fri text för människor. Används inte av koden
 
 Hela filen stoppas vid minsta fel med ett KontoplanFel: okänd eller saknad nyckel, fel typ (till
 exempel ett kontonummer som tal i stället för text), ett tomt värde, ett dolt tecken någonstans i
-filen (även i nycklar och anteckningar), ett konto som står två gånger, eller en roll som pekar på
-ett konto som inte finns. Filen läses med de gemensamma skydden i inlasning_skydd.py (UTF-8, dubbla
-nycklar, för djup nästling och för långa tal), som de andra formatfilerna.
+filen (även i nycklar och anteckningar), ett konto som står två gånger, en roll som pekar på ett
+konto som inte finns, eller ett konto med två olika roller. Filen läses med de gemensamma skydden i
+inlasning_skydd.py (UTF-8, dubbla nycklar, för djup nästling och för långa tal), som de andra
+formatfilerna.
 
 las_kontoplan är den enda offentliga funktionen som läser filen. Den kör alltid alla kontroller och
 returnerar en Kontoplan, som inte går att ändra och bara kan skapas av las_kontoplan. Kontoplanen har
@@ -168,7 +170,27 @@ def _kontrollera_roller(roller, konton, var):
                     " från \"0\" till och med \"" + str(HOGSTA_SATS) + "\", utan nollor först."
                 )
             resultat[roll][sats] = _rollens_konto(konto, vad + " för satsen " + sats, konton, var)
+    _en_roll_per_konto(resultat, var)
     return resultat
+
+
+def _en_roll_per_konto(roller, var):
+    """Ett konto får bara ha en roll (M12, granskning 7).
+
+    Till exempel får bankkontot inte också vara kontot för ingående moms. Samma konto får däremot vara
+    kontot för utgående moms med flera satser, eftersom det är samma roll.
+    """
+    kontots_roll = {}
+    for roll in ROLLER:
+        konton = roller[roll].values() if roll in ROLLER_PER_SATS else [roller[roll]]
+        for konto in konton:
+            annan = kontots_roll.setdefault(konto, roll)
+            if annan != roll:
+                raise KontoplanFel(
+                    var + ": kontot " + repr(konto) + " har både rollen " + repr(annan) + " och rollen " + repr(roll)
+                    + ". Varje roll ska ha ett eget konto, så att till exempel pengar på banken och moms inte"
+                    " bokförs på samma konto."
+                )
 
 
 def _kontrollera_kontoplan(data, var):

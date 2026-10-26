@@ -1209,3 +1209,100 @@ def test_en_kontrollsumma_som_saknas_eller_inte_ar_text_stoppas(kallor, nyckel):
             "'regel' i 'kopplingar' saknar nyckeln '" + nyckel + "'")
     stoppas(kallor, andrat(fakturan, satt("kopplingar", "regel", nyckel, varde=None))(kallor), "indata",
             "'" + nyckel + "' i 'regel' i 'kopplingar' ska vara text, inte None")
+
+
+# --- Granskning 7, M6: en egen variant av regelboken eller kontoplanen ---
+# Varianterna är underklasser skapade med object.__new__. De svarar som testbutikens regelbok och
+# kontoplan, utom på en punkt som släpper igenom ett fel förslag. Med isinstance() i stället för type()
+# (Mut5 och Mut6) skapades förslaget.
+
+def fakturan_pa_representation():
+    """P06b: fakturan SYNT-U-2025-003 med kostnaden på 6071, som regeln R-LEV-TE inte har."""
+    data = fakturan()
+    data["verifikation"]["rader"][0]["konto"] = "6071"
+    return data
+
+
+def test_m6_egen_variant_av_regelboken_stoppas(kallor):
+    from las_regelbok import Regelbok
+
+    riktig = kallor.regelbok
+
+    class EgenRegelbok(Regelbok):
+        """Testbutikens regelbok, men R-LEV-TE bokför på 6071."""
+
+        __slots__ = ()
+
+        def __getattribute__(self, namn):
+            if namn == "regler":
+                regler = riktig.regler
+                for regel in regler:
+                    if regel["id"] == "R-LEV-TE":
+                        regel["kontering"] = {"livsmedel": "6071"}
+                return regler
+            return getattr(riktig, namn)
+
+    stoppas(kallor, fakturan_pa_representation(), "ursprung", "kontot står inte i regeln 'R-LEV-TE'")
+    with pytest.raises(KonteringsforslagFel, match="regelboken ska komma från las_regelbok, inte vara EgenRegelbok"):
+        skapa_konteringsforslag(fakturan_pa_representation(), object.__new__(EgenRegelbok), kallor.kontoplan,
+                                **kallor.perioder())
+
+
+def test_m6_egen_variant_av_kontoplanen_stoppas(kallor):
+    from las_kontoplan import Kontoplan
+
+    riktig = kallor.kontoplan
+
+    class EgenKontoplan(Kontoplan):
+        """Testbutikens kontoplan, men bankkontot 1940 har rollen för leverantörsskulder i stället för bank."""
+
+        __slots__ = ()
+
+        def __getattribute__(self, namn):
+            if namn == "kontots_roller":
+                return lambda nummer: [("leverantorsskulder", None)] if nummer == "1940" else riktig.kontots_roller(nummer)
+            return getattr(riktig, namn)
+
+    # P08: bankkontot ur fakturans belopp_ore stoppas med den riktiga kontoplanen.
+    stoppas(kallor, bankkontot_fran_fakturan(), "ursprung", "rad 1 (konto 1940) är bankkontot")
+    with pytest.raises(KonteringsforslagFel, match="kontoplanen ska komma från las_kontoplan, inte vara EgenKontoplan"):
+        skapa_konteringsforslag(bankkontot_fran_fakturan(), kallor.regelbok, object.__new__(EgenKontoplan),
+                                **kallor.perioder())
+
+
+# --- Granskning 7, M12: regelbok, kontoplan och perioder skapade med __new__ ---
+
+@pytest.mark.parametrize("namn, text", [
+    ("regelbok", "regelboken är tom eller trasig: den har inte skapats av las_regelbok."),
+    ("kontoplan", "kontoplanen är tom eller trasig: den har inte skapats av las_kontoplan."),
+    ("underlagsperiod", "underlagsperioden är tom eller trasig: den har inte skapats av las_underlagsperiod."),
+    ("bankperiod", "bankperioden är tom eller trasig: den har inte skapats av las_bankfil eller sla_ihop_bankperioder."),
+    ("kassaperiod", "kassaperioden är tom eller trasig: den har inte skapats av las_kassaperiod."),
+])
+def test_m12_tomt_objekt_ger_ett_tydligt_fel(kallor, namn, text):
+    # P09: förut gav en Kontoplan skapad med __new__ ett AttributeError, som inte förklarar något.
+    argument = {"regelbok": kallor.regelbok, "kontoplan": kallor.kontoplan, **kallor.perioder()}
+    argument[namn] = object.__new__(type(argument[namn]))
+    with pytest.raises(KonteringsforslagFel, match=re.escape(text)) as fel:
+        skapa_konteringsforslag(fakturan(), **argument)
+    assert fel.value.kontroll == "indata"
+
+
+# --- Granskning 7, M10: den minsta negativa posten i en Z-rapport ---
+
+def test_m10_negativ_post_pa_ett_ore_i_z_rapporten_stoppas(kallor, tmp_path):
+    # Mut4: bara -0,02 kr och lägre stoppades. Samma påhittade Z-rapport som i
+    # test_negativ_post_i_z_rapporten_stoppas, men kontanterna är -0,01 kr.
+    mapp = tmp_path / "kassa"
+    mapp.mkdir()
+    text = (DATAMAPP / "kassa" / "kassa_2025-01-02.csv").read_text(encoding="utf-8")
+    text = text.replace("betalsatt_kontant,,956.00", "betalsatt_kontant,,-0.01")
+    text = text.replace("betalsatt_kort,,4115.00", "betalsatt_kort,,5071.01")
+    (mapp / "kassa_2025-01-02.csv").write_text(text, encoding="utf-8")
+    kassaperiod = las_kassaperiod(mapp, kallor.kassaformat, "2025-01-02", "2025-01-02")
+    data = forslag("2025-01-02", "Kassa Z 1001", [
+        rad("1910", 0, 1, "lika", z("betalsatt_kontant")),
+        rad("1580", 1, 0, "lika", z("betalsatt_kontant")),
+    ], "R-Z-TB-KASSA-1", z_rapporter=[1001])
+    stoppas(kallor, data, "ursprung", "posten 'betalsatt_kontant' är negativ (-0,01 kr)", "returer",
+            kassaperiod=kassaperiod)

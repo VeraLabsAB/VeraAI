@@ -153,13 +153,16 @@ def test_sats_utan_konto_stoppar(tmp_path, sats, meddelande):
 
 
 def test_kontots_roller(tmp_path):
-    kontoplan = las_kontoplan(skriv(tmp_path, roller(leverantorsskulder="0101",
-                                                     utgaende_moms_per_sats={"9": "0707", "7": "0707", "0": "0909"})))
-    assert kontoplan.kontots_roller("0101") == [("bank", None), ("leverantorsskulder", None)]
+    # M12 (granskning 7): ett konto får inte längre ha två olika roller (förut hade 0101 både bank och
+    # leverantorsskulder här). Det prövas i test_m12_konto_med_tva_roller_stoppas. Flera satser på samma konto
+    # för utgående moms är samma roll och godtas.
+    kontoplan = las_kontoplan(skriv(tmp_path, roller(utgaende_moms_per_sats={"9": "0707", "7": "0707", "0": "0909"})))
+    assert kontoplan.kontots_roller("0101") == [("bank", None)]
+    assert kontoplan.kontots_roller("0202") == [("leverantorsskulder", None)]
     assert kontoplan.kontots_roller("0303") == [("ingaende_moms", None)]
     assert kontoplan.kontots_roller("0707") == [("utgaende_moms_per_sats", 7), ("utgaende_moms_per_sats", 9)]
     assert kontoplan.kontots_roller("0909") == [("utgaende_moms_per_sats", 0)]
-    assert kontoplan.kontots_roller("9001") == [] == kontoplan.kontots_roller("0202")
+    assert kontoplan.kontots_roller("9001") == []
     testbutiken = las_kontoplan(KONTOPLAN_FIL)
     assert testbutiken.kontots_roller("1940") == [("bank", None)]
     assert testbutiken.kontots_roller("2621") == [("utgaende_moms_per_sats", 12)]
@@ -356,3 +359,29 @@ def test_sokvag_av_fel_typ_stoppar(sokvag):
 def test_fil_som_saknas_stoppar(tmp_path):
     with pytest.raises(KontoplanFel, match="Kontoplanen saknas"):
         las_kontoplan(tmp_path / "finns_inte.json")
+
+
+# --- Granskning 7: M10 och M12 ---
+
+def test_m10_konto_som_galler_en_enda_dag_godtas(tmp_path):
+    # M10 (Mut1): ett konto där 'fran' och 'till' är samma dag gäller just den dagen.
+    data = plan()
+    data["konton"].append(konto("9002", fran="2025-03-01", till="2025-03-01"))
+    kontoplan = las_kontoplan(skriv(tmp_path, data))
+    assert kontoplan.kontots_namn("9002", "2025-03-01") == "påhittat"
+    for datum in ("2025-02-28", "2025-03-02"):
+        with pytest.raises(KontoplanFel, match="Kontot 9002 gäller inte på " + datum):
+            kontoplan.kontots_namn("9002", datum)
+
+
+@pytest.mark.parametrize("andrat, forsta, andra", [
+    # P18: bankkontot är också ingående moms och leverantörsskulder.
+    ({"leverantorsskulder": "0101", "ingaende_moms": "0101"}, "bank", "leverantorsskulder"),
+    ({"ingaende_moms": "0101"}, "bank", "ingaende_moms"),
+    ({"ingaende_moms": "0707"}, "ingaende_moms", "utgaende_moms_per_sats"),
+    ({"utgaende_moms_per_sats": {"7": "0707", "9": "0202"}}, "leverantorsskulder", "utgaende_moms_per_sats"),
+], ids=["p18_tre_roller", "bank_och_ingaende_moms", "ingaende_och_utgaende_moms", "skulder_och_utgaende_moms"])
+def test_m12_konto_med_tva_roller_stoppas(tmp_path, andrat, forsta, andra):
+    # M12: ett konto med två olika roller är uppenbart fel och stoppas när kontoplanen läses.
+    stoppas(tmp_path, roller(**andrat), "har både rollen " + repr(forsta) + " och rollen " + repr(andra),
+            "Varje roll ska ha ett eget konto")
