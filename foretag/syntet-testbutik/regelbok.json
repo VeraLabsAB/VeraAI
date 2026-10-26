@@ -1,0 +1,92 @@
+{
+  "anteckning": "SYNTETISK regelbok för Syntet Testbutik AB. Konton, varugrupper och gränser är antagna och INTE verifierade av en redovisningskonsult.",
+  "foretag": "syntet-testbutik",
+  "version": 1,
+  "godkand": {"av": "Godkännare 1 (påhittad)", "datum": "2026-10-25"},
+  "granser": {
+    "a_hogst_ore": 2000000,
+    "b_hogst_ore": 4000000
+  },
+  "k9": {"minst_historik": 3, "hogst_procent_av_median": 300, "lagst_procent_av_median": 33},
+  "oppettider": {"stangda_veckodagar": ["sondag"], "stangda_datum": ["2025-01-01", "2025-01-06"]},
+  "regler": [
+    {
+      "id": "R-LEV-TE",
+      "galler": {"kalla": "underlag", "typ": "leverantorsfaktura", "motpart": "LEV-TE"},
+      "kontering": {"livsmedel": "4010"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "A",
+      "anteckning": "Inköp av te för vidareförsäljning."
+    },
+    {
+      "id": "R-LEV-KAFFE",
+      "galler": {"kalla": "underlag", "typ": "leverantorsfaktura", "motpart": "LEV-KAFFE"},
+      "kontering": {"livsmedel": "4010", "ovrigt": "4010"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "A",
+      "anteckning": "Kaffe, och ibland tillbehör på samma faktura (SYNT-U-2025-020 har två momssatser)."
+    },
+    {
+      "id": "R-BUTIK-STAD",
+      "galler": {"kalla": "underlag", "typ": "kvitto", "motpart": "BUTIK-STAD"},
+      "kontering": {"ovrigt": "5460"},
+      "villkor": {"giltig_fran": "2025-01-01", "hogst_belopp_ore": 100000},
+      "niva": "B"
+    },
+    {
+      "id": "R-LEV-FORSAKRING",
+      "galler": {"kalla": "underlag", "typ": "leverantorsfaktura", "motpart": "LEV-FORSAKRING"},
+      "kontering": {"momsfritt": "6310"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "D",
+      "anteckning": "Nivå D tills konsulten har svarat på periodisering och moms (avsnitt 8)."
+    },
+    {
+      "id": "R-RESTAURANG-1",
+      "galler": {"kalla": "underlag", "typ": "kvitto", "motpart": "RESTAURANG-1"},
+      "kontering": {"livsmedel": "6071"},
+      "villkor": {"giltig_fran": "2025-01-01", "avdragsbegransad": true},
+      "niva": "D"
+    },
+    {
+      "id": "R-Z-TB-KASSA-1",
+      "galler": {"kalla": "z_rapport", "kassaregister": "TB-KASSA-1"},
+      "kontering": {
+        "forsaljning": {"livsmedel": "3002", "ovrigt": "3001"},
+        "betalsatt": {"betalsatt_kontant": "1910", "betalsatt_kort": "1580", "betalsatt_swish": "1581"}
+      },
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "B"
+    },
+    {
+      "id": "R-BANK-KORTINLOSEN",
+      "galler": {"kalla": "bankrad", "matchningsregel": "kortinlosen"},
+      "kontering": {"motkonto": "1580", "avgift": "6570"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "C",
+      "anteckning": "Nivå C tills kortinlösarens avgiftsspecifikation finns som underlag (avsnitt 4d)."
+    },
+    {
+      "id": "R-BANK-SWISH",
+      "galler": {"kalla": "bankrad", "matchningsregel": "swish"},
+      "kontering": {"motkonto": "1581"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "B"
+    },
+    {
+      "id": "R-BANK-KONTANT",
+      "galler": {"kalla": "bankrad", "matchningsregel": "kontantinsattning"},
+      "kontering": {"motkonto": "1910"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "B"
+    },
+    {
+      "id": "R-BANK-AVGIFT",
+      "galler": {"kalla": "bankrad", "matchningsregel": "bankavgift"},
+      "kontering": {"kostnad": "6570"},
+      "villkor": {"giltig_fran": "2025-01-01", "hogst_belopp_ore": 25000},
+      "niva": "B",
+      "anteckning": "Inget underlag finns än (Ö11). Därför aldrig nivå A."
+    }
+  ]
+}

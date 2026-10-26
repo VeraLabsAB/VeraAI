@@ -13,7 +13,7 @@ ligger därför här:
   många fält som rubrikraden. Datum och belopp tolkas på samma sätt i alla filer.
 - JSON-formatet: filen läses som UTF-8, dubbla nycklar, för djup nästling och heltal med fler än
   15 siffror stoppas, och nycklar, kolumnnamn och avgränsare kontrolleras.
-- Värden i ett JSON-format (för kontoplanen och momssatserna): dolda tecken var som helst i filen,
+- Värden i ett JSON-format (för kontoplanen, momssatserna och regelboken): dolda tecken var som helst i filen,
   även i nycklar och anteckningar, stoppar filen. Text, heltal och datum kontrolleras med samma
   meddelanden i alla format.
 
@@ -136,12 +136,22 @@ def _ladda_json(sokvag, filsort):
 
     Innehållet är inte kontrollerat. Det gör anroparen, med funktionerna nedan.
     """
+    data, var = _las_jsonfil(sokvag, filsort)
+    return _tolka_json(data, var, filsort), var
+
+
+def _las_jsonfil(sokvag, filsort):
+    """Filens bytes, som de är. Returnerar (bytes, var). Tolkas med _tolka_json.
+
+    Uppdelad från _ladda_json så att en kontrollsumma kan räknas på exakt de bytes som sedan
+    tolkas. Filen läses alltså bara en gång, och kan inte bytas mellan summan och tolkningen.
+    """
     if not _ar_sokvag(sokvag):
         raise filsort.fel(filsort.formatet + " går inte att läsa: " + _sokvagens_typ(sokvag))
     var = filsort.formatet + " i " + str(sokvag)
     try:
         with open(sokvag, "rb") as fil:
-            data = fil.read()
+            return fil.read(), var
     except FileNotFoundError:
         raise filsort.fel(filsort.formatet + " saknas: filen finns inte: " + str(sokvag) + ".") from None
     except IsADirectoryError:
@@ -150,6 +160,10 @@ def _ladda_json(sokvag, filsort):
         raise filsort.fel(
             filsort.formatet + " går inte att läsa: " + str(sokvag) + " (" + (fel.strerror or str(fel)) + ")."
         ) from None
+
+
+def _tolka_json(data, var, filsort):
+    """Tolkar bytes från _las_jsonfil som JSON, med skydden mot dubbla nycklar, långa tal och djup nästling."""
     try:
         innehall = json.loads(data.decode("utf-8-sig"), object_pairs_hook=_inga_dubbla_nycklar,
                               parse_int=_heltal_ur_json)
@@ -168,7 +182,7 @@ def _ladda_json(sokvag, filsort):
             var + " är inte giltigt: för många hakparenteser eller klammerparenteser inuti varandra. "
             + filsort.nivaer + " Filen är troligen trasig."
         ) from None
-    return innehall, var
+    return innehall
 
 
 def _kontrollera_nycklar(data, obligatoriska, valfria, var, filsort):

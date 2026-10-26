@@ -18,13 +18,17 @@ En genväg är en funktion som läser en fil men hoppar över en kontroll:
   delkontrollerna gör var sin del av kontrollerna och hoppar över resten (till exempel överlapp och
   glapp mellan perioder). _KONTOPLANSNYCKEL och _MOMSNYCKEL skapar en Kontoplan eller Momssatser
   med vilket innehåll som helst, och deras inre (_konton, _roller, _varugrupper m.fl.) är det som
-  uppslagen läser.
+  uppslagen läser,
+- las_regelbok: _kontrollera_regelboksregel, _kontrollera_villkor och de andra delkontrollerna gör
+  var sin del av kontrollerna och hoppar över resten (till exempel tvetydiga regler och regler som
+  höjer företagets gränser). _REGELBOKSNYCKEL skapar en Regelbok med vilket innehåll och vilken
+  kontrollsumma som helst, och dess inre (_regelboken, _kontrollsumma) är det som uppslagen läser.
 
 All annan kod ska läsa filer med las_bankfil, las_kassafil, las_kassaperiod,
-las_underlagsperiod, las_kontoplan och las_momssatser, som alltid kör alla kontroller, summera med summa_per_momssats, som bara
+las_underlagsperiod, las_kontoplan, las_momssatser och las_regelbok, som alltid kör alla kontroller, summera med summa_per_momssats, som bara
 tar emot en Kassaperiod, och matcha med matcha_period, som bara tar emot en Bankperiod. Bara inläsningsmodulerna själva (UNDANTAGNA) och testerna får använda
 genvägarna. En ny inläsningsmodul måste läggas till i UNDANTAGNA med flit. las_matchningsformat.py,
-las_kontoplan.py och las_momssatser.py läser JSON-format med de gemensamma skydden och är därför
+las_kontoplan.py, las_momssatser.py och las_regelbok.py läser JSON-format med de gemensamma skydden och är därför
 inläsningsmoduler. matcha_bank.py
 läser inga filer och är inte undantagen: förbudet gäller den som alla andra kärnfiler.
 
@@ -46,16 +50,22 @@ sys.path.insert(0, str(SCRIPTS))
 
 # Filer i scripts/ som får använda genvägarna: inläsningsmodulerna själva.
 UNDANTAGNA = ("las_bank.py", "las_kassa.py", "las_underlag.py", "las_matchningsformat.py", "las_kontoplan.py",
-              "las_momssatser.py", "inlasning_skydd.py")
+              "las_momssatser.py", "las_regelbok.py", "inlasning_skydd.py")
 SKYDDSMODUL = "inlasning_skydd"
-INLASNINGSMODULER = ("las_bank", "las_kassa", "las_underlag", "las_matchningsformat", "las_kontoplan", "las_momssatser")
+INLASNINGSMODULER = ("las_bank", "las_kassa", "las_underlag", "las_matchningsformat", "las_kontoplan", "las_momssatser",
+                     "las_regelbok")
 GENVAGAR = ("_tolka_rader", "_tolka_kassarader", "_las_underlagsfil",
             # Kontoplanens och momsfilens delkontroller, och kontrollerna som ger ett ofryst resultat
             "_kontrollera_kontoplan", "_kontrollera_konton", "_kontrollera_konto", "_kontrollera_roller",
-            "_kontrollera_momssatser", "_kontrollera_perioder", "_kontrollera_period")
-# Nycklarna som skapar en Kontoplan eller Momssatser, och det som ligger i dem.
-KONFIGURATIONENS_INRE = ("_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_status", "_konton", "_roller", "_varugrupper",
-                         "_tolerans_ore_per_rad")
+            "_kontrollera_momssatser", "_kontrollera_perioder", "_kontrollera_period",
+            # Regelbokens delkontroller, och kontrollen som ger ett ofryst resultat
+            "_kontrollera_regelbok", "_kontrollera_regelbokens_regler", "_kontrollera_regelboksregel",
+            "_kontrollera_galler", "_kontrollera_villkor", "_kontrollera_kontering", "_kontrollera_bankradsregel",
+            "_kontrollera_varugrupp", "_kontrollera_granser", "_kontrollera_k9", "_kontrollera_oppettider",
+            "_kontrollera_godkand", "_konfigurationen", "_konto_per_varugrupp")
+# Nycklarna som skapar en Kontoplan, Momssatser eller en Regelbok, och det som ligger i dem.
+KONFIGURATIONENS_INRE = ("_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_REGELBOKSNYCKEL", "_status", "_konton", "_roller",
+                         "_varugrupper", "_tolerans_ore_per_rad", "_kontrollsumma", "_regelboken")
 # Det inre i en Kassaperiod, en Underlagsperiod och en Bankperiod: nyckeln som skapar en (den heter
 # _PERIODNYCKEL i alla tre modulerna), och det som ligger i den.
 PERIODENS_INRE = ("_PERIODNYCKEL", "_rapporter", "_fran_datum", "_till_datum", "_underlag", "_arenden", "_rader",
@@ -225,7 +235,9 @@ def test_i1_de_forbjudna_namnen_hittas():
                  "_utgaende_saldo_ore", "_inga_dolda_tecken_i_json", "_text_i_json", "_heltal_i_json", "_datumtext",
                  "_ar_dolt_tecken", "_json_typ", "_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_konton", "_roller",
                  "_varugrupper", "_status", "_tolerans_ore_per_rad", "_kontrollera_konto", "_kontrollera_period",
-                 "_kontrollera_perioder", "_KONTOPLAN", "_MOMSSATSER"]:
+                 "_kontrollera_perioder", "_KONTOPLAN", "_MOMSSATSER", "_REGELBOKSNYCKEL", "_regelboken",
+                 "_kontrollsumma", "_REGELBOK", "_las_jsonfil", "_tolka_json", "_kontrollera_regelbok",
+                 "_kontrollera_regelboksregel", "_konfigurationen"]:
         assert namn in forbjudna, namn
     # Det som annan kod ska använda är inte förbjudet.
     for namn in ["las_bankfil", "las_kassafil", "las_kassaperiod", "Kassaperiod", "ladda_bankformat",
@@ -236,22 +248,36 @@ def test_i1_de_forbjudna_namnen_hittas():
                  "Bankperiod", "sla_ihop_bankperioder", "rader", "ingaende_saldo_ore", "utgaende_saldo_ore",
                  "las_kontoplan", "Kontoplan", "KontoplanFel", "kontots_namn", "rollens_konto", "utgaende_moms_konto",
                  "konton", "status", "las_momssatser", "Momssatser", "MomssatsFel", "sats", "period", "varugrupper",
-                 "tolerans_ore_per_rad", "ROLLER", "HOGSTA_SATS"]:
+                 "tolerans_ore_per_rad", "ROLLER", "HOGSTA_SATS", "las_regelbok", "Regelbok", "RegelbokFel",
+                 "regel_for_underlag", "regel_for_z_rapport", "regel_for_bankrad", "kontrollsumma", "regler",
+                 "granser", "oppettider", "REGELBOK_NYCKLAR", "KALLOR", "NIVAER"]:
         assert namn not in forbjudna, namn
 
 
 def test_konfigurationens_inre_finns_i_modulerna_och_ar_forbjudet():
-    # Skydd: nycklarna, det inre och delkontrollerna ska verkligen heta så i las_kontoplan.py och
-    # las_momssatser.py. Annars förbjuder testerna namn som ingen använder, medan det verkliga heter något annat.
+    # Skydd: nycklarna, det inre och delkontrollerna ska verkligen heta så i las_kontoplan.py,
+    # las_momssatser.py och las_regelbok.py. Annars förbjuder testerna namn som ingen använder, medan
+    # det verkliga heter något annat.
     import las_kontoplan
     import las_momssatser
+    import las_regelbok
 
-    toppnamn_i_modulerna = toppnamn(SCRIPTS / "las_kontoplan.py") | toppnamn(SCRIPTS / "las_momssatser.py")
-    assert {"_KONTOPLANSNYCKEL", "_MOMSNYCKEL"} <= toppnamn_i_modulerna
-    assert {namn for namn in GENVAGAR if namn.startswith("_kontrollera_")} <= toppnamn_i_modulerna
-    inre = set(las_kontoplan.Kontoplan.__slots__) | set(las_momssatser.Momssatser.__slots__)
-    assert inre | {"_KONTOPLANSNYCKEL", "_MOMSNYCKEL"} == set(KONFIGURATIONENS_INRE)
+    toppnamn_i_modulerna = (toppnamn(SCRIPTS / "las_kontoplan.py") | toppnamn(SCRIPTS / "las_momssatser.py")
+                            | toppnamn(SCRIPTS / "las_regelbok.py"))
+    assert {"_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_REGELBOKSNYCKEL"} <= toppnamn_i_modulerna
+    assert set(GENVAGAR[3:]) <= toppnamn_i_modulerna
+    inre = (set(las_kontoplan.Kontoplan.__slots__) | set(las_momssatser.Momssatser.__slots__)
+            | set(las_regelbok.Regelbok.__slots__))
+    assert inre | {"_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_REGELBOKSNYCKEL"} == set(KONFIGURATIONENS_INRE)
     assert set(KONFIGURATIONENS_INRE) <= forbjudna_namn()
+
+
+def test_regelbokens_alla_delkontroller_ar_forbjudna():
+    # Skydd: varje funktion i las_regelbok.py som kontrollerar en del av filen (namnet börjar med
+    # _kontrollera_) står bland genvägarna. En ny delkontroll måste alltså läggas till med flit.
+    delkontroller = {namn for namn in toppnamn(SCRIPTS / "las_regelbok.py") if namn.startswith("_kontrollera_")}
+    assert len(delkontroller) > 10
+    assert delkontroller <= set(GENVAGAR)
 
 
 def test_i1_underlagets_genvagar_finns_i_modulen():
@@ -331,10 +357,11 @@ def test_inlasningsmodulerna_har_inga_byggstenar_under_offentligt_namn():
     import las_kontoplan
     import las_matchningsformat
     import las_momssatser
+    import las_regelbok
     import matcha_bank
 
     assert offentliga_namn_for_byggstenar([las_bank, las_kassa, las_underlag, las_matchningsformat, matcha_bank,
-                                           las_kontoplan, las_momssatser]) == []
+                                           las_kontoplan, las_momssatser, las_regelbok]) == []
 
 
 def test_kontrollen_hittar_byggstenar_under_offentligt_namn_nar_programmet_kor():
@@ -402,6 +429,9 @@ def projekt(tmp_path):
     (tmp_path / "las_momssatser.py").write_text(
         "from inlasning_skydd import _ladda_json\n_MOMSNYCKEL = object()\ndef las_momssatser(sokvag): ...\n",
         encoding="utf-8")
+    (tmp_path / "las_regelbok.py").write_text(
+        "from inlasning_skydd import _las_jsonfil, _tolka_json\n_REGELBOKSNYCKEL = object()\n"
+        "def las_regelbok(sokvag, kontoplan, momssatser, matchningsformat): ...\n", encoding="utf-8")
     (tmp_path / "inlasning_skydd.py").write_text("def _las_fil(sokvag, filsort): ...\n", encoding="utf-8")
     (tmp_path / "belopp.py").write_text("def tolka_belopp(text): ...\n", encoding="utf-8")
     return tmp_path
@@ -575,12 +605,46 @@ def test_i1_kontrollen_hittar_genvagar_forbi_kontoplanens_och_momsfilens_kontrol
     assert fynd and all(rad.startswith("rapport.py:") for rad in fynd), fynd
 
 
+# Genvägar förbi regelbokens kontroller. las_regelbok.py är undantagen, men förbudet gäller alla andra kärnfiler.
+REGELBOKENS_GENVAGSKOD = {
+    "regelbokens_nyckel": "from las_regelbok import _REGELBOKSNYCKEL\n",
+    "regelbokens_nyckel_attribut": "import las_regelbok as r\nb = r.Regelbok(r._REGELBOKSNYCKEL, '0' * 64, {})\n",
+    "regelbokens_nyckel_getattr": "import las_regelbok\nn = getattr(las_regelbok, '_REGELBOKS' + 'NYCKEL')\n",
+    "regelbokens_inre": "def f(bok):\n    return bok._regelboken\n",
+    "regelbokens_inre_getattr_text": "def f(bok):\n    return getattr(bok, '_regelboken')\n",
+    "regelbokens_kontrollsumma_setattr": "def f(bok):\n    object.__setattr__(bok, '_kontrollsumma', '0' * 64)\n",
+    "regelbokens_kontrollsumma_attribut": "def f(bok):\n    return bok._kontrollsumma\n",
+    "regelbokens_kontroll_utan_frysning": "from las_regelbok import _kontrollera_regelbok\n",
+    "regelbokens_delkontroll": "from las_regelbok import _kontrollera_regelboksregel\n",
+    "regelbokens_delkontroll_attribut": "import las_regelbok\nv = las_regelbok._kontrollera_villkor({}, 'x', {}, 'y')\n",
+    "regelbokens_tvetydighet_hoppas_over": "from las_regelbok import _kontrollera_regelbokens_regler as k\n",
+    "regelbokens_indata_hoppas_over": "import las_regelbok as r\nk = r._konfigurationen(None, None, None)\n",
+    "regelbokens_byggsten": "from las_regelbok import _las_jsonfil\n",
+    "regelbokens_byggsten_tolka": "import las_regelbok\nd = las_regelbok._tolka_json(b'{}', 'x', None)\n",
+    "regelbokens_stjarna": "from las_regelbok import *\n",
+    "nya_byggstenar_for_json_direkt": "from inlasning_skydd import _las_jsonfil, _tolka_json\n",
+}
+
+
+@pytest.mark.parametrize("kod", REGELBOKENS_GENVAGSKOD.values(), ids=REGELBOKENS_GENVAGSKOD.keys())
+def test_i1_kontrollen_hittar_genvagar_forbi_regelbokens_kontroller(projekt, kod):
+    # Skydd: namnen finns verkligen i den riktiga modulen, så att förbudet gäller den verkliga genvägen.
+    assert {"_REGELBOKSNYCKEL", "_kontrollera_regelbok", "_kontrollera_villkor", "_konfigurationen"} <= toppnamn(
+        SCRIPTS / "las_regelbok.py")
+    (projekt / "rapport.py").write_text(kod, encoding="utf-8")
+    fynd = genvagar_i(projekt)
+    assert fynd and all(rad.startswith("rapport.py:") for rad in fynd), fynd
+
+
 @pytest.mark.parametrize("kod", [
     "from las_kontoplan import las_kontoplan, Kontoplan, KontoplanFel, ROLLER\n"
     "plan = las_kontoplan('k.json')\nkonto = plan.rollens_konto('bank', '2025-01-01')\nx = plan.konton\n",
     "from las_momssatser import las_momssatser, MomssatsFel\nsatser = las_momssatser('m.json')\n"
     "sats = satser.sats('grupp', '2025-01-01')\nstatus = satser.status\n",
-], ids=["kontoplan", "momssatser"])
+    "from las_regelbok import las_regelbok, Regelbok, RegelbokFel, KALLOR\n"
+    "bok = las_regelbok('r.json', None, None, None)\nregel = bok.regel_for_underlag('kvitto', 'x', '2025-01-01')\n"
+    "summa = bok.kontrollsumma\ngranser = (bok.granser, bok.k9, bok.oppettider, bok.regler)\n",
+], ids=["kontoplan", "momssatser", "regelbok"])
 def test_i1_kontoplanen_och_momsfilen_las_pa_ratt_satt_slapps_igenom(projekt, kod):
     (projekt / "rapport.py").write_text(kod, encoding="utf-8")
     assert genvagar_i(projekt) == []

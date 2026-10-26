@@ -157,13 +157,35 @@ MATCHNINGSMODULEN = SCRIPTS / "matcha_bank.py"
 UNDERLAGETS_ANVANDARE = (UNDERLAGSMODULEN, MATCHNINGSMODULEN)
 UNDERLAGETS_EGNA_ORD = set(las_underlag.NYCKLAR) | set(las_underlag.MOMSRAD_NYCKLAR)
 
+# Regelbokens nycklar är kärnans egen form för regelboken (las_regelbok.py), gemensam för alla
+# företag. Två av dem råkar också vara namn i testbutikens kassaformat: "datum" (när regelboken
+# godkändes) och "forsaljning" (konteringen av en Z-rapports försäljning). De godtas som
+# textsträngar bara i las_regelbok.py. Vilka ord det är räknas fram ur modulens egna nycklar.
+REGELBOKSMODULEN = SCRIPTS / "las_regelbok.py"
+
+
+def regelbokens_egna_ord():
+    import las_regelbok
+
+    nycklar = set(las_regelbok.GODKAND_NYCKLAR) | set(las_regelbok.KONTERING_Z_NYCKLAR)
+    return nycklar & set(namn_i_kassaformaten())
+
 
 def test_karnan_innehaller_inga_namn_fran_kassaformaten():
     """Kassaformatet hör till företagets konfiguration, inte till kärnan."""
     namn = namn_i_kassaformaten()
-    fynd = kassanamn_i_filer([fil for fil in karnans_filer() if fil not in UNDERLAGETS_ANVANDARE], namn)
+    sarskilda = UNDERLAGETS_ANVANDARE + (REGELBOKSMODULEN,)
+    fynd = kassanamn_i_filer([fil for fil in karnans_filer() if fil not in sarskilda], namn)
     fynd += kassanamn_i_filer(list(UNDERLAGETS_ANVANDARE), namn, KARNANS_EGNA_ORD | UNDERLAGETS_EGNA_ORD)
+    fynd += kassanamn_i_filer([REGELBOKSMODULEN], namn, KARNANS_EGNA_ORD | regelbokens_egna_ord())
     assert not fynd, "Kolumnnamn, postnamn eller kassaregister från kassaformatet i kärnan:\n" + "\n".join(fynd)
+
+
+def test_regelbokens_undantag_galler_bara_tva_nycklar():
+    # Skydd: undantaget för las_regelbok.py är exakt de två nycklarna, och inget annat namn ur kassaformatet.
+    assert REGELBOKSMODULEN in karnans_filer()
+    assert regelbokens_egna_ord() == {"datum", "forsaljning"}
+    assert kassanamn_i_filer([REGELBOKSMODULEN], namn_i_kassaformaten(), KARNANS_EGNA_ORD) != []
 
 
 def test_underlagets_undantag_galler_bara_underlagets_nycklar(tmp_path):
@@ -412,6 +434,56 @@ def test_konto_och_satskontrollerna_hittar_inbyggda_varden(tmp_path):
         "x.py:2 innehåller '1940'", "x.py:3 innehåller '2611'"]
     assert sorted(satser_i_filer([fil], satser_i_momsfilerna())) == [
         "x.py:10 har textsträngen '25'", "x.py:5 har talet 25", "x.py:6 innehåller '12 %'", "x.py:9 har talet 12.0"]
+
+
+# --- Regelboken ---
+
+def namn_i_regelbockerna():
+    """Regel-id, motparter, kassaregister, regler i matchning.json, betalsätt och konton ur alla företags regelbok.json.
+
+    Varugrupperna ur konteringen finns redan i kontrollen av momsfilerna. Källorna och typerna
+    (till exempel "underlag" och "kvitto") och konteringens egna nycklar (till exempel "motkonto")
+    är kärnans ord och tas inte med.
+    """
+    namn = set()
+    for fil in sorted(FORETAG.glob("*/regelbok.json")):
+        for regel in json.loads(fil.read_text(encoding="utf-8"))["regler"]:
+            namn.add(regel["id"])
+            namn.update(varde for nyckel, varde in regel["galler"].items() if nyckel not in ("kalla", "typ"))
+            kontering = regel["kontering"]
+            if regel["galler"]["kalla"] == "z_rapport":
+                namn.update(kontering["betalsatt"])
+                namn.update(kontering["betalsatt"].values())
+                namn.update(kontering["forsaljning"].values())
+            else:
+                namn.update(kontering.values())
+    return sorted(namn)
+
+
+def test_regelbockerna_har_namn_att_soka_efter():
+    # Skydd mot att testet nedan blir grönt för att det inte hittar några namn alls.
+    namn = set(namn_i_regelbockerna())
+    assert {"R-LEV-TE", "R-Z-TB-KASSA-1", "R-BANK-AVGIFT", "LEV-TE", "RESTAURANG-1", "TB-KASSA-1", "bankavgift",
+            "betalsatt_swish", "4010", "6570"} <= namn
+    assert not namn & {"underlag", "kvitto", "leverantorsfaktura", "motkonto", "kostnad", "livsmedel"}
+    assert REGELBOKSMODULEN in karnans_filer()
+
+
+def test_karnan_innehaller_inga_namn_ur_regelbockerna():
+    """Regler, motparter och konton hör till företagets regelbok (SPEC 2), inte till kärnan.
+
+    Namnen söks som hela ord var de än står, även i kommentarer och förklarande text.
+    """
+    fynd = namn_ur_testdatan_i_filer(karnans_filer(), namn_i_regelbockerna())
+    assert not fynd, "Namn ur regelboken i kärnan:\n" + "\n".join(fynd)
+
+
+def test_regelbokskontrollen_hittar_inbyggda_namn(tmp_path):
+    fil = tmp_path / "x.py"
+    fil.write_text('# regeln R-BUTIK-STAD\nif regel["id"] == "R-LEV-KAFFE":\n    pass\nx = "R-LEV-TEX"\n'
+                   'konto = "6071"\n', encoding="utf-8")
+    assert namn_ur_testdatan_i_filer([fil], namn_i_regelbockerna()) == [
+        "x.py:1 innehåller 'R-BUTIK-STAD'", "x.py:2 innehåller 'R-LEV-KAFFE'", "x.py:5 innehåller '6071'"]
 
 
 def test_bankradstext_kontrollen_hittar_inbyggda_texter(tmp_path):
