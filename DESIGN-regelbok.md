@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil), uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) och uppgift 3 (konteringsförslaget med K2 och ursprungskontrollen) i avsnitt 7 är byggda, och granskning 7:s M1 och M2 är rättade (täckningen och ingående och utgående moms, avsnitt 3), liksom M3 och en del av M4 (regeln ska passa förslaget, och kontrollsummor för regelbok, kontoplan, momsfil och matchningsformat, avsnitt 3). Hugos beslut efter uppgift 2 och 3 och efter granskning 7 står i avsnitt 8. Ändrar inget i SPEC.md |
+| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil), uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) och uppgift 3 (konteringsförslaget med K2 och ursprungskontrollen) i avsnitt 7 är byggda, och granskning 7:s M1 och M2 är rättade (täckningen och ingående och utgående moms, avsnitt 3), liksom M3 och en del av M4 (regeln ska passa förslaget, och kontrollsummor för regelbok, kontoplan, momsfil och matchningsformat, avsnitt 3), och M5–M8 och M10–M12 (förväxlingstecken och ägarens bankrader i avsnitt 1, en roll per konto i avsnitt 2, och bankradernas nyckelnamn i avsnitt 3). M9 hör till uppgift 5. Hugos beslut efter uppgift 2 och 3 och efter granskning 7 står i avsnitt 8. Ändrar inget i SPEC.md |
 | Gäller | Steg 4 i arbetsflödet (SPEC avsnitt 4): kontera enligt företagets regelbok, och kontrollerna K2, K5, K8 och K9 |
 | Exempel | Bara Syntet Testbutik AB och testdatan för 2025-Q1. **Allt är SYNTETISKT** |
 
@@ -73,6 +73,15 @@ godkännaren ser vilken regel som användes (SPEC avsnitt 4, steg 4).
 
 - Motparten jämförs efter samma **normalisering** som i K4 och matchningen (`normalisering.py`): stora
   och små bokstäver, blanksteg och osynliga tecken räknas inte.
+- **Förväxlingstecken stoppar regelboken** (granskning 7, M5). En motpart, ett kassaregister och en ägare
+  eller närstående får bara ha latinska bokstäver (även å, ä, ö och é) och siffrorna 0–9. Ett regel-id får
+  bara ha a–z, siffror och bindestreck, efter normaliseringen (som fakturanumret i underlagen). Annars
+  stoppas hela filen. Underlagen stoppar bara ord som blandar latinska och andra bokstäver, men regelboken
+  är konfiguration och stoppar också ett helt ord i ett annat skriftsystem, till exempel cherokee-bokstäver
+  som ser ut som `AGARE`. Konton och varugrupper ska finnas i kontoplanen och momsfilen, där de redan bara
+  får ha 0–9 respektive a–z, siffror och understreck. Kvar är förväxlingar inom de latinska tecknen, till
+  exempel litet L i stället för en etta. De kräver en lista över tecken som liknar varandra (granskning 7,
+  M5) och är inte byggda.
 - **Högst en regel får passa.** Två regler som kan passa samma underlag (samma källa, typ, motpart och
   överlappande datum) stoppar regelboken redan när den läses in, som i `matchning.json`. Om ett underlag
   ändå passar flera regler (till exempel för att motparten står två gånger i en bankrad) blir det ett
@@ -198,6 +207,11 @@ Några saker att lägga märke till:
   ha nivå D, annars stoppas regelboken. Vilka motparter som är ägare eller närstående står i den valfria
   nyckeln `agare_och_narstaende`, en lista med motparter (för testbutiken `["AGARE-1"]`). Motparterna
   jämförs efter samma normalisering som ovan (Hugos beslut 2026-10-26, avsnitt 8).
+- **Bankrader mot en ägare eller närstående** ska aldrig få lägre nivå än D, inte heller när en regel i
+  `matchning.json` undantar raden från underlag (granskning 7, M7). Uppslaget
+  `ar_bankrad_mot_agare_eller_narstaende` pekar ut en bankrad där en motpart i `agare_och_narstaende`
+  står som hela ord i beskrivningen eller referensen, efter normaliseringen. Själva nivån sätts i
+  uppgift 6 (avsnitt 5 och 7, SPEC Ö13).
 
 ---
 
@@ -241,6 +255,9 @@ behövs eftersom kärnan aldrig får ha ett kontonummer i sin kod (SPEC 2).
 
 - Ett konto är text, inte ett tal, så att ett konto som börjar med noll inte förlorar nollan.
 - Varje konto i `roller` och i regelboken måste finnas i `konton`. Annars stoppas filen.
+- Ett konto får bara ha en roll (granskning 7, M12). Bankkontot får till exempel inte också vara kontot
+  för ingående moms. Samma konto får däremot vara kontot för utgående moms med flera satser, eftersom det
+  är samma roll.
 - I version 1 läses kontoplanen ur filen. Enligt SPEC 2.1 ska den senare läsas ur kundens program, och
   då ska de två jämföras.
 - Vilket konto som ska användas för vad är ett **bokföringsmässigt val**. Hugo kan bestämma formatet, men
@@ -329,6 +346,16 @@ människa ska kunna förstå och godkänna den. Exempel: betalningen av leverant
 }
 ```
 
+**Bankradernas nyckelnamn i koden** (granskning 7, M11). Exemplet ovan pekar ut en bankrad med filen och
+radnumret. Koden pekar i stället ut den med bankradens `id`, som `las_bankfil` ger varje rad, eftersom ett
+radnummer bara är unikt inom en fil. De andra nyckelnamnen i exemplen gäller som de står (D17).
+
+| Var | I DESIGN-exemplet | I koden |
+|---|---|---|
+| En källa i `ursprung` | `{"kalla": "bankrad", "fil": …, "radnr": …, "falt": "belopp_ore"}` | `{"kalla": "bankrad", "id": …, "falt": "belopp_ore"}` |
+| `bankrader` i `kopplingar`, i förslaget som byggs | `{"fil": …, "radnr": …, "filens_kontrollsumma": …}` | `{"id": …}` |
+| `bankrader` i `kopplingar`, i det färdiga förslaget | `{"fil": …, "radnr": …, "filens_kontrollsumma": …}` | `{"id": …, "radnr": …, "filens_kontrollsumma": …}`, där radnumret och kontrollsumman kommer från inläsningen |
+
 - **Belopp är heltal i öre**, aldrig flyttal (SPEC 7). En rad har antingen debet eller kredit större än
   noll, aldrig båda, och inget belopp är negativt. Minus visas genom att beloppet står på andra sidan.
 - **`kopplingar`** säger vilka underlag, bankrader, Z-rapporter och vilken regel förslaget bygger på, med
@@ -376,7 +403,8 @@ Körs direkt efter K2, också i Python:
 2. Varje värde pekar på något som verkligen finns i den här körningen: ett underlag i
    underlagsperioden, en bankrad i bankperioden, en post i en Z-rapport i kassaperioden. Funktionen tar
    bara emot perioderna från de enda tillåtna inläsningsfunktionerna (SPEC 7), så att ingen källa kan ha
-   ändrats eller lagts till efter kontrollerna.
+   ändrats eller lagts till efter kontrollerna. Ett objekt som har skapats förbi sin inläsningsfunktion
+   (till exempel med `__new__`) stoppas med ett tydligt fel (granskning 7, M12).
 3. Kontrollen räknar själv om beloppet från källorna med `berakning`, och det ska bli exakt radens belopp.
 4. Varje källa i `ursprung` står också i `kopplingar`, och tvärtom används varje underlag, bankrad och
    Z-rapport i `kopplingar` av minst en rad. Regeln i `kopplingar` finns i regelboken.
@@ -805,6 +833,19 @@ Byggt i ursprungskontrollen (avsnitt 3, punkt 5 och 7):
 2. **Ingående och utgående moms** (punkt 5): kontot för ingående moms tar bara moms ur underlag, och
    kontona för utgående moms bara moms ur Z-rapporter. Sidan prövas inte förrän kreditnotorna är bestämda
    (D16).
+
+**På Hugos uppdrag 2026-10-26, efter granskning 7 (M5–M8 och M10–M12):** rättat enligt uppdraget och
+granskningens förslag (avsnitt 1, 2 och 3, och GRANSKNING.md, tabellen "Rättelserna"). Fyra val gjordes i
+uppgiften och bör bekräftas av Hugo:
+
+1. Regelbokens namn (motpart, kassaregister, ägare och närstående) får bara ha latinska bokstäver och
+   siffrorna 0–9. Det är strängare än underlagen. En leverantör med ett namn i till exempel grekisk skrift
+   behöver en latinsk stavning i regelboken, och ett underlag med det grekiska namnet blir då en ny motpart
+   (ett ärende), vilket är den säkra riktningen.
+2. Ett regel-id får bara ha a–z, siffror och bindestreck, alltså inte understreck eller punkt.
+3. Ett konto får bara ha en roll, utom utgående moms med flera satser på samma konto.
+4. Ägarens bankrader pekas ut när namnet står som hela ord (som när matchningen letar efter en motpart),
+   inte när det står inuti ett längre ord (SPEC Ö13).
 
 Det som Hugo bestämmer gäller bara testföretaget och produktens beteende. För en riktig kund ska varje
 konto, sats och metod komma från kunden och dess redovisningskonsult, och stå som källa i konfigurationen.
