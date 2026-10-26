@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil) och uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) i avsnitt 7 är byggda. Hugos beslut efter uppgift 2 står i avsnitt 8. Ändrar inget i SPEC.md |
+| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil), uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) och uppgift 3 (konteringsförslaget med K2 och ursprungskontrollen) i avsnitt 7 är byggda. Hugos beslut efter uppgift 2 och 3 står i avsnitt 8. Ändrar inget i SPEC.md |
 | Gäller | Steg 4 i arbetsflödet (SPEC avsnitt 4): kontera enligt företagets regelbok, och kontrollerna K2, K5, K8 och K9 |
 | Exempel | Bara Syntet Testbutik AB och testdatan för 2025-Q1. **Allt är SYNTETISKT** |
 
@@ -715,6 +715,17 @@ konfigurationen.
 3. **Testbutikens regelbok.** De två tilläggen till exemplet i avsnitt 1 är godkända: `oppettider` och
    gränsen 25000 öre i `R-BANK-AVGIFT`. Dessutom har den `agare_och_narstaende` med det syntetiska värdet
    `AGARE-1` ur exemplen ovan.
+
+**Hugos beslut 2026-10-26, efter uppgift 3:** tre kontroller i ursprungskontrollen (avsnitt 3), utöver
+punkt 1–5 där, är godkända:
+
+1. **Bankkontot.** En rad på bankkontot (rollen `bank` i kontoplanen) får bara ha bankrader som ursprung,
+   räknade med `lika` eller `summa`, och ska stå på rätt sida: pengar in i debet, pengar ut i kredit.
+2. **Utgående moms.** En rad på ett konto för utgående moms ska ha momsen med kontots egen sats som
+   ursprung.
+3. **Negativa poster i kassan.** En negativ post i en Z-rapport (till exempel en retur) stoppar förslaget.
+   Regeln i avsnitt 3 att ett negativt värde räknas som positivt gäller bara bankrader. Hur returer ska
+   bokföras är inte bestämt (Ö-T22).
 
 Det som Hugo bestämmer gäller bara testföretaget och produktens beteende. För en riktig kund ska varje
 konto, sats och metod komma från kunden och dess redovisningskonsult, och stå som källa i konfigurationen.
