@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil), uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) och uppgift 3 (konteringsförslaget med K2 och ursprungskontrollen) i avsnitt 7 är byggda, och granskning 7:s M1 och M2 är rättade (täckningen och ingående och utgående moms, avsnitt 3). Hugos beslut efter uppgift 2 och 3 och efter granskning 7 står i avsnitt 8. Ändrar inget i SPEC.md |
+| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil), uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) och uppgift 3 (konteringsförslaget med K2 och ursprungskontrollen) i avsnitt 7 är byggda, och granskning 7:s M1 och M2 är rättade (täckningen och ingående och utgående moms, avsnitt 3), liksom M3 och en del av M4 (regeln ska passa förslaget, och kontrollsummor för regelbok, kontoplan, momsfil och matchningsformat, avsnitt 3). Hugos beslut efter uppgift 2 och 3 och efter granskning 7 står i avsnitt 8. Ändrar inget i SPEC.md |
 | Gäller | Steg 4 i arbetsflödet (SPEC avsnitt 4): kontera enligt företagets regelbok, och kontrollerna K2, K5, K8 och K9 |
 | Exempel | Bara Syntet Testbutik AB och testdatan för 2025-Q1. **Allt är SYNTETISKT** |
 
@@ -318,7 +318,8 @@ människa ska kunna förstå och godkänna den. Exempel: betalningen av leverant
     "underlag": [{"id": "SYNT-U-2025-003", "kontrollsumma": "…"}],
     "bankrader": [{"fil": "bank_2025-02.csv", "radnr": 26, "filens_kontrollsumma": "…"}],
     "z_rapporter": [],
-    "regel": {"id": "R-LEV-TE", "regelbokens_kontrollsumma": "…"}
+    "regel": {"id": "R-LEV-TE", "regelbokens_kontrollsumma": "…", "kontoplanens_kontrollsumma": "…",
+              "momsfilens_kontrollsumma": "…", "matchningsformatets_kontrollsumma": "…"}
   },
   "motivering": "Bankraden matchar fakturan SYNT-TE-761 (samma belopp, motpart LEV-TE, inom 40 dagar). Regeln R-LEV-TE.",
   "kontroller": {"K2": "ok", "K3": "ok", "K5": "ej aktuell", "K8": "ok", "K9": "ok"},
@@ -331,7 +332,11 @@ människa ska kunna förstå och godkänna den. Exempel: betalningen av leverant
 - **Belopp är heltal i öre**, aldrig flyttal (SPEC 7). En rad har antingen debet eller kredit större än
   noll, aldrig båda, och inget belopp är negativt. Minus visas genom att beloppet står på andra sidan.
 - **`kopplingar`** säger vilka underlag, bankrader, Z-rapporter och vilken regel förslaget bygger på, med
-  kontrollsumman för varje fil. Ändras en fil efteråt syns det.
+  kontrollsumman för varje fil. Ändras en fil efteråt syns det. `regel` har också kontrollsummorna för de
+  fyra filerna som förslaget är byggt mot: regelboken, kontoplanen, momsfilen och matchningsformatet
+  (granskning 7, M4). Koden som bygger förslaget skriver dem, K2 jämför dem med de inlästa filerna, och
+  förslaget får summorna från de inlästa filerna. Att jämföra dem med en godkänd summa hör till
+  spärrsteget (SPEC Ö12).
 - **`ursprung`** finns på **varje rad**. Det säger vilka värden i källorna beloppet kommer ifrån och hur det
   räknas fram. Bara tre sätt finns:
   - `lika`: beloppet är exakt ett värde ur en källa,
@@ -349,12 +354,18 @@ människa ska kunna förstå och godkänna den. Exempel: betalningen av leverant
 K2 körs i Python på varje förslag, och ett förslag som inte klarar den skapas aldrig (det blir ett fel i
 kärnan, inte ett ärende, eftersom det betyder att koden räknat fel):
 
-1. Verifikationen har minst två rader.
-2. Varje belopp är ett heltal, inte ett sanningsvärde (True eller False räknas annars som 1 och 0 i
+1. Förslaget är byggt mot samma filer som det kontrolleras mot. Kontoplanen är den som regelboken
+   kontrollerades mot (samma kontrollsumma), eftersom regelbokens konton och roller bara betyder något
+   med den kontoplanen. Förslagets fyra kontrollsummor i `regel` är de som regelboken, kontoplanen, och
+   momsfilen och matchningsformatet som regelboken kontrollerades mot, faktiskt har. Kontrollsummorna
+   räknas när filerna läses (`las_regelbok`, `las_kontoplan`, `las_momssatser`, `las_matchningsformat`),
+   på exakt de bytes som sedan kontrolleras (granskning 7, M4).
+2. Verifikationen har minst två rader.
+3. Varje belopp är ett heltal, inte ett sanningsvärde (True eller False räknas annars som 1 och 0 i
    Python), inte negativt och har högst 15 siffror.
-3. På varje rad är exakt ett av `debet_ore` och `kredit_ore` större än noll.
-4. Summan av all debet är lika med summan av all kredit.
-5. Varje konto finns i kontoplanen och gäller på verifikationens datum.
+4. På varje rad är exakt ett av `debet_ore` och `kredit_ore` större än noll.
+5. Summan av all debet är lika med summan av all kredit.
+6. Varje konto finns i kontoplanen och gäller på verifikationens datum.
 
 ### Kontrollen av ursprunget
 
@@ -377,6 +388,13 @@ Körs direkt efter K2, också i Python:
    `summa`, och står på rätt sida: pengar in i debet, pengar ut i kredit.
 7. **Täckningen:** raderna tillsammans använder varje värde i källorna högst en gång per sida, så att inget
    räknas två gånger (se nedan).
+8. **Regeln passar förslaget** (granskning 7, M3). Verifikationens datum ligger inom regelns giltighet
+   (`giltig_fran` till `giltig_till`). Förslaget har minst en källa av det slag regeln gäller (underlag,
+   Z-rapport eller bankrad), och varje sådan källa har just den här regeln i regelboken på verifikationens
+   datum: för ett underlag avgör typen och motparten, för en Z-rapport kassaregistret och för en bankrad
+   regeln i `matchning.json` som raden passar. Varje konto på raderna står i regelns kontering eller är ett
+   **rollkonto** (ett konto som kontoplanen pekar ut för en roll: bankkontot, leverantörsskulderna och
+   momskontona). Punkt 8 körs efter täckningen, så att ett värde som räknas två gånger visas först.
 
 Rollerna slås upp i kontoplanen med `kontots_roller`, så att kärnan inte har något kontonummer i sin kod.
 
@@ -414,7 +432,8 @@ Så här blir det med exemplen och granskning 7:s prov (SYNT-U-2025-003: 14 938,
 | P10, skillnad mellan två underlag | SYNT-U-2025-005 **−1** | | stoppas (a) |
 | Underlaget utan momsen | 14 938,00 av 16 730,56 kr | | stoppas (b) |
 
-Regeln säger inget om vilka konton som används, bara att varje värde räknas en gång. Om en del i en
+Täckningen säger inget om vilka konton som används, bara att varje värde räknas en gång (kontona prövas i
+punkt 8). Om en del i en
 Z-rapport saknas (till exempel kortförsäljningen, som bokförs mot banken senare i flöde 4d) är det
 tillåtet: en Z-rapport kan delas på flera verifikationer, ett underlag kan det inte.
 
