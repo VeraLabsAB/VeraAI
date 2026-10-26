@@ -2273,3 +2273,93 @@ Jag använde listans kommandon och fil-verktygen. Kopior, provfil och mutationer
 5. **M5:** ska regelbokens motparter och kassaregister få samma kontroll av blandade ord som underlagen, och regel-id bara ASCII? Rekommendation: ja.
 6. **M7:** ska bankrader med en ägare i texten kunna slippa underlag? Rekommendation: nej, men det kan vänta till nivåsteget (uppgift 6).
 7. **M6, M8–M12:** tester och små rättelser som kan samlas i en uppgift. M11:s nyckelnamn för bankrader bör Hugo godkänna i efterhand (D17), eller be att DESIGN ändras.
+
+## Åtgärder efter granskning 7 (M1 och M2)
+
+Gjort i en egen session, direkt i projektmappen på main. Uppgiften kom från Hugo, som beslutade: "Ja, M1 och M2 ska rättas innan uppgift 4. Börja i en ny session med en täckningskontroll och separata regler för ingående och utgående moms." Det beslutet är också OK:et att ändra DESIGN-regelbok.md avsnitt 3 och `foretag/README.md` så att de stämmer med koden. Ingen granskares text ovan är ändrad. Regelboken, kontoplanen, testdatan, `foretag/syntet-testbutik/` och `testforetag/` är inte ändrade. M3–M12 är inte rättade.
+
+**Ord som används nedan.** En **del** är det minsta värdet som täckningen räknar: i ett underlag beloppet utan moms eller momsen i en momsrad, i en bankrad hela beloppet, och i en Z-rapport försäljningen utan moms, momsen med en sats eller ett betalsätt. **Med tecken** betyder att det som dras ifrån i en `skillnad` räknas som minus en gång. En **sida** är debet eller kredit.
+
+### Regeln (M1, täckningen)
+
+Ursprungskontrollen har fått en punkt 7, täckningen. Varje källa består av delar:
+
+- ett underlag: `underlag_ore` och `moms_ore` i varje momsrad. `belopp_ore` består av alla underlagets delar (summan av momsraderna, K13),
+- en bankrad: en del,
+- en Z-rapport: försäljningen med en sats är försäljningen utan moms plus momsen med samma sats, momsposten är bara momsdelen, totalsumman är all försäljning, och varje betalsätt är en egen del.
+
+För varje sida räknas hur många gånger varje del används, med tecken. Regeln:
+
+- **a.** Varje del används 0 eller 1 gång i debet, och 0 eller 1 gång i kredit.
+- **b.** På varje sida är det som kommer från ett underlag antingen 0 eller hela `belopp_ore`.
+
+**Prövad mot alla exempel innan den byggdes** (för hand, och sedan med testerna):
+
+| Förslag | Debet | Kredit | Utfall |
+|---|---|---|---|
+| `test_4a_fakturan` | utan moms 1, moms 1 (hela underlaget) | `belopp_ore`: utan moms 1, moms 1 | godtas |
+| `test_4a_betalningen` | underlaget helt | bankraden 1 | godtas |
+| `test_4c_z_1001` | kontant 1, kort 1, Swish 1 | per sats: utan moms 1, moms +1 −1 +1 = 1 | godtas |
+| `test_4d_kortinlosen_med_avgiften_som_skillnad` | bankraden +1 −1 = 0, kort 1 | kort 1 | godtas |
+| `test_4e_bankavgiften` | bankraden 1 | bankraden 1 | godtas |
+| `test_summa_av_flera_bankrader` | bankrad 1: 1, bankrad 2: 1 | Swish 1 | godtas |
+| P01 | moms **2** | `belopp_ore` + moms: moms **2** | stoppas (a, i debet) |
+| P02 | `belopp_ore` + moms: moms **2** | moms **2** | stoppas (a, i debet) |
+| P03 | bankraden **2** | bankraden **2** | stoppas (a, i debet) |
+| P10 | SYNT-U-2025-005 **−1** | SYNT-U-2025-005 **−1** | stoppas (a, i debet) |
+
+Regel a ensam stoppar alla fyra proven. Regel b lades till för ett fel som a inte ser: ett underlag där en del saknas, till exempel fakturan bokförd utan momsraden (leverantörsskulden blir beloppet utan moms). Det är granskarens andra förslag ("det som kommer från ett underlag i debet är lika med underlagets `belopp_ore`"), här för båda sidorna, så att betalningen (underlaget bara i debet) godtas. b gäller inte Z-rapporter, eftersom en Z-rapport delas på flera verifikationer (betalsätten stäms av mot banken i flöde 4d).
+
+### Rättelserna
+
+| Fynd | Rättelse | Test |
+|---|---|---|
+| M1 | **Täckningen** i `_kontrollera_tackning` (`konteringsforslag.py`), som körs sist i ursprungskontrollen (efter kopplingarna). Varje värde (`_Varde`) bär sina delar (`_Del`): `_underlagets_delar` och `_momsradens_del` för underlag, en del för en bankrad och `_z_postens_delar` för Z-rapporter. Posttyperna kommer från kassaformatet (`forsaljning_per_sats`, `moms_per_sats`, `totalsumma`), inga postnamn står i koden. Felet säger sidan, delen, hur många gånger och vilka rader, och förklarar delarna. Beskrivningen överst i filen har regeln | `test_tackningen_stoppar` (7 fall): P01, P02, P03, P10, `underlaget_utan_momsen` (regel b), `z_forsaljningen_med_moms_och_momsen` (försäljningen 12 % med moms på 3002 och momsen dessutom på 2621) och `z_totalsumman_och_forsaljningen` (totalsumman och försäljningen per sats i kredit). Skydd: `test_tackningen_godtar_samma_del_i_debet_och_kredit` (4d och 4e), `test_tackningen_godtar_underlaget_som_skillnad_mellan_beloppet_och_momsen`, `test_tackningen_godtar_totalsumman_mot_betalsatten` |
+| M2 | **Ingående och utgående moms** i `_kontrollera_momskonto`. Kontot för ingående moms (rollen `ingaende_moms`) tar bara `moms_ore` ur en momsrad i ett underlag. Ett konto för utgående moms (rollerna i `utgaende_moms_per_sats`) tar bara en momspost (`moms_per_sats`) ur en Z-rapport, med kontots sats (som förut). `_Varde.moms` säger nu vilken sorts moms värdet är (`"underlag"`, `"z_rapport"` eller None) i stället för bara ja eller nej. Rollerna slås upp med `kontots_roller`, inget konto står i koden | `test_p04_kassans_moms_pa_kontot_for_ingaende_moms_stoppas` (Z 1001 med båda momsraderna på 2641), `test_p05_fakturans_moms_pa_kontot_for_utgaende_moms_stoppas` (fakturans moms på 2621). Meddelandet säger vilken sorts moms kontot är för |
+
+**Dokumentationen.** DESIGN-regelbok.md avsnitt 3: K2-listan (högst 15 siffror, kontot gäller på datumet) och ursprungslistan (punkt 1–7) stämmer nu med koden, och täckningen står med tabellen ovan. Avsnitt 8 har Hugos beslut ordagrant och statusraden nämner rättelsen. `foretag/README.md`: täckningen och momskontona. Undantag: exemplet i DESIGN 3 har fortfarande de gamla nyckelnamnen för bankrader (`fil` och `radnr` i stället för `id`). Det är M11, som väntar på Hugos beslut om D17.
+
+**Beslut som togs i uppgiften (bör bekräftas av Hugo).**
+
+1. **Täckningsregeln** a och b ovan, med delarna som de är beskrivna. Särskilt att b (helt eller inte alls) gäller underlag men inte Z-rapporter.
+2. **Totalsumman räknas som all försäljning** (summan av försäljningens delar), inte som en egen del. Annars kunde totalsumman och försäljningen per sats stå på samma sida utan att täckningen såg det.
+3. **Samma del en gång i debet och en gång i kredit godtas**, som i bankavgiften (4e) där bankraden står på både kostnaden och bankkontot.
+4. **Täckningen körs sist**, efter kopplingarna. Ett förslag som har flera fel visar därför de tidigare felen först (till exempel bankkontot med `skillnad`), som förut.
+5. **Momsen i ett underlag räknas alltid som ingående moms.** I dag är alla underlag inköp (fakturor och kvitton). När kundfakturor kommer (utgående moms ur ett underlag) behöver regeln ändras, och det är ett nytt beslut.
+
+**Medvetet inte rättat.**
+
+- **Sidan på momskontona** prövas inte (ingående moms i debet, utgående i kredit). Det kräver att det är bestämt hur kreditnotor ska bokföras (D16, Ö8).
+- **Täckningen säger inget om konton**, bara att varje värde räknas en gång. Att regeln passar förslaget och att kontona finns i regeln är M3.
+- **Två sätt att dela en Z-rapport.** Betalsätten och försäljningen per sats är två olika uppdelningar av samma totalsumma, och täckningen jämför dem inte med varandra. Att debet och kredit går ihop prövas av K2. Att avräkningskontona går jämnt ut hör till K10.
+- **M3–M12.**
+
+**Så bevisades testerna.** Den nya testfilen kördes mot koden från commit 907dced (före rättelserna) i en kopia utanför projektet (`git archive` och `tar` till scratchpad-mappen): **9 röda och 2 496 gröna**. Alla 9 stopptester (de 7 i `test_tackningen_stoppar` och P04 och P05) fick "DID NOT RAISE", alltså godtog den gamla koden förslagen, vilket är rätt skäl. De 3 skyddstesterna är gröna även mot den gamla koden, vilket är väntat: de visar att den nya kontrollen inte stoppar för mycket.
+
+**Mutationstest.** I en kopia utanför projektet ändrades en ny delkontroll i taget med fil-verktyget, och hela sviten kördes. Efter varje ändring visade `diff` att bara den ändringen fanns. Alla 11 gav minst ett rött test. Efteråt var kopians `scripts/` lika med projektets (`diff -r`, bara `.DS_Store` skiljer).
+
+| Nr | Borttagen eller svagare kontroll (i en kopia) | Röda tester |
+|---|---|---|
+| Mu1 | Regel a: en del får användas 2 gånger per sida | 5 |
+| Mu2 | Regel a: en del får dras ifrån en gång mer än den läggs till | 1 |
+| Mu3 | `skillnad` räknas som plus för alla källor | 6 |
+| Mu4 | Debet och kredit räknas tillsammans, inte var för sig | 20 |
+| Mu5 | Regel b borttagen | 1 |
+| Mu6 | Ett underlags `belopp_ore` är en egen del, inte momsradernas delar | 2 |
+| Mu7 | Försäljningen med en sats är en egen del, inte delad i utan moms och moms | 5 |
+| Mu8 | Totalsumman är en egen del, inte all försäljning | 1 |
+| Mu9 | Kontot för ingående moms godtar all moms (som före M2) | 1 |
+| Mu10 | Ett konto för utgående moms godtar ett underlags moms med rätt sats (som före M2) | 1 |
+| Mu11 | Täckningen körs inte alls | 7 |
+
+En körning gjordes om: när Mu4 skulle återställas träffade fil-verktyget fel ställe (ordet `pass` fanns två gånger), så nästa körning hade både Mu4 och Mu5. Den räknas inte. Mu4 återställdes och Mu5 kördes ensam.
+
+**Kommandon utanför den fasta listan.** Bara för att läsa eller i scratchpad-mappen, och inget av dem ändrade något i projektet:
+
+- **`sed` två gånger, av misstag**, i kommandon som bara läste: `sed -n 1,60p ... | head -0` (gav ett fel och visade inget) och `sed -n '1,0p'` (visade inget). Uppgiften förbjöd `sed`.
+- **`grep` med `--include=*.md`**, som skalet inte kunde tolka (gav ett fel, inget kördes).
+- **Testsviten i kopiorna** kördes inifrån kopian (`cd` till scratchpad-mappen, som 7.1 tillåter), men med projektets Python med hela sökvägen (`/Users/hugolindholmer/VERA/agent/.venv/bin/python`), eftersom `.venv` inte följer med i `git archive`.
+- **Ihopkopplade kommandon** med `&&`, `;` och `|` (till `tar`, `grep`, `tail` och `head`), och `2>&1`. `mkdir -p`, `cp -R` och `tar -x` bara med mål i scratchpad-mappen.
+- Inget `cd` till projektmappen, inget `echo`, ingen `for`-slinga och inget `$(...)`.
+
+Testsviten efter rättelserna: **2 505 passed**, 0 misslyckade (2 493 före, alltså 12 fler).

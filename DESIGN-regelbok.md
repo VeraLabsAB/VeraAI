@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil), uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) och uppgift 3 (konteringsförslaget med K2 och ursprungskontrollen) i avsnitt 7 är byggda. Hugos beslut efter uppgift 2 och 3 står i avsnitt 8. Ändrar inget i SPEC.md |
+| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil), uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) och uppgift 3 (konteringsförslaget med K2 och ursprungskontrollen) i avsnitt 7 är byggda, och granskning 7:s M1 och M2 är rättade (täckningen och ingående och utgående moms, avsnitt 3). Hugos beslut efter uppgift 2 och 3 och efter granskning 7 står i avsnitt 8. Ändrar inget i SPEC.md |
 | Gäller | Steg 4 i arbetsflödet (SPEC avsnitt 4): kontera enligt företagets regelbok, och kontrollerna K2, K5, K8 och K9 |
 | Exempel | Bara Syntet Testbutik AB och testdatan för 2025-Q1. **Allt är SYNTETISKT** |
 
@@ -351,27 +351,75 @@ kärnan, inte ett ärende, eftersom det betyder att koden räknat fel):
 
 1. Verifikationen har minst två rader.
 2. Varje belopp är ett heltal, inte ett sanningsvärde (True eller False räknas annars som 1 och 0 i
-   Python), och inte negativt.
+   Python), inte negativt och har högst 15 siffror.
 3. På varje rad är exakt ett av `debet_ore` och `kredit_ore` större än noll.
 4. Summan av all debet är lika med summan av all kredit.
-5. Varje konto finns i kontoplanen.
+5. Varje konto finns i kontoplanen och gäller på verifikationens datum.
 
 ### Kontrollen av ursprunget
 
 Körs direkt efter K2, också i Python:
 
-1. Varje rad har ett `ursprung` med minst ett värde i `fran`.
+1. Varje rad har ett `ursprung` med minst ett värde i `fran` (exakt ett för `lika`, minst två för `summa`
+   och `skillnad`), och samma värde står inte två gånger på samma rad.
 2. Varje värde pekar på något som verkligen finns i den här körningen: ett underlag i
    underlagsperioden, en bankrad i bankperioden, en post i en Z-rapport i kassaperioden. Funktionen tar
    bara emot perioderna från de enda tillåtna inläsningsfunktionerna (SPEC 7), så att ingen källa kan ha
    ändrats eller lagts till efter kontrollerna.
 3. Kontrollen räknar själv om beloppet från källorna med `berakning`, och det ska bli exakt radens belopp.
 4. Varje källa i `ursprung` står också i `kopplingar`, och tvärtom används varje underlag, bankrad och
-   Z-rapport i `kopplingar` av minst en rad.
-5. En rad på ett momskonto ska ha en momsrad (eller en momspost i Z-rapporten) som ursprung.
+   Z-rapport i `kopplingar` av minst en rad. Regeln i `kopplingar` finns i regelboken.
+5. En rad på ett **momskonto** har bara momsbelopp som ursprung, och rätt sorts moms. På kontot för
+   **ingående moms** (rollen `ingaende_moms`) är det `moms_ore` i en momsrad i ett underlag. På ett konto
+   för **utgående moms** (rollen `utgaende_moms_per_sats`) är det en momspost i en Z-rapport, med kontots
+   egen sats. Sidan (debet eller kredit) prövas inte, eftersom kreditnotor inte är bestämda (D16).
+6. En rad på **bankkontot** (rollen `bank`) har bara bankrader som ursprung, räknade med `lika` eller
+   `summa`, och står på rätt sida: pengar in i debet, pengar ut i kredit.
+7. **Täckningen:** raderna tillsammans använder varje värde i källorna högst en gång per sida, så att inget
+   räknas två gånger (se nedan).
+
+Rollerna slås upp i kontoplanen med `kontots_roller`, så att kärnan inte har något kontonummer i sin kod.
+
+**Täckningen.** Varje källa består av **delar**:
+
+- ett **underlag**: en del per momsrad och fält, `underlag_ore` och `moms_ore`. `belopp_ore` består av
+  alla underlagets delar, eftersom det är summan av momsraderna (K13),
+- en **bankrad**: en del, bankradens belopp,
+- en **Z-rapport**: försäljningen med en sats består av två delar, försäljningen utan moms och momsen med
+  samma sats. Momsposten är bara momsdelen, och totalsumman består av alla försäljningens delar. Ett
+  betalsätt är en egen del.
+
+För debet och för kredit räknas hur många gånger varje del används, med tecken: på en rad som räknas med
+`skillnad` dras källorna efter den första ifrån (minus en gång), annars läggs de till (plus en gång).
+Regeln:
+
+- **a.** Varje del används 0 eller 1 gång i debet, och 0 eller 1 gång i kredit.
+- **b.** På varje sida är det som kommer från ett underlag antingen 0 eller hela `belopp_ore`: underlaget
+  används helt eller inte alls på en sida.
+
+Så här blir det med exemplen och granskning 7:s prov (SYNT-U-2025-003: 14 938,00 kr plus moms 12 %
+1 792,56 kr, att betala 16 730,56 kr):
+
+| Förslag | Debet | Kredit | Utfall |
+|---|---|---|---|
+| 4a fakturan | utan moms 1, moms 1 (= hela underlaget) | `belopp_ore`: utan moms 1, moms 1 | godtas |
+| 4a betalningen | underlaget helt | bankraden 1 | godtas |
+| 4c Z 1001 | kontant 1, kort 1, Swish 1 | försäljning utan moms 1 per sats (skillnad: momsen +1 −1 = 0), moms 1 per sats | godtas |
+| 4d kortinlösen | bankraden +1 −1 = 0, kort 1 | kort 1 | godtas |
+| 4e bankavgiften | bankraden 1 | bankraden 1 | godtas |
+| Swish, summa av två bankrader | bankrad 1: 1, bankrad 2: 1 | Swish 1 | godtas |
+| P01, momsen två gånger | moms **2** | | stoppas (a) |
+| P02, momsen i bruttot och för sig | `belopp_ore` och momsen: moms **2** | | stoppas (a) |
+| P03, samma bankrad två gånger | bankraden **2** | | stoppas (a) |
+| P10, skillnad mellan två underlag | SYNT-U-2025-005 **−1** | | stoppas (a) |
+| Underlaget utan momsen | 14 938,00 av 16 730,56 kr | | stoppas (b) |
+
+Regeln säger inget om vilka konton som används, bara att varje värde räknas en gång. Om en del i en
+Z-rapport saknas (till exempel kortförsäljningen, som bokförs mot banken senare i flöde 4d) är det
+tillåtet: en Z-rapport kan delas på flera verifikationer, ett underlag kan det inte.
 
 Ett förslag som inte klarar ursprungskontrollen skapas inte heller. På så sätt bär varje rad sitt
-ursprung, och ingen siffra i en verifikation kan komma från modellen.
+ursprung, ingen siffra i en verifikation kan komma från modellen, och inget värde räknas två gånger.
 
 ---
 
@@ -726,6 +774,17 @@ punkt 1–5 där, är godkända:
 3. **Negativa poster i kassan.** En negativ post i en Z-rapport (till exempel en retur) stoppar förslaget.
    Regeln i avsnitt 3 att ett negativt värde räknas som positivt gäller bara bankrader. Hur returer ska
    bokföras är inte bestämt (Ö-T22).
+
+**Hugos beslut 2026-10-26, efter granskning 7 (M1 och M2):** "Ja, M1 och M2 ska rättas innan uppgift 4.
+Börja i en ny session med en täckningskontroll och separata regler för ingående och utgående moms."
+Byggt i ursprungskontrollen (avsnitt 3, punkt 5 och 7):
+
+1. **Täckningen** (punkt 7): varje del av en källa används 0 eller 1 gång per sida, räknat med tecken,
+   och ett underlag används helt eller inte alls på varje sida. Den exakta regeln är formulerad i
+   uppgiften och bör bekräftas (GRANSKNING.md, "Åtgärder efter granskning 7").
+2. **Ingående och utgående moms** (punkt 5): kontot för ingående moms tar bara moms ur underlag, och
+   kontona för utgående moms bara moms ur Z-rapporter. Sidan prövas inte förrän kreditnotorna är bestämda
+   (D16).
 
 Det som Hugo bestämmer gäller bara testföretaget och produktens beteende. För en riktig kund ska varje
 konto, sats och metod komma från kunden och dess redovisningskonsult, och stå som källa i konfigurationen.
