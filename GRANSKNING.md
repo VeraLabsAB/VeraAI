@@ -2049,3 +2049,227 @@ Namnet K4c följer K4a och K4b, eftersom det är samma sorts kontroll (dubblette
 **Kommandon utanför den fasta listan.** Av misstag, och bara för att läsa: `.venv/bin/python -B -c` två gånger (för att se Pythons version och Unicode-version, och namnen på cherokee-bokstäverna), `du -sh` en gång (för att se hur stora mapparna var innan de kopierades), `sed -e`/`sed -n`, `uniq -c` och `cut -c` för att korta och räkna felrader, och `echo` i mutationskörningen. `cd` användes till projektmappen, alltid för att köra listans kommandon där, samma misstag som i granskning 5 och 6. Kopiorna gjordes med `git archive`, `tar` och `cp -R` i den tillfälliga mappen, de 20 mutationskopiorna och körningarna med en `for`-slinga, och ändringarna i kopiorna gjordes med fil-verktygen. Inget av det ändrade något i projektet.
 
 Testsviten efter del B: **1 410 passed**, 0 misslyckade (1 346 före, alltså 64 fler).
+
+## Granskning 7: K4c-fixen, kontoplan och momsfil, regelboken och konteringsförslaget
+
+| | |
+|---|---|
+| Datum | 2026-10-26 |
+| Granskad version | commit ce52522 (HEAD). Koden i 5712b60 (K4c och normaliseringen), 5e1af42 (uppgift 1), 82b5e87 och 3368f9e (uppgift 2) och 1c1bdc5 (uppgift 3), och dokumentationen i a232ee7, bb1f601, cead140, b6ad503 och ce52522 |
+| Granskare | Oberoende session som inte sett bygget. Ingen kod, inget test och ingen annan fil än GRANSKNING.md har ändrats |
+| Underlag | CLAUDE.md, SPEC.md (5, 6, 7 och 7.1), DESIGN-regelbok.md (hela), granskning 1–6 ovan, scripts/normalisering.py, inlasning_skydd.py, las_kontoplan.py, las_momssatser.py, las_regelbok.py, las_matchningsformat.py (början), konteringsforslag.py, `git show 5712b60` (las_underlag.py och matcha_bank.py), testerna för allt detta, foretag/README.md och testbutikens konfiguration |
+
+### Viktigt först
+
+Inget av fynden gör att något kan bokföras utan godkännande: inget i koden bokför, och förslaget har inget fält för bokfört eller godkänt. Men två saker rör säkerheten och bör vara kända innan flödena byggs (uppgift 4):
+
+1. **K2 och ursprungskontrollen godkänner förslag där summorna går ihop men momsen eller banken är räknad två gånger** (M1, hög). Det är precis det de ska skydda mot, eftersom flödena i uppgift 4 och 5 ska lita på dem.
+2. **Regelbokens kontrollsumma jämförs inte med något**, och kontoplanen, momsfilen och matchningsformatet har ingen kontrollsumma alls (M4). Agenten kan skriva i `foretag/`, så en ändrad regelbok eller kontoplan syns i dag bara om en människa själv jämför summorna.
+
+### Så gick granskningen till
+
+Allt provande gjordes i en tillfällig mapp utanför projektet. Där lades två rena kopior av HEAD (med `git archive` och `tar`). I den ena skrev jag med fil-verktyget en egen provfil (`test_granskning7_prov.py`) som skriver utfallet av varje prov till en textfil: **GODKÄND** (funktionen släppte igenom det), **STOPPAD** (tydligt fel från kärnan) eller **KRASCH** (annat Python-fel). Provfilen kontrollerar själv att det är kopians kod som körs. I den andra kopian gjorde jag mutationer, och återställde dem efteråt (`diff -r` mot projektets `scripts/` visar inga skillnader utom `.DS_Store`).
+
+**Ord som används nedan.** En **källa** är ett värde som en rad i förslaget räknas fram ur: ett fält i ett underlag, en bankrad eller en post i en Z-rapport. **Ursprungskontrollen** är kontrollen som räknar om varje rads belopp ur dess källor. Ett **rollkonto** är ett konto som kontoplanen pekar ut för en roll, till exempel bankkontot eller kontot för ingående moms. Ett **förväxlingstecken** ser ut som ett annat tecken men är ett annat tecken i datorn, till exempel kyrilliskt А i stället för latinskt A. En **underklass** är en egen variant av en klass, som kan ha samma namn på sina delar men göra något annat. En **mutation** är att i en kopia ta bort eller ändra en kontroll och se om minst ett test blir rött.
+
+Fynden heter **M1–M12**, som Hugo bad om. De ska inte förväxlas med mutationerna M1–M11 i granskning 6. Mina egna mutationer heter här **Mut1–Mut7**.
+
+Allvar: **hög** = kan ge fel bokföring, **medel** = onödig krasch eller otydligt fel (eller fel bokföring som kräver ovanliga omständigheter), **låg** = kosmetiskt eller kräver avsiktligt skriven kod.
+
+### Sammanfattning av fynden
+
+| Nr | Fynd | Allvar |
+|---|---|---|
+| M1 | Samma källa kan användas på flera rader, och källor kan blandas fritt. K2 och ursprungskontrollen godkänner dubbel moms, kostnad med moms plus momsavdrag, samma bankrad två gånger på bankkontot och belopp som är skillnaden mellan två orelaterade fakturor | **Hög** |
+| M2 | Momskontona skiljer inte på ingående och utgående moms. Kassans utgående moms godtas på kontot för ingående moms, och en fakturas ingående moms på kontot för utgående moms | Medel |
+| M3 | Regeln i kopplingarna behöver inte passa förslaget: fel regel, ett konto som regeln inte har och vilket datum som helst godtas | Medel |
+| M4 | Kontrollsumman täcker bara regelboken och jämförs inte med något. Förslaget kan kontrolleras mot en annan kontoplan än den regelboken kontrollerades mot, och ingen ser vilken | Medel |
+| M5 | Regelbokens texter har inget skydd mot förväxlingstecken. En regel för ägaren kan få nivå A, och två regler som ser likadana ut godtas | Medel |
+| M6 | Skyddet mot underklasser av Regelbok och Kontoplan har inget test: tre mutationer gav 0 röda tester | Medel (testlucka) |
+| M7 | Ägarregeln gäller bara regler för underlag. En regel för bankrader med ägarens uttag kan ha nivå B | Låg |
+| M8 | Normaliseringen tar bort osynliga tecken efter Unicode-normaliseringen, så "CAFÉ" och "CAFE" + osynligt tecken + accent blir olika | Låg |
+| M9 | En Z-regels betalsätt och kassaregister kontrolleras inte mot kassaformatet | Låg |
+| M10 | Testluckor vid gränserna: konto och regel för en enda dag, och en Z-post på −0,01 kr | Låg (testlucka) |
+| M11 | Dokumentationen säger mer än koden på fyra ställen, och nyckelnamnen för bankrader skiljer sig från DESIGN (D17) | Låg |
+| M12 | Små saker: krasch med `AttributeError`, flera roller på samma konto, momstolerans utan rimlig gräns | Låg |
+
+### Fynd i detalj
+
+#### M1. Samma källa kan användas på flera rader, och källor kan blandas fritt. Allvar: hög
+
+**Vad som är fel:** ursprungskontrollen räknar om varje rad för sig. Den stoppar en källa som står två gånger på *samma* rad, men inte samma källa på flera rader, och den prövar inte att förslagets rader tillsammans beskriver källan en gång. Därför kan summorna gå ihop (K2) och varje rad räknas fram ur riktiga värden, medan verifikationen ändå är fel.
+
+**Hur det visas:** alla fyra förslagen nedan blev **GODKÄNDA** av `skapa_konteringsforslag` med testbutikens konfiguration och testdatan (SYNT-U-2025-003: 14 938,00 kr plus moms 12 % 1 792,56 kr, att betala 16 730,56 kr).
+
+| Prov | Raderna | Vad som blir fel |
+|---|---|---|
+| P01 | 4010 debet 14 938,00 (`underlag_ore`), 2641 debet 1 792,56 (`moms_ore`), **2641 debet 1 792,56 igen** (`moms_ore`), 2440 kredit 18 523,12 (`summa` av `belopp_ore` och `moms_ore`) | Ingående moms dras av två gånger, och leverantörsskulden blir 1 792,56 kr för stor |
+| P02 | 4010 debet 16 730,56 (`belopp_ore`, alltså med moms), 2641 debet 1 792,56 (`moms_ore`), 2440 kredit 18 523,12 (`summa`) | Momsen är både kostnad och avdrag |
+| P03 | 1940 debet 4 065,62 (bankraden), **1940 debet 4 065,62 igen** (samma bankrad), 1580 kredit 4 065,62 och 1581 kredit 4 065,62 (samma bankrad) | En insättning på banken bokförs två gånger |
+| P10 | 4010 debet och 2440 kredit 7 130,56 kr, båda `skillnad` mellan SYNT-U-2025-003 och SYNT-U-2025-005 | Ett belopp som inte finns i något underlag |
+
+Det svarar på Hugos fråga: **ja, K2 kan godkänna ett förslag där summorna går ihop men momsen är fel.** K2 prövar bara att debet och kredit är lika, och ursprungskontrollen bara att varje rad för sig kan räknas fram. Att momsen stämmer med satsen (K5) är inte byggt än, men P01 och P02 har rätt sats och rätt moms per rad, så K5 som den är beskriven i DESIGN 6 skulle inte heller fånga dem.
+
+**Varför det spelar roll:** i flödena (uppgift 4 och 5) är det koden som räknar fram förslagen, och K2 och ursprungskontrollen är spärren som ska fånga när den koden räknar fel. Ett fel i flödeskoden som tar med momsraden två gånger, eller bruttot i stället för nettot, ser ut som ett godkänt förslag. En människa godkänner förslaget, men hon litar på att "K2: ok, ursprung: ok" betyder att siffrorna hänger ihop.
+
+**Förslag (beslut behövs om exakt regel):** en **täckningskontroll** i ursprungskontrollen: för varje underlag, bankrad och Z-rapport i kopplingarna ska raderna tillsammans använda källans värden så att de går jämnt ut, till exempel att det som kommer från ett underlag i debet är lika med underlagets `belopp_ore`, och att samma värde inte står på två rader på samma sida. Regeln behöver formuleras så att skillnaden i 4d (kortavgiften = kortförsäljningen minus bankraden) fortfarande godtas.
+
+**Förslag på test:** P01, P02, P03 och P10 ska stoppas med kontrollen `ursprung`, medan de fyra exemplen i DESIGN 4 (`test_4a_fakturan`, `test_4a_betalningen`, `test_4c_z_1001`, `test_4d_kortinlosen_med_avgiften_som_skillnad`, `test_4e_bankavgiften`) fortfarande godtas.
+
+#### M2. Momskontona skiljer inte på ingående och utgående moms. Allvar: medel
+
+**Vad som är fel:** `_kontrollera_momskonto` kräver bara att en rad på ett momskonto har *något* momsbelopp som källa. På kontot för ingående moms godtas alla momsbelopp, även Z-rapportens moms (som är utgående moms). På ett konto för utgående moms godtas också ett underlags `moms_ore` (ingående moms), om satsen är samma. Sidan (debet eller kredit) prövas inte heller.
+
+**Hur det visas:**
+
+- P04: Z 1001 med båda momsraderna (454,50 och 344,60 kr) i kredit på **2641 Ingående moms** i stället för 2621 och 2611: **GODKÄND**.
+- P05: fakturan SYNT-U-2025-003 med momsen 1 792,56 kr i debet på **2621 Utgående moms, sats 12**: **GODKÄND**.
+
+Båda ger en fel momsdeklaration, fast varje rad har "rätt" ursprung. Hugos beslut 2 efter uppgift 3 (utgående moms med kontots sats) är uppfyllt, men det täcker bara satsen, inte vilken sorts moms.
+
+**Förslag:** ingående moms bara med `moms_ore` ur ett underlag, utgående moms bara med en momspost ur en Z-rapport (och senare kundfakturor). Om sidan också ska prövas, till exempel ingående moms i debet utom för kreditnotor, är ett beslut (D16 är öppen).
+
+**Förslag på test:** P04 och P05 ska stoppas med kontrollen `ursprung` och ett meddelande som säger vilken sorts moms kontot är för.
+
+#### M3. Regeln i kopplingarna behöver inte passa förslaget. Allvar: medel
+
+**Vad som är fel:** `_kontrollera_kopplingar` prövar bara att regelns id finns i regelboken. Den prövar inte att regeln gäller källan (källa, typ, motpart, kassaregister eller regel i matchningen), att den gäller på verifikationens datum, eller att kontona finns i regelns kontering. Verifikationens datum prövas bara mot kontoplanen.
+
+**Hur det visas:**
+
+- P06a: LEV-TE-fakturan med regeln `R-BANK-AVGIFT` (en regel för bankrader): **GODKÄND**, och förslaget visar `R-BANK-AVGIFT` med regelbokens kontrollsumma.
+- P06b: LEV-TE-fakturan med kostnaden på 6071 Representation, med regeln `R-LEV-TE` som säger 4010: **GODKÄND**.
+- P07: fakturan (daterad 2025-01-07) med verifikationsdatum 2024-06-01 och 2031-12-31: båda **GODKÄNDA**, fast regeln gäller från 2025-01-01.
+
+Godkännaren ser ett regel-id och en kontrollsumma i förslaget och kan tro att regeln har styrt konteringen.
+
+**Förslag:** pröva i `skapa_konteringsforslag` att regeln passar förslagets källor och gäller på datumet (med samma uppslag som `regel_for_underlag` och de andra), och att varje konto antingen står i regelns kontering eller är ett rollkonto. Vilket datum en verifikation ska ha är D14 (öppen), så datumet kan tills vidare prövas mot regelns giltighet och periodens gränser (K6).
+
+**Förslag på test:** P06a, P06b och P07 ska stoppas.
+
+#### M4. Kontrollsumman täcker bara regelboken och jämförs inte med något. Allvar: medel
+
+**Vad som är fel:** regelbokens kontrollsumma räknas rätt (se "inte hittat" nedan), men tre saker gör att en ändring kan gå obemärkt förbi:
+
+1. **Regelbokens innebörd beror på tre andra filer** (kontoplanen, momsfilen och matchningsformatet), som inte har någon kontrollsumma. P15: samma regelbok, men en kontoplan där 4010 heter "Eget uttag" i stället för "Inköp av varor": **samma kontrollsumma**.
+2. **`skapa_konteringsforslag` tar emot kontoplanen för sig**, och inget prövar att det är samma kontoplan som regelboken kontrollerades mot. Förslaget visar inte heller vilken kontoplan som användes. P08: förslaget "1940 debet 16 730,56 ur fakturans `belopp_ore`, 2440 kredit" stoppas med testbutikens kontoplan (bankkontot ska komma från en bankrad), men blir **GODKÄNT** med en annan kontoplan där rollen `bank` är 1910, och testbutikens regelbok. Förslaget har samma kopplingar och samma regelbokssumma i båda fallen.
+3. **Ingen godkänd kontrollsumma finns sparad någonstans** att jämföra med (sökt i `foretag/`, `scripts/`, SPEC och DESIGN). README:s mening "Tills spärrsteget flyttar den till en skyddad mapp är det kontrollsumman som visar om den har ändrats" stämmer bara om en människa jämför summan med en summa hon har sparat själv.
+
+**Varför medel och inte hög:** det kräver att någon (till exempel agenten) skriver en ny kontoplan eller regelbok, och att spärrsteget inte är byggt. Men det är just "spärrtestet ändrad regelbok" i SPEC 7 som ska bygga på summan, och i dag skyddar den mindre än dokumentationen säger.
+
+**Förslag:** låt `Regelbok` komma ihåg kontoplanen (eller dess kontrollsumma), momsfilen och matchningsformatet som den kontrollerades mot, och låt `skapa_konteringsforslag` kräva samma kontoplan. Ge kontoplanen, momsfilen och matchningsformatet egna kontrollsummor, och skriv dem i förslaget. Den godkända summan sparas i spärrsteget på en plats agenten inte kan skriva i.
+
+**Förslag på test:** P08b ska stoppas ("kontoplanen är inte den som regelboken kontrollerades mot"), och ett test att en ändrad kontoplan ger en annan summa i förslaget.
+
+#### M5. Regelbokens texter har inget skydd mot förväxlingstecken. Allvar: medel
+
+**Vad som är fel:** underlagen stoppar ord som blandar latinska och andra bokstäver (granskning 5 och 6), men regelboken gör inte det. `id`, `motpart`, `kassaregister` och `agare_och_narstaende` jämförs bara efter normaliseringen, som inte gör kyrilliska eller cherokee-bokstäver till latinska.
+
+**Hur det visas:** testbutikens regelbok (med `AGARE-1` i `agare_och_narstaende`) och en ny regel för leverantörsfakturor med nivå A:
+
+| Regelns motpart | Utfall |
+|---|---|
+| `AGARE-1` | STOPPAD, ska ha nivå D (rätt) |
+| `АGARE-1` (kyrilliskt А först) | **GODKÄND**, nivå A, `ar_agare_eller_narstaende` säger False |
+| `ᎪᏀᎪᏒᎬ-1` (fem cherokee-bokstäver som ser ut som AGARE) | **GODKÄND**, nivå A, inte ägare |
+| `AGARE-l` (litet L i stället för ettan) | **GODKÄND**, nivå A, inte ägare |
+
+P12: en andra regel med id `R-LEV-TЕ` och motparten `LEV-TЕ` (kyrilliskt Е sist), konto 6071, bredvid den vanliga `R-LEV-TE`: **GODKÄND**. Regelboken har då två regler som ser exakt likadana ut på skärmen men konterar på olika konton.
+
+P22: ett underlag från `ᎪᏀᎪᏒᎬ-1` **godtas** av `las_underlagsperiod` (ett helt ord i ett annat skriftsystem, som L2 i granskning 6), och passar då regeln med nivå A utan att räknas som ägare. Ett underlag med det blandade `АGARE-1` stoppas däremot av underlagets egen kontroll (provat).
+
+**Varför medel:** det kräver en regelbok som någon har skrivit så, men regelboken ligger där agenten kan skriva, och kontrollsumman jämförs inte med något (M4). Det är också precis den sortens ändring som en människa inte ser när hon läser filen.
+
+**Förslag (beslut behövs):** samma kontroll av blandade ord som i underlagen för `motpart`, `kassaregister` och `agare_och_narstaende`, och bara ASCII (vanliga latinska bokstäver, siffror och bindestreck) i regel-id. Ett helt ord i ett annat skriftsystem som ser likadant ut kräver mer (till exempel Unicodes lista över förväxlingsbara tecken), och kan vara ett beslut för senare.
+
+**Förslag på test:** de tre GODKÄNDA raderna i tabellen och P12 ska stoppas.
+
+#### M6. Skyddet mot underklasser av Regelbok och Kontoplan har inget test. Allvar: medel (testlucka)
+
+**Vad som är fel:** koden prövar med `type(...) is` att regelboken och kontoplanen kommer från sina inläsningsfunktioner, "så att en underklass med egna regler inte släpps igenom" (kommentaren i koden). Men bara Bankperioden har ett test för det (`test_underklass_till_perioden_stoppas`).
+
+**Hur det visas:** Mut5–Mut7 (`isinstance` i stället för `type()` för regelboken och kontoplanen i `konteringsforslag.py`, och för kontoplanen i `las_regelbok.py`) gav tillsammans **0 röda tester**. Med en sådan ändring släpps en egen variant av Regelbok igenom, skapad med `object.__new__` och med en egen `regler` eller `kontots_roller`, och då styr den varianten vilka regler och roller som finns. Genvägstestet slår inte larm på en underklass eller på `__new__`.
+
+**Förslag på test:** en underklass av `Regelbok`, `Kontoplan` och `Momssatser` (skapad med `object.__new__`) ska stoppas av både `las_regelbok` och `skapa_konteringsforslag`.
+
+#### M7. Ägarregeln gäller bara regler för underlag. Allvar: låg
+
+**Hur det visas:** P13: ett matchningsformat med regeln `agaruttag` (pengar ut, beskrivningen börjar med `UTTAG AGARE-1`, högst 10 000 kr) och en regel i regelboken för den med nivå B: **GODKÄND**. Kontrollen för ägare tittar bara på `galler.motpart` i regler för underlag, och en regel för bankrader har ingen motpart.
+
+K7 säger "Ägare och närstående: alltid ärende". Det kräver två konfigurationsfiler skrivna så, därför låg. **Beslut behövs:** ska en regel för bankrader vars text i matchningsformatet innehåller en ägare stoppas, eller ska sådana bankrader aldrig kunna slippa underlag? **Förslag på test:** P13 ska stoppas, om Hugo beslutar så.
+
+#### M8. Normaliseringens ordning. Allvar: låg
+
+**Vad som är fel:** `normalisera_for_jamforelse` gör först Unicode-normaliseringen (NFKC, som bland annat sätter ihop "E" och en accent till "É") och tar bort osynliga tecken **efteråt**. Står ett osynligt tecken mellan bokstaven och accenten sätts de inte ihop, och när tecknet sedan tas bort blir texten "E" + accent för sig.
+
+**Hur det visas:** P20: `CAFE` + U+034F + U+0301, `CAFE` + U+200B + U+0301 och `CAFE` + U+FE00 + U+0301 blir alla `cafe` + U+0301, medan `CAFÉ` blir `café`. De ser likadana ut men jämförs som olika. Följden är i dag i den säkra riktningen (ingen regel passar, och det blir "ny motpart"), utom att en ägare skriven så inte känns igen av `ar_agare_eller_narstaende`, och att K4 ser två olika motparter (K4c fångar det om fakturanumret är samma).
+
+**Förslag:** gör NFKC en gång till efter att tecknen har tagits bort. **Förslag på test:** de tre texterna ovan ska normaliseras till samma som `CAFÉ`.
+
+#### M9. En Z-regels betalsätt och kassaregister kontrolleras inte mot kassaformatet. Allvar: låg
+
+**Hur det visas:** P14: testbutikens Z-regel med betalsättet `betalsatt_kortt` (felstavat) och kassaregistret `TB-KASSA-9` (finns inte i kassaformatet): **GODKÄND**. `las_regelbok` tar inte emot kassaformatet, så felet syns först när en Z-rapport ska konteras, eller aldrig om regeln inte används. DESIGN 1 säger att betalsätten har "betalsättets postnamn i kassaformatet". **Förslag:** låt `las_regelbok` också ta emot kassaformatet, eller låt uppgift 5 stoppa en Z-rapport vars betalsätt saknar konto. **Förslag på test:** P14 ska stoppas.
+
+#### M10. Testluckor vid gränserna. Allvar: låg (testlucka)
+
+| Nr | Fil | Ändring (i en kopia) | Röda tester |
+|---|---|---|---|
+| Mut1 | las_kontoplan.py | Ett konto som gäller en enda dag (`fran` = `till`) stoppas | **0** |
+| Mut2 | las_momssatser.py | En period som gäller en enda dag stoppas | 2 |
+| Mut3 | las_regelbok.py | En regel som gäller en enda dag stoppas | **0** |
+| Mut4 | konteringsforslag.py | En Z-post på −0,01 kr godtas (bara −0,02 kr och lägre stoppas) | **0** |
+
+Mut1–Mut4 kördes i samma körning (två röda tester, båda i `test_las_momssatser.py`). Mut1 och Mut3 gör kontrollen strängare, så luckan är bara att "en dag godtas" inte är låst. Mut4 gör kontrollen svagare: testet för negativa Z-poster använder −100,00 kr. **Förslag på test:** ett konto och en regel med `fran` = `till` godtas, och en Z-post på −0,01 kr stoppas.
+
+#### M11. Dokumentationen. Allvar: låg
+
+- **Nyckelnamnen för bankrader skiljer sig från DESIGN.** DESIGN 3 har källan `{"kalla": "bankrad", "fil": ..., "radnr": ..., "falt": ...}` och kopplingen `{"fil", "radnr", "filens_kontrollsumma"}`. Koden har `id` (bankradens id från `las_bankfil`) i stället för `fil` och `radnr`, och kopplingen har `id`, `radnr` och `filens_kontrollsumma`. Hugos beslut D17 säger att "filformaten och nyckelnamnen i exemplen gäller". Ändringen är rimlig, men den står inte i DESIGN, README eller commit-texten.
+- **README, konteringsförslaget:** "Så kan ingen siffra komma från modellen." Det stämmer för varje enskild siffra, men vilka källor som kombineras väljs fritt (M1).
+- **README, regelboken:** "är det kontrollsumman som visar om den har ändrats" säger mer än koden gör (M4).
+- **DESIGN 1:** "En regels beloppsgräns får bara vara **lägre** än företagets gräns". Koden (och SPEC, README och D20) godtar en lika stor gräns (P17: 4 000 000 godtas, 4 000 001 stoppas). Koden är rätt enligt D20, men DESIGN 1 bör säga "inte högre".
+- **DESIGN 3, ursprunget punkt 5** säger inte att ingående och utgående moms är olika (M2).
+
+#### M12. Små saker. Allvar: låg
+
+- **Krasch i stället för tydligt fel.** P09: en `Kontoplan` skapad med `Kontoplan.__new__` (utan kontrollerna) ger `AttributeError: _konton` i `skapa_konteringsforslag`, inte ett `KonteringsforslagFel`. Inget släpps igenom, men meddelandet förklarar inget. Samma sak gäller troligen `Regelbok.__new__`.
+- **Flera roller på samma konto.** P18: en kontoplan där `bank`, `ingaende_moms` och `leverantorsskulder` alla är 1940 godtas. Det släpper inget igenom (en rad på 1940 måste då både vara en bankrad och ett momsbelopp, så varje sådan rad stoppas), men filen är uppenbart fel och borde stoppas när den läses.
+- **Momstoleransen.** P19: `moms_tolerans_ore_per_rad` 999 999 999 999 999 öre godtas. K5 är inte byggd än, men med ett så stort värde gör K5 ingenting. En rimlig övre gräns är ett beslut (D4 är öppen).
+
+### Det jag granskade och inte hittade något i
+
+- **K4c-fixen (5712b60).** Koden stämmer med SPEC K4c och åtgärdsavsnittet: samma belopp och datum, och samma motpart eller samma fakturanummer men inte båda, ger ett ärende med lägst id i `jamfort_med`, och båda underlagen behålls. K4a och K4b går före K4c. Fakturanumret avgör inte längre mellan kandidater med samma datum. `_OSYNLIGA_ANDRA` är skrivet med koder. Utöver M8 hittade jag inget nytt.
+- **Kontrollsumman räknas på rätt bytes.** `las_regelbok` läser filen en gång (`_las_jsonfil`), räknar SHA-256 på just de bytes, och tolkar samma bytes. Filen kan inte bytas mellan summan och kontrollerna. Dubbla nycklar stoppas, så en fil kan inte tolkas på två sätt. Ett mellanslag, en radbrytning eller en BOM i början ger en annan summa, vilket är den säkra riktningen. Inget annat läser regelboken igen senare.
+- **Flyttal.** Inget flyttal tar sig in. Alla tal i kontoplanen, momsfilen, regelboken och förslaget prövas med `type(...) is int`, så decimaltal, `True` och `False` stoppas. P16: `NaN`, `Infinity`, `1.0` och `1e0` i regelboken stoppas med "inte decimaltal". I förslaget stoppas decimaltal i belopp, Z-nummer och satser.
+- **Ändringsbara objekt.** `Regelbok`, `Kontoplan`, `Momssatser` och `Konteringsforslag` går inte att ändra genom sina offentliga delar, och det som lämnas ut är nya kopior (testerna visar det). Förslaget kopieras innan något kontrolleras, och bara vanliga `dict`, listor, text och tal godtas (en egen variant av `dict` stoppas). Förslagets innehåll ligger utanför objektet, så ett förslag skapat med `object.__new__` går inte att läsa. Det som återstår kräver de förbjudna inre namnen, som genvägstestet stoppar i kärnan.
+- **Gränserna.** En regels `hogst_belopp_ore` över B-gränsen stoppas, lika med godtas (P17). En regel för bankrader med pengar ut måste ha en gräns, och den får inte vara högre än matchningsformatets. En regel för bankrader med nivå A stoppas. A-gräns över B-gräns stoppas. Utöver M5 och M7 hittade jag inget sätt för en regel att höja en gräns eller för en ägare att få lägre nivå än D.
+- **Dolda tecken i konfigurationen.** Kontoplanen, momsfilen och regelboken stoppar alla tecken som normaliseringen tar bort, även de milda riktningsmärkena, och även i nycklar och anteckningar, som SPEC 7 kräver. Förslagets texter gör samma sak.
+- **Generalitetsregeln.** Inga företagsnamn, konton, varugrupper, momssatser, Z-nummer eller testdatanamn i koden i `scripts/` (sökt med `grep`). Ord som "kortinlösen", "Swish", "momsfritt" och "SYNTETISK" står bara i beskrivningar, som allmänna begrepp eller exempel. `test_karnan_ar_generell.py` söker också i de nya filerna.
+- **Säkerhetsprincipen.** Förslaget har inget fält för bokfört eller godkänt, och okända nycklar som `bokford` och `godkand` stoppas. Inget i de granskade filerna skriver till en fil. Att regelboken, kontoplanen och momsfilen läses från `foretag/`, där agenten kan skriva, är känt och hör till spärrsteget (SPEC 7, DESIGN), men se M4.
+- **Tomma tester och tester som testar sig själva.** 83 testfunktioner har ingen egen `assert` eller `pytest.raises`. Alla i testfilerna för kontoplanen, momsfilen, regelboken, förslaget och underlagen anropar en hjälpfunktion (`stoppas`) som har det. De övriga (i `test_las_kassa.py`, och `test_inga_otillatna_tecken_godtar_tabb_och_radslut` i `test_inlasning_skydd.py`) prövar bara att ett anrop inte ger fel, vilket är meningen med dem. Jag hittade inget test som bara jämför ett värde med sig självt. Jag läste hela `test_konteringsforslag.py` och stopptabellen i `test_las_regelbok.py`.
+
+### Testsviten
+
+Kommando: `.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests`
+
+Resultat: **2 493 passed**, 0 misslyckade, i projektet och i den rena kopian. Det stämmer med commit 1c1bdc5. I provkopian, med min provfil: 2 516 passed (provfilen slår inte larm, utom kontrollen att kopians kod körs). `git status` visade inga ändrade filer innan det här avsnittet skrevs.
+
+### Kommandon
+
+Jag använde listans kommandon och fil-verktygen. Kopior, provfil och mutationer låg bara i den tillfälliga mappen. Avvikelser, alla bara för att läsa, och inget av dem ändrade något i projektet:
+
+- **`sed` två gånger, av misstag:** `sed -n 1,80p ... | head -0` (gav ett fel och visade inget) och `sed -n '' /dev/null` (gjorde ingenting).
+- **`cd` till projektets mapp `scripts/tests` en gång, av misstag**, i ett kommando som bara läste med `grep`. Både SPEC 7.1 och Hugos uppgift förbjuder det. Efter det stod arbetsmappen kvar där, och jag använde hela sökvägar.
+- **Testsviten mot kopiorna kördes inte inifrån kopian**, som SPEC 7.1 säger, eftersom Hugo skrev "inget cd". I stället kördes listans kommando från projektmappen (senare från `scripts/tests`) med kopians sökväg i stället för `scripts/tests`, och med Pythons hela sökväg. `-B` och `-p no:cacheprovider` gör att inget skrivs. Provfilen kontrollerade att det var kopians kod som kördes.
+- **`git -C <projektmappen>`** framför `git log`, `git show` och `git status`, för att peka ut projektet.
+- **Ihopkopplade kommandon** med `;` och `|` (till `grep`, `tail`, `head` och `wc`), och `2>&1` och `2>/dev/null`.
+- `mkdir -p`, `tar -x` och `git archive -o` bara med mål i den tillfälliga mappen. Inget `echo`, inga `for`-slingor och inget `$(...)`.
+
+### Beslut som behövs från Hugo
+
+1. **M1 (hög):** ska ursprungskontrollen få en täckningskontroll, så att varje underlag, bankrad och Z-rapport används så att det går jämnt ut och inget värde står två gånger på samma sida? Rekommendation: ja, innan uppgift 4. Den exakta regeln behöver formuleras så att kortavgiften i 4d fortfarande går igenom.
+2. **M2:** ska kontot för ingående moms bara ta moms ur underlag, och kontona för utgående moms bara moms ur Z-rapporter? Rekommendation: ja, samtidigt som M1.
+3. **M3:** ska `skapa_konteringsforslag` pröva att regeln passar källorna och datumet, och att kontona finns i regeln eller är rollkonton? Rekommendation: ja, som en del av uppgift 4.
+4. **M4:** ska regelboken komma ihåg kontoplanen, momsfilen och matchningsformatet den kontrollerades mot, och få förslaget deras kontrollsummor? Rekommendation: ja. Var den godkända summan sparas hör till spärrsteget.
+5. **M5:** ska regelbokens motparter och kassaregister få samma kontroll av blandade ord som underlagen, och regel-id bara ASCII? Rekommendation: ja.
+6. **M7:** ska bankrader med en ägare i texten kunna slippa underlag? Rekommendation: nej, men det kan vänta till nivåsteget (uppgift 6).
+7. **M6, M8–M12:** tester och små rättelser som kan samlas i en uppgift. M11:s nyckelnamn för bankrader bör Hugo godkänna i efterhand (D17), eller be att DESIGN ändras.
