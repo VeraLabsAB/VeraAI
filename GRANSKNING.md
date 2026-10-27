@@ -2374,3 +2374,236 @@ En körning gjordes om: när Mu4 skulle återställas träffade fil-verktyget fe
 - Inget `cd` till projektmappen, inget `echo`, ingen `for`-slinga och inget `$(...)`.
 
 Testsviten efter rättelserna: **2 505 passed**, 0 misslyckade (2 493 före, alltså 12 fler).
+
+## Granskning 8: rättelserna av granskning 7, M5–M8 och M10–M12
+
+| | |
+|---|---|
+| Datum | 2026-10-26 |
+| Granskad version | commit 3f0e2da (HEAD). Koden i 9e0462e och dokumentationen i 35d74bb |
+| Granskare | Oberoende session som inte sett bygget. Ingen kod, inget test och ingen annan fil än GRANSKNING.md har ändrats |
+| Underlag | CLAUDE.md, SPEC.md (5, 6, 7, 7.1 och Ö13), DESIGN-regelbok.md (status, 1, 2, 3 och 8), granskning 7 med tabellen "Rättelserna", `git show 9e0462e` och `git show 35d74bb`, scripts/normalisering.py, las_regelbok.py (förväxlingstecknen, uppslaget för bankrader och `_konfigurationen`), las_kontoplan.py (`_en_roll_per_konto`), konteringsforslag.py (`_kontrollera_indatans_typer`), inlasning_skydd.py (`_ar_dolt_tecken`), las_matchningsformat.py (`matchningsregel_for_bankrad`), testerna för M5–M8 och M12, och testbutikens konfiguration |
+
+### Viktigt först
+
+Inget av fynden gör att något kan bokföras utan godkännande: inget i koden bokför, och nivåerna sätts inte än. Men två saker gör att **M5 inte är helt stängt**, och båda går hela vägen från underlag till regel:
+
+1. **Osynliga tecken som inte räknas som dolda** (N1, medel). Fyra sorters tecken syns inte på skärmen men stoppas inte av kontrollen av dolda tecken, varken i regelboken eller i underlagen. En regel för `AGARE-1` + ett sådant tecken med nivå A godtas, ett underlag från samma motpart godtas utan ärende, och ägaren känns inte igen.
+2. **Tecken som ser ut som bindestreck eller ettor** (N2, medel). Regelbokens kontroll prövar bara bokstäver och siffror. Skiljetecken och symboler som ser ut som "-", och några latinska bokstäver som ser ut som "1", godtas. Samma sak som i punkt 1 händer då, fast tecknet syns.
+
+Dessutom pekar uppslaget för ägarens bankrader (M7) inte ut en rad där namnet står med ett skiljetecken intill, till exempel `UTTAG AGARE-1/LAN`, fast en regel i matchningsformatet undantar raden från underlag (N3). Det används inte än, men det är just det uppslaget som SPEC Ö13 bygger på.
+
+### Så gick granskningen till
+
+Allt provande gjordes i scratchpad-mappen, utanför projektet. Där lades tre rena kopior med `git archive` och `tar`: **prov** (HEAD), **gammal** (d87aacf, före rättelserna) och **mut** (HEAD, för mutationer). Testsviten kördes med listans kommando från projektmappen, med kopians sökväg.
+
+I prov-kopian skrev jag med fil-verktyget en provfil (`test_granskning8_prov.py`) som skriver utfallet av varje prov till en textfil: **GODKÄND** (funktionen släppte igenom det) eller **STOPPAD** (tydligt fel från kärnan). Provfilen kontrollerar först att det är kopians kod som körs (den gör det). Den jämför också den gamla och den nya koden tecken för tecken, genom att läsa in de gamla filerna ur gammal-kopian.
+
+**Ord som används nedan.** Ett **förväxlingstecken** ser ut som en latinsk bokstav, en siffra eller ett bindestreck men är ett annat tecken i datorn. Ett **dolt tecken** är ett tecken som inte syns, och som regelboken, kontoplanen och momsfilen stoppar (`_ar_dolt_tecken` i `inlasning_skydd.py`). Ett **kombinerande tecken** är ett tecken som läggs ovanpå bokstaven före, till exempel en accent. Ett **ej tilldelat** tecken är en kod som Unicode inte har gett något tecken än. **NFKC** är den Unicode-normalisering som gör till exempel fullbreddsbokstäver till vanliga. En **mutation** är att i en kopia ändra en kontroll och se om minst ett test blir rött.
+
+Fynden heter **N1–N7**. Mina mutationer heter **Mt1–Mt10**.
+
+Allvar som i granskning 7: **hög** = kan ge fel bokföring, **medel** = onödig krasch eller otydligt fel, eller fel bokföring som kräver ovanliga omständigheter, **låg** = kosmetiskt eller kräver avsiktligt skriven kod.
+
+### Sammanfattning av fynden
+
+| Nr | Fynd | Allvar |
+|---|---|---|
+| N1 | Fyra sorters osynliga tecken räknas inte som dolda. En regel för ägaren med ett sådant tecken får nivå A, och underlaget godtas utan ärende | Medel |
+| N2 | Regelbokens förväxlingskontroll prövar bara bokstäver och siffror. Skiljetecken och symboler som ser ut som bindestreck, och latinska bokstäver som ser ut som en etta, godtas. SPEC och DESIGN säger "bara latinska bokstäver och siffrorna 0–9" | Medel |
+| N3 | Uppslaget för ägarens bankrader missar namnet med ett skiljetecken intill, och en regel i matchningsformatet kan undanta just de raderna | Låg i dag, medel när nivåsteget byggs |
+| N4 | Den extra normaliseringen (M8) slår också ihop fristående accenttecken med bokstaven före, och `star_som_hela_ord` normaliserar inte orden tillsammans | Låg |
+| N5 | SPEC 7.1: skälet för att `cd` inte används stämmer inte med vad granskning 7 såg, och listan säger inget om ihopkopplade kommandon, om att läsa i kopior eller om provfiler i kopian | Låg (dokumentation) |
+| N6 | GRANSKNING.md, åtgärderna efter granskning 7: tre meningar stämmer inte längre, och M9 saknas i tabellen | Låg (dokumentation) |
+| N7 | Regelbokens egna uppslag på ett objekt skapat med `__new__` ger fortfarande `AttributeError` | Låg |
+
+### Fynd i detalj
+
+#### N1. Fyra sorters osynliga tecken räknas inte som dolda. Allvar: medel
+
+**Vad som är fel:** `_ar_dolt_tecken` räknar ett tecken som dolt om normaliseringen tar bort det. Normaliseringen tar bort blanksteg, styrtecken (Cc), formattecken (Cf) och listan `_OSYNLIGA_ANDRA`. Men Unicode har fler tecken som inte syns ("default ignorable", tecken som ska ritas som ingenting), och de tas inte bort:
+
+- U+17B4 och U+17B5, två khmeriska vokaltecken som är osynliga (kategori Mn, kombinerande tecken),
+- U+2065, ej tilldelat, i samma block som riktningstecknen,
+- U+FFF0–U+FFF8, ej tilldelade,
+- U+E0000, U+E0002–U+E001F, U+E0080–U+E00FF och U+E01F0–U+E0FFF, ej tilldelade.
+
+Listan är Unicodes egen lista över tecken som inte ska synas, minus de tecken som kärnan redan tar bort. Provat: U+17B4, U+17B5, U+2065, U+FFF0 och U+E0080. Pythons Unicode-version här är 13.0.0.
+
+**Hur det visas:** testbutikens regelbok (med `AGARE-1` i `agare_och_narstaende`) och en ny regel `R-AGARE-X` för leverantörsfakturor med nivå A:
+
+| Prov | Regelns motpart | Regelboken | Underlag från samma motpart (`las_underlagsperiod`) |
+|---|---|---|---|
+| Q08 | `AGARE-1` + U+17B4 | **GODKÄND**, nivå A, `ar_agare_eller_narstaende` säger False | **godtas**, 0 ärenden, passar `R-AGARE-X` med nivå A |
+| Q09 | `AGA` + U+17B5 + `RE-1` | **GODKÄND**, som Q08 | **godtas**, som Q08 |
+| Q10 | `AGARE-1` + U+2065 | **GODKÄND**, som Q08 | **godtas**, som Q08 |
+| Q11 | `AGARE-1` + U+FFF0 | **GODKÄND**, som Q08 | **godtas**, som Q08 |
+| Q12 | `AGARE-1` + U+E0080 | **GODKÄND**, som Q08 | **godtas**, som Q08 |
+
+Samma tecken i `agare_och_narstaende` (till exempel `["AGARE-1" + U+17B4]`) godtas också, och då kan regeln för det vanliga `AGARE-1` ha nivå A. En andra regel `R-LEV-TE-2` för motparten `LEV-TE` + U+17B4 med konto 6071 godtas bredvid `R-LEV-TE`: två regler för motparter som ser likadana ut, men id:na skiljer sig synligt (ett regel-id med U+17B4 stoppas, eftersom id:t bara får ha a–z, siffror och bindestreck).
+
+Kontrollen: ogham-mellanslaget U+1680, som ser ut som ett streck, stoppas som dolt tecken (Q04). Det är bara tecknen ovan som slinker igenom.
+
+**Varför medel:** det är samma sak som M5, fast tecknet inte syns alls. Det kräver en regelbok som någon har skrivit så, och regelboken ligger där agenten kan skriva (M4, Ö12). Ett underlag med tecknet men en ärlig regelbok blir en ny motpart (ett ärende), alltså den säkra riktningen, men ägaren känns inte igen och raden får nivå C i stället för D.
+
+Bristen gäller hela definitionen av dolda tecken (granskning 6, L2), inte bara M5: kontoplanen, momsfilen, regelboken, underlagen, normaliseringen och testet `test_inga_dolda_tecken.py` (som söker i koden) har samma lista.
+
+**Förslag:** räkna alla "default ignorable"-tecken som dolda, plus alla ej tilldelade tecken (kategori Cn) och kombinerande tecken som inte syns. Det enklaste är att låta normaliseringen ta bort kategori Cn och de två khmeriska tecknen, och att lägga till dem i testets lista.
+
+**Förslag på test:** Q08–Q12 ska stoppas i regelboken, och underlaget med samma motpart ska normaliseras till `agare-1` (eller stoppas).
+
+#### N2. Förväxlingskontrollen prövar bara bokstäver och siffror. Allvar: medel
+
+**Vad som är fel:** `_inga_forvaxlingstecken` prövar tre saker: blandade ord, bokstäver från andra skriftsystem och siffror som inte är 0–9. Allt som inte är en bokstav eller en siffra godtas, till exempel skiljetecken, symboler och kombinerande tecken. SPEC 7, DESIGN 1 och beskrivningen i `las_regelbok.py` säger att ett namn "bara får ha latinska bokstäver och siffrorna 0–9", vilket är mer än koden gör. Koden måste släppa igenom vissa tecken, till exempel `&` i `Café Ölund & Söner AB` (testet `test_m5_latinska_namn_godtas`), men det står inte vilka.
+
+**Hur det visas:** samma prov som i N1, med tecknet i regelns motpart:
+
+| Prov | Regelns motpart | Tecknet | Utfall |
+|---|---|---|---|
+| Q05 | `AGARE˗1` | U+02D7 MODIFIER LETTER MINUS SIGN (en symbol) | **GODKÄND**, nivå A, inte ägare. Underlaget godtas och passar regeln |
+| Q06 | `AGARE⁃1` | U+2043 HYPHEN BULLET (ett skiljetecken) | **GODKÄND**, som Q05 |
+| Q07 | `AGARE─1` | U+2500 BOX DRAWINGS LIGHT HORIZONTAL (en symbol) | **GODKÄND**, som Q05 |
+| Q14 | `AGARE-׀` | U+05C0 HEBREW PUNCTUATION PASEQ (ser ut som ett lodrätt streck) | **GODKÄND** |
+| Q13 | `AGARE-ǀ` | U+01C0 LATIN LETTER DENTAL CLICK (en latinsk bokstav som är ett lodrätt streck) | **GODKÄND** |
+| Q19 | `AGARE-ı` | U+0131 LATIN SMALL LETTER DOTLESS I | **GODKÄND** |
+| Q18 | `ᴀGARE-1` | U+1D00 LATIN LETTER SMALL CAPITAL A | **GODKÄND** |
+| Q15, Q20 | `AGARE-1` + U+0323 eller U+0336 | kombinerande punkt under, eller streck genom | **GODKÄND** |
+
+Kontrollerna i samma körning: `AGARE-1`, `AGARE‐1` (U+2010, ett riktigt bindestreck) och `AGARE-𝟏` (fet etta, som NFKC gör till 1) stoppas med "ska ha nivå D", som de ska. Grekiskt Α stoppas som blandat ord. I underlagen gäller samma sak: `blandat_ord` ser bara bokstäver, så Q05–Q07 godtas.
+
+DESIGN 1 nämner förväxlingar inom de latinska bokstäverna (`AGARE-l`) som en känd lucka. Q13, Q18 och Q19 hör dit. Men Q05–Q07 och Q14 är inte bokstäver alls, och de nämns inte.
+
+**Varför medel:** som N1 och M5. Det kräver en regelbok som någon har skrivit så.
+
+**Förslag (beslut behövs):** en uttrycklig lista över tecken som får finnas i ett namn i regelboken, utöver latinska bokstäver och 0–9, till exempel mellanslag, bindestreck (efter normaliseringen), `&`, `.`, `,`, `'` och `/`. Allt annat stoppas. Bokstäverna kan begränsas på samma sätt till de vanliga latinska bokstäverna med accenter (Latin-1 och Latin Extended-A), så att Q13, Q18 och Q19 också stoppas. SPEC 7 och DESIGN 1 bör säga vilka tecken som godtas.
+
+**Förslag på test:** Q05–Q07, Q13–Q15 och Q18–Q20 ska stoppas, och testbutikens regelbok och `test_m5_latinska_namn_godtas` ska fortfarande godtas.
+
+#### N3. Uppslaget för ägarens bankrader missar namn med ett skiljetecken intill. Allvar: låg i dag, medel när nivåsteget byggs
+
+**Vad som är fel:** `ar_bankrad_mot_agare_eller_narstaende` delar texten i ord vid blanksteg och kräver att ägarens namn är ett eller flera hela ord. Ett skiljetecken som sitter ihop med namnet blir en del av ordet, så namnet känns inte igen. Regeln i matchningsformatet jämför däremot början av texten, utan normalisering (`matchningsregel_for_bankrad`). Därför kan en regel undanta en rad från underlag som uppslaget inte pekar ut, fast SPEC Ö13 säger att en sådan rad "aldrig ska få lägre nivå än D, inte heller om en regel i `matchning.json` undantar raden".
+
+**Hur det visas:** testbutikens regelbok, med `AGARE-1` som ägare.
+
+| Bankradens beskrivning eller referens | Uppslaget |
+|---|---|
+| `UTTAG AGARE-1` | True |
+| `UTTAG AGARE-1,LAN`, `UTTAG AGARE-1, LAN`, `UTTAG AGARE-1.`, `UTTAG (AGARE-1)`, `TILL:AGARE-1`, `UTTAG AGARE-1/MARS` | **False** |
+| referensen `AGARE-1;LON` | **False** |
+| `UTTAG AGARE 1` (mellanslag i stället för bindestreck) | **False** |
+| `UTTAG АGARE-1` (kyrilliskt А), `UTTAG AGARE˗1` (N2), `UTTAG AGARE-1` + U+17B4 (N1) | **False** |
+| `LON A GARE-1` | True (namnet delat i två ord räknas, den säkra riktningen) |
+
+Bankfilen prövar inte blandade ord som underlagen gör (sökt med `grep` i `las_bank.py`), så en beskrivning med kyrilliskt А kommer fram till uppslaget.
+
+Med matchningsformatet plus en regel `agaruttag` (pengar ut, beskrivningen börjar med `UTTAG AGARE-1`, som P13 i granskning 7), och en bankfil läst med `las_bankfil`:
+
+| Rad | Beskrivning | Regeln i matchningsformatet | Uppslaget |
+|---|---|---|---|
+| 1 | `UTTAG AGARE-1` | `agaruttag` | True |
+| 2 | `UTTAG AGARE-1/LAN` | `agaruttag` | **False** |
+| 3 | `UTTAG AGARE-1.` | `agaruttag` | **False** |
+| 4 | `UTTAG AGARE-1X` | `agaruttag` | False |
+| 5 | `UTTAG AGARE-10` | `agaruttag` | False |
+
+Rad 2 och 3 är ägarens uttag, slipper underlag och pekas inte ut. Rad 4 och 5 kan vara andra motparter, men regeln undantar dem ändå.
+
+**Varför låg i dag:** uppslaget används inte än (nivåerna sätts i uppgift 6), och Ö13 säger att Hugo avgör där om det ska räcka att namnet står någonstans i texten. Men Ö13 och DESIGN 1 nämner bara `UTTAGAGARE-1`, inte skiljetecken, så den som bygger uppgift 6 kan tro att uppslaget redan räcker.
+
+**Förslag (beslut i uppgift 6):** dela orden vid skiljetecken också (allt som inte är en bokstav, en siffra eller ett bindestreck), och pröva bankradens text mot förväxlingstecken och osynliga tecken som underlagen gör. Pröva också att en regel i matchningsformatet vars text innehåller en ägare (efter normaliseringen) stoppas, som granskning 7 föreslog i M7.
+
+**Förslag på test:** raderna med False ovan, utom `AGARE-1X` och `AGARE-10`, ska pekas ut. Rad 2 och 3 i tabellen ovan ska ge nivå D i uppgift 6.
+
+#### N4. Den extra normaliseringen gör mer än det står. Allvar: låg
+
+**Vad som är fel:** M8 gör NFKC en gång till efter att tecknen har tagits bort. Avsikten var att "E" + osynligt tecken + accent ska bli "É", och det fungerar. Men NFKC gör också om några **fristående accenttecken** till ett mellanslag och ett kombinerande tecken, till exempel ´ (U+00B4) till mellanslag + U+0301. Mellanslaget tas sedan bort, och den nya NFKC sätter ihop accenten med bokstaven före.
+
+**Hur det visas:** jag jämförde den gamla och den nya `normalisera_for_jamforelse` på 7,8 miljoner texter (varje tecken i Unicode i sju sorters sammanhang):
+
+- 1 022 olikheter i texter med ett tecken som normaliseringen tar bort. De är just det M8 skulle rätta.
+- **48 olikheter i texter utan något sådant tecken.** Alla som visades kommer från fristående accenttecken (bland dem ¨ ¯ ´ ¸ ˘ ˙ ˚ ˛ ˜ och grekiska accenttecken) efter en bokstav. Till exempel blir nu `A¨` lika med `Ä`, `A˚` lika med `Å` och `CAFE´` lika med `CAFÉ`. Förut var de olika.
+- Ett blanksteg mellan bokstaven och ett kombinerande tecken gör samma sak: `CAFE ́` (med ett synligt mellanslag före accenten) blir nu lika med `CAFÉ`.
+
+Det är den säkra riktningen för ägare (fler känns igen) och för K4 (fler möjliga dubbletter blir ärenden), men det står inte i beskrivningen i `normalisering.py` eller i GRANSKNING.
+
+Dessutom normaliserar `star_som_hela_ord` varje ord för sig och sätter ihop dem efteråt, utan ny normalisering. `star_som_hela_ord("CAFÉ", "KOP CAFE ́")` ger därför False, fast hela texten `CAFE ́` normaliseras till samma som `CAFÉ`. Det är en liten olikhet mellan de två sätten att jämföra.
+
+**Förslag:** skriv i beskrivningen i `normalisering.py` att fristående accenttecken och accenter efter ett blanksteg sätts ihop med bokstaven, eller låt bli att ta bort blanksteg före ett kombinerande tecken. Låt `star_som_hela_ord` normalisera den ihopsatta texten. **Förslag på test:** att `A¨` jämförs som `Ä` (eller inte), så att valet är låst.
+
+#### N5. SPEC 7.1 stämmer inte helt med hur arbetet görs. Allvar: låg (dokumentation)
+
+- **Skälet för att `cd` inte används.** 7.1 säger "Arbetsmappen återställs till projektmappen mellan kommandona, så ett `cd` gäller inte nästa kommando." Granskning 7 såg motsatsen: efter ett `cd` till `scripts/tests` "stod arbetsmappen kvar där". Verktygets egen beskrivning säger också att arbetsmappen finns kvar mellan kommandona. Regeln (inget `cd`, hela sökvägar) är bra, men skälet är fel, och det felaktiga skälet kan få någon att tro att ett `cd` är ofarligt.
+- **Ihopkopplade kommandon.** Alla sessioner (granskning 7, åtgärderna och den här) kopplar ihop kommandon med `|`, `;` och `&&`, och skickar felutskrift vidare med `2>&1`. Listan säger inget om det. Det bör stå om det är tillåtet, till exempel "kommandon på listan får kopplas ihop med `|`, `;` och `&&`, och `2>&1` får användas".
+- **Läsa i kopior.** Listan säger att `ls`, `cat`, `head`, `tail` och `grep` läser "i projektet". En granskning behöver läsa i kopian och i utfallsfilen i scratchpad-mappen, och `diff -r` jämför dem redan. Det bör stå att läsningen också får gälla kopior utanför projektet.
+- **Provfiler i kopian.** Granskning 7 och den här granskningen provar kärnan genom att skriva en egen testfil i kopian och köra den med pytest-kommandot. Listan nämner bara mutationer ("ändringar i en kopia ... till exempel ett mutationstest"). Det fungerar, men bör stå uttryckligen, eftersom det är det enda sättet att köra egen Python.
+- **`sed`.** Granskning 7, åtgärderna efter den och den här granskningen har alla använt `sed` av misstag för att läsa ett stycke av en fil. Listan har inget kommando för det (`head` och `tail` ihopkopplade, eller fil-verktyget Read, gör samma sak). En mening om det minskar misstagen.
+- Det jag provade och som stämmer: pytest-kommandot från projektmappen med kopians sökväg kör kopians kod (provfilen kontrollerar det), `-B` och `-p no:cacheprovider` skriver inget i projektet (`git status` är tom), och tilläggen `--tb`, `-q`, `-r` och `-k` räckte för hela granskningen.
+
+**Förslag:** rätta skälet för `cd`, och lägg till de fyra punkterna ovan i 7.1. Det kräver Hugos OK (SPEC ändras bara efter Hugos OK).
+
+#### N6. GRANSKNING.md efter granskning 7. Allvar: låg (dokumentation)
+
+- Avsnittet heter "Åtgärder efter granskning 7 (M1 och M2)" och säger i början "M3–M12 är inte rättade", och under "Medvetet inte rättat" står "M3–M12". Tabellen "Rättelserna" i samma avsnitt har nu rader för M3–M8 och M10–M12. Meningarna säger alltså emot tabellen.
+- **M9 saknas i tabellen.** Bara statusraden i DESIGN-regelbok.md säger "M9 hör till uppgift 5". CLAUDE.md säger "Säg till om något hoppas över", och tabellen är där läsaren letar.
+- Sista raden säger "Testsviten efter rättelserna: 2 505 passed". Nu är det 2 601 (commit-texten för 9e0462e säger samma).
+- Det som stämmer: raderna för M5–M8 och M10–M12 beskriver koden rätt, med två undantag som redan står i raderna själva (`AGARE-l` och momstoleransen). Testerna som nämns finns och är gröna.
+
+**Förslag:** ändra rubriken och de två meningarna, lägg till en rad för M9 ("inte rättat, hör till uppgift 5") och skriv det nya antalet tester.
+
+#### N7. Regelbokens egna uppslag på ett objekt skapat med `__new__`. Allvar: låg
+
+`skapa_konteringsforslag` och `las_regelbok` ger nu ett tydligt fel för alla objekt skapade med `__new__` (provat för regelbok, kontoplan, momsfil, matchningsformat och de tre perioderna: alla ger `KonteringsforslagFel` eller `RegelbokFel` med "tom eller trasig"). Men `Regelbok.__new__(Regelbok).regel_for_underlag(...)` och `.ar_bankrad_mot_agare_eller_narstaende(...)` ger fortfarande `AttributeError: _regelboken`. Inget släpps igenom, och det låg utanför det som M12 bad om. **Förslag:** samma tydliga fel i Regelbokens uppslag, när nivåsteget börjar använda dem.
+
+### Det jag granskade och inte hittade något i
+
+- **Underlagen beter sig som förut efter flytten (M5).** Jag jämförde den gamla `_inga_blandade_ord` (d87aacf) med den nya på 6 672 384 texter: varje tecken i Unicode i sex sorters sammanhang, till exempel `AB` + tecknet + `C`. 389 652 av dem stoppades av den gamla. **0 olikheter**, varken i utfall eller i felmeddelandet. Den extra NFKC i `_bokstaver` ändrar inget, eftersom NFKC av en text som redan är NFKC ger samma text.
+- **M5 i regelboken.** Blandade ord, hela ord i ett annat skriftsystem och andra siffror än 0–9 stoppas i motpart, kassaregister och `agare_och_narstaende`. Regel-id prövas tecken för tecken efter normaliseringen, och två id som ser likadana ut kan inte båda godtas (dubbletter efter normaliseringen stoppas, och U+17B4, U+02D7 och kyrilliska bokstäver i ett id stoppas). Konton och varugrupper är skyddade av kontoplanen och momsfilen. Utöver N1 och N2 hittade jag inget.
+- **M7 pekar inte ut för mycket.** `AGARE-12`, `GARE-1` och `UTTAGAGARE-1` pekas inte ut. Att `A GARE-1` pekas ut är den säkra riktningen. Uppslaget läser både beskrivning och referens, och fel sorts bankrad ger ett tydligt fel.
+- **M8.** "E" + osynligt tecken + accent blir nu "É", som de tre testerna visar. Den andra NFKC sätter bara ihop tecken som redan är normaliserade var för sig, så den kan inte skapa nya bindestreck, blanksteg eller osynliga tecken (det har jag resonerat mig fram till, inte mätt). Det enda oväntade jag hittade är N4.
+- **M12, en roll per konto.** Bank och leverantörsskulder på samma konto stoppas, ingående och utgående moms på samma konto stoppas, och utgående moms med två satser på samma konto godtas, som DESIGN 2 säger. Alla roller är obligatoriska, så inget `null` kan krocka.
+- **M12, `__new__`.** Alla sju fall jag provade i `skapa_konteringsforslag` (regelbok, kontoplan och de tre perioderna) och `las_regelbok` (momsfil och matchningsformat) ger ett tydligt fel. Kontoplanen i `las_regelbok` prövas av projektets egna tester. Se också N7.
+- **Generalitetsregeln.** De nya funktionerna i `normalisering.py`, `las_regelbok.py` och `las_kontoplan.py` har inga företagsnamn, konton eller momssatser. Rollnamnen kommer från `ROLLER`.
+- **Säkerhetsprincipen.** Inget i 9e0462e skriver till en fil eller bokför.
+
+### Mutationer
+
+I mut-kopian ändrades en sak i taget med fil-verktyget, och hela sviten kördes. Före varje körning visade `diff -r` mot projektets `scripts/` att bara den ändringen fanns. Alla tio gav minst ett rött test. Efteråt var kopians `scripts/` lika med projektets (`diff -r`, bara `.DS_Store` skiljer).
+
+| Nr | Fil | Ändring (i kopian) | Röda tester |
+|---|---|---|---|
+| Mt1 | normalisering.py | Den andra NFKC (M8) borttagen | 4 |
+| Mt2 | normalisering.py | `star_som_hela_ord` letar bara från första ordet | 2 |
+| Mt3 | normalisering.py | `star_som_hela_ord` godtar namnet var som helst i texten, inte bara som hela ord | 2 |
+| Mt4 | las_regelbok.py | Förväxlingskontrollen bara för motpart, inte kassaregister | 2 |
+| Mt5 | las_regelbok.py | Andra siffror än 0–9 godtas | 2 |
+| Mt6 | las_regelbok.py | Regel-id prövas utan normalisering (strängare) | 2 |
+| Mt7 | las_kontoplan.py | Utgående moms med två satser på samma konto stoppas (strängare) | 2 |
+| Mt8 | konteringsforslag.py | Tydligt fel för `__new__` bara för regelboken | 4 |
+| Mt9 | las_regelbok.py | Uppslaget för bankrader läser bara beskrivningen | 2 |
+| Mt10 | normalisering.py | Ett ord helt i ett annat skriftsystem räknas som blandat (påverkar underlagen) | 17 |
+
+### Testsviten
+
+Kommando: `.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests`
+
+Resultat i projektet: **2 601 passed**, 0 misslyckade. Det stämmer med commit-texten för 9e0462e. I prov-kopian, med min provfil: de 2 601 testerna och provfilens 12 är gröna utom ett: `test_ingen_pythonfil_innehaller_dolda_tecken` blir rött för att min provfil har osynliga tecken skrivna direkt i texten. Det är projektets skydd som gör det det ska. `git status` visade inga ändrade filer innan det här avsnittet skrevs.
+
+### Kommandon
+
+Jag använde listans kommandon och fil-verktygen. Kopior, provfil, utfallsfil och mutationer låg bara i scratchpad-mappen. Avvikelser, alla bara för att läsa eller i scratchpad-mappen, och inget av dem ändrade något i projektet:
+
+- **`cd` till projektmappen själv**, i det första kommandot (`cd ... && ls -la && wc ... && grep ...`), innan jag hade läst 7.1. Det bytte inte mapp, eftersom arbetsmappen redan var projektmappen.
+- **`sed -n 100,267p SPEC.md`** i det andra kommandot, för att läsa SPEC, också innan jag hade läst 7.1.
+- **`sed -n '1,0p'` av misstag**, ihopkopplat med `grep` i körningen av Mt1. Det visade ingenting, men gjorde att sviten kördes två gånger.
+- **Ihopkopplade kommandon** med `|`, `;` och `&&` (till `grep`, `tail` och `head`), och `2>&1` och `2>/dev/null`. Se N5.
+- **`cat`, `ls` och `grep -c` på filer i scratchpad-mappen** (utfallsfilen och kopian), inte i projektet. Se N5.
+- `mkdir -p`, `git archive -o` och `tar -x -f ... -C` bara med mål i scratchpad-mappen. Inget `echo`, ingen `for`-slinga och inget `$(...)`.
+
+### Beslut som behövs från Hugo
+
+1. **N1:** ska alla tecken som inte syns (alla "default ignorable" och alla ej tilldelade tecken) räknas som dolda, i hela kärnan? Rekommendation: ja, innan uppgift 4 läser riktiga underlag.
+2. **N2:** vilka tecken utöver latinska bokstäver och 0–9 ska få finnas i ett namn i regelboken? Rekommendation: en kort lista (mellanslag, bindestreck, `&`, `.`, `,`, `'`, `/`) och bara de vanliga latinska bokstäverna med accenter. SPEC 7 och DESIGN 1 skrivs om därefter.
+3. **N3:** ska uppslaget för ägarens bankrader dela orden vid skiljetecken, och ska en regel i matchningsformatet som nämner en ägare stoppas? Rekommendation: ja på båda, senast i uppgift 6.
+4. **N4:** ska `A¨` jämföras som `Ä`? Rekommendation: ja (det är den säkra riktningen), men skriv det i beskrivningen och lås det med ett test.
+5. **N5:** godkänn ändringarna i SPEC 7.1 (rätt skäl för `cd`, ihopkopplade kommandon, läsa i kopior, provfiler i kopian).
+6. **De fyra valen i DESIGN 8** från rättelserna (regelbokens namn bara latinska, regel-id bara a–z, siffror och bindestreck, en roll per konto, ägarens bankrader som hela ord) väntar fortfarande på Hugos bekräftelse. N2 och N3 påverkar val 1 och 4.
