@@ -1306,3 +1306,29 @@ def test_m10_negativ_post_pa_ett_ore_i_z_rapporten_stoppas(kallor, tmp_path):
     ], "R-Z-TB-KASSA-1", z_rapporter=[1001])
     stoppas(kallor, data, "ursprung", "posten 'betalsatt_kontant' är negativ (-0,01 kr)", "returer",
             kassaperiod=kassaperiod)
+
+
+# --- Granskning 8, N3: en bankrad mot ägaren undantas aldrig av en regel i matchningsformatet ---
+
+def test_n3_bankavgift_mot_agaren_stoppas(kallor, tmp_path):
+    # Båda raderna passar regeln bankavgift i matchningsformatet, men i rad 1 står ägaren AGARE-1 med ett
+    # snedstreck intill. Förut godtogs förslaget med R-BANK-AVGIFT för rad 1, så att ägarens rad slapp
+    # underlag. Rad 2 är skyddet: samma förslag utan ägaren godtas.
+    fil = tmp_path / "bank.csv"
+    fil.write_text("\n".join([
+        "Radnummer,Bokföringsdag,Transaktionsdag,Referens,Beskrivning,Belopp,Bokfört saldo",
+        "1,2025-04-01,2025-04-01,AVG-1,BANK AVGIFT AGARE-1/APRIL,-100.00,9900.00",
+        "2,2025-04-02,2025-04-02,AVG-2,BANK AVGIFT APRIL,-100.00,9800.00",
+    ]) + "\n", encoding="utf-8")
+    bankperiod = las_bankfil(fil, ladda_bankformat(TESTBUTIKEN / "bankformat.json"), 1000000, 980000)
+
+    def avgiften(bankraden):
+        return forslag(bankraden["transaktionsdag"], "Bankavgift", [
+            rad("6570", 10000, 0, "lika", bankrad(bankraden["id"])),
+            rad("1940", 0, 10000, "lika", bankrad(bankraden["id"])),
+        ], "R-BANK-AVGIFT", bankrader=[bankraden["id"]])
+
+    agarens, vanlig = bankperiod.rader
+    assert skapa(kallor, avgiften(vanlig), bankperiod=bankperiod).kopplingar["bankrader"][0]["radnr"] == 2
+    stoppas(kallor, avgiften(agarens), "ursprung", "(radnummer 1), som är mot en ägare eller närstående",
+            "har ingen regel i regelboken", bankperiod=bankperiod)

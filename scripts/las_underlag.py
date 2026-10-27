@@ -38,7 +38,10 @@ inlasning_skydd.py: sökvägen ska vara text eller en Path, filen får vara hög
 byte och läses aldrig längre än så, den ska vara sparad som UTF-8, NUL-tecken, styrtecken och
 riktningstecken stoppar filen, och dubbla nycklar och för djup nästling stoppar filen. Styrtecken,
 riktningstecken och halva tecken som har skrivits som koder i JSON (till exempel "\\u202e")
-stoppas också, eftersom de blir riktiga tecken när filen har lästs.
+stoppas också, eftersom de blir riktiga tecken när filen har lästs. Det gör också de osynliga
+tecknen på Unicodes lista som inte används i vanlig text (N1, granskning 8): de khmeriska
+vokaltecknen U+17B4 och U+17B5 och koder som Unicode inte har gett något tecken (U+2065,
+U+FFF0–U+FFF8 och U+E0000–U+E0FFF utom taggarna och variantväljarna).
 
 las_underlagsperiod är den enda offentliga funktionen. Den läser alla underlag i en mapp, var och
 en med alla kontroller ovan, stoppar perioden om två filer har samma id, och kör sedan K4 på
@@ -82,6 +85,7 @@ from inlasning_skydd import (
 )
 from las_bank import kronor as _kronor
 from las_kassa import normalisera_kassaregister as _normalisera
+from normalisering import OSYNLIGA_SOM_INTE_ANVANDS as _OSYNLIGA_SOM_INTE_ANVANDS
 from normalisering import blandat_ord as _blandat_ord
 from normalisering import normalisera_for_jamforelse as _jamforbar
 from normalisering import tecken_med_namn as _tecken_med_namn
@@ -226,7 +230,11 @@ def _exakta_nycklar(objekt, nycklar, vad, var, filsort):
 
 
 def _kontrollera_text(varde, vad, var, filsort):
-    """En icke-tom text på högst TEXT_HOGST_TECKEN tecken, utan styrtecken, riktningstecken eller halva tecken."""
+    """En icke-tom text på högst TEXT_HOGST_TECKEN tecken, utan styrtecken, riktningstecken eller halva tecken.
+
+    Inte heller de osynliga tecknen som inte används i vanlig text (normalisering.OSYNLIGA_SOM_INTE_ANVANDS,
+    N1, granskning 8). Andra osynliga formattecken, till exempel nollbreddsmellanslag, godtas (SPEC 7).
+    """
     if not isinstance(varde, str):
         raise filsort.fel(var + ": " + vad + " ska vara text, inte " + _typnamn(varde) + ".")
     if len(varde) > TEXT_HOGST_TECKEN:
@@ -251,6 +259,12 @@ def _kontrollera_text(varde, vad, var, filsort):
         if unicodedata.category(tecken) == "Cs":
             raise filsort.fel(
                 var + ": " + vad + " innehåller " + kod + ", ett halvt tecken som inte är giltig Unicode."
+            )
+        if tecken in _OSYNLIGA_SOM_INTE_ANVANDS:
+            raise filsort.fel(
+                var + ": " + vad + " innehåller tecknet " + kod + ", som inte syns och inte används i vanlig text"
+                " (det står på Unicodes lista över tecken som inte ska synas). Ett sådant tecken kan få till exempel"
+                " en motpart att se ut som en annan än den är."
             )
     if not _normalisera(varde):
         raise filsort.fel(var + ": " + vad + " får inte vara tom eller bara bestå av blanksteg och osynliga tecken.")

@@ -269,8 +269,9 @@ def _ar_dolt_tecken(tecken):
     """True för ett tecken som inte syns, utom vanligt mellanslag.
 
     Det gäller allt som normaliseringen för jämförelser tar bort (normalisering.py): blanksteg
-    utom vanligt mellanslag, styrtecken, osynliga formattecken (bland dem riktningstecknen) och
-    tecken som ser tomma ut. Dessutom halva tecken (kategori Cs), som inte är giltig Unicode.
+    utom vanligt mellanslag, styrtecken, osynliga formattecken (bland dem riktningstecknen),
+    tecken som ser tomma ut och alla tecken på Unicodes lista över tecken som inte ska synas (N1,
+    granskning 8). Dessutom halva tecken (kategori Cs), som inte är giltig Unicode.
     """
     if tecken == " ":
         return False

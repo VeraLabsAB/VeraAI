@@ -27,6 +27,16 @@ DOLDA = {
     "u2028": chr(0x2028), "utfyllnad": chr(0x3164), "variantvaljare": chr(0xFE0F), "mjukt_bindestreck": chr(0xAD),
 }
 
+# Granskning 8, N1: tecken på Unicodes lista över tecken som inte ska synas (Default_Ignorable_Code_Point),
+# som inte räknades som dolda före rättelsen. Det första och det sista tecknet i varje grupp: två khmeriska
+# vokaltecken som inte syns, och koder som Unicode inte har gett något tecken (U+2065, U+FFF0–U+FFF8,
+# U+E0000, U+E0002–U+E001F, U+E0080–U+E00FF och U+E01F0–U+E0FFF).
+N1_OSYNLIGA = {
+    "khmer_17b4": chr(0x17B4), "khmer_17b5": chr(0x17B5), "u2065": chr(0x2065), "ufff0": chr(0xFFF0),
+    "ufff8": chr(0xFFF8), "ue0000": chr(0xE0000), "ue0002": chr(0xE0002), "ue001f": chr(0xE001F),
+    "ue0080": chr(0xE0080), "ue00ff": chr(0xE00FF), "ue01f0": chr(0xE01F0), "ue0fff": chr(0xE0FFF),
+}
+
 
 def period(fran="2024-01-01", till=None, sats=7, kalla="påhittad"):
     return {"fran": fran, "till": till, "sats": sats, "kalla": kalla}
@@ -221,6 +231,19 @@ def test_dolt_tecken_var_som_helst_stoppar(tmp_path, tecken, ascii, plats):
     else:
         data["varugrupper"]["grupp_a"][0] = {"fran": "2024-01-01", "till": None, "sats" + tecken: 7, "kalla": "x"}
     stoppas(tmp_path, data, "U+" + format(ord(tecken), "04X"), "inte syns", ascii=ascii)
+
+
+@pytest.mark.parametrize("ascii", [False, True], ids=["som_tecken", "som_kod_i_json"])
+@pytest.mark.parametrize("tecken", N1_OSYNLIGA.values(), ids=N1_OSYNLIGA.keys())
+def test_n1_osynligt_tecken_enligt_unicode_stoppar_momsfilen(tmp_path, tecken, ascii):
+    # Granskning 8, N1: förut godtogs tecknet, eftersom normaliseringen inte tog bort det.
+    for plats in ("kalla", "varugrupp"):
+        data = moms()
+        if plats == "kalla":
+            data["varugrupper"]["grupp_a"][0]["kalla"] = "på" + tecken + "hittad"
+        else:
+            data["varugrupper"] = {"grupp_a" + tecken: [period()]}
+        stoppas(tmp_path, data, "U+" + format(ord(tecken), "04X"), "inte syns", ascii=ascii)
 
 
 def test_halvt_tecken_stoppar(tmp_path):

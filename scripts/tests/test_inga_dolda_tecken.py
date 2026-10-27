@@ -10,7 +10,10 @@ koder: \\u00a0, \\u202f, \\u200b, \\u2028 och så vidare. Testet slår larm för
 - andra blanksteg än vanligt mellanslag (kategori Zs, Zl och Zp), till exempel hårt mellanslag
   (U+00A0), smalt hårt mellanslag (U+202F) och de ovanliga radbrytningarna U+2028 och U+2029,
 - tecken som ser tomma ut fast de inte är blanksteg: utfyllnadstecken (U+115F, U+1160, U+3164,
-  U+FFA0), blank blindskrift (U+2800) och variantväljare (U+FE00–U+FE0F, U+E0100–U+E01EF).
+  U+FFA0), blank blindskrift (U+2800) och variantväljare (U+FE00–U+FE0F, U+E0100–U+E01EF),
+- alla tecken på Unicodes lista över tecken som inte ska synas (Default_Ignorable_Code_Point,
+  granskning 8, N1), till exempel de khmeriska vokaltecknen U+17B4 och U+17B5 och koder som
+  Unicode inte har gett något tecken (U+2065, U+FFF0–U+FFF8 och U+E0000–U+E0FFF).
 """
 
 import unicodedata
@@ -21,6 +24,13 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1]
 
 OSYNLIGA_ANDRA = {0x115F, 0x1160, 0x3164, 0xFFA0, 0x2800, *range(0xFE00, 0xFE10), *range(0xE0100, 0xE01F0)}
+# Unicodes lista över tecken som inte ska synas (Default_Ignorable_Code_Point i DerivedCoreProperties.txt),
+# skriven som koder, så att den inte beror på Pythons Unicode-version (granskning 8, N1).
+OSYNLIGA_ENLIGT_UNICODE = {
+    0x00AD, 0x034F, 0x061C, 0x115F, 0x1160, 0x17B4, 0x17B5, *range(0x180B, 0x1810), *range(0x200B, 0x2010),
+    *range(0x202A, 0x202F), *range(0x2060, 0x2070), 0x3164, *range(0xFE00, 0xFE10), 0xFEFF, 0xFFA0,
+    *range(0xFFF0, 0xFFF9), *range(0x1BCA0, 0x1BCA4), *range(0x1D173, 0x1D17B), *range(0xE0000, 0xE1000),
+}
 
 
 def ar_dolt(tecken):
@@ -31,7 +41,7 @@ def ar_dolt(tecken):
         return True
     if kategori == "Zs":
         return tecken != " "
-    return ord(tecken) in OSYNLIGA_ANDRA
+    return ord(tecken) in OSYNLIGA_ANDRA or ord(tecken) in OSYNLIGA_ENLIGT_UNICODE
 
 
 def dolda_tecken_i(text):
@@ -87,6 +97,18 @@ DOLDA = {
 
 @pytest.mark.parametrize("tecken", DOLDA.values(), ids=DOLDA.keys())
 def test_kontrollen_hittar_dolda_tecken(tecken):
+    text = 'x = 1\nnamn = "a' + tecken + 'b"\n'
+    assert dolda_tecken_i(text) == [(2, 10, "U+" + format(ord(tecken), "04X"))]
+
+
+N1_OSYNLIGA = {namn: chr(kod) for namn, kod in (
+    ("khmer_17b4", 0x17B4), ("khmer_17b5", 0x17B5), ("u2065", 0x2065), ("ufff0", 0xFFF0), ("ufff8", 0xFFF8),
+    ("ue0000", 0xE0000), ("ue0080", 0xE0080), ("ue01f0", 0xE01F0), ("ue0fff", 0xE0FFF))}
+
+
+@pytest.mark.parametrize("tecken", N1_OSYNLIGA.values(), ids=N1_OSYNLIGA.keys())
+def test_n1_kontrollen_hittar_unicodes_osynliga_tecken(tecken):
+    # Granskning 8, N1: förut räknades de här tecknen inte som dolda, fast de inte syns.
     text = 'x = 1\nnamn = "a' + tecken + 'b"\n'
     assert dolda_tecken_i(text) == [(2, 10, "U+" + format(ord(tecken), "04X"))]
 

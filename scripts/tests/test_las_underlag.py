@@ -28,6 +28,7 @@ import las_underlag  # noqa: E402
 import normalisering  # noqa: E402
 from las_underlag import UnderlagFilFel, las_underlagsperiod  # noqa: E402
 from normalisering import normalisera_for_jamforelse  # noqa: E402
+from test_las_momssatser import N1_OSYNLIGA  # noqa: E402
 
 FALT = ["id", "typ", "datum", "motpart", "fakturanummer", "belopp_ore", "moms", "flaggor", "kalla_fil"]
 HELA_TIDEN = ("0001-01-01", "9999-12-31")
@@ -1169,6 +1170,74 @@ def test_k4c_ser_bara_underlag_i_perioden(tmp_path):
     skriv(tmp_path, underlag(id="U-3", fakturanummer="F-3", datum="2025-02-10"))
     period = las(tmp_path, "2025-02-01", "2025-02-28")
     assert [(a["id"], a["kontroll"], a["jamfort_med"]) for a in period.arenden] == [("U-3", "K4c", "U-2")]
+
+
+# --- Granskning 8, N1: osynliga tecken enligt Unicodes egen lista ---
+
+# Unicodes lista över tecken som inte ska synas (egenskapen Default_Ignorable_Code_Point i Unicodes fil
+# DerivedCoreProperties.txt), avskriven för hand, så att testet inte beror på Pythons Unicode-version.
+UNICODES_OSYNLIGA = {
+    0x00AD, 0x034F, 0x061C, 0x115F, 0x1160, 0x17B4, 0x17B5, *range(0x180B, 0x1810), *range(0x200B, 0x2010),
+    *range(0x202A, 0x202F), *range(0x2060, 0x2070), 0x3164, *range(0xFE00, 0xFE10), 0xFEFF, 0xFFA0,
+    *range(0xFFF0, 0xFFF9), *range(0x1BCA0, 0x1BCA4), *range(0x1D173, 0x1D17B), *range(0xE0000, 0xE1000),
+}
+
+
+def test_n1_listan_over_osynliga_tecken_star_uttryckligen_i_koden():
+    # N1: listan står som koder i normalisering.py, så att den inte beror på Pythons Unicode-version, och
+    # normaliseringen tar bort varje tecken på den.
+    assert {ord(tecken) for tecken in normalisering._OSYNLIGA_ENLIGT_UNICODE} == UNICODES_OSYNLIGA
+    kvar = [hex(kod) for kod in sorted(UNICODES_OSYNLIGA) if normalisera_for_jamforelse("A" + chr(kod) + "B") != "ab"]
+    assert kvar == []
+
+
+@pytest.mark.parametrize("tecken", N1_OSYNLIGA.values(), ids=N1_OSYNLIGA.keys())
+def test_n1_normaliseringen_tar_bort_unicodes_osynliga_tecken(tecken):
+    # Förut blev tecknet kvar, så att "AGARE-1" med tecknet jämfördes som en annan motpart (Q08–Q12).
+    assert normalisera_for_jamforelse("AGARE-1" + tecken) == normalisera_for_jamforelse("AGA" + tecken + "RE-1") == (
+        "agare-1")
+
+
+@pytest.mark.parametrize("som_kod", [False, True], ids=["som_tecken", "som_kod_i_json"])
+@pytest.mark.parametrize("tecken", N1_OSYNLIGA.values(), ids=N1_OSYNLIGA.keys())
+def test_n1_osynligt_tecken_enligt_unicode_stoppar_underlaget(tmp_path, tecken, som_kod):
+    # Förut godtogs underlaget från "AGARE-1" + tecknet utan ärende (Q08–Q12). Nu stoppas hela filen, var
+    # i underlaget tecknet än står.
+    for nummer, andrat in enumerate([{"motpart": "AGARE-1" + tecken}, {"motpart": "AGA" + tecken + "RE-1"},
+                                     {"fakturanummer": "F-1" + tecken}, {"flaggor": ["fl" + tecken + "agga"]}]):
+        mapp = tmp_path / str(nummer)
+        mapp.mkdir()
+        skriv_ra(mapp, json.dumps(underlag(**andrat), ensure_ascii=som_kod))
+        stoppas(mapp, "innehåller tecknet U+" + format(ord(tecken), "04X"), "som inte syns")
+
+
+def test_n1_andra_osynliga_tecken_godtas_fortfarande_i_underlaget(tmp_path):
+    # Skydd: SPEC 7 godtar osynliga formattecken i underlag (de ska visas i rapporten). Bara tecknen som
+    # granskning 8 hittade stoppar hela filen.
+    skriv(tmp_path, underlag(motpart="Motpart" + OSYNLIGT_MELLANSLAG + " A"))
+    assert [post["motpart"] for post in las(tmp_path).underlag] == ["Motpart" + OSYNLIGT_MELLANSLAG + " A"]
+
+
+# --- Granskning 8, N4: fristående accenttecken och accenter efter ett blanksteg ---
+
+@pytest.mark.parametrize("text, som", [
+    ("A" + chr(0x00A8), "Ä"), ("A" + chr(0x02DA), "Å"), ("CAFE" + chr(0x00B4), "CAFÉ"), ("CAFE " + chr(0x0301), "CAFÉ"),
+], ids=["trema", "ring", "akut_accent", "accent_efter_mellanslag"])
+def test_n4_fristaende_accent_jamfors_som_bokstaven_med_accent(text, som):
+    # Låser valet (granskning 8, N4): ett fristående accenttecken efter en bokstav, eller en accent efter ett
+    # blanksteg, sätts ihop med bokstaven. Det är den säkra riktningen: fler ägare känns igen och fler
+    # möjliga dubbletter blir ärenden.
+    assert normalisera_for_jamforelse(text) == normalisera_for_jamforelse(som)
+
+
+def test_n4_star_som_hela_ord_normaliserar_den_ihopsatta_texten():
+    # Förut normaliserades varje ord för sig, så att "CAFE" och accenten efter mellanslaget aldrig sattes ihop.
+    assert normalisering.star_som_hela_ord("CAFÉ", "KOP CAFE " + chr(0x0301))
+    assert normalisering.star_som_hela_ord("ÄGARE", "UTTAG A" + chr(0x00A8) + "GARE")
+    # Accenten blir ett eget ord, och "LEV" + "A" är redan lika långt som "LEV-Ä". Att sätta ihop ett ord
+    # till gör inte texten längre, så sökningen får inte sluta förrän texten är längre än namnet.
+    assert normalisering.star_som_hela_ord("LEV-Ä", "KOP LEV-A" + chr(0x00A8))
+    assert not normalisering.star_som_hela_ord("CAFÉ", "KOP CAFE")
 
 
 # --- Punkt 5: K17, texterna i underlaget är data ---

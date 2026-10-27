@@ -738,6 +738,10 @@ def _kallans_regel(typ, vad, regelbok, kallorna, datum):
     rad = kallorna.bankrader[vad]
     visas = "bankraden " + repr(vad) + " (radnummer " + str(rad["radnr"]) + ")"
     namn = regelbok.matchningsregel_for_bankrad(rad)
+    if namn is None and regelbok.ar_bankrad_mot_agare_eller_narstaende(rad):
+        # En regel i matchningsformatet undantar aldrig en bankrad mot en ägare eller närstående (K7, N3).
+        return None, (visas + ", som är mot en ägare eller närstående och därför aldrig undantas från underlag av en"
+                      " regel i matchningsformatet,")
     if namn is None:
         return None, visas + ", som inte passar någon regel för bankrader utan underlag i matchningsformatet,"
     return regelbok.regel_for_bankrad(namn, datum), visas + " (regeln " + repr(namn) + " i matchningsformatet)"

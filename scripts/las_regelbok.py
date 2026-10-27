@@ -29,7 +29,8 @@ Filen ska ha exakt nycklarna i REGELBOK_NYCKLAR, och får ha nycklarna i REGELBO
               efter normaliseringen (normalisering.py) räknas som samma och stoppar filen. Saknas
               nyckeln är listan tom, och en tom lista godtas. Uppslaget ar_agare_eller_narstaende
               säger om en motpart står i listan, och ar_bankrad_mot_agare_eller_narstaende om en
-              motpart i listan står i en bankrad (M7), så att nivåsteget kan använda det
+              motpart i listan står i en bankrad (M7, N3), så att nivåsteget kan använda det. En
+              sådan bankrad passar aldrig en regel i matchningsformatet (matchningsregel_for_bankrad)
 
 En regel har exakt nycklarna i REGEL_NYCKLAR, och får ha nycklarna i REGEL_VALFRIA_NYCKLAR:
 
@@ -74,20 +75,28 @@ Regler för regelboken som helhet:
   (Hugos beslut D20).
 - En regel för underlag vars motpart står i agare_och_narstaende (efter normaliseringen) måste
   ha nivå D (K7). Annars stoppas filen.
-- Förväxlingstecken (M5, granskning 7): en motpart (i 'galler' och i agare_och_narstaende) och ett
-  kassaregister får bara ha latinska bokstäver och siffrorna 0–9, efter Unicode-normaliseringen
-  (NFKC). Ett ord som blandar latinska bokstäver med till exempel kyrilliska stoppas som i
-  underlagen, och regelboken är dessutom strängare: ett helt ord i ett annat skriftsystem (till
-  exempel cherokee-bokstäver som ser ut som ett latinskt namn) stoppas också. Konton och
-  varugrupper är redan skyddade: de ska finnas i kontoplanen och momsfilen, där ett konto bara har
-  siffrorna 0–9 och en varugrupp bara a–z, siffror och understreck.
+- Förväxlingstecken (M5, granskning 7, och N2, granskning 8): en motpart (i 'galler' och i
+  agare_och_narstaende) och ett kassaregister får bara ha bokstäverna a–z och A–Z, med eller utan
+  accent (som å, ä, ö och é), siffrorna 0–9, mellanslag, bindestreck (alla sorter, som blir "-" när
+  namn jämförs), understreck och punkt, efter Unicode-normaliseringen (NFKC). Ett ord som blandar
+  latinska bokstäver med till exempel kyrilliska stoppas som i underlagen, och regelboken är dessutom
+  strängare: ett helt ord i ett annat skriftsystem (till exempel cherokee-bokstäver som ser ut som ett
+  latinskt namn), andra siffror än 0–9 och alla andra tecken stoppas också, till exempel tecken som ser
+  ut som ett bindestreck (U+02D7, U+2043) och latinska bokstäver som inte är a–z med accent (U+0131, i
+  utan prick, som ser ut som en etta). Konton och varugrupper är redan skyddade: de ska finnas i
+  kontoplanen och momsfilen, där ett konto bara har siffrorna 0–9 och en varugrupp bara a–z, siffror
+  och understreck.
+- Ingen regel i matchningsformatet får ha en ägare eller närstående (efter normaliseringen, som hela
+  ord) i referens_borjar_med eller beskrivning_borjar_med (N3, granskning 8). En sådan regel skulle
+  undanta ägarens bankrader från underlag (K7).
 
 Hela filen stoppas vid minsta fel med ett RegelbokFel: okänd eller saknad nyckel, fel typ (till
 exempel ett decimaltal i ett belopp), ett tomt värde, ett dolt tecken någonstans i filen (även i
 nycklar och anteckningar), en regel som står två gånger eller kan passa samma sak som en annan,
 ett konto som inte finns i kontoplanen, en varugrupp som saknar sats i momsfilen, en motpart som
 står två gånger i agare_och_narstaende, en regel för en ägare eller närstående som inte har nivå D,
-eller ett förväxlingstecken i ett regel-id, en motpart eller ett kassaregister. Filen läses
+en regel i matchningsformatet som nämner en ägare eller närstående, eller ett förväxlingstecken i ett
+regel-id, en motpart eller ett kassaregister. Filen läses
 med de gemensamma skydden i inlasning_skydd.py (UTF-8, dubbla nycklar, för djup nästling och för
 långa tal), som de andra formatfilerna.
 
@@ -116,7 +125,7 @@ from inlasning_skydd import (
 )
 from las_kontoplan import Kontoplan
 from las_matchningsformat import (
-    Matchningsformat, MatchningsformatFel, kontrollera_matchningsformat, matchningsregel_for_bankrad,
+    MONSTER_NYCKLAR, Matchningsformat, MatchningsformatFel, kontrollera_matchningsformat, matchningsregel_for_bankrad,
 )
 from las_momssatser import Momssatser, MomssatsFel
 from las_underlag import HELTAL_HOGST_SIFFROR, TYPER
@@ -145,6 +154,13 @@ _HOGSTA_TAL = 10 ** HELTAL_HOGST_SIFFROR - 1
 # Ett tecken som ett regel-id får innehålla efter normaliseringen för jämförelser (M5): a–z, siffror
 # och bindestreck.
 _REGEL_ID_TECKEN = re.compile(r"[a-z0-9-]", re.ASCII)
+# Tecken utöver bokstäver och mellanslag som ett namn på en motpart eller ett kassaregister får ha,
+# efter normaliseringen för jämförelser (N2, granskning 8): siffrorna 0–9, bindestreck, understreck och
+# punkt. SPEC säger inte vilka skiljetecken som godtas, så det är de som uppdraget efter granskning 8
+# tillåter (en fråga till Hugo). Alla sorters bindestreck räknas som "-", som när namn jämförs.
+_NAMNETS_TECKEN = re.compile(r"[0-9._-]", re.ASCII)
+# En bokstav i ett namn: a–z eller A–Z, med eller utan accent (N2).
+_BOKSTAV = re.compile(r"[a-zA-Z]", re.ASCII)
 # Nycklarna i 'galler' som är namn på en motpart eller ett kassaregister, och som prövas mot
 # förväxlingstecken (M5). typ och matchningsregel ska vara exakt ett känt namn och prövas så.
 _NAMN_I_GALLER = ("motpart", "kassaregister")
@@ -228,15 +244,16 @@ def _inga_dubbletter(varden, vad, var):
 
 
 def _inga_forvaxlingstecken(namn, vad, var):
-    """Ett namn på en motpart eller ett kassaregister får bara ha latinska bokstäver och siffrorna 0–9 (M5).
+    """Ett namn på en motpart eller ett kassaregister får bara ha de tecken som _tillatet_i_namn godtar (M5, N2).
 
     Förväxlingstecken ser ut som latinska bokstäver eller siffror men är andra tecken, till exempel ett
     kyrilliskt "А" eller cherokee-bokstäver som tillsammans ser ut som ett latinskt namn. Ett sådant namn
     jämförs som ett annat namn, så att en regel eller en ägare som ser rätt ut på skärmen inte känns
     igen. Ett ord som blandar latinska och andra bokstäver stoppas som i underlagen (J1). Regelboken är
     konfiguration och därför strängare än underlagen: där stoppas också ett helt ord i ett annat
-    skriftsystem, och siffror som inte är 0–9. Texten prövas efter Unicode-normaliseringen (NFKC), så
-    att till exempel fullbreddsbokstäver räknas som latinska.
+    skriftsystem, siffror som inte är 0–9 och alla andra tecken än a–z med eller utan accent, siffror,
+    mellanslag, bindestreck, understreck och punkt (N2, granskning 8). Texten prövas efter
+    Unicode-normaliseringen (NFKC), så att till exempel fullbreddsbokstäver räknas som latinska.
     """
     blandat = blandat_ord(namn)
     if blandat:
@@ -259,7 +276,33 @@ def _inga_forvaxlingstecken(namn, vad, var):
             var + ": " + vad + " har siffran " + tecken_med_namn(siffror[0]) + ". Ett namn i regelboken får bara ha"
             " siffrorna 0–9, eftersom andra siffror kan se ut som dem."
         )
+    andra_tecken = [tecken for tecken in unicodedata.normalize("NFKC", namn) if not _tillatet_i_namn(tecken)]
+    if andra_tecken:
+        raise RegelbokFel(
+            var + ": " + vad + " har tecknet " + tecken_med_namn(andra_tecken[0]) + ". Ett namn i regelboken får bara"
+            " ha bokstäverna a–z, med eller utan accent (som å, ä, ö och é), siffrorna 0–9, mellanslag, bindestreck,"
+            " understreck och punkt. Andra tecken kan se ut som en bokstav, en siffra eller ett bindestreck, så att"
+            " namnet jämförs som ett annat namn än det ser ut att vara."
+        )
     return namn
+
+
+def _tillatet_i_namn(tecken):
+    """True om tecknet (efter NFKC) får finnas i ett namn i regelboken (N2, granskning 8).
+
+    En bokstav är tillåten om den är a–z eller A–Z när accenten tas bort med Unicodes uppdelning (NFD):
+    "Å" blir "A" och en ring, och "é" blir "e" och en accent. Latinska bokstäver som inte delas så, till
+    exempel U+0131 (i utan prick), U+01C0 (ett lodrätt streck) och U+1D00 (ett litet versalt A), stoppas,
+    eftersom de kan se ut som en etta eller en annan bokstav. Ett kombinerande tecken som står för sig
+    efter NFKC stoppas också. Siffror och skiljetecken prövas efter normaliseringen för jämförelser, så
+    att alla sorters bindestreck räknas som "-". Ett tecken som normaliseringen tar bort godtas bara om
+    det är ett vanligt mellanslag (de andra är dolda tecken, som redan stoppar hela filen).
+    """
+    delar = unicodedata.normalize("NFD", tecken)
+    if _BOKSTAV.fullmatch(delar[0]) and all(unicodedata.category(del_) == "Mn" for del_ in delar[1:]):
+        return True
+    normaliserat = normalisera_for_jamforelse(tecken)
+    return tecken == " " or (normaliserat != "" and all(_NAMNETS_TECKEN.fullmatch(del_) for del_ in normaliserat))
 
 
 def _regel_id(id_, vad, var):
@@ -593,6 +636,27 @@ def _konfigurationen(kontoplan, momssatser, matchningsformat):
     return konton, matchning["kraver_inte_underlag"], summor
 
 
+def _ingen_matchningsregel_for_agare(matchningsregler, agare, var):
+    """Ingen regel i matchningsformatet får ha en ägare eller närstående i sin text (K7, N3, granskning 8).
+
+    En sådan regel skulle undanta ägarens bankrader från underlag. Namnet söks som hela ord i regelns
+    referens_borjar_med och beskrivning_borjar_med, på samma sätt som i en bankrad
+    (normalisering.star_som_hela_ord). En regel vars text bara börjar som ett namn (till exempel
+    "UTTAG NAMN" för motparten "NAMN-7") stoppas inte här. Den undantar ändå aldrig en bankrad mot en ägare, eftersom
+    Regelbok.matchningsregel_for_bankrad inte ger någon regel för en sådan rad.
+    """
+    for regel in matchningsregler:
+        for nyckel in MONSTER_NYCKLAR:
+            for namn in agare:
+                if nyckel in regel and star_som_hela_ord(namn, regel[nyckel]):
+                    raise RegelbokFel(
+                        var + ": i regeln " + repr(regel["namn"]) + " i matchningsformatet är " + repr(nyckel) + " "
+                        + repr(regel[nyckel]) + ", där " + repr(namn) + " i 'agare_och_narstaende' står. En regel i"
+                        " matchningsformatet får aldrig undanta en bankrad mot en ägare eller närstående från underlag"
+                        " (K7)."
+                    )
+
+
 def _kontrollera_regelbok(data, kontoplan, momssatser, matchningsformat, var):
     """Kontrollerar hela regelboken och returnerar den som ett nytt objekt i den form kärnan använder."""
     konton, matchningslistan, summor = _konfigurationen(kontoplan, momssatser, matchningsformat)
@@ -605,6 +669,7 @@ def _kontrollera_regelbok(data, kontoplan, momssatser, matchningsformat, var):
     granser = _kontrollera_granser(data["granser"], var)
     # Saknas nyckeln är listan tom (Hugos beslut 2026-10-26).
     agare = _kontrollera_agare_och_narstaende(data.get("agare_och_narstaende", []), var)
+    _ingen_matchningsregel_for_agare(matchningslistan, agare, var)
     return {
         "foretag": _text_i_json(data["foretag"], "'foretag'", var, _REGELBOK),
         "version": _heltal_i_json(data["version"], "'version'", 1, _HOGSTA_TAL, var, _REGELBOK),
@@ -710,14 +775,30 @@ class Regelbok:
         """
         return _kopia(self._regelboken["kontrollerad_mot"])
 
+    def _innehall(self):
+        """Regelbokens innehåll, eller ett tydligt fel för en regelbok som inte har skapats av las_regelbok (N7).
+
+        En Regelbok skapad med __new__ saknar sitt innehåll, och då ger Python annars ett AttributeError,
+        som inte förklarar något.
+        """
+        try:
+            return self._regelboken
+        except AttributeError:
+            raise RegelbokFel("Uppslaget i regelboken: regelboken är tom eller trasig. Den har inte skapats av"
+                              " las_regelbok.") from None
+
     def matchningsregel_for_bankrad(self, rad):
         """Namnet på regeln i matchningsformatets kraver_inte_underlag som bankraden passar, eller None.
 
         Samma uppslag som matchningen gör (las_matchningsformat.matchningsregel_for_bankrad), mot
-        matchningsformatet som regelboken kontrollerades mot. Beloppsgränsen prövas inte här.
+        matchningsformatet som regelboken kontrollerades mot. Beloppsgränsen prövas inte här. En bankrad
+        mot en ägare eller närstående (ar_bankrad_mot_agare_eller_narstaende) passar aldrig någon regel,
+        så att en regel i matchningsformatet aldrig undantar den från underlag (K7, N3, granskning 8).
         """
-        regel = matchningsregel_for_bankrad(rad, self._regelboken["matchningsregler"])
-        return None if regel is None else regel["namn"]
+        regel = matchningsregel_for_bankrad(rad, self._innehall()["matchningsregler"])
+        if regel is None or self.ar_bankrad_mot_agare_eller_narstaende(rad):
+            return None
+        return regel["namn"]
 
     def ar_agare_eller_narstaende(self, motpart):
         """True om motparten står i 'agare_och_narstaende', annars False (K7).
@@ -727,18 +808,22 @@ class Regelbok:
         if not isinstance(motpart, str):
             raise RegelbokFel("Uppslaget i regelboken: motpart ska vara text, inte " + _json_typ(motpart) + ".")
         sokt = normalisera_for_jamforelse(motpart)
-        return any(normalisera_for_jamforelse(namn) == sokt for namn in self._regelboken["agare_och_narstaende"])
+        return any(normalisera_for_jamforelse(namn) == sokt for namn in self._innehall()["agare_och_narstaende"])
 
     def ar_bankrad_mot_agare_eller_narstaende(self, rad):
         """True om en motpart i 'agare_och_narstaende' står i bankradens beskrivning eller referens (K7, M7).
 
         rad är en bankrad från las_bankfil (en dict eller en MappingProxyType med beskrivning och
         referens). Motparten ska stå som ett eller flera hela ord, efter normaliseringen för jämförelser
-        (normalisering.star_som_hela_ord). Uppslaget gäller alla bankrader, även de som en regel i
-        matchningsformatet undantar från underlag, så att till exempel ett uttag till ägaren pekas ut
-        oavsett vilken regel det passar. En sådan bankrad ska aldrig få lägre nivå än D. Nivåerna sätts i
-        nivåsteget (DESIGN-regelbok.md avsnitt 7, uppgift 6, och SPEC Ö13).
+        (normalisering.star_som_hela_ord). Orden delas vid allt som inte är en bokstav, en siffra eller ett
+        kombinerande tecken, så att till exempel motparten "NAMN-7" pekas ut i "UTTAG NAMN-7/LAN" och i
+        "TILL:NAMN-7" (N3, granskning 8). Uppslaget gäller alla bankrader, även de som en regel i matchningsformatet skulle
+        undanta från underlag, så att till exempel ett uttag till ägaren pekas ut oavsett vilken regel det
+        passar. matchningsregel_for_bankrad ger aldrig en regel för en sådan bankrad. Den ska heller aldrig
+        få lägre nivå än D. Nivåerna sätts i nivåsteget (DESIGN-regelbok.md avsnitt 7, uppgift 6, och SPEC
+        Ö13).
         """
+        agare = self._innehall()["agare_och_narstaende"]
         if not isinstance(rad, (dict, MappingProxyType)):
             raise RegelbokFel("Uppslaget i regelboken: bankraden ska vara ett objekt med nycklar, inte "
                               + _json_typ(rad) + ".")
@@ -748,17 +833,17 @@ class Regelbok:
                 raise RegelbokFel("Uppslaget i regelboken: bankradens " + repr(nyckel) + " ska vara text, inte "
                                   + _json_typ(rad.get(nyckel)) + ".")
             texter.append(rad[nyckel])
-        return any(star_som_hela_ord(namn, text) for namn in self._regelboken["agare_och_narstaende"]
-                   for text in texter)
+        return any(star_som_hela_ord(namn, text) for namn in agare for text in texter)
 
     def _regel_for(self, galler, datum):
         """Regeln som gäller samma sak på datumet, som en ny kopia, eller None om ingen regel passar."""
+        regler = self._innehall()["regler"]
         datum = _datumtext(datum, "datumet", "Uppslaget i regelboken", _REGELBOK)
         for nyckel, varde in galler.items():
             if not isinstance(varde, str):
                 raise RegelbokFel("Uppslaget i regelboken: " + nyckel + " ska vara text, inte " + _json_typ(varde) + ".")
         sokt = _vad_regeln_galler(galler)
-        for regel in self._regelboken["regler"]:
+        for regel in regler:
             villkor = regel["villkor"]
             if (_vad_regeln_galler(regel["galler"]) == sokt and villkor["giltig_fran"] <= datum
                     and (villkor["giltig_till"] is None or datum <= villkor["giltig_till"])):

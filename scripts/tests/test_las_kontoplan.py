@@ -20,7 +20,7 @@ KONTOPLAN_FIL = AGENT / "foretag" / "syntet-testbutik" / "kontoplan.json"
 sys.path.insert(0, str(AGENT / "scripts"))
 
 from las_kontoplan import ROLLER, Kontoplan, KontoplanFel, las_kontoplan  # noqa: E402
-from test_las_momssatser import DOLDA, json_block_i_design  # noqa: E402
+from test_las_momssatser import DOLDA, N1_OSYNLIGA, json_block_i_design  # noqa: E402
 
 
 def konto(nummer, namn="påhittat", **giltighet):
@@ -257,6 +257,15 @@ def test_dolt_tecken_var_som_helst_stoppar(tmp_path, tecken, ascii, plats):
         data["roller"]["bank"] = "01" + tecken + "01"
     else:
         data["roller"] = {**data["roller"], "bank" + tecken: "0101"}
+    stoppas(tmp_path, data, "U+" + format(ord(tecken), "04X"), "inte syns", ascii=ascii)
+
+
+@pytest.mark.parametrize("ascii", [False, True], ids=["som_tecken", "som_kod_i_json"])
+@pytest.mark.parametrize("tecken", N1_OSYNLIGA.values(), ids=N1_OSYNLIGA.keys())
+def test_n1_osynligt_tecken_enligt_unicode_stoppar_kontoplanen(tmp_path, tecken, ascii):
+    # Granskning 8, N1: förut godtogs tecknet i ett kontonamn, eftersom normaliseringen inte tog bort det.
+    data = plan()
+    data["konton"][5]["namn"] = "kost" + tecken + "nad"
     stoppas(tmp_path, data, "U+" + format(ord(tecken), "04X"), "inte syns", ascii=ascii)
 
 

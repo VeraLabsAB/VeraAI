@@ -24,7 +24,7 @@ from las_kontoplan import las_kontoplan  # noqa: E402
 from las_matchningsformat import ladda_matchningsformat, las_matchningsformat  # noqa: E402
 from las_momssatser import las_momssatser  # noqa: E402
 from las_regelbok import REGELBOK_NYCKLAR, Regelbok, RegelbokFel, las_regelbok  # noqa: E402
-from test_las_momssatser import DOLDA, json_block_i_design  # noqa: E402
+from test_las_momssatser import DOLDA, N1_OSYNLIGA, json_block_i_design  # noqa: E402
 
 
 # --- Påhittad konfiguration ---
@@ -1052,12 +1052,13 @@ def test_m5_stoppregel(tmp_path, konfiguration, data, texter):
 def test_m5_latinska_namn_godtas(tmp_path, konfiguration):
     # Skydd: svenska och andra latinska bokstäver, fullbreddsbokstäver (som är latinska efter NFKC),
     # vanliga tecken och olika sorters bindestreck i ett id godtas, och namnen sparas som de står.
-    data = bok(agare_och_narstaende=["Ägare Åström", "Ølhus Straße"])
-    data["regler"][0]["galler"]["motpart"] = "Café Ölund & Söner AB"
+    # Ändrat efter granskning 8 (N2): "&", "Ø" och "ß" stoppas nu (test_n2_stoppregel).
+    data = bok(agare_och_narstaende=["Ägare Åström", "Ölhus Strasse"])
+    data["regler"][0]["galler"]["motpart"] = "Café Ölund och Söner AB"
     data["regler"][2]["galler"]["kassaregister"] = "Ｋａｓｓａ-7"
     data["regler"][0]["id"] = "r" + chr(0x2010) + "LEV-1"
     regelbok = las(tmp_path, data, konfiguration)
-    assert regelbok.regler[0]["galler"]["motpart"] == "Café Ölund & Söner AB"
+    assert regelbok.regler[0]["galler"]["motpart"] == "Café Ölund och Söner AB"
     assert regelbok.regler[0]["id"] == "r" + chr(0x2010) + "LEV-1"
     assert regelbok.ar_agare_eller_narstaende("ÄGARE ÅSTRÖM") is True
 
@@ -1213,3 +1214,209 @@ def test_m7_uppslag_med_fel_bankrad_stoppar(tmp_path, konfiguration, rad, text):
     regelbok = las(tmp_path, bok(agare_och_narstaende=["AGARE-X"]), konfiguration)
     with pytest.raises(RegelbokFel, match=re.escape("Uppslaget i regelboken: " + text)):
         regelbok.ar_bankrad_mot_agare_eller_narstaende(rad)
+
+
+# --- Granskning 8, N1: osynliga tecken enligt Unicodes egen lista ---
+# Granskarens prov Q08–Q12: testbutikens regelbok (med AGARE-1 i agare_och_narstaende) och en ny regel
+# R-AGARE-X för leverantörsfakturor med nivå A. Förut godtogs regeln, och ägaren kändes inte igen.
+
+N1_PROV = {
+    "q08_17b4": ("AGARE-1" + chr(0x17B4), chr(0x17B4)),
+    "q09_17b5": ("AGA" + chr(0x17B5) + "RE-1", chr(0x17B5)),
+    "q10_2065": ("AGARE-1" + chr(0x2065), chr(0x2065)),
+    "q11_fff0": ("AGARE-1" + chr(0xFFF0), chr(0xFFF0)),
+    "q12_e0080": ("AGARE-1" + chr(0xE0080), chr(0xE0080)),
+}
+
+
+@pytest.mark.parametrize("motpart, tecken", N1_PROV.values(), ids=N1_PROV.keys())
+def test_n1_regel_for_agaren_med_osynligt_tecken_stoppar_filen(tmp_path, motpart, tecken):
+    # Samma tecken i listan med ägare, och granskarens andra regel R-LEV-TE-2 för LEV-TE med tecknet,
+    # bredvid den vanliga R-LEV-TE, stoppas också.
+    for nya_regler, agare in (([leverantorsregel("R-AGARE-X", motpart)], None), ([], ["AGARE-1", motpart]),
+                              ([leverantorsregel("R-LEV-TE-2", "LEV-TE" + tecken, konto="6071")], None)):
+        with pytest.raises(RegelbokFel) as fel:
+            las_testbutikens_regelbok(regelbok_fran_testbutiken_med(tmp_path, *nya_regler, agare=agare))
+        meddelande = str(fel.value)
+        assert "tecknet U+" + format(ord(tecken), "04X") + ", som inte syns" in meddelande, meddelande
+
+
+@pytest.mark.parametrize("ascii", [False, True], ids=["som_tecken", "som_kod_i_json"])
+@pytest.mark.parametrize("tecken", N1_OSYNLIGA.values(), ids=N1_OSYNLIGA.keys())
+def test_n1_osynligt_tecken_enligt_unicode_stoppar_regelboken(tmp_path, konfiguration, tecken, ascii):
+    for data in (andrad(((R, 0, "galler", "motpart"), "MOTPART-A" + tecken)),
+                 andrad(((R, 2, "galler", "kassaregister"), "KASSA" + tecken + "-X")),
+                 bok(agare_och_narstaende=["AGARE-X" + tecken]), bok(anteckning="på" + tecken + "hittad")):
+        stoppas(tmp_path, data, konfiguration, "U+" + format(ord(tecken), "04X"), "inte syns", ascii=ascii)
+
+
+# --- Granskning 8, N2: ett namn får bara ha de tecken som SPEC tillåter ---
+# Granskarens prov: samma regel R-AGARE-X med nivå A, med ett tecken som syns och ser ut som ett
+# bindestreck, en etta eller ett A. Förut godtogs alla, och ägaren kändes inte igen.
+
+N2_PROV = {
+    "q05_02d7": ("AGARE" + chr(0x02D7) + "1", "U+02D7 (MODIFIER LETTER MINUS SIGN)"),
+    "q06_2043": ("AGARE" + chr(0x2043) + "1", "U+2043 (HYPHEN BULLET)"),
+    "q07_2500": ("AGARE" + chr(0x2500) + "1", "U+2500 (BOX DRAWINGS LIGHT HORIZONTAL)"),
+    "q13_01c0": ("AGARE-" + chr(0x01C0), "U+01C0 (LATIN LETTER DENTAL CLICK)"),
+    "q14_05c0": ("AGARE-" + chr(0x05C0), "U+05C0 (HEBREW PUNCTUATION PASEQ)"),
+    "q15_0323": ("AGARE-1" + chr(0x0323), "U+0323 (COMBINING DOT BELOW)"),
+    "q18_1d00": (chr(0x1D00) + "GARE-1", "U+1D00 (LATIN LETTER SMALL CAPITAL A)"),
+    "q19_0131": ("AGARE-" + chr(0x0131), "U+0131 (LATIN SMALL LETTER DOTLESS I)"),
+    "q20_0336": ("AGARE-1" + chr(0x0336), "U+0336 (COMBINING LONG STROKE OVERLAY)"),
+}
+
+
+@pytest.mark.parametrize("motpart, tecken", N2_PROV.values(), ids=N2_PROV.keys())
+def test_n2_regel_for_agaren_med_tecken_som_inte_ar_tillatet_stoppar_filen(tmp_path, motpart, tecken):
+    for nya_regler, agare, vad in (([leverantorsregel("R-AGARE-X", motpart)], None,
+                                    "'motpart' i 'galler' i regel nummer 11 (R-AGARE-X)"),
+                                   ([], ["AGARE-1", motpart], "motpart nummer 2 i 'agare_och_narstaende'")):
+        with pytest.raises(RegelbokFel) as fel:
+            las_testbutikens_regelbok(regelbok_fran_testbutiken_med(tmp_path, *nya_regler, agare=agare))
+        meddelande = str(fel.value)
+        assert vad + " har tecknet " + tecken in meddelande and "får bara ha" in meddelande, meddelande
+
+
+N2_STOPPAS = {
+    # Skiljetecken som SPEC inte tillåter i ett namn. Vilka som ska godtas väntar på Hugos beslut (N2).
+    "et_tecken": (andrad(((R, 0, "galler", "motpart"), "Café Ölund & Söner AB")), "regel nummer 1 (R-1) har"
+                  " tecknet U+0026 (AMPERSAND)"),
+    "snedstreck": (andrad(((R, 0, "galler", "motpart"), "LEV/A")), "U+002F (SOLIDUS)"),
+    "komma": (andrad(((R, 0, "galler", "motpart"), "LEV A, AB")), "U+002C (COMMA)"),
+    "apostrof": (andrad(((R, 0, "galler", "motpart"), "O'LEV")), "U+0027 (APOSTROPHE)"),
+    "parentes": (andrad(((R, 0, "galler", "motpart"), "LEV (A)")), "U+0028 (LEFT PARENTHESIS)"),
+    "mittpunkt": (andrad(((R, 0, "galler", "motpart"), "LEV" + chr(0x00B7) + "A")), "U+00B7 (MIDDLE DOT)"),
+    # Latinska bokstäver som inte är a–z med eller utan accent.
+    "o_med_snedstreck": (andrad(((R, 0, "galler", "motpart"), "Ølhus")),
+                         "U+00D8 (LATIN CAPITAL LETTER O WITH STROKE)"),
+    "skarpt_s": (andrad(((R, 0, "galler", "motpart"), "Straße")), "U+00DF (LATIN SMALL LETTER SHARP S)"),
+    "ae": (andrad(((R, 0, "galler", "motpart"), "Æble")), "U+00C6 (LATIN CAPITAL LETTER AE)"),
+    "kassaregister": (andrad(((R, 2, "galler", "kassaregister"), "KASSA" + chr(0x2043) + "X")),
+                      "'kassaregister' i 'galler' i regel nummer 3 (R-3) har tecknet U+2043 (HYPHEN BULLET)"),
+    "agare": (bok(agare_och_narstaende=["AGARE" + chr(0x2500) + "X"]), "motpart nummer 1 i 'agare_och_narstaende'"
+              " har tecknet U+2500"),
+}
+
+
+@pytest.mark.parametrize("data, texter", [(fall[0], fall[1:]) for fall in N2_STOPPAS.values()], ids=N2_STOPPAS.keys())
+def test_n2_stoppregel(tmp_path, konfiguration, data, texter):
+    stoppas(tmp_path, data, konfiguration, *texter, "får bara ha")
+
+
+def test_n2_namnkontrollen_godtar_inte_heller_dolda_tecken():
+    # Två lager: ett dolt tecken stoppar redan hela filen (_inga_dolda_tecken_i_json), men namnkontrollen
+    # godtar det inte heller. Bara ett vanligt mellanslag godtas av de tecken som normaliseringen tar bort.
+    from las_regelbok import _tillatet_i_namn
+
+    assert _tillatet_i_namn(" ") and _tillatet_i_namn("-") and _tillatet_i_namn(chr(0x2010))
+    for tecken in (chr(0x200B), chr(0x00A0), chr(0x17B4), chr(0xE0080)):
+        assert not _tillatet_i_namn(tecken), hex(ord(tecken))
+
+
+def test_n2_tillatna_tecken_godtas(tmp_path, konfiguration):
+    # Skydd: latinska bokstäver med och utan accent, fullbreddsbokstäver, siffrorna 0–9, mellanslag,
+    # bindestreck (alla sorter, eftersom de blir "-" efter normaliseringen), understreck och punkt godtas.
+    data = bok(agare_och_narstaende=["Ägare Åström", "agare" + chr(0x2013) + "Y"])
+    data["regler"][0]["galler"]["motpart"] = "Café Ñandú Ü-ç_9.AB"
+    data["regler"][2]["galler"]["kassaregister"] = "Ｋａｓｓａ" + chr(0x2010) + "7"
+    regelbok = las(tmp_path, data, konfiguration)
+    assert regelbok.regler[0]["galler"]["motpart"] == "Café Ñandú Ü-ç_9.AB"
+    assert regelbok.ar_agare_eller_narstaende("AGARE-Y") is True
+
+
+# --- Granskning 8, N3: ägarens namn med ett skiljetecken intill ---
+
+def test_n3_uppslaget_hittar_agaren_med_skiljetecken_intill():
+    # Granskarens prov med testbutikens regelbok (AGARE-1). Förut pekades raderna med ett skiljetecken
+    # intill namnet inte ut, och inte heller ett mellanslag i stället för bindestrecket.
+    regelbok = las_testbutikens_regelbok()
+    ja = [("UTTAG AGARE-1", ""), ("UTTAG AGARE-1,LAN", ""), ("UTTAG AGARE-1, LAN", ""), ("UTTAG AGARE-1.", ""),
+          ("UTTAG (AGARE-1)", ""), ("TILL:AGARE-1", ""), ("UTTAG AGARE-1/MARS", ""), ("X", "AGARE-1;LON"),
+          ("UTTAG AGARE 1", ""), ("UTTAG AGARE" + chr(0x02D7) + "1", ""), ("UTTAG AGARE-1" + chr(0x17B4), ""),
+          ("LON A GARE-1", "")]
+    nej = [("UTTAG AGARE-1X", ""), ("UTTAG AGARE-10", ""), ("KOP AGARE-12 AB", ""), ("UTTAG GARE-1", ""),
+           ("UTTAGAGARE-1", ""), ("", "")]
+    for beskrivning, referens in ja:
+        assert regelbok.ar_bankrad_mot_agare_eller_narstaende({"beskrivning": beskrivning, "referens": referens}), (
+            beskrivning, referens)
+    for beskrivning, referens in nej:
+        assert not regelbok.ar_bankrad_mot_agare_eller_narstaende({"beskrivning": beskrivning, "referens": referens}), (
+            beskrivning, referens)
+
+
+def matchningsformat_fran_testbutiken_med(tmp_path, *nya_regler):
+    """Testbutikens matchningsformat med nya_regler till sist i kraver_inte_underlag, läst med las_matchningsformat."""
+    data = json.loads((TESTBUTIKEN / "matchning.json").read_text(encoding="utf-8"))
+    data["kraver_inte_underlag"] += list(nya_regler)
+    fil = tmp_path / "matchning.json"
+    fil.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return las_matchningsformat(fil)
+
+
+def regelbok_fran_testbutiken_mot(matchningsformat):
+    """Testbutikens regelbok, kontoplan och momsfil, och matchningsformatet."""
+    return las_regelbok(REGELBOK_FIL, las_kontoplan(TESTBUTIKEN / "kontoplan.json"),
+                        las_momssatser(TESTBUTIKEN / "momssatser.json"), matchningsformat)
+
+
+def test_n3_en_regel_i_matchningsformatet_undantar_aldrig_agarens_bankrader(tmp_path):
+    # Granskarens prov: regeln agaruttag (pengar ut, beskrivningen börjar med "UTTAG AGARE") och en
+    # bankfil läst med las_bankfil. Rad 1–3 är ägarens uttag. Förut passade alla fem raderna regeln, så
+    # att rad 2 och 3 slapp underlag utan att pekas ut. Nu pekas rad 1–3 ut, och regeln gäller dem inte.
+    # Rad 4 och 5 kan vara andra motparter.
+    from las_bank import ladda_bankformat, las_bankfil
+
+    rader = [
+        "Radnummer,Bokföringsdag,Transaktionsdag,Referens,Beskrivning,Belopp,Bokfört saldo",
+        "1,2025-04-01,2025-04-01,UTTAG-1,UTTAG AGARE-1,-500.00,9500.00",
+        "2,2025-04-01,2025-04-01,UTTAG-2,UTTAG AGARE-1/LAN,-100.00,9400.00",
+        "3,2025-04-02,2025-04-02,UTTAG-3,UTTAG AGARE-1.,-100.00,9300.00",
+        "4,2025-04-02,2025-04-02,UTTAG-4,UTTAG AGARE-1X,-100.00,9200.00",
+        "5,2025-04-03,2025-04-03,UTTAG-5,UTTAG AGARE-10,-100.00,9100.00",
+    ]
+    fil = tmp_path / "bank.csv"
+    fil.write_text("\n".join(rader) + "\n", encoding="utf-8")
+    period = las_bankfil(fil, ladda_bankformat(TESTBUTIKEN / "bankformat.json"), 1000000, 910000)
+    regelbok = regelbok_fran_testbutiken_mot(matchningsformat_fran_testbutiken_med(tmp_path, {
+        "namn": "agaruttag", "riktning": "ut", "beskrivning_borjar_med": "UTTAG AGARE", "hogst_belopp_ore": 100000}))
+    assert [rad["radnr"] for rad in period.rader if regelbok.ar_bankrad_mot_agare_eller_narstaende(rad)] == [1, 2, 3]
+    assert [regelbok.matchningsregel_for_bankrad(rad) for rad in period.rader] == [
+        None, None, None, "agaruttag", "agaruttag"]
+
+
+@pytest.mark.parametrize("regel, text", [
+    ({"namn": "agaruttag", "riktning": "ut", "beskrivning_borjar_med": "UTTAG AGARE-1", "hogst_belopp_ore": 100000},
+     "är 'beskrivning_borjar_med' 'UTTAG AGARE-1'"),
+    ({"namn": "agaruttag", "riktning": "ut", "referens_borjar_med": "agare" + chr(0x2013) + "1/",
+      "hogst_belopp_ore": 100000}, "är 'referens_borjar_med' 'agare" + chr(0x2013) + "1/'"),
+    ({"namn": "agarinsattning", "riktning": "in", "beskrivning_borjar_med": "INSATTNING FRAN (AGARE-1)"},
+     "är 'beskrivning_borjar_med' 'INSATTNING FRAN (AGARE-1)'"),
+], ids=["beskrivning", "referens_med_tankstreck", "pengar_in"])
+def test_n3_regel_i_matchningsformatet_som_namner_en_agare_stoppar_regelboken(tmp_path, regel, text):
+    # En sådan regel skulle undanta ägarens bankrader från underlag. Förut godtogs den.
+    with pytest.raises(RegelbokFel) as fel:
+        regelbok_fran_testbutiken_mot(matchningsformat_fran_testbutiken_med(tmp_path, regel))
+    meddelande = str(fel.value)
+    assert meddelande.startswith("Regelboken i " + str(REGELBOK_FIL)), meddelande
+    for del_ in ("i regeln " + repr(regel["namn"]) + " i matchningsformatet", text, "'AGARE-1' i 'agare_och_narstaende'",
+                 "aldrig undanta"):
+        assert del_ in meddelande, meddelande
+
+
+# --- Granskning 8, N7: regelbokens uppslag på ett objekt skapat med __new__ ---
+
+@pytest.mark.parametrize("uppslag", [
+    lambda bok_: bok_.regel_for_underlag("kvitto", "MOTPART-A", "2025-01-01"),
+    lambda bok_: bok_.regel_for_z_rapport("KASSA-X", "2025-01-01"),
+    lambda bok_: bok_.regel_for_bankrad("regel_in", "2025-01-01"),
+    lambda bok_: bok_.ar_agare_eller_narstaende("AGARE-X"),
+    lambda bok_: bok_.ar_bankrad_mot_agare_eller_narstaende({"beskrivning": "UTTAG AGARE-X", "referens": ""}),
+    lambda bok_: bok_.matchningsregel_for_bankrad({"belopp_ore": 100, "referens": "IN-7", "beskrivning": "x"}),
+], ids=["regel_for_underlag", "regel_for_z_rapport", "regel_for_bankrad", "ar_agare_eller_narstaende",
+        "ar_bankrad_mot_agare_eller_narstaende", "matchningsregel_for_bankrad"])
+def test_n7_uppslag_i_en_tom_regelbok_ger_ett_tydligt_fel(uppslag):
+    # Förut gav uppslaget AttributeError: _regelboken, som inte förklarar något.
+    with pytest.raises(RegelbokFel, match=re.escape("Uppslaget i regelboken: regelboken är tom eller trasig. Den har"
+                                                    " inte skapats av las_regelbok.")):
+        uppslag(object.__new__(Regelbok))
