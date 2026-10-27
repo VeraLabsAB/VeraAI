@@ -2648,3 +2648,202 @@ BESLUT SOM BEHÖVS (Hugo eller Casper):
 NÄSTA STEG: Låt en byggsession rätta PROGRESS.md och märka besluten med
   namn och datum. Kör punkt 5 med git archive. Lägg in punkt 1–4 i
   spärrsteget och nivåsteget, eller gör dem nu om ni bestämmer det.
+
+## Granskning 10 – dd0e1cf (2026-10-28)
+
+Oberoende granskning i en ny session som inte har sett bygget. Granskat: koden och testerna i commit
+`dd0e1cf` och dokumentationen i `8239ddc` (SPEC.md och PROGRESS.md), jämfört med `ba42d26`. Ingenting i
+projektets kod är ändrat. Den här texten är hela granskningen.
+
+**Kort sagt:** båda besluten (a) och (b) är byggda och gör i stort sett det de säger, och testerna fångar
+alla tolv felaktiga varianter av koden som granskaren provade. Men det finns ett hål i beslut (a): en lista
+som bara innehåller ett tecken som `-` eller `.` godtas, fast den aldrig kan känna igen en enda ägare (P1).
+Det är i praktiken en tom lista.
+
+### Vad som lästes
+
+`CLAUDE.md`, SPEC.md (avsnitt 6, 7, 7.1, 11 och Ö13), PROGRESS.md, Granskning 9 (sammanfattningen),
+`git diff ba42d26 HEAD`, hela `scripts/las_regelbok.py` och `scripts/matcha_bank.py`, funktionerna
+`star_som_hela_ord`, `_ord_i` och `normalisera_for_jamforelse` i `scripts/normalisering.py`,
+`normalisera_kassaregister` i `scripts/las_kassa.py`, och de delar av `foretag/README.md` och
+`DESIGN-regelbok.md` som nämner listan.
+
+### Hur granskaren prövade
+
+- **Ren kopia:** `git archive -o <scratchpad>/head.tar HEAD`, uppackad med `tar` till två mappar i
+  scratchpad-mappen: en orörd kopia (för testsviten) och en kopia för egna prov och mutationer.
+- **Egna prov:** en egen testfil (`test_granskning10_prov.py`) skrevs bara i kopian, med bara påhittade
+  data (ägaren `PAHITTAD-AGARE`, påhittade konton, satser, bankformat och underlag från testernas egna
+  påhittade konfiguration). Inga av testföretagets uppgifter användes.
+- **Mutationer:** en **mutation** är en medveten liten felaktighet i koden, för att se om testerna blir
+  röda. Varje mutation gjordes i kopian med fil-verktyget Edit, testerna kördes, och mutationen togs bort
+  innan nästa. Efteråt visade `diff -r` att kopian var lika med den orörda kopian (utom provfilen).
+
+### Testsviten (punkt 6)
+
+| Var | Kommando | Resultat |
+|---|---|---|
+| Projektet | `.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests` | **2 794 passed**, 0 röda (28 s) |
+| Ren kopia av HEAD (8239ddc) från `git archive` | samma, med kopians sökväg | **2 794 passed**, 0 röda (28 s) |
+
+Antalet stämmer med PROGRESS.md (2 794).
+
+### Fynd
+
+**P1 – Beslut (a) går att kringgå med en lista som inte kan känna igen någon (allvar: medel).**
+Listan `agare_och_narstaende` godtas om den innehåller ett namn som bara består av skiljetecken, till
+exempel `["-"]`, `["."]`, `["_"]`, `["-.-"]`, `["_ ."]` eller `["–"]` (tankstreck). Namnkontrollen (N2)
+tillåter bindestreck, punkt, understreck och mellanslag, och ett namn får bestå av bara sådana tecken.
+Men uppslaget för bankrader (`star_som_hela_ord`) tar bort allt som inte är bokstäver och siffror, och
+"ett namn som blir tomt efter normaliseringen står aldrig i en text". Resultatet är en lista som ser
+ifylld ut och går igenom `las_regelbok`, men som aldrig pekar ut en enda bankrad mot en ägare.
+- *Prövat:* sex sådana listor lästes med `las_regelbok`, och uppslaget prövades på sju bankrader, bland
+  annat `"-"`, `"UTTAG - AGARE"` och raden med samma tecken som i listan.
+- *Resultat:* alla sex listor godtogs, och ingen bankrad pekades ut. En människa som skriver `-` för att
+  säga "ingen ägare" får alltså samma resultat som den tomma lista som Hugos beslut 2026-10-27 skulle
+  stoppa.
+- *Förslag:* ett namn i listan ska ha minst en bokstav eller siffra (det vill säga inte bli tomt i
+  `star_som_hela_ord`), annars stoppas hela körningen med samma text som för en tom lista. Det kräver
+  ett OK, eftersom det ändrar vad som godtas (se beslut nedan).
+
+**P2 – Alla stopp på grund av listan säger inte att hela körningen stoppas (allvar: låg).**
+SPEC avsnitt 11 och beskrivningen i `las_regelbok.py` säger att en oläsbar lista stoppar körningen "med
+ett fel som säger det". Körningen stoppas i alla fall granskaren prövade, men i tre fall saknar felet
+meningen "Hela körningen stoppas":
+- ett dolt tecken i listan (till exempel U+200B, eller en tabb som enda namn): felet kommer från den
+  allmänna kontrollen av dolda tecken, som körs på hela filen innan listan prövas,
+- trasig JSON i listan (till exempel ett kommatecken för mycket): felet säger bara att filen inte är
+  giltig JSON,
+- en tom lista tillsammans med ett annat fel som prövas först (till exempel `granser` utan
+  `b_hogst_ore`): felet säger bara det andra felet.
+
+Inget av detta släpper igenom något, eftersom ingen Regelbok skapas. Det är texten i dokumentationen som
+lovar lite mer än koden gör. *Förslag:* skriv i SPEC 11 att felet säger att körningen stoppas när listan
+själv är fel, eller låt felen ovan också få texten.
+
+**P3 – En ägarrad med skiljetecken intill namnet matchas aldrig mot sitt underlag (allvar: låg, säker riktning).**
+Matchningen och ägaruppslaget delar texten i ord på olika sätt. Ägaruppslaget delar vid allt som inte är
+en bokstav eller siffra (N3), men matchningen (regel 2 i `matcha_bank.py`) delar bara vid blanksteg.
+- *Prövat:* fyra ägarrader med ett underlag från ägaren med samma belopp och datum:
+  `"UTTAG PAHITTAD-AGARE"`, `"UTTAG/PAHITTAD-AGARE"`, `"pahittad agare"` och `"UTTAG (PAHITTAD-AGARE)"`.
+- *Resultat:* bara den första blev ett ärende "kräver mänsklig bedömning" (K7) med underlaget som
+  kandidat. De tre andra pekas ut som ägarrader och är märkta, men underlaget blir aldrig kandidat, så
+  raden väntar och blir efter 7 dagar ett ärende "saknat underlag", fast underlaget finns. Ingen av dem
+  blev en vanlig matchning. Det är alltså säkert, men ärendets text blir missvisande för människan.
+  Beteendet fanns före dd0e1cf (det hör till regel 2), och tas med här bara för att det rör ägarraderna.
+
+**P4 – Raden som pekas ut är bara den där ägarens namn står i bankraden (allvar: information).**
+Granskaren prövade om matchningen någonsin ser ägarens namn i en bankrad (så att ägarens underlag blir
+kandidat) utan att ägaruppslaget gör det, vilket skulle ge en vanlig matchning för en ägarrad.
+- *Prövat:* alla texter av 1–5 bitar ur `PAHITTAD`, `AGARE`, `-`, mellanslag, `/`, `.`, `_`, tankstreck,
+  U+200B och `X`, totalt 111 110 texter.
+- *Resultat:* inget sådant fall. När ägarens underlag är kandidat är raden alltid utpekad och märkt.
+- Ett underlag från ägaren på en bankrad som inte nämner ägaren (till exempel `"BETALNING"`) blir inte
+  kandidat alls, eftersom motparten ska stå i bankraden. Raden väntar på underlag. Den matchas alltså inte
+  heller.
+- Att konteringsförslaget (`skapa_konteringsforslag`) inte tar emot matchningens resultat betyder att
+  märkningen ännu inte följer med till förslagen. Det är väntat, eftersom nivån D sätts i nivåsteget
+  (uppgift 6, Ö13), men nivåsteget behöver använda märkningen eller uppslaget, så att ett förslag för
+  ett underlag som hör till en ägarrad inte får lägre nivå än D.
+
+**P5 – DESIGN-regelbok.md säger fortfarande att listan är valfri (allvar: låg, dokumentation).**
+`DESIGN-regelbok.md` avsnitt 1 (raderna om ägartransaktioner) säger "den valfria nyckeln
+`agare_och_narstaende`". PROGRESS.md (Öppet 4) nämner bara att `foretag/README.md` är inaktuell, där
+tabellen säger "Nej" (inte obligatorisk) och "en tom lista godtas". Beslutet 2026-10-26 i DESIGN avsnitt 8
+("en ny, valfri nyckel ... Saknas nyckeln är listan tom") är historik, men det står inte där att Hugos
+beslut 2026-10-27 har ersatt det.
+
+**P6 – En otydlig mening i PROGRESS.md (allvar: låg, dokumentation).**
+PROGRESS.md Öppet 1 säger att "granskningens punkt 4 är okänd". Det framgår inte om det är punkt 4 i
+granskningens prov eller beslut 4 i dess sammanfattning (vem som tog N3-beslutet). Beslut 4 är nu besvarat
+i SPEC (Hugos beslut 2026-10-27). Meningen bör skrivas om eller tas bort.
+
+### Svar på uppdragets frågor
+
+**1. Beslut (a), Hugos beslut 2026-10-27.** En saknad nyckel prövas före allt annat i filen utom JSON,
+dolda tecken, att filen är ett objekt och kontrollen av de tre andra filerna, och ger ett fel på svenska som säger att hela körningen stoppas. En
+tom lista och en lista som inte går att läsa (text, null, objekt, heltal, heltal eller null i listan, tom
+text, dubblett, otillåtet tecken) ger också det felet. Ingen Regelbok skapas då, och `matcha_period` och
+`skapa_konteringsforslag` tar bara emot en Regelbok (prövas med `type(...) is Regelbok`, och en regelbok
+skapad förbi `las_regelbok` stoppas). Ingenting går alltså vidare. Undantagen är P1 (en lista som godtas
+men inte känner igen någon) och P2 (tre stopp där felet inte säger att hela körningen stoppas).
+
+**2. Beslut (b), Hugos beslut 2026-10-27.** Ja. Varje post i matchningens fyra grupper för bankrader har
+`kraver_mansklig_bedomning`, och den är sann exakt för raderna som regelbokens uppslag pekar ut. En ägarrad
+med exakt ett underlag blir ett ärende "kräver mänsklig bedömning" med kontroll K7 och underlaget som
+enda kandidat, och underlaget räknas som oavstämt. Med flera underlag blir den "tvetydig", utan underlag
+väntar den eller blir "saknat underlag", alltid märkt. Den hamnar aldrig bland matchningarna eller bland
+raderna som inte kräver underlag, eftersom `Regelbok.matchningsregel_for_bankrad` aldrig ger en regel för
+den (regeln från ea51c97). Granskarens egna prov (P3, P4, och en ägarrad vars underlag passar två rader,
+som blev två märkta "tvetydig") bekräftar det.
+
+**3. Företagsspecifikt i kärnan.** Nej. Ändringarna i `las_regelbok.py` och `matcha_bank.py` innehåller
+inga företagsnamn, konton, momssatser eller belopp. Det enda nya är texter, nyckelnamn och kontrollernas
+nummer (K3, K7). En sökning efter `agare-`, `pahittad`, `syntet` och `testbutik` i de två filerna gav
+inga träffar.
+
+**4. Testerna.** De nya testerna prövar besluten på riktigt. Tolv mutationer, alla röda:
+
+| Mutation | Röda tester |
+|---|---|
+| M1: en tom lista godtas | 3 |
+| M2: den saknade nyckeln prövas inte först (det allmänna felet "saknar nyckeln" utan stopptexten) | 1 |
+| M3: felen i listan får inte texten "Hela körningen stoppas" | 11 |
+| M4: en ägarrad med ett underlag blir en vanlig matchning | 3 |
+| M5: ägarens underlag räknas som avstämt | 2 |
+| M6: ägarens ärende får kontroll K3 i stället för K7 | 1 |
+| M7: en tvetydig ägarrad märks inte | 1 |
+| M8: en ägarrad med "saknat underlag" märks inte | 2 |
+| M9: en väntande ägarrad märks inte | 3 |
+| M10: alla vanliga matchningar märks | 2 |
+| M11: ägarens ärende saknar underlaget som kandidat | 3 |
+| M12: ingen rad märks som ägarrad | 6 |
+
+Testerna bygger på påhittade data (`PAHITTAD-AGARE`) och har skydd ("med en annan ägare undantas samma
+rad"), så de kan inte passera bara för att testföretagets data råkar se ut på ett visst sätt. Det som
+saknas är ett test för P1 (en lista med bara skiljetecken). Fuzz-testet (som prövar slumpvis skadade
+indata) fångade M8, M9, M10 och M12, men inte M4. M4 fångas ändå av tre riktade tester.
+
+**5. Dokumentationen.** SPEC avsnitt 11, Ö13 och PROGRESS.md stämmer med koden, med undantag för P2
+(texten om felmeddelandet lovar lite mer än koden gör), P5 och P6. Besluten står med namn och datum:
+"Hugos beslut 2026-10-27" för (a) och (b), och "Hugos beslut i chatten 2026-10-27" för att listan ligger
+kvar i regelboken tills spärrsteget. SPEC:s statusrad nämner ändringen 2026-10-28 och commit dd0e1cf.
+
+**6. Testsviten.** Se tabellen ovan: 2 794 passed i projektet och i den rena kopian.
+
+**7. Annat i ägarspärren.** Känt och inte ett fynd i sig: listan ligger i `foretag/<namn>/regelbok.json`,
+där agenten kan skriva, tills spärrsteget (Hugos beslut i chatten 2026-10-27), och nivån D är inte byggd
+(uppgift 6). Det betyder också att den som kan skriva i regelboken kan byta ut ägaren mot ett påhittat
+namn. P1 är något annat: där räcker ett misstag, inte en ändring med avsikt.
+
+### Kommandon
+
+Alla kommandon kördes ett i taget från projektmappen, utan `cd`, `;`, `|`, `&&`, `>` och `sed`. Kopior och
+provfilen låg bara i scratchpad-mappen. Kommandon som inte står ordagrant på listan i SPEC 7.1:
+- `ls` på den delade anteckningsmappen för sessionerna (utanför projektet och inte en kopia). Den var tom.
+- `tail` på utfallsfilerna från de två testkörningarna, som kördes i bakgrunden och skrev sin utskrift i
+  en tillfällig mapp utanför projektet (inte scratchpad-mappen).
+- `git diff --stat` och `git diff --word-diff=porcelain -U0` (tillägg till `git diff`).
+- Pytest med `-k "not prov"`, `-k "agarlista"`, `-rA`, `-rf` och `--tb=short|line|no`, som alla får användas
+  enligt SPEC 7.1.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **P1:** ska ett namn i `agare_och_narstaende` som inte har någon bokstav eller siffra (till exempel
+   `-` eller `.`) räknas som tomt och stoppa hela körningen? Rekommendation: ja, det följer av Hugos beslut
+   2026-10-27 om en tom lista.
+2. **P2:** räcker det att körningen stoppas, eller ska felet alltid säga "Hela körningen stoppas" när
+   listan är orsaken (också vid dolda tecken och trasig JSON)? Rekommendation: rätta texten i SPEC 11, och
+   låt koden vara.
+3. **P5 och P6:** får en byggsession rätta `DESIGN-regelbok.md` avsnitt 1, `foretag/README.md` och
+   meningen i PROGRESS.md?
+
+STATUS: gult
+KAN JAG GÅ VIDARE: ja, men rätta P1 först. Besluten (a) och (b) är byggda,
+  testade och fångar alla tolv mutationer. P1 är ett litet hål i (a): en
+  lista med bara "-" eller "." godtas men känner aldrig igen någon ägare.
+BESLUT SOM BEHÖVS: P1 (ska ett namn utan bokstäver och siffror stoppa
+  körningen?), P2 (felets text) och P5–P6 (dokumentationen), se ovan.
+NÄSTA STEG: En byggsession rättar P1 med ett test, och P5–P6 i
+  dokumentationen. Därefter uppgift 4. Nivåsteget (uppgift 6) ska använda
+  märkningen så att förslag för ägarens rader får nivå D (P4).
