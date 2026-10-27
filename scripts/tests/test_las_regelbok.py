@@ -411,6 +411,61 @@ def test_a_utan_godkand_agarlista_finns_ingen_regelbok_att_ga_vidare_med(tmp_pat
     assert las(tmp_path, bok(), konfiguration).agare_och_narstaende == ["PAHITTAD-AGARE"]
 
 
+# --- Granskning 10, P1: ett namn utan bokstäver och siffror räknas som tomt ---
+# Hugos beslut 2026-10-28. Ett namn som bara har skiljetecken och mellanslag blir tomt när det delas i
+# ord (normalisering.star_som_hela_ord) och står därför aldrig i en bankrad. En lista med ett sådant namn
+# ser ifylld ut men känner aldrig igen den ägaren, och stoppar hela körningen som en tom lista.
+
+TANKSTRECK = chr(0x2013)
+
+
+@pytest.mark.parametrize("agare, nummer", [
+    (["-"], 1),
+    (["."], 1),
+    (["_"], 1),
+    (["-.-"], 1),
+    (["_ ."], 1),
+    ([TANKSTRECK], 1),
+    (["PAHITTAD-AGARE", "-"], 2),
+    (["-", "PAHITTAD-AGARE"], 1),
+], ids=["bindestreck", "punkt", "understreck", "blandat", "med_mellanslag", "tankstreck", "efter_ett_giltigt_namn",
+        "fore_ett_giltigt_namn"])
+def test_p1_namn_utan_bokstaver_och_siffror_stoppar_hela_korningen(tmp_path, konfiguration, agare, nummer):
+    namn = agare[nummer - 1]
+    meddelande = stoppas(
+        tmp_path, bok(agare_och_narstaende=agare), konfiguration,
+        "motpart nummer " + str(nummer) + " i listan över ägare och närstående ('agare_och_narstaende') är "
+        + repr(namn) + ", som saknar bokstäver och siffror",
+        "aldrig kan kännas igen i en bankrad",
+        "skriv in ägarens eller den närståendes namn",
+        STOPP_UTAN_AGARLISTA,
+    )
+    # Felet säger vilken fil (stoppas prövar början), vilket värde, var det står och hur det rättas, i en
+    # mening före texten om att hela körningen stoppas.
+    forklaring = meddelande.split(": ", 1)[1].split(" Utan en giltig lista")[0]
+    assert forklaring.endswith("."), meddelande
+    assert forklaring.replace(repr(namn), "").count(".") == 1, meddelande
+
+
+def test_p1_ingen_regelbok_med_ett_namn_utan_bokstaver_och_siffror(tmp_path, konfiguration):
+    # Utan en Regelbok kan varken matchningen eller konteringsförslagen köras.
+    for agare in (["-"], ["PAHITTAD-AGARE", "-"]):
+        with pytest.raises(RegelbokFel, match=STOPP_UTAN_AGARLISTA):
+            las(tmp_path, bok(agare_och_narstaende=agare), konfiguration)
+
+
+def test_p1_namn_med_minst_en_bokstav_eller_siffra_godtas(tmp_path, konfiguration):
+    # Skydd: ett namn med en enda bokstav eller siffra, och vanliga påhittade namn med accent, mellanslag,
+    # punkt och bindestreck, godtas fortfarande och känns igen i en bankrad.
+    namn = ["0", "A", "PAHITTAD-AGARE", "Åsa Öberg", "Ägare 2", "É. Larsson AB"]
+    for ett in namn:
+        regelbok = las(tmp_path, bok(agare_och_narstaende=[ett]), konfiguration)
+        assert regelbok.agare_och_narstaende == [ett]
+        assert regelbok.ar_bankrad_mot_agare_eller_narstaende({"beskrivning": "UTTAG " + ett, "referens": ""}), ett
+    regelbok = las(tmp_path, bok(agare_och_narstaende=namn), konfiguration)
+    assert regelbok.agare_och_narstaende == namn
+
+
 @pytest.mark.parametrize("varde", [None, 5, True, ["AGARE-X"]])
 def test_uppslag_av_agare_med_annat_an_text_stoppar(tmp_path, konfiguration, varde):
     regelbok = las(tmp_path, bok(agare_och_narstaende=["AGARE-X"]), konfiguration)
