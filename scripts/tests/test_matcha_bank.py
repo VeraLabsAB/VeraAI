@@ -36,6 +36,7 @@ from las_momssatser import las_momssatser  # noqa: E402
 from las_regelbok import Regelbok, RegelbokFel, las_regelbok  # noqa: E402
 from las_underlag import UnderlagFilFel, Underlagsperiod, las_underlagsperiod  # noqa: E402
 from matcha_bank import MatchningFel, Matchningsresultat, matcha_period  # noqa: E402
+import test_las_regelbok as pahittat  # noqa: E402  den påhittade konfigurationen, för beslut (b) nedan
 
 BANKFORMAT = ladda_bankformat(FORETAG / "bankformat.json")
 MATCHNINGSFORMAT = ladda_matchningsformat(FORETAG / "matchning.json")
@@ -797,7 +798,7 @@ def test_over_gransen_ger_ett_arende_med_regeln_och_gransen(tmp_path):
     arende = resultat.arenden[0]
     assert dict(arende, bankrad=None) == {
         "kontroll": "K3", "typ": "över gräns", "regel": "avgift", "hogst_belopp_ore": 200, "kandidater": (),
-        "bankrad": None,
+        "bankrad": None, "kraver_mansklig_bedomning": False,
         "text": "Bankraden passar regeln 'avgift' för rader som inte kräver underlag, men beloppet är större än"
                 " regelns gräns, 2,00 kr per bankrad. En människa behöver avgöra vad raden är och vilket underlag"
                 " den ska ha.",
@@ -858,6 +859,8 @@ def test_testdatans_avgifter_ligger_inom_gransen(kvartalet):
 
 AGARUTTAG = {"namn": "agaruttag", "riktning": "ut", "beskrivning_borjar_med": "UTTAG AGARE", "hogst_belopp_ore": 100000}
 MED_AGARUTTAG = {**FORMAT, "kraver_inte_underlag": FORMAT["kraver_inte_underlag"] + [AGARUTTAG]}
+# En ägare som inte står i någon av raderna, för skydden. Listan får inte vara tom (beslut a).
+ANNAN = ("AGARE-9",)
 
 
 def granskarens_rader(tmp_path):
@@ -882,8 +885,8 @@ def test_n3_granskarens_prov_agarens_rader_kraver_underlag(tmp_path):
     assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-30", format_=MED_AGARUTTAG)) == tomt(
         arenden=[(1, "saknat underlag", ()), (2, "saknat underlag", ()), (3, "saknat underlag", ())],
         kraver_inte=[(4, "agaruttag"), (5, "agaruttag")])
-    # Skydd: utan ägare i regelboken passar alla fem raderna regeln, så regeln prövas verkligen.
-    assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-30", format_=MED_AGARUTTAG, agare=())) == tomt(
+    # Skydd: med en annan ägare i regelboken passar alla fem raderna regeln, så regeln prövas verkligen.
+    assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-30", format_=MED_AGARUTTAG, agare=ANNAN)) == tomt(
         kraver_inte=[(nummer, "agaruttag") for nummer in range(1, 6)])
 
 
@@ -898,17 +901,19 @@ def test_n3_agarens_rad_over_gransen_kraver_underlag_och_ar_inte_over_grans(tmp_
         arenden=[over_grans(2)], vantande=[(1, "2025-04-08"), (3, "2025-04-08")])
     assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-09", format_=MED_AGARUTTAG)) == tomt(
         arenden=[over_grans(2), (1, "saknat underlag", ()), (3, "saknat underlag", ())])
-    # Skydd: utan ägare i regelboken är rad 1 och 3 också över gränsen.
-    assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-01", format_=MED_AGARUTTAG, agare=())) == tomt(
+    # Skydd: med en annan ägare i regelboken är rad 1 och 3 också över gränsen.
+    assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-01", format_=MED_AGARUTTAG, agare=ANNAN)) == tomt(
         arenden=[over_grans(1), over_grans(2), over_grans(3)])
 
 
-def test_n3_agarens_rad_matchas_mot_ett_underlag(tmp_path):
-    # Raden behandlas som alla rader som kräver underlag: finns ett underlag matchas den med det.
+def test_n3_agarens_rad_med_underlag_blir_ingen_matchning(tmp_path):
+    # Förut matchades raden med underlaget som alla andra rader (granskning 9). Nu blir den ett ärende
+    # "kräver mänsklig bedömning" med underlaget som kandidat (beslut b, Hugos beslut 2026-10-27).
     rader = bankrader(tmp_path, ("UTTAG-1", "UTTAG AGARE-1", -50000, "2025-04-01"))
     underlagen = period(tmp_path, underlag(motpart="AGARE-1", fakturanummer="UTTAG-1", belopp_ore=50000,
                                            datum="2025-04-01"))
-    assert sammanfattning(matcha(rader, underlagen, format_=MED_AGARUTTAG)) == tomt(matchningar=[(1, "U-1")])
+    assert sammanfattning(matcha(rader, underlagen, format_=MED_AGARUTTAG)) == tomt(
+        arenden=[(1, "kräver mänsklig bedömning", ("U-1",))], oavstamda=["U-1"])
 
 
 @pytest.mark.parametrize("referens, beskrivning", [
@@ -922,7 +927,7 @@ def test_n3_agaren_pekas_ut_med_regelbokens_uppslag(tmp_path, referens, beskrivn
     rader = bankrader(tmp_path, (referens, beskrivning, -10000, "2025-04-01"))
     assert regelbok_for(MED_AGARUTTAG).ar_bankrad_mot_agare_eller_narstaende(rader.rader[0])
     # Skydd: regeln passar raden, så det är ägaren som gör att den kräver underlag.
-    assert regelbok_for(MED_AGARUTTAG, agare=()).matchningsregel_for_bankrad(rader.rader[0]) == "agaruttag"
+    assert regelbok_for(MED_AGARUTTAG, agare=ANNAN).matchningsregel_for_bankrad(rader.rader[0]) == "agaruttag"
     assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-30", format_=MED_AGARUTTAG)) == tomt(
         arenden=[(1, "saknat underlag", ())])
 
@@ -939,17 +944,152 @@ def test_n3_en_narstaende_i_listan_galler_som_agaren(tmp_path):
 
 def test_n3_testdatans_rader_ger_samma_resultat_som_utan_agare(kvartalet):
     # Ingen av testdatans rader i Q1 är mot ägaren, så resultatet är exakt detsamma som med en regelbok
-    # utan ägare och närstående (som förut, då matchningen inte visste vilka som är ägare). Testerna
-    # ovan för kvartalet visar att resultatet är detsamma som förut, rad för rad.
+    # med en annan ägare (som förut, då matchningen inte visste vilka som är ägare). En regelbok utan
+    # ägare finns inte längre (beslut a). Testerna ovan för kvartalet visar att resultatet är detsamma
+    # som förut, rad för rad.
     assert not [rad for rad in kvartalet["rader"] if REGELBOK.ar_bankrad_mot_agare_eller_narstaende(rad)]
     assert REGELBOK.agare_och_narstaende == ["AGARE-1"]
     for dag in ("2025-03-31", "2025-04-30"):
         med = matcha_period(kvartalet["bankperiod"], kvartalet["period"], REGELBOK, dag)
-        for regelbok in (regelbok_for(MATCHNINGSFORMAT), regelbok_for(MATCHNINGSFORMAT, agare=())):
+        for regelbok in (regelbok_for(MATCHNINGSFORMAT), regelbok_for(MATCHNINGSFORMAT, agare=ANNAN)):
             assert matcha_period(kvartalet["bankperiod"], kvartalet["period"], regelbok, dag) == med
         kontrollera_grupperna(med, kvartalet["bankperiod"], kvartalet["period"])
     assert [(a["typ"], a["bankrad"]["radnr"]) for a in med.arenden] == [("saknat underlag", 85)]
     assert (len(med.matchningar), len(med.kraver_inte_underlag), len(med.vantande)) == (23, 371, 0)
+
+
+# --- Beslut (b): en bankrad mot en ägare eller närstående kräver mänsklig bedömning (Hugos beslut 2026-10-27) ---
+# Bara påhittade data: kontoplanen, momsfilen och regelboken är de påhittade i test_las_regelbok.py,
+# bankformatet och matchningsformatet är påhittade här, och ägaren heter PAHITTAD-AGARE.
+
+PAHITTAD_AGARE = "PAHITTAD-AGARE"
+KRAVER_BEDOMNING = "kräver mänsklig bedömning"
+PAHITTAT_BANKFORMAT = {
+    "kolumner": {"radnr": "Nr", "bokforingsdag": "Bokdag", "transaktionsdag": "Transdag", "referens": "Ref",
+                 "beskrivning": "Text", "belopp": "Summa", "saldo": "Saldo"},
+    "avgransare": [";"],
+    "anteckning": "påhittat",
+}
+PAHITTAT_FORMAT = {
+    "kraver_inte_underlag": pahittat.MATCHNING["kraver_inte_underlag"] + [
+        {"namn": "pahittat_uttag", "riktning": "ut", "referens_borjar_med": "PA-", "beskrivning_borjar_med": "PAHITTAT UTTAG",
+         "hogst_belopp_ore": 40000}],
+    "tidsfonster_dagar": {"leverantorsfaktura": 30, "kvitto": 3},
+    "saknat_underlag_efter_dagar": 7,
+}
+
+
+def pahittad_konfiguration(mapp, agare=(PAHITTAD_AGARE,)):
+    """(bankformat, regelbok), lästa med de vanliga inläsningsfunktionerna ur påhittade filer i mappen."""
+    mapp.mkdir()
+    filer = {"kontoplan": pahittat.KONTOPLAN, "momssatser": pahittat.MOMSSATSER, "matchning": PAHITTAT_FORMAT,
+             "bankformat": PAHITTAT_BANKFORMAT, "regelbok": pahittat.bok(agare_och_narstaende=list(agare))}
+    for namn, data in filer.items():
+        (mapp / (namn + ".json")).write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    regelbok = las_regelbok(mapp / "regelbok.json", las_kontoplan(mapp / "kontoplan.json"),
+                            las_momssatser(mapp / "momssatser.json"), las_matchningsformat(mapp / "matchning.json"))
+    return ladda_bankformat(mapp / "bankformat.json"), regelbok
+
+
+def pahittade_bankrader(mapp, bankformat, *rader):
+    """En påhittad bankfil i det påhittade formatet. Varje rad är (referens, beskrivning, belopp_ore, dag)."""
+    saldo, text = 0, ["Nr;Bokdag;Transdag;Ref;Text;Summa;Saldo"]
+    for nummer, (referens, beskrivning, belopp, dag) in enumerate(rader, start=1):
+        saldo += belopp
+        text.append(";".join([str(nummer), dag, dag, referens, beskrivning, kr(belopp), kr(saldo)]))
+    fil = mapp / "pahittad_bank.csv"
+    fil.write_text("\n".join(text) + "\n", encoding="utf-8")
+    return las_bankfil(fil, bankformat, 0, saldo)
+
+
+def pahittade_underlag(mapp, *poster):
+    mapp.mkdir()
+    return period(mapp, *poster)
+
+
+def agarunderlag(id_, belopp_ore, datum="2025-05-02", fakturanummer="PA-X"):
+    return underlag(id=id_, motpart=PAHITTAD_AGARE, fakturanummer=fakturanummer, belopp_ore=belopp_ore, datum=datum)
+
+
+def bedomning_per_rad(resultat):
+    """(radnr, märkningen) för varje bankrad i alla fyra grupperna."""
+    return sorted((post["bankrad"]["radnr"], post["kraver_mansklig_bedomning"])
+                  for grupp in GRUPPER_FOR_BANKRADER for post in getattr(resultat, grupp))
+
+
+def test_b_agarrad_med_underlag_kraver_mansklig_bedomning_och_matchas_inte(tmp_path):
+    bankformat, regelbok = pahittad_konfiguration(tmp_path / "konfiguration")
+    rader = pahittade_bankrader(tmp_path, bankformat, ("PA-1", "PAHITTAT UTTAG " + PAHITTAD_AGARE, -30000, "2025-05-02"),
+                                ("PF-77", "PAHITTAD-LEV", -12500, "2025-05-03"))
+    underlagen = pahittade_underlag(tmp_path / "u", agarunderlag("U-1", 30000, fakturanummer="PA-1"),
+                                    underlag(id="U-2", motpart="PAHITTAD-LEV", fakturanummer="PF-77",
+                                             datum="2025-05-01"))
+    resultat = matcha_period(rader, underlagen, regelbok, "2025-05-03")
+    kontrollera_grupperna(resultat, rader, underlagen)
+    # Ägarraden blir aldrig en vanlig matchning, utan ett ärende med underlaget som kandidat. Den andra
+    # raden matchas som vanligt.
+    assert [(m["bankrad"]["radnr"], m["underlag"]["id"]) for m in resultat.matchningar] == [(2, "U-2")]
+    assert [(a["bankrad"]["radnr"], a["kontroll"], a["typ"], a["kandidater"]) for a in resultat.arenden] == [
+        (1, "K7", KRAVER_BEDOMNING, ("U-1",))]
+    assert "mänsklig bedömning" in resultat.arenden[0]["text"] and "ägare eller närstående" in resultat.arenden[0]["text"]
+    assert [post["id"] for post in resultat.oavstamda_underlag] == ["U-1"]
+    assert resultat.kraver_inte_underlag == () and resultat.vantande == ()
+    assert bedomning_per_rad(resultat) == [(1, True), (2, False)]
+
+
+def test_b_agarrad_utan_underlag_kraver_underlag_och_undantas_aldrig(tmp_path):
+    bankformat, regelbok = pahittad_konfiguration(tmp_path / "konfiguration")
+    rader = pahittade_bankrader(tmp_path, bankformat, ("PA-2", "PAHITTAT UTTAG " + PAHITTAD_AGARE, -30000, "2025-05-02"),
+                                ("PA-3", "PAHITTAT UTTAG ANNAN", -30000, "2025-05-02"))
+    underlagen = pahittade_underlag(tmp_path / "u")
+    # Regeln pahittat_uttag passar båda raderna, men ägarraden undantas inte: den väntar på underlag.
+    fore = matcha_period(rader, underlagen, regelbok, "2025-05-09")
+    assert [(post["bankrad"]["radnr"], post["arende_efter"]) for post in fore.vantande] == [(1, "2025-05-09")]
+    assert [(post["bankrad"]["radnr"], post["regel"]) for post in fore.kraver_inte_underlag] == [(2, "pahittat_uttag")]
+    assert fore.arenden == () and fore.matchningar == ()
+    assert bedomning_per_rad(fore) == [(1, True), (2, False)]
+    # Efter 7 dagar blir den ett ärende "saknat underlag" (K3), fortfarande märkt.
+    efter = matcha_period(rader, underlagen, regelbok, "2025-05-10")
+    assert [(a["bankrad"]["radnr"], a["kontroll"], a["typ"]) for a in efter.arenden] == [(1, "K3", "saknat underlag")]
+    assert efter.vantande == ()
+    assert bedomning_per_rad(efter) == [(1, True), (2, False)]
+    # Skydd: med en annan ägare i listan undantas samma rad av regeln.
+    _, annan = pahittad_konfiguration(tmp_path / "annan", agare=("ANNAN-AGARE-9",))
+    resultat = matcha_period(rader, underlagen, annan, "2025-05-10")
+    assert [post["bankrad"]["radnr"] for post in resultat.kraver_inte_underlag] == [1, 2]
+    assert bedomning_per_rad(resultat) == [(1, False), (2, False)]
+
+
+def test_b_agarrad_over_regelns_grans_kraver_mansklig_bedomning(tmp_path):
+    bankformat, regelbok = pahittad_konfiguration(tmp_path / "konfiguration")
+    rader = pahittade_bankrader(tmp_path, bankformat, ("PA-4", "PAHITTAT UTTAG " + PAHITTAD_AGARE, -50000, "2025-05-02"),
+                                ("PA-5", "PAHITTAT UTTAG ANNAN", -50000, "2025-05-02"))
+    # Utan underlag: den andra raden är "över gräns", men ägarraden väntar på underlag, märkt.
+    utan = matcha_period(rader, pahittade_underlag(tmp_path / "tom"), regelbok, "2025-05-02")
+    assert [(a["bankrad"]["radnr"], a["typ"]) for a in utan.arenden] == [(2, "över gräns")]
+    assert [post["bankrad"]["radnr"] for post in utan.vantande] == [1]
+    assert bedomning_per_rad(utan) == [(1, True), (2, False)]
+    # Med ett underlag: ägarraden blir ett ärende "kräver mänsklig bedömning", inte en matchning.
+    med = matcha_period(rader, pahittade_underlag(tmp_path / "u", agarunderlag("U-1", 50000)), regelbok, "2025-05-02")
+    assert sorted((a["bankrad"]["radnr"], a["typ"], a["kandidater"]) for a in med.arenden) == [
+        (1, KRAVER_BEDOMNING, ("U-1",)), (2, "över gräns", ())]
+    assert med.matchningar == () and bedomning_per_rad(med) == [(1, True), (2, False)]
+
+
+def test_b_agarrad_med_flera_underlag_ar_tvetydig_och_markt(tmp_path):
+    bankformat, regelbok = pahittad_konfiguration(tmp_path / "konfiguration")
+    rader = pahittade_bankrader(tmp_path, bankformat, ("PA-6", "PAHITTAT UTTAG " + PAHITTAD_AGARE, -30000, "2025-05-02"))
+    underlagen = pahittade_underlag(tmp_path / "u", agarunderlag("U-1", 30000, "2025-05-01"),
+                                    agarunderlag("U-2", 30000, "2025-05-02", fakturanummer="PA-Y"))
+    resultat = matcha_period(rader, underlagen, regelbok, "2025-05-02")
+    assert [(a["typ"], a["kandidater"], a["kraver_mansklig_bedomning"]) for a in resultat.arenden] == [
+        ("tvetydig", ("U-1", "U-2"), True)]
+
+
+def test_a_matchningen_far_ingen_regelbok_utan_agarlista(tmp_path):
+    # Beslut (a): utan lista finns ingen Regelbok, och matchningen tar inte emot något annat.
+    with pytest.raises(RegelbokFel, match="Hela körningen stoppas"):
+        pahittad_konfiguration(tmp_path / "konfiguration", agare=())
 
 
 def test_flera_bankfiler(tmp_path):
@@ -1340,9 +1480,14 @@ def ar_giltigt(resultat, bankperiod, underlagen, regelbok, bedomning):
     """Ett resultat ska alltid följa reglerna i matcha_bank.py, med regelbokens matchningsformat."""
     format_ = kontrollera_matchningsformat(regelbok.matchningsformat)
     kontrollera_grupperna(resultat, bankperiod, underlagen)
-    # En rad mot en ägare eller närstående undantas aldrig av en regel (granskning 8, N3).
+    # En rad mot en ägare eller närstående undantas aldrig av en regel (granskning 8, N3), blir aldrig en
+    # vanlig matchning, och märks "kräver mänsklig bedömning" i alla grupper (beslut b).
     for post in resultat.kraver_inte_underlag + tuple(a for a in resultat.arenden if a["typ"] == "över gräns"):
         assert not regelbok.ar_bankrad_mot_agare_eller_narstaende(post["bankrad"])
+    for grupp in GRUPPER_FOR_BANKRADER:
+        for post in getattr(resultat, grupp):
+            assert post["kraver_mansklig_bedomning"] is regelbok.ar_bankrad_mot_agare_eller_narstaende(post["bankrad"])
+    assert not [m for m in resultat.matchningar if m["kraver_mansklig_bedomning"]]
     assert all(rad["transaktionsdag"] <= bedomning for rad in bankperiod.rader)  # annars stoppas den (J9)
     dag = dt.date.fromisoformat(bedomning)
     for matchning in resultat.matchningar:
@@ -1355,8 +1500,10 @@ def ar_giltigt(resultat, bankperiod, underlagen, regelbok, bedomning):
                                                               + normalisera_kassaregister(rad["referens"]))
     regler = {regel["namn"]: regel for regel in format_["kraver_inte_underlag"]}
     for arende in resultat.arenden:
-        assert (arende["typ"] == "tvetydig") == bool(arende["kandidater"])
-        assert arende["typ"] in ("tvetydig", "saknat underlag", "över gräns")
+        assert (arende["typ"] in ("tvetydig", "kräver mänsklig bedömning")) == bool(arende["kandidater"])
+        assert arende["typ"] in ("tvetydig", "saknat underlag", "över gräns", "kräver mänsklig bedömning")
+        if arende["typ"] == "kräver mänsklig bedömning":  # en ägarrad med exakt ett underlag (beslut b)
+            assert arende["kontroll"] == "K7" and len(arende["kandidater"]) == 1 and arende["kraver_mansklig_bedomning"]
         if arende["typ"] == "saknat underlag":
             assert (dag - dt.date.fromisoformat(arende["bankrad"]["transaktionsdag"])).days > format_[
                 "saknat_underlag_efter_dagar"]

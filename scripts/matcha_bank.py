@@ -70,9 +70,18 @@ Reglerna:
    mer än saknat_underlag_efter_dagar dagar efter bankradens transaktionsdag. Fram till dess väntar
    raden, eftersom underlaget kan komma in senare.
 7. Underlag som inte har matchats är oavstämda, till exempel fakturor som ännu inte är betalda.
+8. En bankrad mot en ägare eller närstående (K7) märks "kräver mänsklig bedömning" redan här, även när
+   underlaget finns (Hugos beslut 2026-10-27, granskning 9). Den blir aldrig en vanlig matchning: har
+   den exakt ett underlag, som inte passar någon annan bankrad, blir den i stället ett ärende "kräver
+   mänsklig bedömning" (kontroll K7) med underlaget som enda kandidat, och underlaget räknas som
+   oavstämt tills en människa har avgjort. Annars följer den regel 5 och 6 (tvetydig, väntar eller
+   saknat underlag), med märkningen. Den kräver alltid underlag (regel 1). Vem som är ägare avgör
+   regelbokens uppslag, aldrig matchningen själv.
 
 Resultatet är ett Matchningsresultat med fem grupper. Varje bankrad finns i exakt en av de fyra
-grupperna för bankrader: matchningar, arenden, kraver_inte_underlag och vantande. Varje underlag i
+grupperna för bankrader: matchningar, arenden, kraver_inte_underlag och vantande. Varje post i de fyra
+grupperna har kraver_mansklig_bedomning: True för en bankrad mot en ägare eller närstående (regel 8),
+annars False. En post med True finns aldrig bland matchningar eller kraver_inte_underlag. Varje underlag i
 perioden finns antingen i exakt en matchning eller bland oavstamda_underlag. Resultatet går inte att ändra: grupperna är tupler och varje post är
 en MappingProxyType, en sorts objekt som bara går att läsa.
 
@@ -104,11 +113,13 @@ _FAKTURANUMMER_MINST_TECKEN = 5
 # delas upp efter belopp en gång i stället för att alla gås igenom för varje bankrad.
 _HOGST_ANTAL = 20_000
 
-# Ärendenas typ och kontroll. K3: varje förslag har underlag.
+# Ärendenas typ och kontroll. K3: varje förslag har underlag. K7: ägare och närstående, alltid ärende.
 _KONTROLL = "K3"
 _SAKNAT = "saknat underlag"
 _TVETYDIG = "tvetydig"
 _OVER_GRANS = "över gräns"
+_KONTROLL_AGARE = "K7"
+_KRAVER_BEDOMNING = "kräver mänsklig bedömning"
 
 
 class MatchningFel(Exception):
@@ -122,12 +133,16 @@ class Matchningsresultat(NamedTuple):
     arenden               en post per bankrad som en människa måste titta på: {"kontroll", "typ",
                           "text", "bankrad", "kandidater"}, där kandidater är id:n för underlagen
                           som passade. Ett ärende "över gräns" har också "regel" (regelns namn) och
-                          "hogst_belopp_ore" (regelns gräns)
+                          "hogst_belopp_ore" (regelns gräns). Ett ärende "kräver mänsklig bedömning"
+                          (K7) har exakt en kandidat
     oavstamda_underlag    underlagen som inte har matchats, till exempel obetalda fakturor
     kraver_inte_underlag  en post per bankrad som inte ska ha underlag: {"bankrad": ..., "regel": namn}
     vantande              en post per bankrad utan underlag som ännu inte är ett ärende:
                           {"bankrad": ..., "arende_efter": datum}. Blir ett ärende om bedömningen görs
                           efter det datumet
+
+    Varje post i de fyra grupperna för bankrader har också "kraver_mansklig_bedomning": True för en
+    bankrad mot en ägare eller närstående (K7, regel 8 överst i filen), annars False.
     """
 
     matchningar: tuple
@@ -247,8 +262,9 @@ def _kandidater(rad, underlag, tidsfonster):
     return kandidater
 
 
-def _arende(typ, text, rad, kandidater, **mer):
-    return {"kontroll": _KONTROLL, "typ": typ, "text": text, "bankrad": rad, "kandidater": kandidater, **mer}
+def _arende(typ, text, rad, kandidater, agarrad, kontroll=_KONTROLL, **mer):
+    return {"kontroll": kontroll, "typ": typ, "text": text, "bankrad": rad, "kandidater": kandidater,
+            "kraver_mansklig_bedomning": agarrad, **mer}
 
 
 def matcha_period(bankperiod, underlagsperiod, regelbok, bedomningsdatum):
@@ -309,15 +325,17 @@ def matcha_period(bankperiod, underlagsperiod, regelbok, bedomningsdatum):
                 " bankraden finns, så bedömningsdatumet är troligen fel."
             )
 
-    behover = []  # (rad, kandidaterna) för raderna som ska ha underlag
+    behover = []  # (rad, kandidaterna, om raden är mot en ägare) för raderna som ska ha underlag
     kraver_inte, arenden = [], []
     for rad in rader:
         # Regelbokens uppslag, som konteringsförslaget också använder. Det ger aldrig en regel för en
         # bankrad mot en ägare eller närstående, så en sådan rad kräver alltid underlag (K7, N3).
         namn = regelbok.matchningsregel_for_bankrad(rad)
         regel = None if namn is None else regler[namn]
+        # Regel 8: en rad mot en ägare eller närstående märks, även när underlaget finns.
+        agarrad = regelbok.ar_bankrad_mot_agare_eller_narstaende(rad)
         if regel is None:
-            behover.append((rad, _kandidater(rad, underlag, format_["tidsfonster_dagar"])))
+            behover.append((rad, _kandidater(rad, underlag, format_["tidsfonster_dagar"]), agarrad))
         elif _over_grans(rad, regel):
             # Matchas inte mot underlag: en människa avgör vad en så stor rad är.
             arenden.append(_arende(
@@ -325,27 +343,37 @@ def matcha_period(bankperiod, underlagsperiod, regelbok, bedomningsdatum):
                 "Bankraden passar regeln " + repr(regel["namn"]) + " för rader som inte kräver underlag, men"
                 " beloppet är större än regelns gräns, " + _kronor(regel["hogst_belopp_ore"]) + " kr per bankrad."
                 " En människa behöver avgöra vad raden är och vilket underlag den ska ha.",
-                rad, [], regel=regel["namn"], hogst_belopp_ore=regel["hogst_belopp_ore"]))
+                rad, [], agarrad, regel=regel["namn"], hogst_belopp_ore=regel["hogst_belopp_ore"]))
         else:
-            kraver_inte.append({"bankrad": rad, "regel": regel["namn"]})
+            kraver_inte.append({"bankrad": rad, "regel": regel["namn"], "kraver_mansklig_bedomning": agarrad})
 
     antal_rader = {}  # underlagets id -> hur många bankrader det är kandidat för
-    for _, kandidater in behover:
+    for _, kandidater, _ in behover:
         for post in kandidater:
             antal_rader[post["id"]] = antal_rader.get(post["id"], 0) + 1
 
     matchningar, vantande, matchade = [], [], set()
     sista_dag = dt.date.max.toordinal()
-    for rad, kandidater in behover:
+    for rad, kandidater, agarrad in behover:
         if len(kandidater) == 1 and antal_rader[kandidater[0]["id"]] == 1:
-            matchningar.append({"bankrad": rad, "underlag": kandidater[0]})
-            matchade.add(kandidater[0]["id"])
+            if agarrad:
+                # Regel 8: aldrig en vanlig matchning. Underlaget räknas som oavstämt tills en människa
+                # har avgjort.
+                arenden.append(_arende(
+                    _KRAVER_BEDOMNING,
+                    "Bankraden är mot en ägare eller närstående (K7), och ett underlag passar. Den matchas inte"
+                    " som andra rader, utan kräver mänsklig bedömning: en människa avgör om underlaget hör till"
+                    " raden.",
+                    rad, [kandidater[0]["id"]], agarrad, kontroll=_KONTROLL_AGARE))
+            else:
+                matchningar.append({"bankrad": rad, "underlag": kandidater[0], "kraver_mansklig_bedomning": agarrad})
+                matchade.add(kandidater[0]["id"])
         elif kandidater:
             arenden.append(_arende(
                 _TVETYDIG,
                 "Flera underlag passar bankraden, eller så passar underlaget också en annan bankrad. En människa"
                 " behöver avgöra vilket underlag som hör till vilken bankrad.",
-                rad, [post["id"] for post in kandidater]))
+                rad, [post["id"] for post in kandidater], agarrad))
         else:
             arende_efter = _datum(rad["transaktionsdag"], "Bankradens transaktionsdag") + format_[
                 "saknat_underlag_efter_dagar"]
@@ -354,11 +382,11 @@ def matcha_period(bankperiod, underlagsperiod, regelbok, bedomningsdatum):
                     _SAKNAT,
                     "Inget underlag med samma belopp, motpart och datum har hittats, och det har gått mer än "
                     + str(format_["saknat_underlag_efter_dagar"]) + " dagar sedan transaktionsdagen.",
-                    rad, []))
+                    rad, [], agarrad))
             else:
                 # Ett datum efter 9999-12-31 finns inte. Bedömningsdatumet kan inte heller ligga efter det.
                 vantande.append({"bankrad": rad, "arende_efter": dt.date.fromordinal(
-                    min(arende_efter, sista_dag)).isoformat()})
+                    min(arende_efter, sista_dag)).isoformat(), "kraver_mansklig_bedomning": agarrad})
 
     return Matchningsresultat(
         matchningar=_frys(matchningar),

@@ -119,6 +119,8 @@ def bok(**andrat):
         "granser": {"a_hogst_ore": 1000, "b_hogst_ore": 5000},
         "k9": {"minst_historik": 3, "hogst_procent_av_median": 300, "lagst_procent_av_median": 33},
         "oppettider": {"stangda_veckodagar": ["sondag"], "stangda_datum": ["2025-01-01"]},
+        # Listan krävs och får inte vara tom (Hugos beslut 2026-10-27, beslut a). En påhittad ägare.
+        "agare_och_narstaende": ["PAHITTAD-AGARE"],
         "regler": regler(),
     }
     data.update(andrat)
@@ -366,11 +368,47 @@ def test_m8_agare_med_osynligt_tecken_fore_accenten_kanns_igen(tmp_path, konfigu
         assert regelbok.ar_agare_eller_narstaende("A" + osynligt + chr(0x0308) + "GARE-X") is True
 
 
-def test_utan_agare_och_narstaende_ar_listan_tom(tmp_path, konfiguration):
-    for data in (bok(), bok(agare_och_narstaende=[])):
-        regelbok = las(tmp_path, data, konfiguration)
-        assert regelbok.agare_och_narstaende == []
-        assert regelbok.ar_agare_eller_narstaende("MOTPART-A") is False
+# --- Beslut (a): en saknad, tom eller oläsbar lista över ägare och närstående stoppar hela körningen ---
+# Hugos beslut 2026-10-27 (SPEC avsnitt 11). Förut godtogs en saknad nyckel och en tom lista.
+
+STOPP_UTAN_AGARLISTA = "Hela körningen stoppas"
+
+
+def test_a_saknad_agarlista_stoppar_hela_korningen(tmp_path, konfiguration):
+    data = bok()
+    del data["agare_och_narstaende"]
+    stoppas(tmp_path, data, konfiguration, "saknar nyckeln 'agare_och_narstaende'", "ägare och närstående",
+            STOPP_UTAN_AGARLISTA)
+
+
+def test_a_tom_agarlista_stoppar_hela_korningen(tmp_path, konfiguration):
+    stoppas(tmp_path, bok(agare_och_narstaende=[]), konfiguration, "'agare_och_narstaende' är tom",
+            STOPP_UTAN_AGARLISTA)
+
+
+@pytest.mark.parametrize("varde, text", [
+    ("PAHITTAD-AGARE", "'agare_och_narstaende' ska vara en lista, inte text"),
+    (None, "'agare_och_narstaende' ska vara en lista"),
+    ({"PAHITTAD-AGARE": True}, "'agare_och_narstaende' ska vara en lista"),
+    (7, "'agare_och_narstaende' ska vara en lista"),
+    (["PAHITTAD-AGARE", 1], "motpart nummer 2 i 'agare_och_narstaende'"),
+    ([None], "motpart nummer 1 i 'agare_och_narstaende'"),
+    ([""], "motpart nummer 1 i 'agare_och_narstaende' får inte vara tom"),
+    (["PAHITTAD-AGARE", "pahittad-agare"], "står flera gånger i 'agare_och_narstaende'"),
+    (["PAHITTAD&AGARE"], "motpart nummer 1 i 'agare_och_narstaende' har tecknet U+0026"),
+], ids=["text", "null", "objekt", "heltal", "heltal_i_listan", "null_i_listan", "tom_text", "dubblett", "fel_tecken"])
+def test_a_olasbar_agarlista_stoppar_hela_korningen(tmp_path, konfiguration, varde, text):
+    stoppas(tmp_path, bok(agare_och_narstaende=varde), konfiguration, text, STOPP_UTAN_AGARLISTA)
+
+
+def test_a_utan_godkand_agarlista_finns_ingen_regelbok_att_ga_vidare_med(tmp_path, konfiguration):
+    # Allt efter regelboken (matchningen och konteringsförslagen) tar bara emot en Regelbok från
+    # las_regelbok. När listan stoppar regelboken finns ingen Regelbok, så ingenting kan gå vidare.
+    for data in (bok(agare_och_narstaende=[]), bok(agare_och_narstaende=None)):
+        with pytest.raises(RegelbokFel, match=STOPP_UTAN_AGARLISTA):
+            las(tmp_path, data, konfiguration)
+    # Skydd: med en giltig lista går regelboken att läsa.
+    assert las(tmp_path, bok(), konfiguration).agare_och_narstaende == ["PAHITTAD-AGARE"]
 
 
 @pytest.mark.parametrize("varde", [None, 5, True, ["AGARE-X"]])

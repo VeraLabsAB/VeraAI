@@ -24,10 +24,11 @@ Filen ska ha exakt nycklarna i REGELBOK_NYCKLAR, och får ha nycklarna i REGELBO
   regler      en lista med minst en regel, se nedan
   anteckning  fri text för människor. Används inte av koden
   agare_och_narstaende
-              valfri lista med motparter som är ägare eller närstående (K7, Hugos beslut
-              2026-10-26). Varje motpart är text och får stå en gång: två motparter som blir samma
-              efter normaliseringen (normalisering.py) räknas som samma och stoppar filen. Saknas
-              nyckeln är listan tom, och en tom lista godtas. Uppslaget ar_agare_eller_narstaende
+              lista med motparter som är ägare eller närstående (K7, Hugos beslut 2026-10-26).
+              Varje motpart är text och får stå en gång: två motparter som blir samma efter
+              normaliseringen (normalisering.py) räknas som samma och stoppar filen. Listan krävs och
+              ska ha minst en motpart: en saknad, tom eller oläsbar lista stoppar hela körningen, med
+              ett fel som säger det (Hugos beslut 2026-10-27). Uppslaget ar_agare_eller_narstaende
               säger om en motpart står i listan, och ar_bankrad_mot_agare_eller_narstaende om en
               motpart i listan står i en bankrad (M7, N3), så att nivåsteget kan använda det. En
               sådan bankrad passar aldrig en regel i matchningsformatet (matchningsregel_for_bankrad)
@@ -132,8 +133,11 @@ from las_momssatser import Momssatser, MomssatsFel
 from las_underlag import HELTAL_HOGST_SIFFROR, TYPER
 from normalisering import andra_skriftsystem, blandat_ord, normalisera_for_jamforelse, star_som_hela_ord, tecken_med_namn
 
-REGELBOK_NYCKLAR = ("foretag", "version", "godkand", "granser", "k9", "oppettider", "regler")
-REGELBOK_VALFRIA_NYCKLAR = ("anteckning", "agare_och_narstaende")
+REGELBOK_NYCKLAR = ("foretag", "version", "godkand", "granser", "k9", "oppettider", "agare_och_narstaende", "regler")
+REGELBOK_VALFRIA_NYCKLAR = ("anteckning",)
+# Läggs till i varje fel i listan över ägare och närstående (Hugos beslut 2026-10-27).
+_UTAN_AGARLISTA = ("Utan en giltig lista över ägare och närstående (K7) kan ägarens transaktioner inte kännas igen."
+                   " Hela körningen stoppas, och ingenting går vidare.")
 GODKAND_NYCKLAR = ("av", "datum")
 GRANSER_NYCKLAR = ("a_hogst_ore", "b_hogst_ore")
 K9_NYCKLAR = ("minst_historik", "hogst_procent_av_median", "lagst_procent_av_median")
@@ -341,10 +345,12 @@ def _kontrollera_oppettider(oppettider, var):
 
 
 def _kontrollera_agare_och_narstaende(agare, var):
-    """Motparterna som är ägare eller närstående (K7). Varje motpart en gång, efter normaliseringen."""
+    """Motparterna som är ägare eller närstående (K7). Minst en, och varje motpart en gång, efter normaliseringen."""
     vad = "'agare_och_narstaende'"
+    if not _lista(agare, vad, var):
+        raise RegelbokFel(var + ": " + vad + " är tom. Listan ska ha minst en ägare eller närstående.")
     resultat = []
-    for nummer, motpart in enumerate(_lista(agare, vad, var), start=1):
+    for nummer, motpart in enumerate(agare, start=1):
         ny = _text_i_json(motpart, "motpart nummer " + str(nummer) + " i " + vad, var, _REGELBOK)
         _inga_forvaxlingstecken(ny, "motpart nummer " + str(nummer) + " i " + vad, var)
         for annan in resultat:
@@ -665,12 +671,19 @@ def _kontrollera_regelbok(data, kontoplan, momssatser, matchningsformat, var):
     matchningsregler = {regel["namn"]: regel for regel in matchningslistan}
     _inga_dolda_tecken_i_json(data, var, _REGELBOK)
     _objekt(data, "filen", var)
+    # En saknad, tom eller oläsbar lista över ägare och närstående stoppar hela körningen (Hugos beslut
+    # 2026-10-27). Den saknade nyckeln prövas före de andra nycklarna, så att felet alltid säger varför.
+    if "agare_och_narstaende" not in data:
+        raise RegelbokFel(var + " saknar nyckeln 'agare_och_narstaende', listan över ägare och närstående. "
+                          + _UTAN_AGARLISTA)
     _kontrollera_nycklar(data, REGELBOK_NYCKLAR, REGELBOK_VALFRIA_NYCKLAR, var, _REGELBOK)
     if "anteckning" in data:
         _text_i_json(data["anteckning"], "'anteckning'", var, _REGELBOK)
     granser = _kontrollera_granser(data["granser"], var)
-    # Saknas nyckeln är listan tom (Hugos beslut 2026-10-26).
-    agare = _kontrollera_agare_och_narstaende(data.get("agare_och_narstaende", []), var)
+    try:
+        agare = _kontrollera_agare_och_narstaende(data["agare_och_narstaende"], var)
+    except RegelbokFel as fel:
+        raise RegelbokFel(str(fel) + " " + _UTAN_AGARLISTA) from None
     _ingen_matchningsregel_for_agare(matchningslistan, agare, var)
     return {
         "foretag": _text_i_json(data["foretag"], "'foretag'", var, _REGELBOK),
@@ -761,7 +774,7 @@ class Regelbok:
 
     @property
     def agare_och_narstaende(self):
-        """Motparterna som är ägare eller närstående, som de står i filen. En tom lista om nyckeln saknas."""
+        """Motparterna som är ägare eller närstående, som de står i filen. Aldrig tom (Hugos beslut 2026-10-27)."""
         return _kopia(self._regelboken["agare_och_narstaende"])
 
     @property
