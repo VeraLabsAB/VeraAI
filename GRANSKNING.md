@@ -2624,3 +2624,27 @@ På Hugos uppdrag 2026-10-27. Koden och testerna i commit ca2df6a, dokumentation
 | N7 | Regelbokens uppslag (`regel_for_underlag`, `regel_for_z_rapport`, `regel_for_bankrad`, `ar_agare_eller_narstaende`, `ar_bankrad_mot_agare_eller_narstaende` och `matchningsregel_for_bankrad`) ger `RegelbokFel` med "tom eller trasig" för en regelbok skapad med `__new__` (`Regelbok._innehall`) | ca2df6a | `test_n7_uppslag_i_en_tom_regelbok_ger_ett_tydligt_fel` (6 fall) |
 | M11 (granskning 7) | DESIGN-regelbok.md avsnitt 3: exemplet visar kodens nyckelnamn för bankrader (`id` i stället för `fil` och `radnr`), och tabellen "Nyckelnamn för bankrader i DESIGN-exemplet och i koden". Namnen i koden är inte ändrade (Hugos OK 2026-10-27) | dokumentationen | Inget test (dokumentation) |
 | N3, det som var kvar (beslutet i chatten 2026-10-27) | `matcha_period(bankperiod, underlagsperiod, regelbok, bedomningsdatum)` tar emot en `Regelbok` (obligatoriskt, prövas med `type(...) is Regelbok`, och en regelbok skapad med `__new__` ger `MatchningFel`) i stället för matchningsformatet. Formatet tas från regelboken (`Regelbok.matchningsformat`, ny), så matchningen kan inte använda ett annat format än regelboken kontrollerades mot, och kontrolleras igen. Regelbokens uppslag `matchningsregel_for_bankrad` avgör vilka rader som inte kräver underlag, så en rad mot en ägare eller närstående kräver underlag (K3) och blir aldrig "över gräns". Ändrade befintliga tester: alla anrop av `matcha_period` i `test_matcha_bank.py` skickar regelboken (testbutikens, eller `regelbok_for(format)`, som skriver formatet och en regelbok i en tillfällig mapp), `test_trasigt_format_stoppas_aven_nar_det_skickas_direkt` heter `test_trasigt_format_i_regelboken_stoppas_anda` och efterliknar en regelbok med trasigt format, fuzzen läser skadade format med `las_matchningsformat` och `las_regelbok` och har en rad mot ägaren, och exemplet `matcha_period` i `test_inga_genvagar.py` skickar en regelbok. Testsviten: 2 777 passed (13 nya, alla röda mot koden före). 10 av 10 mutationer gav minst ett rött test | ea51c97 | `test_n3_granskarens_prov_agarens_rader_kraver_underlag` (rad 1–3 kräver underlag, rad 4 och 5 undantas), `test_n3_agarens_rad_over_gransen_kraver_underlag_och_ar_inte_over_grans`, `test_n3_agarens_rad_matchas_mot_ett_underlag`, `test_n3_agaren_pekas_ut_med_regelbokens_uppslag` (4 fall), `test_n3_en_narstaende_i_listan_galler_som_agaren`, `test_n3_testdatans_rader_ger_samma_resultat_som_utan_agare`, `test_regelboken_ska_vara_en_regelbok`, `test_tom_regelbok_ger_matchningfel`, `test_regelboken_ger_matchningsformatet_den_kontrollerades_mot` och `test_n7_uppslag_i_en_tom_regelbok_ger_ett_tydligt_fel[matchningsformat]` (`test_las_regelbok.py`) |
+
+## Granskning 9 – ea51c97 (2026-10-27)
+
+Bara sammanfattningen finns kvar. Hela granskningen gick förlorad när sessionen rensades.
+
+STATUS: rött
+KAN JAG GÅ VIDARE: nej. Ändringen i ea51c97 gör det den säger: en ägarrad
+  undantas aldrig från underlag, och alla tester är gröna. Men punkt 1–4
+  och 7 håller inte: listan ligger där agenten kan skriva, en saknad eller
+  tom lista godtas, en ägarrad med underlag blir en vanlig matchning, och
+  besluten saknar namn. Dessutom har PROGRESS.md ett Shop and Go-namn och
+  en inaktuell status.
+BESLUT SOM BEHÖVS (Hugo eller Casper):
+  1. Ska en saknad eller tom ägarlista stoppa agenten? I dag godkänns den.
+  2. Ska en ägarrad märkas "kräver mänsklig bedömning" redan i
+     matchningen, eller räcker det med nivå D i uppgift 6?
+  3. PROGRESS.md: ta bort Shop and Go-raden och skriva om filen så att den
+     stämmer med var projektet står i dag (med N2 som egen punkt)?
+  4. Vem tog beslutet om N3 i chatten 2026-10-27? Namnet ska skrivas in.
+     Och ska N4 in i SPEC?
+  5. Ska de tre commitarna pushas först när detta är rättat?
+NÄSTA STEG: Låt en byggsession rätta PROGRESS.md och märka besluten med
+  namn och datum. Kör punkt 5 med git archive. Lägg in punkt 1–4 i
+  spärrsteget och nivåsteget, eller gör dem nu om ni bestämmer det.
