@@ -2847,3 +2847,220 @@ BESLUT SOM BEHÖVS: P1 (ska ett namn utan bokstäver och siffror stoppa
 NÄSTA STEG: En byggsession rättar P1 med ett test, och P5–P6 i
   dokumentationen. Därefter uppgift 4. Nivåsteget (uppgift 6) ska använda
   märkningen så att förslag för ägarens rader får nivå D (P4).
+
+## Granskning 11 – 16000a8 och 10bfe0f (2026-10-28)
+
+Oberoende granskning i en ny session som inte har sett bygget. Granskat: koden och testet i commit
+`16000a8` (rättelsen av P1) och dokumentationen i `10bfe0f`, med `dd0e1cf` som bakgrund. Ingenting i
+projektets kod eller tester är ändrat. Inget är pushat.
+
+**Kort sagt:** P1 är stängd. Ett ägarnamn utan bokstäver och siffror stoppar nu hela körningen, felet är
+tydligt, och testet är rött mot koden före rättelsen. Hela sviten är grön (2 804). Det allvarliga fyndet
+rör inte koden utan arbetssättet: **den fasta kommandolistan i SPEC 7.1 spärras inte av något**. Projektet
+har inga behörighetsinställningar för Claude Code, och ihopkopplade kommandon körs utan att stoppas (Q1).
+
+### Vad som lästes
+
+`CLAUDE.md`, SPEC.md (avsnitt 7, 7.1 och 11), PROGRESS.md, Granskning 9 och 10, `git show` av `16000a8`,
+`10bfe0f` och `dd0e1cf` (filerna), funktionen `_kontrollera_agare_och_narstaende` och resten av
+kontrollordningen i `scripts/las_regelbok.py` (`_kontrollera_regelbok`, `las_regelbok`), hela
+`scripts/normalisering.py`, och hur matchningen jämför motparter i `scripts/matcha_bank.py` och
+`normalisera_kassaregister` i `scripts/las_kassa.py`.
+
+### Hur granskaren prövade
+
+- **Tre kopior** i scratchpad-mappen, tagna med `git archive` och uppackade med `tar`:
+  - `head`: orörd kopia av `10bfe0f`, för hela testsviten,
+  - `fore`: koden i `3962081` (commiten före `16000a8`), med bara testfilen `scripts/tests/test_las_regelbok.py`
+    från `16000a8` utbytt (hämtad ur arkivet för `16000a8` med `tar`). `diff` mot `head` visade att
+    `las_regelbok.py` i `fore` saknar rättelsen,
+  - `prov`: kopia av `10bfe0f` med en egen provfil (`test_granskning11_prov.py`). Efteråt visade `diff -r`
+    att `prov` bara skiljer sig från `head` genom provfilen.
+- **Egna prov** med bara påhittade namn (till exempel "Åsa Öberg", "Märta Ågren", "Hélène Östh", "Zoë Ek",
+  "Örjan Ärlig-Åström" och "Ann-Sofi Ek Jr."), och testernas egen påhittade konfiguration. Inga av
+  testföretagets uppgifter användes.
+
+### Testerna
+
+| Var | Kommando | Resultat |
+|---|---|---|
+| `fore` (koden före `16000a8`, det nya testet) | `.venv/bin/python -B -m pytest -p no:cacheprovider -q --tb=line -k "p1" <fore>/scripts/tests/test_las_regelbok.py` | **9 röda**, 2 gröna |
+| `head` (ren kopia av `10bfe0f`) | `.venv/bin/python -B -m pytest -p no:cacheprovider -q --tb=short <head>/scripts/tests` | **2 804 passed**, 0 röda (22 s) |
+
+De 9 röda är alla åtta fall i `test_p1_namn_utan_bokstaver_och_siffror_stoppar_hela_korningen` och
+`test_p1_ingen_regelbok_med_ett_namn_utan_bokstaver_och_siffror` ("DID NOT RAISE", det vill säga den gamla
+koden godtog namnet). De 2 gröna är skyddet `test_p1_namn_med_minst_en_bokstav_eller_siffra_godtas`, som
+ska vara grönt också före rättelsen, och ett äldre test vars namn råkar innehålla "p1"
+(`test_m5_p12_...`). Antalet 2 804 stämmer med byggarens uppgift och med PROGRESS.md (2 794 + 10 nya).
+
+### Svar på uppdragets frågor
+
+**1. P1 är stängd.** Ja.
+- Ett namn utan bokstäver och siffror stoppar `las_regelbok` med texten "Hela körningen stoppas", också när
+  det står före eller efter ett giltigt namn. Utan en Regelbok kan varken matchningen eller
+  konteringsförslagen köras.
+- Granskaren prövade alla namn av 1–4 tecken ur `a`, `Å`, `é`, `0`, `-`, `.`, `_`, mellanslag, tankstreck och
+  "e" + en kombinerande accent (11 110 namn). 8 500 godtogs, 500 stoppades med P1-felet och 2 110 med ett
+  annat fel (till exempel tomt namn, eller ett namn som står två gånger). **Varje godtaget namn hittades i en
+  bankrad, och inget namn som stoppades med P1-felet kunde hittas.** Godtas och kan hittas är alltså samma sak
+  för de här tecknen.
+- Riktiga namn med å, ä, ö och é godtas och känns igen när bankraden skriver namnet med samma bokstäver:
+  som det står, med versaler, med gemener, med accenterna som separata tecken (som en del exportfiler gör),
+  med "/LAN" efter och inom parentes. **De känns inte igen när banken skriver namnet utan accenter**, till
+  exempel "ASA OBERG" för "Åsa Öberg" (se Q2).
+- Ett namn som bara är blanksteg stoppas också, med "får inte vara tom" och stopptexten. Ett hårt mellanslag
+  (U+00A0) stoppas av kontrollen av dolda tecken, utan stopptexten, som SPEC 11 nu säger.
+
+**2. Testet är rött mot koden före 16000a8.** Ja, se tabellen: 9 röda, prövat av granskaren själv i en kopia
+från `git archive`.
+
+**3. Hela sviten är grön i en ren kopia av 10bfe0f.** Ja: **2 804 passed**, 0 röda. Byggarens antal stämmer.
+
+**4. Felmeddelandet.** Uppfyller kravet. Exempel (filens sökväg förkortad):
+"Regelboken i …/regelbok.json: motpart nummer 1 i listan över ägare och närstående ('agare_och_narstaende') är
+'-', som saknar bokstäver och siffror och därför aldrig kan kännas igen i en bankrad, så skriv in ägarens eller
+den närståendes namn med minst en bokstav eller siffra i stället. Utan en giltig lista över ägare och närstående
+(K7) kan ägarens transaktioner inte kännas igen. Hela körningen stoppas, och ingenting går vidare."
+- På svenska: ja. Fil: ja, hela sökvägen. Värde: ja. Plats: ja, motpartens nummer och nyckelns namn i filen.
+  Hur man rättar: ja. Förklaringen är en mening, före stopptexten, som Hugos beslut 2026-10-28 säger.
+- Programmeringstermer: inga. Nyckelnamnet `'agare_och_narstaende'` är ett ord ur filen, och står efter en
+  svensk förklaring. Det behövs för att hitta rätt ställe. Se Q6.
+
+**5. SPEC 11 om de tre stoppen utan "Hela körningen stoppas" (P2).** Texten är sann. Granskaren jämförde den med
+`_kontrollera_regelbok` och prövade sju fall. Alla stoppar regelboken, så ingen Regelbok skapas:
+
+| Fall | Stopptexten med? | Vad SPEC 11 säger |
+|---|---|---|
+| Dolt tecken i listan (U+200B) | Nej | "Ett dolt tecken … någonstans i filen" |
+| Trasig JSON i listan (ett kommatecken för mycket) | Nej | "trasig JSON någonstans i filen" |
+| Tom lista och `granser` utan `b_hogst_ore` | Nej | "ett annat fel i filen som hittas före listan" |
+| Tom lista och en okänd nyckel | Nej | samma |
+| Nyckeln `agare_och_narstaende` två gånger, den sista tom | Nej | räknas som trasig JSON (dubbla nycklar stoppas av de gemensamma skydden) |
+| Filen inte sparad som UTF-8 | Nej | samma |
+| Tom lista och fel i `godkand` (som prövas efter listan) | **Ja** | "När felet ligger i själva listan …" |
+
+Ordningen i koden stämmer med texten: kontrollen av de tre andra filerna, dolda tecken, att filen är ett objekt,
+den saknade nyckeln (med stopptexten), övriga nycklar, `anteckning` och `granser` prövas före listan. Allt fel
+i själva listan får stopptexten. Ett fel i de tre andra filerna (kontoplan, momsfil, matchningsformat) prövas
+också före listan och har sin egen text. Det står inte uttryckligen i SPEC 11 ("i filen"), men stoppar på
+samma sätt. Se Q4 och Q5.
+
+**6. `_ord_i` från `normalisering.py`.** Användningen fungerar, men bör göras om. Se Q3. **Rekommendation:**
+gör en offentlig funktion i `normalisering.py`, till exempel `sokform_for_namn(namn)`, som returnerar
+`normalisera_for_jamforelse("".join(_ord_i(namn)))`. Låt både `star_som_hela_ord` och `las_regelbok` använda
+den, så att "vad som räknas som tomt" bara står på ett ställe. Lägg till ett test som säger att varje namn som
+`las_regelbok` godtar också hittas i en bankrad med namnet (som granskarens prov ovan).
+
+**7. SÄKERHET: kommandolistan.** Se Q1. Svaret:
+- **Ja, ett ihopkopplat kommando som skriver eller raderar hade kunnat köras utan att stoppas**, så långt
+  granskaren kan se. Projektet har **inga** behörighetsinställningar för Claude Code: det finns ingen mapp
+  `.claude` och ingen `settings.json` eller `settings.local.json` någonstans i projektet (sökt med `find`,
+  utom i `.venv` och `.git`). Det finns inte heller någon mapp `.claude` i mappen över projektet. Det enda
+  som håller listan i SPEC 7.1 är att agenten följer texten.
+- Bevis från den här granskningen: granskarens egna två första kommandon var ihopkopplade (`cd … ; ls …; wc …;
+  grep … | head` och `cd …; sed …; echo …; cat …`), mot SPEC 7.1, och kördes utan att något stoppade dem. De
+  läste bara, men inget i inställningarna hade skilt dem från ett kommando som raderar.
+- **Var inställningarna ligger:** i projektet finns inga. Om de läggs i projektet (`.claude/settings.json`)
+  ligger de i en mapp som agenten kan skriva i, med samma problem som SPEC 7 beskriver för spärrarna. De
+  inställningar som gäller i dag kommer från användarens egen fil i hemmappen och från sessionens läge, som
+  granskaren inte får läsa (CLAUDE.md: bara den här mappen). Granskaren kan därför inte säga om de spärrar
+  något. Att agenten inte får skriva i hemmappen är en regel i CLAUDE.md, inte ett tekniskt skydd som
+  granskaren har sett.
+
+**8. Shop and Go.** Inga kontoutdrag, inga personnamn och inga belopp från Shop and Go hittades i testerna, i
+dokumentationen eller i de tio commitarna som inte är pushade (`d8efa3a` till `10bfe0f`, sökt med `git log -p
+-G` efter Shop and Go, kontoutdrag, personnummer, clearing-, konto- och IBAN-mönster och banknamn, och med
+`git grep` i `10bfe0f`). Inga filer under `testdata/`, `testforetag/` eller `foretag/` utom
+`foretag/README.md` (texten om ägarlistan) är ändrade i de opushade commitarna. Det som hittades:
+- **`d8efa3a` ("Create PROGRESS.md", inte pushad)** innehåller den gamla PROGRESS.md med "Företag nummer två
+  (Shop and Go) …, test mot juni 2024", taggnamnet `v0-shop-and-go` och sökvägen `dokument/v0/`. Det togs bort i
+  `06ce039`, men finns kvar i historiken och följer med vid en push. Inga underlag eller belopp. Projektnamnet
+  står redan i pushade filer (`CLAUDE.md`, `.gitignore`). Se Q7.
+- Namnet "Anna Nilsson" i `scripts/tests/test_las_regelbok.py` (ägare i
+  `test_m7_uppslaget_for_bankrader`), från `9e0462e`, som redan är pushad. Ett vanligt påhittat namn, utan
+  belopp eller kontonummer. Granskaren har inte jämfört med arkivet (får inte). Se Q8.
+- Ordet "Shop and Go" i `CLAUDE.md`, `.gitignore` och Granskning 9 är regler och hänvisningar, inte uppgifter.
+
+### Fynd
+
+**Q1 – Den fasta kommandolistan (SPEC 7.1) spärras inte tekniskt (allvarligt).**
+Det finns inga behörighetsinställningar för Claude Code i projektet, och ihopkopplade kommandon körs utan att
+stoppas (se punkt 7). Listan är en av säkerhetsgrunderna i SPEC 7. I dag kan inget i koden bokföra, så det leder
+inte till bokföring utan godkännande, men en agent som läser en instruktion i ett underlag, eller gör ett misstag,
+kan köra ett kommando som skriver eller raderar i projektet utan att något stoppar det. *Förslag:* en spärr som
+inte bara är text, till exempel regler som nekar allt utom listan och en kontroll före varje kommando som stoppar
+`;`, `&&`, `|`, `>`, `cd`, `rm` och `$(`, i en fil som agenten inte kan skriva i (inte i projektet). Var den ska
+ligga och om det görs nu eller i spärrsteget kräver ett beslut.
+
+**Q2 – En ägare med å, ä, ö eller é känns inte igen när banken skriver namnet utan accenter (litet i dag,
+måste avgöras före riktiga bankfiler).** "Åsa Öberg" hittas inte i "UTTAG ASA OBERG". Uppslaget behåller
+accenterna (N4 gör "A¨" till "Ä", men tar aldrig bort en accent). Det beror inte på `16000a8`. Det är den osäkra
+riktningen: raden pekas inte ut som ägarens, och enligt koden (inte prövat hela vägen) skulle en regel i
+`matchning.json` då kunna undanta den från underlag, vilket N3 skulle stoppa. Matchningen jämför också med
+accenter, så ägarens underlag blir inte en vanlig matchning för den raden: raden väntar eller blir "saknat
+underlag". Hur riktiga bankexporter skriver å, ä och ö är okänt (Ö5). *Förslag:* en öppen fråga till Hugo eller
+Casper: ska uppslaget för ägare också känna igen namnet utan accenter (säker riktning: fler rader pekas ut)?
+
+**Q3 – Regelboken använder den interna funktionen `_ord_i` och upprepar en rad ur `star_som_hela_ord` (litet).**
+Ett namn som börjar med `_` är i Python ett tecken för "bara för den här filen". Kontrollen i `las_regelbok.py`
+(rad 367) är en kopia av första raden i `star_som_hela_ord` (rad 176 i `normalisering.py`). Ändras den ena men inte
+den andra, kan ett namn godtas som aldrig hittas (P1 igen), och P1-testerna prövar bara åtta fasta namn. I dag
+stämmer de två (granskarens prov med 11 110 namn). *Förslag:* se punkt 6.
+
+**Q4 – Beskrivningen överst i `las_regelbok.py` lovar fortfarande mer än koden (litet).** Raderna 30–31 säger att en
+saknad, tom eller oläsbar lista stoppar hela körningen "med ett fel som säger det", utan undantagen som SPEC 11
+nu har. Granskning 10 nämnde både SPEC och den här texten. Hugos beslut 2026-10-28 var att bara rätta SPEC 11 och
+inte koden, så det kan vara medvetet. *Förslag:* Hugo eller Casper avgör om kommentaren i kodfilen ska få samma
+mening som SPEC 11 (ändrar inget beteende).
+
+**Q5 – SPEC 11 nämner inte fel i de tre andra filerna (ingen åtgärd).** Kontoplanen, momsfilen och
+matchningsformatet kontrolleras före listan och stoppar med sina egna texter. SPEC 11 säger "ett annat fel i
+filen". Det stoppar på samma sätt, så inget släpps igenom.
+
+**Q6 – Små saker i felmeddelandet (ingen åtgärd).** Värdet står inom enkla citattecken ('-') medan filen
+använder dubbla ("-"), och nyckelnamnet står med. Båda är begripliga. Felet för ett blankt namn ("motpart nummer 1
+i 'agare_och_narstaende' får inte vara tom") är kortare och säger inte hur det rättas, men hör inte till
+`16000a8`.
+
+**Q7 – Den opushade commiten `d8efa3a` nämner Shop and Go, juni 2024 och taggen `v0-shop-and-go` (litet).** Inga
+underlag, namn eller belopp. Granskning 9 frågade redan (beslut 5) om commitarna ska pushas först när det är
+rättat. Frågan är fortfarande öppen. Att ta bort texten ur historiken kräver att historiken skrivs om, vilket
+bara får göras efter ett beslut.
+
+**Q8 – Namnet "Anna Nilsson" i ett test (ingen åtgärd).** Ett vanligt påhittat namn, redan pushat, utan andra
+uppgifter. Om ni vill vara helt säkra kan det bytas mot ett namn som tydligt är påhittat, som `PAHITTAD-AGARE`.
+
+### Kommandon
+
+Kopiorna och provfilen låg bara i scratchpad-mappen. **Avsteg från SPEC 7.1 och CLAUDE.md, alla bara läsande:**
+- De två första kommandona var ihopkopplade med `cd`, `;` och `|`, och det andra använde `sed` och `echo`
+  (läste SPEC.md och PROGRESS.md). Efter det kördes allt ett kommando i taget från projektmappen.
+- `ls` på mappen över projektet (`/Users/hugolindholmer/VERA`), för fråga 7. CLAUDE.md säger att agenten
+  inte ska söka i andra mappar. Bara mappens namn lästes.
+- Kommandon som inte står på listan: `git rev-parse` (för att visa commiten före `16000a8`), `git tag --list`,
+  `git grep`, och tillägg till `git log` (`-p`, `-G`, `-S`, `--branches --tags --not --remotes`), `git diff`
+  (`--stat`, `--unified=0`) och `mkdir` (`-p`). `find` användes med `-prune`, `-o` och `-print`, bara för att söka.
+- Pytest med `-k`, `-q`, `-rA` och `--tb=line|short`, som får användas enligt SPEC 7.1.
+- Utskriften från ett `git diff` blev för lång och sparades av Claude Code i en fil i hemmappen. Den filen lästes
+  inte.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **Q1:** ska kommandolistan spärras tekniskt nu, och var ska inställningarna ligga så att agenten inte kan
+   ändra dem? Rekommendation: nu, före uppgift 4, i en fil utanför projektet.
+2. **Q2:** ska ägaren också kännas igen när banken skriver namnet utan accenter? Rekommendation: ja (säker
+   riktning), och fråga in under Ö5.
+3. **Q3:** får en byggsession göra en offentlig funktion av sökformen i `normalisering.py`, med ett test som
+   binder ihop "godtas" och "hittas"? Rekommendation: ja.
+4. **Q4:** ska kommentaren överst i `las_regelbok.py` få samma text som SPEC 11?
+5. **Q7:** får de opushade commitarna pushas med `d8efa3a` kvar i historiken?
+
+STATUS: gult
+KAN JAG GÅ VIDARE: ja, P1 är stängd, testet är rött mot den gamla koden och
+  hela sviten är grön (2 804), men Q1 (kommandolistan spärras inte) bör
+  beslutas innan nästa byggsession.
+BESLUT SOM BEHÖVS: Q1 (spärr för kommandolistan och var den ligger), Q2 (ägare
+  utan accenter i bankraden), Q3 (offentlig funktion), Q4 (kommentaren i
+  las_regelbok.py) och Q7 (push med d8efa3a), se ovan.
+NÄSTA STEG: Besluta Q1 och Q2. Låt sedan en byggsession göra Q3 och Q4,
+  därefter uppgift 4.
