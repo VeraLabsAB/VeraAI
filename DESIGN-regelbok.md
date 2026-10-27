@@ -211,9 +211,12 @@ Några saker att lägga märke till:
   alltså ihop: matchningen säger *att* raden inte kräver underlag, regelboken säger *hur* den bokförs.
 - `godkand` och `version` är till för människor och för loggen. Det som skyddar är kontrollsumman.
 - Ägartransaktioner (K7) har ingen regel som kan ge annat än D. En regel med motparten `AGARE-1` får bara
-  ha nivå D, annars stoppas regelboken. Vilka motparter som är ägare eller närstående står i den valfria
-  nyckeln `agare_och_narstaende`, en lista med motparter (för testbutiken `["AGARE-1"]`). Motparterna
-  jämförs efter samma normalisering som ovan (Hugos beslut 2026-10-26, avsnitt 8).
+  ha nivå D, annars stoppas regelboken. Vilka motparter som är ägare eller närstående står i nyckeln
+  `agare_och_narstaende`, en lista med motparter (för testbutiken `["AGARE-1"]`). Motparterna
+  jämförs efter samma normalisering som ovan (Hugos beslut 2026-10-26, avsnitt 8). Listan krävs och ska
+  ha minst en motpart: en saknad, tom eller oläsbar lista stoppar hela körningen (Hugos beslut
+  2026-10-27). En motpart utan bokstäver och siffror, till exempel `-` eller `.`, räknas som tom och
+  stoppar också hela körningen (Hugos beslut 2026-10-28, granskning 10, P1).
 - **Bankrader mot en ägare eller närstående** ska aldrig få lägre nivå än D, inte heller när en regel i
   `matchning.json` undantar raden från underlag (granskning 7, M7). Uppslaget
   `ar_bankrad_mot_agare_eller_narstaende` pekar ut en bankrad där en motpart i `agare_och_narstaende`
@@ -821,6 +824,10 @@ konfigurationen.
    jämförs efter samma normalisering som i K4 och i resten av regelboken (avsnitt 1), så `AGARE-1` och
    `agare-1` är samma motpart. Uppslaget `ar_agare_eller_narstaende` säger om en motpart är ägare eller
    närstående, så att nivåsteget (uppgift 6) kan använda det. Byggt som ett tillägg till uppgift 2.
+   **Ersatt i en del:** att nyckeln är valfri och att listan får vara tom gäller inte längre. Hugos beslut
+   2026-10-27 (SPEC avsnitt 11): en saknad, tom eller oläsbar lista stoppar hela körningen, byggt i commit
+   dd0e1cf. Hugos beslut 2026-10-28 (granskning 10, P1): en motpart utan bokstäver och siffror räknas som
+   tom och stoppar också hela körningen, byggt i commit 16000a8.
 2. **Öppettider.** `oppettider` har `stangda_veckodagar` och `stangda_datum`. Datumen är hela datum
    (ÅÅÅÅ-MM-DD). Det finns ingen återkommande dag utan år, så en helgdag skrivs in för varje år.
 3. **Testbutikens regelbok.** De två tilläggen till exemplet i avsnitt 1 är godkända: `oppettider` och

@@ -6,7 +6,7 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **2 794 passed**, 0 misslyckade (körd 2026-10-28 på commit dd0e1cf, både i projektet och i en
+Testsviten: **2 804 passed**, 0 misslyckade (körd 2026-10-28 på commit 16000a8, både i projektet och i en
 ren kopia av commiten tagen med `git archive`).
 
 ## Klart
@@ -29,13 +29,16 @@ ren kopia av commiten tagen med `git archive`).
 | Rättelserna efter granskning 8 (N1–N4 och N7), och dokumentationen (N5 och N6) | ca2df6a, c2a8f2d |
 | Granskning 8, N3, det som var kvar: `matcha_period` får regelboken, och ägarens bankrad kräver alltid underlag | ea51c97, de14da7 |
 | Efter granskning 9: en saknad, tom eller oläsbar ägarlista stoppar körningen (a), och ägarens bankrad märks "kräver mänsklig bedömning" i matchningen och blir aldrig en vanlig matchning (b) | dd0e1cf |
+| Efter granskning 10 (P1): en motpart i ägarlistan utan bokstäver och siffror, till exempel `-`, stoppar körningen | 16000a8 |
 
 ## Öppet
 
-1. **Granskning 9 (av ea51c97)** står sist i `GRANSKNING.md`. Bara sammanfattningen finns kvar. Beslut (a)
-   och (b) är byggda i dd0e1cf. Kvar: listan över ägare och närstående ligger där agenten kan skriva, till
-   spärrsteget (Hugos beslut 2026-10-27), och granskningens punkt 4 är okänd. dd0e1cf är inte oberoende
-   granskad.
+1. **Granskning 10 (av dd0e1cf)** står sist i `GRANSKNING.md`. P1 är rättat i 16000a8 (Hugos beslut
+   2026-10-28), P2 i texten i SPEC avsnitt 11 och P5–P6 i dokumentationen. Kvar från granskningen: P3
+   (en ägarrad med ett skiljetecken intill namnet matchas aldrig mot sitt underlag, säker riktning) och P4
+   (nivåsteget ska använda märkningen, uppgift 6). Listan över ägare och närstående ligger där agenten kan
+   skriva, till spärrsteget (Hugos beslut i chatten 2026-10-27). dd0e1cf tillsammans med 16000a8 är inte
+   oberoende granskade efter rättelsen.
 2. **N2, vilka tecken ett namn i regelboken får ha.** I dag får ett namn bara ha a–z med eller utan accent,
    0–9, mellanslag, bindestreck, understreck och punkt. Öppen fråga till Hugo eller Casper: ska fler tecken
    få finnas, till exempel `&` (som i "Café Ölund & Söner AB"), `/`, `,`, `'` och parenteser, och bokstäver
@@ -44,13 +47,10 @@ ren kopia av commiten tagen med `git archive`).
    granskning 8:s punkt 6): regelbokens namn bara latinska, regel-id bara a–z, siffror och bindestreck, en
    roll per konto, och ägarens bankrader som hela ord. Valen gjordes i en byggsession, inte av en människa.
    BESLUTSFATTARE SAKNAS.
-4. **`foretag/README.md` säger fortfarande att ägarlistan är valfri** och att en tom lista godtas. Det
-   stämmer inte efter dd0e1cf. Filen fick inte ändras i uppgiften (bara ägarspärren, matchningen, deras
-   tester, SPEC.md och PROGRESS.md).
 
 ## Nästa steg i byggordningen
 
-1. En oberoende granskning av dd0e1cf i en ny session.
+1. En oberoende granskning av dd0e1cf och rättelsen 16000a8 i en ny session.
 2. **Uppgift 4**: flöde a, b och e (leverantörsfakturor, kvitton och bankavgifter) med K5 och K8.
 3. Uppgift 5: Z-rapporter, kortinlösen, Swish och kontantinsättningar (och M9 från granskning 7).
 4. Uppgift 6: nivåerna A–D och K9, med nivå D för ägarens bankrader. Därefter en oberoende granskning.
@@ -73,6 +73,13 @@ avsnitt 8, med namn och datum.
 - **Hugos beslut 2026-10-27:** en bankrad mot en ägare eller närstående märks "kräver mänsklig bedömning"
   redan i matchningen, och får dessutom nivå D i uppgift 6. Märkningen är byggd i dd0e1cf. Nivå D är inte
   byggd.
+- **Hugos beslut 2026-10-28 (granskning 10, P1):** en motpart i listan över ägare och närstående som
+  inte har någon bokstav eller siffra räknas som tom och stoppar hela körningen. Det gäller alla företag.
+  Byggt i 16000a8.
+- **Hugos beslut 2026-10-28 (granskning 10, P2 och P5–P6):** felet för P1 ska säga fil, värde, var det
+  står och hur det rättas, i en mening. De tre andra stoppen där felet inte säger "Hela körningen stoppas"
+  rättas bara i texten i SPEC avsnitt 11, inte i koden. Dokumentationen (`DESIGN-regelbok.md`,
+  `foretag/README.md` och PROGRESS.md) rättas i en egen commit.
 - **Hugos beslut i chatten 2026-10-27:** listan över ägare och närstående ligger kvar i
   `foretag/<namn>/regelbok.json` tills spärrsteget, eftersom SPEC inte säger var den skyddade mappen ska
   ligga. Testet att listan ligger utanför alla mappar agenten får skriva i skrivs då.
