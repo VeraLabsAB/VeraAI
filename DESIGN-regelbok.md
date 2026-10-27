@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil), uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) och uppgift 3 (konteringsförslaget med K2 och ursprungskontrollen) i avsnitt 7 är byggda, och granskning 7:s M1 och M2 är rättade (täckningen och ingående och utgående moms, avsnitt 3), liksom M3 och en del av M4 (regeln ska passa förslaget, och kontrollsummor för regelbok, kontoplan, momsfil och matchningsformat, avsnitt 3), och M5–M8 och M10–M12 (förväxlingstecken och ägarens bankrader i avsnitt 1, en roll per konto i avsnitt 2, och bankradernas nyckelnamn i avsnitt 3). M9 hör till uppgift 5. Hugos beslut efter uppgift 2 och 3 och efter granskning 7 står i avsnitt 8. Ändrar inget i SPEC.md |
+| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil), uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) och uppgift 3 (konteringsförslaget med K2 och ursprungskontrollen) i avsnitt 7 är byggda, och granskning 7:s M1 och M2 är rättade (täckningen och ingående och utgående moms, avsnitt 3), liksom M3 och en del av M4 (regeln ska passa förslaget, och kontrollsummor för regelbok, kontoplan, momsfil och matchningsformat, avsnitt 3), och M5–M8 och M10–M12 (förväxlingstecken och ägarens bankrader i avsnitt 1, en roll per konto i avsnitt 2, och bankradernas nyckelnamn i avsnitt 3). M9 hör till uppgift 5. Efter granskning 8 är N1–N4 och N7 rättade (dolda tecken enligt Unicodes lista, vilka tecken ett namn får ha och ägarens bankrader, avsnitt 1), och exemplet i avsnitt 3 har kodens nyckelnamn för bankrader (M11, Hugos OK 2026-10-27). Hugos beslut efter uppgift 2 och 3 och efter granskning 7 och 8 står i avsnitt 8. Ändrar inget i SPEC.md |
 | Gäller | Steg 4 i arbetsflödet (SPEC avsnitt 4): kontera enligt företagets regelbok, och kontrollerna K2, K5, K8 och K9 |
 | Exempel | Bara Syntet Testbutik AB och testdatan för 2025-Q1. **Allt är SYNTETISKT** |
 
@@ -73,15 +73,22 @@ godkännaren ser vilken regel som användes (SPEC avsnitt 4, steg 4).
 
 - Motparten jämförs efter samma **normalisering** som i K4 och matchningen (`normalisering.py`): stora
   och små bokstäver, blanksteg och osynliga tecken räknas inte.
-- **Förväxlingstecken stoppar regelboken** (granskning 7, M5). En motpart, ett kassaregister och en ägare
-  eller närstående får bara ha latinska bokstäver (även å, ä, ö och é) och siffrorna 0–9. Ett regel-id får
-  bara ha a–z, siffror och bindestreck, efter normaliseringen (som fakturanumret i underlagen). Annars
-  stoppas hela filen. Underlagen stoppar bara ord som blandar latinska och andra bokstäver, men regelboken
-  är konfiguration och stoppar också ett helt ord i ett annat skriftsystem, till exempel cherokee-bokstäver
-  som ser ut som `AGARE`. Konton och varugrupper ska finnas i kontoplanen och momsfilen, där de redan bara
-  får ha 0–9 respektive a–z, siffror och understreck. Kvar är förväxlingar inom de latinska tecknen, till
-  exempel litet L i stället för en etta. De kräver en lista över tecken som liknar varandra (granskning 7,
-  M5) och är inte byggda.
+- **Förväxlingstecken stoppar regelboken** (granskning 7, M5, och granskning 8, N2). En motpart, ett
+  kassaregister och en ägare eller närstående får bara ha bokstäverna a–z med eller utan accent (även å, ä,
+  ö och é), siffrorna 0–9, mellanslag, bindestreck (alla sorter, som räknas som "-"), understreck och
+  punkt. Ett regel-id får bara ha a–z, siffror och bindestreck, efter normaliseringen (som fakturanumret i
+  underlagen). Annars stoppas hela filen. Underlagen stoppar bara ord som blandar latinska och andra
+  bokstäver, men regelboken är konfiguration och stoppar också ett helt ord i ett annat skriftsystem, till
+  exempel cherokee-bokstäver som ser ut som `AGARE`, och alla andra tecken: skiljetecken och symboler som
+  ser ut som ett bindestreck (till exempel U+02D7 och U+2043), kombinerande tecken som står för sig, och
+  latinska bokstäver som inte är a–z med accent (till exempel U+0131, i utan prick, som ser ut som en etta,
+  U+01C0, ett lodrätt streck, och U+1D00, ett litet versalt A). Också `&`, `/`, `,`, `'`, parenteser, `Ø`,
+  `Æ` och `ß` stoppas, tills Hugo har bestämt om de ska få finnas (avsnitt 8). Konton och varugrupper ska
+  finnas i kontoplanen och momsfilen, där de redan bara får ha 0–9 respektive a–z, siffror och understreck.
+  Kvar är förväxlingar inom a–z, till exempel litet L i stället för en etta. De kräver en lista över tecken
+  som liknar varandra (granskning 7, M5) och är inte byggda.
+- **Dolda tecken** stoppar regelboken var de än står, som i kontoplanen och momsfilen. Dit hör alla tecken
+  på Unicodes egen lista över tecken som inte ska synas, som står uttryckligen i koden (granskning 8, N1).
 - **Högst en regel får passa.** Två regler som kan passa samma underlag (samma källa, typ, motpart och
   överlappande datum) stoppar regelboken redan när den läses in, som i `matchning.json`. Om ett underlag
   ändå passar flera regler (till exempel för att motparten står två gånger i en bankrad) blir det ett
@@ -210,8 +217,13 @@ Några saker att lägga märke till:
 - **Bankrader mot en ägare eller närstående** ska aldrig få lägre nivå än D, inte heller när en regel i
   `matchning.json` undantar raden från underlag (granskning 7, M7). Uppslaget
   `ar_bankrad_mot_agare_eller_narstaende` pekar ut en bankrad där en motpart i `agare_och_narstaende`
-  står som hela ord i beskrivningen eller referensen, efter normaliseringen. Själva nivån sätts i
-  uppgift 6 (avsnitt 5 och 7, SPEC Ö13).
+  står som hela ord i beskrivningen eller referensen, efter normaliseringen. Orden delas vid allt som inte
+  är en bokstav, en siffra eller ett kombinerande tecken, så att `UTTAG AGARE-1/LAN` och `TILL:AGARE-1`
+  pekas ut (granskning 8, N3). En sådan rad passar aldrig en regel i `matchning.json`
+  (`matchningsregel_for_bankrad`), så ett förslag för den med en regel för bankrader stoppas, och en regel
+  i `matchning.json` vars text nämner en ägare stoppar regelboken. Matchningen (`matcha_period`) vet inte
+  vilka som är ägare och lägger fortfarande raden bland dem som inte kräver underlag (avsnitt 8). Själva
+  nivån sätts i uppgift 6 (avsnitt 5 och 7, SPEC Ö13).
 
 ---
 
@@ -326,14 +338,14 @@ människa ska kunna förstå och godkänna den. Exempel: betalningen av leverant
         "debet_ore": 0,
         "kredit_ore": 1673056,
         "ursprung": {"berakning": "lika", "fran": [
-          {"kalla": "bankrad", "fil": "bank_2025-02.csv", "radnr": 26, "falt": "belopp_ore"}
+          {"kalla": "bankrad", "id": "BANK-…", "falt": "belopp_ore"}
         ]}
       }
     ]
   },
   "kopplingar": {
     "underlag": [{"id": "SYNT-U-2025-003", "kontrollsumma": "…"}],
-    "bankrader": [{"fil": "bank_2025-02.csv", "radnr": 26, "filens_kontrollsumma": "…"}],
+    "bankrader": [{"id": "BANK-…", "radnr": 26, "filens_kontrollsumma": "…"}],
     "z_rapporter": [],
     "regel": {"id": "R-LEV-TE", "regelbokens_kontrollsumma": "…", "kontoplanens_kontrollsumma": "…",
               "momsfilens_kontrollsumma": "…", "matchningsformatets_kontrollsumma": "…"}
@@ -346,11 +358,14 @@ människa ska kunna förstå och godkänna den. Exempel: betalningen av leverant
 }
 ```
 
-**Bankradernas nyckelnamn i koden** (granskning 7, M11). Exemplet ovan pekar ut en bankrad med filen och
-radnumret. Koden pekar i stället ut den med bankradens `id`, som `las_bankfil` ger varje rad, eftersom ett
-radnummer bara är unikt inom en fil. De andra nyckelnamnen i exemplen gäller som de står (D17).
+**Nyckelnamn för bankrader i DESIGN-exemplet och i koden** (granskning 7, M11). Exemplet ovan pekade
+förut ut en bankrad med filen och radnumret. Koden pekar i stället ut den med bankradens `id`, som
+`las_bankfil` ger varje rad (`BANK-` och 16 tecken av radens kontrollsumma), eftersom ett radnummer bara är
+unikt inom en fil. Exemplet visar nu kodens nyckelnamn, och namnen i koden är inte ändrade. Avvikelsen från
+exemplet som D17 godkände är godkänd av Hugo 2026-10-27 (uppdraget efter granskning 8). De andra
+nyckelnamnen i exemplen gäller som de står (D17).
 
-| Var | I DESIGN-exemplet | I koden |
+| Var | Förut i DESIGN-exemplet | I koden (och nu i exemplet) |
 |---|---|---|
 | En källa i `ursprung` | `{"kalla": "bankrad", "fil": …, "radnr": …, "falt": "belopp_ore"}` | `{"kalla": "bankrad", "id": …, "falt": "belopp_ore"}` |
 | `bankrader` i `kopplingar`, i förslaget som byggs | `{"fil": …, "radnr": …, "filens_kontrollsumma": …}` | `{"id": …}` |
@@ -846,6 +861,28 @@ uppgiften och bör bekräftas av Hugo:
 3. Ett konto får bara ha en roll, utom utgående moms med flera satser på samma konto.
 4. Ägarens bankrader pekas ut när namnet står som hela ord (som när matchningen letar efter en motpart),
    inte när det står inuti ett längre ord (SPEC Ö13).
+
+**På Hugos uppdrag 2026-10-27, efter granskning 8 (N1–N7 och M11):** rättat enligt uppdraget (GRANSKNING.md,
+tabellen "Rättelserna efter granskning 8"). Val 1 och 4 ovan är ändrade av N2 och N3:
+
+1. **Dolda tecken (N1).** Alla tecken på Unicodes lista över tecken som inte ska synas räknas som dolda i
+   regelboken, kontoplanen och momsfilen, och de som inte används i vanlig text stoppar också ett underlag.
+   Listan står uttryckligen i koden.
+2. **Tecknen i ett namn (N2).** Ett namn i regelboken får ha a–z med eller utan accent, 0–9, mellanslag,
+   bindestreck (alla sorter), understreck och punkt. SPEC sa inte vilka skiljetecken som godtas, så
+   uppdragets regel gäller: bara bindestreck, understreck och punkt. **Öppen fråga till Hugo:** ska fler
+   tecken få finnas, till exempel `&` (som i "Café Ölund & Söner AB"), `/`, `,`, `'` och parenteser, och
+   latinska bokstäver som inte är a–z med accent, till exempel `Ø`, `Æ` och `ß`? I dag stoppas de.
+3. **Ägarens bankrader (N3).** Orden delas vid skiljetecken. En regel i `matchning.json` undantar aldrig en
+   rad mot en ägare eller närstående i regelboken och i konteringsförslaget, och en regel vars text nämner
+   en ägare stoppar regelboken. **Öppen fråga till Hugo:** matchningen (`matcha_period`) vet inte vilka som
+   är ägare och lägger fortfarande en sådan rad bland raderna som inte kräver underlag. Ska `matcha_period`
+   få regelboken (eller listan över ägare), så att raden i stället kräver ett underlag, eller räcker det
+   att nivåsteget (uppgift 6) ger raden nivå D?
+4. **Fristående accenttecken (N4).** "A¨" jämförs som "Ä", som granskningen rekommenderade (den säkra
+   riktningen). Valet står i `normalisering.py` och är låst med ett test.
+5. **Nyckelnamnen för bankrader (M11).** Exemplet i avsnitt 3 visar kodens nyckelnamn (`id`). Namnen i
+   koden är inte ändrade. Hugo har godkänt avvikelsen från exemplet som D17 godkände.
 
 Det som Hugo bestämmer gäller bara testföretaget och produktens beteende. För en riktig kund ska varje
 konto, sats och metod komma från kunden och dess redovisningskonsult, och stå som källa i konfigurationen.
