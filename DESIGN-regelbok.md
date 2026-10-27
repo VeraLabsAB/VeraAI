@@ -221,9 +221,10 @@ Några saker att lägga märke till:
   är en bokstav, en siffra eller ett kombinerande tecken, så att `UTTAG AGARE-1/LAN` och `TILL:AGARE-1`
   pekas ut (granskning 8, N3). En sådan rad passar aldrig en regel i `matchning.json`
   (`matchningsregel_for_bankrad`), så ett förslag för den med en regel för bankrader stoppas, och en regel
-  i `matchning.json` vars text nämner en ägare stoppar regelboken. Matchningen (`matcha_period`) vet inte
-  vilka som är ägare och lägger fortfarande raden bland dem som inte kräver underlag (avsnitt 8). Själva
-  nivån sätts i uppgift 6 (avsnitt 5 och 7, SPEC Ö13).
+  i `matchning.json` vars text nämner en ägare stoppar regelboken. Matchningen (`matcha_period`) får
+  regelboken och tar matchningsformatet från den (`Regelbok.matchningsformat`), så den använder samma
+  uppslag: raden hamnar aldrig bland dem som inte kräver underlag och blir aldrig "över gräns", utan kräver
+  underlag som andra rader (K3, avsnitt 8). Själva nivån sätts i uppgift 6 (avsnitt 5 och 7, SPEC Ö13).
 
 ---
 
@@ -875,10 +876,12 @@ tabellen "Rättelserna efter granskning 8"). Val 1 och 4 ovan är ändrade av N2
    latinska bokstäver som inte är a–z med accent, till exempel `Ø`, `Æ` och `ß`? I dag stoppas de.
 3. **Ägarens bankrader (N3).** Orden delas vid skiljetecken. En regel i `matchning.json` undantar aldrig en
    rad mot en ägare eller närstående i regelboken och i konteringsförslaget, och en regel vars text nämner
-   en ägare stoppar regelboken. **Öppen fråga till Hugo:** matchningen (`matcha_period`) vet inte vilka som
-   är ägare och lägger fortfarande en sådan rad bland raderna som inte kräver underlag. Ska `matcha_period`
-   få regelboken (eller listan över ägare), så att raden i stället kräver ett underlag, eller räcker det
-   att nivåsteget (uppgift 6) ger raden nivå D?
+   en ägare stoppar regelboken. Frågan om matchningen är **besvarad i chatten 2026-10-27**: "matcha_period
+   ska få regelbokens ägarlista så att ägarens bankrad kräver underlag". Det är gjort: `matcha_period` tar
+   emot regelboken (ett obligatoriskt argument) i stället för matchningsformatet, tar formatet från
+   regelboken och använder regelbokens uppslag. Ägarens rad kräver underlag som andra rader (K3) och blir
+   aldrig "över gräns". Formatet skickas inte längre in för sig, så att matchningen aldrig kan använda ett
+   annat format än regelboken kontrollerades mot. Nivån D sätts fortfarande i uppgift 6.
 4. **Fristående accenttecken (N4).** "A¨" jämförs som "Ä", som granskningen rekommenderade (den säkra
    riktningen). Valet står i `normalisering.py` och är låst med ett test.
 5. **Nyckelnamnen för bankrader (M11).** Exemplet i avsnitt 3 visar kodens nyckelnamn (`id`). Namnen i
