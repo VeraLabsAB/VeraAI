@@ -6,20 +6,30 @@ matcha_period är den enda offentliga funktionen. Den tar emot:
                     för flera bankfiler. Där har K1 redan kontrollerat raderna
   underlagsperiod   en Underlagsperiod från las_underlagsperiod (las_underlag.py), där K4 redan har
                     tagit bort dubbletterna
-  matchningsformat  företagets matchningsformat från ladda_matchningsformat (las_matchningsformat.py)
+  regelbok          företagets Regelbok från las_regelbok (las_regelbok.py). Den har kontrollerats
+                    mot företagets matchningsformat, och matchningen tar formatet från den
+                    (Regelbok.matchningsformat). Regelboken vet också vilka som är ägare och
+                    närstående (granskning 8, N3)
   bedomningsdatum   dagen då bedömningen görs, som text ÅÅÅÅ-MM-DD
 
 Bankraderna tas bara emot som en Bankperiod, aldrig som en lista: en Bankperiod går inte att
-ändra, så ingen bankrad kan ha tagits bort efter inläsningen. Allt som skickas in kontrolleras och
-kopieras först. Det som skickades in ändras aldrig. Fel i indatan stoppar matchningen med ett
-MatchningFel, och inget resultat returneras. Det gäller också en period som inte har skapats av
-sin inläsningsfunktion och därför saknar sitt innehåll (J7), fler än _HOGST_ANTAL bankrader eller
-underlag (J5), och ett bedömningsdatum före någon bankrads transaktionsdag (J9).
+ändra, så ingen bankrad kan ha tagits bort efter inläsningen. Matchningsformatet tas bara emot genom
+regelboken, aldrig för sig, så att matchningen aldrig använder ett annat format än regelboken
+kontrollerades mot, och aldrig matchar utan att veta vilka som är ägare. Allt som skickas in
+kontrolleras och kopieras först, och formatet kontrolleras igen. Det som skickades in ändras aldrig.
+Fel i indatan stoppar matchningen med ett MatchningFel, och inget resultat returneras. Det gäller
+också en period eller regelbok som inte har skapats av sin inläsningsfunktion och därför saknar sitt
+innehåll (J7), fler än _HOGST_ANTAL bankrader eller underlag (J5), och ett bedömningsdatum före
+någon bankrads transaktionsdag (J9).
 
 Reglerna:
 
 1. En bankrad som passar en regel i matchningsformatets kraver_inte_underlag (rätt riktning och
-   rätt början på referensen och beskrivningen) kräver inget underlag. Det gäller till exempel
+   rätt början på referensen och beskrivningen) kräver inget underlag. Vilken regel en rad passar
+   avgör regelbokens uppslag, Regelbok.matchningsregel_for_bankrad. En bankrad mot en ägare eller
+   närstående (Regelbok.ar_bankrad_mot_agare_eller_narstaende, K7) passar aldrig någon regel: den
+   kräver underlag som alla andra rader (regel 2–6) och blir aldrig "över gräns" (granskning 8, N3).
+   Matchningen jämför inga namn på ägare själv. Det gäller till exempel
    kortinlösens insättning, Swish-betalningar och kontantinsättningar. De stäms av mot
    Z-rapporterna i K10 i ett senare steg. Bankens egna avgifter hör också hit så länge det inte
    finns något underlag för dem. Vilka rader det gäller står i företagets matchning.json, aldrig här.
@@ -78,7 +88,8 @@ from typing import NamedTuple
 from belopp import formatera_ore as _kronor
 from las_bank import Bankperiod
 from las_kassa import normalisera_kassaregister as _normalisera
-from las_matchningsformat import MatchningsformatFel, kontrollera_matchningsformat, matchningsregel_for_bankrad
+from las_matchningsformat import MatchningsformatFel, kontrollera_matchningsformat
+from las_regelbok import Regelbok, RegelbokFel
 from las_underlag import Underlagsperiod
 from normalisering import normalisera_for_jamforelse as _jamforbar
 
@@ -240,10 +251,11 @@ def _arende(typ, text, rad, kandidater, **mer):
     return {"kontroll": _KONTROLL, "typ": typ, "text": text, "bankrad": rad, "kandidater": kandidater, **mer}
 
 
-def matcha_period(bankperiod, underlagsperiod, matchningsformat, bedomningsdatum):
+def matcha_period(bankperiod, underlagsperiod, regelbok, bedomningsdatum):
     """Matchar bankraderna i bankperioden mot underlagen i perioden. Returnerar ett Matchningsresultat.
 
-    Se reglerna överst i filen. Fel i indatan ger MatchningFel.
+    Matchningsformatet och ägarna kommer från regelboken. Se reglerna överst i filen. Fel i indatan
+    ger MatchningFel.
     """
     # type() i stället för isinstance(), så att en underklass med andra regler inte godtas.
     if type(bankperiod) is not Bankperiod:
@@ -276,10 +288,18 @@ def matcha_period(bankperiod, underlagsperiod, matchningsformat, bedomningsdatum
                 + _med_mellanrum(_HOGST_ANTAL) + " åt gången, eftersom den annars tar för lång tid. Dela upp"
                 " perioden i kortare perioder."
             )
+    if type(regelbok) is not Regelbok:
+        raise MatchningFel("Regelboken ska vara en Regelbok från las_regelbok, inte " + _sort(regelbok) + ".")
+    # En Regelbok skapad med __new__ saknar sitt innehåll, och då ger regelboken ett RegelbokFel.
+    try:
+        matchningsformat = regelbok.matchningsformat  # en ny kopia
+    except RegelbokFel:
+        raise MatchningFel("Regelboken är tom eller trasig: den har inte skapats av las_regelbok.") from None
     try:
         format_ = kontrollera_matchningsformat(matchningsformat)
     except MatchningsformatFel as fel:
         raise MatchningFel(str(fel)) from None
+    regler = {regel["namn"]: regel for regel in format_["kraver_inte_underlag"]}
     bedomning = _datum(bedomningsdatum, "Bedömningsdatumet")
     for rad in rader:
         if _datum(rad["transaktionsdag"], "Bankradens transaktionsdag") > bedomning:
@@ -292,8 +312,10 @@ def matcha_period(bankperiod, underlagsperiod, matchningsformat, bedomningsdatum
     behover = []  # (rad, kandidaterna) för raderna som ska ha underlag
     kraver_inte, arenden = [], []
     for rad in rader:
-        # Samma uppslag som konteringsförslaget gör för en regel för bankrader (las_matchningsformat).
-        regel = matchningsregel_for_bankrad(rad, format_["kraver_inte_underlag"])
+        # Regelbokens uppslag, som konteringsförslaget också använder. Det ger aldrig en regel för en
+        # bankrad mot en ägare eller närstående, så en sådan rad kräver alltid underlag (K7, N3).
+        namn = regelbok.matchningsregel_for_bankrad(rad)
+        regel = None if namn is None else regler[namn]
         if regel is None:
             behover.append((rad, _kandidater(rad, underlag, format_["tidsfonster_dagar"])))
         elif _over_grans(rad, regel):

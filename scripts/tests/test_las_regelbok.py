@@ -598,6 +598,22 @@ def test_matchningsregel_for_bankrad_i_regelboken(tmp_path, konfiguration):
     assert regelbok.matchningsregel_for_bankrad({"belopp_ore": -100, "referens": "IN-7", "beskrivning": "x"}) is None
 
 
+def test_regelboken_ger_matchningsformatet_den_kontrollerades_mot(tmp_path, konfiguration):
+    # Granskning 8, N3: matcha_period tar matchningsformatet från regelboken, så att matchningen och
+    # regelboken alltid använder samma format. Det är hela det kontrollerade innehållet, som en ny kopia.
+    _, _, matchning = konfiguration
+    regelbok = las(tmp_path, bok(), konfiguration)
+    assert regelbok.matchningsformat == matchning.innehall
+    assert sorted(regelbok.matchningsformat) == ["kraver_inte_underlag", "saknat_underlag_efter_dagar",
+                                                 "tidsfonster_dagar"]
+    kopia = regelbok.matchningsformat
+    kopia["kraver_inte_underlag"].clear()
+    kopia["tidsfonster_dagar"]["kvitto"] = 0
+    kopia["saknat_underlag_efter_dagar"] = 0
+    assert regelbok.matchningsformat == matchning.innehall
+    assert regelbok.matchningsregel_for_bankrad({"belopp_ore": 100, "referens": "IN-7", "beskrivning": "x"}) == "regel_in"
+
+
 # --- Stoppregler ---
 
 @pytest.mark.parametrize("ascii", [False, True], ids=["som_tecken", "som_kod_i_json"])
@@ -1413,8 +1429,9 @@ def test_n3_regel_i_matchningsformatet_som_namner_en_agare_stoppar_regelboken(tm
     lambda bok_: bok_.ar_agare_eller_narstaende("AGARE-X"),
     lambda bok_: bok_.ar_bankrad_mot_agare_eller_narstaende({"beskrivning": "UTTAG AGARE-X", "referens": ""}),
     lambda bok_: bok_.matchningsregel_for_bankrad({"belopp_ore": 100, "referens": "IN-7", "beskrivning": "x"}),
+    lambda bok_: bok_.matchningsformat,
 ], ids=["regel_for_underlag", "regel_for_z_rapport", "regel_for_bankrad", "ar_agare_eller_narstaende",
-        "ar_bankrad_mot_agare_eller_narstaende", "matchningsregel_for_bankrad"])
+        "ar_bankrad_mot_agare_eller_narstaende", "matchningsregel_for_bankrad", "matchningsformat"])
 def test_n7_uppslag_i_en_tom_regelbok_ger_ett_tydligt_fel(uppslag):
     # Förut gav uppslaget AttributeError: _regelboken, som inte förklarar något.
     with pytest.raises(RegelbokFel, match=re.escape("Uppslaget i regelboken: regelboken är tom eller trasig. Den har"

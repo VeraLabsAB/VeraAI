@@ -108,9 +108,10 @@ bytes, som text med 64 tecken), så att varje förslag kan visa vilken regelbok 
 fil ger alltid samma summa, och minsta ändring ger en annan. Regelbokens innebörd beror på de tre
 andra filerna, så Regelbok.kontrollerad_mot säger vilken kontoplan, momsfil och vilket
 matchningsformat den kontrollerades mot (deras kontrollsummor). Ett konteringsförslag kan bara
-kontrolleras mot samma kontoplan (granskning 7, M4). Regelboken kommer också ihåg reglerna i
-matchningsformatets kraver_inte_underlag, så att matchningsregel_for_bankrad kan säga vilken av dem
-en bankrad passar.
+kontrolleras mot samma kontoplan (granskning 7, M4). Regelboken kommer också ihåg hela det
+kontrollerade matchningsformatet (Regelbok.matchningsformat), så att matchningsregel_for_bankrad kan
+säga vilken regel i kraver_inte_underlag en bankrad passar, och så att matcha_period tar formatet
+härifrån och aldrig kan använda ett annat format än regelboken kontrollerades mot (granskning 8, N3).
 """
 
 import datetime as dt
@@ -611,7 +612,7 @@ def _innehallet_i(hamta, vad, funktion, tom="tom eller trasig. Den"):
 
 
 def _konfigurationen(kontoplan, momssatser, matchningsformat):
-    """Kontrollerar indata. Returnerar (konton, matchningsreglerna som lista, kontrollsummorna för kontrollerad_mot)."""
+    """Kontrollerar indata. Returnerar (konton, det kontrollerade matchningsformatet, kontrollsummorna för kontrollerad_mot)."""
     # type() i stället för isinstance(), så att en underklass med egna regler inte släpps igenom.
     if type(kontoplan) is not Kontoplan:
         raise RegelbokFel("Regelboken kan inte kontrolleras: kontoplanen ska komma från las_kontoplan, inte vara "
@@ -633,7 +634,7 @@ def _konfigurationen(kontoplan, momssatser, matchningsformat):
         matchning = kontrollera_matchningsformat(matchningsformat.innehall)
     except MatchningsformatFel as fel:
         raise RegelbokFel("Regelboken kan inte kontrolleras: matchningsformatet är fel. " + str(fel)) from None
-    return konton, matchning["kraver_inte_underlag"], summor
+    return konton, matchning, summor
 
 
 def _ingen_matchningsregel_for_agare(matchningsregler, agare, var):
@@ -659,7 +660,8 @@ def _ingen_matchningsregel_for_agare(matchningsregler, agare, var):
 
 def _kontrollera_regelbok(data, kontoplan, momssatser, matchningsformat, var):
     """Kontrollerar hela regelboken och returnerar den som ett nytt objekt i den form kärnan använder."""
-    konton, matchningslistan, summor = _konfigurationen(kontoplan, momssatser, matchningsformat)
+    konton, matchning, summor = _konfigurationen(kontoplan, momssatser, matchningsformat)
+    matchningslistan = matchning["kraver_inte_underlag"]
     matchningsregler = {regel["namn"]: regel for regel in matchningslistan}
     _inga_dolda_tecken_i_json(data, var, _REGELBOK)
     _objekt(data, "filen", var)
@@ -680,9 +682,10 @@ def _kontrollera_regelbok(data, kontoplan, momssatser, matchningsformat, var):
         "agare_och_narstaende": agare,
         "regler": _kontrollera_regelbokens_regler(data["regler"], granser, agare, konton, momssatser, matchningsregler,
                                                   var),
-        # Filerna regelboken kontrollerades mot, och matchningsformatets regler för bankrader utan underlag.
+        # Filerna regelboken kontrollerades mot, och hela det kontrollerade matchningsformatet, som
+        # matchningsregel_for_bankrad och matcha_period använder (granskning 8, N3).
         "kontrollerad_mot": summor,
-        "matchningsregler": matchningslistan,
+        "matchningsformat": matchning,
     }
 
 
@@ -775,6 +778,16 @@ class Regelbok:
         """
         return _kopia(self._regelboken["kontrollerad_mot"])
 
+    @property
+    def matchningsformat(self):
+        """Matchningsformatet som regelboken kontrollerades mot, som en ny kopia (granskning 8, N3).
+
+        Samma innehåll som Matchningsformat.innehall: kraver_inte_underlag, tidsfonster_dagar och
+        saknat_underlag_efter_dagar. matcha_period tar formatet härifrån, så att matchningen alltid
+        använder samma format som regelboken och vet vilka som är ägare och närstående.
+        """
+        return _kopia(self._innehall()["matchningsformat"])
+
     def _innehall(self):
         """Regelbokens innehåll, eller ett tydligt fel för en regelbok som inte har skapats av las_regelbok (N7).
 
@@ -795,7 +808,7 @@ class Regelbok:
         mot en ägare eller närstående (ar_bankrad_mot_agare_eller_narstaende) passar aldrig någon regel,
         så att en regel i matchningsformatet aldrig undantar den från underlag (K7, N3, granskning 8).
         """
-        regel = matchningsregel_for_bankrad(rad, self._innehall()["matchningsregler"])
+        regel = matchningsregel_for_bankrad(rad, self._innehall()["matchningsformat"]["kraver_inte_underlag"])
         if regel is None or self.ar_bankrad_mot_agare_eller_narstaende(rad):
             return None
         return regel["namn"]

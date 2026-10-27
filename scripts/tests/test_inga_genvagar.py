@@ -32,7 +32,7 @@ En genväg är en funktion som läser en fil men hoppar över en kontroll:
 
 All annan kod ska läsa filer med las_bankfil, las_kassafil, las_kassaperiod,
 las_underlagsperiod, las_kontoplan, las_momssatser och las_regelbok, som alltid kör alla kontroller, summera med summa_per_momssats, som bara
-tar emot en Kassaperiod, matcha med matcha_period, som bara tar emot en Bankperiod, och skapa förslag med
+tar emot en Kassaperiod, matcha med matcha_period, som bara tar emot en Bankperiod och en Regelbok, och skapa förslag med
 skapa_konteringsforslag, som alltid kör K2 och ursprungskontrollen. Bara inläsningsmodulerna själva (UNDANTAGNA) och testerna får använda
 genvägarna. En ny inläsningsmodul måste läggas till i UNDANTAGNA med flit. las_matchningsformat.py,
 las_kontoplan.py, las_momssatser.py och las_regelbok.py läser JSON-format med de gemensamma skydden och är därför
@@ -810,8 +810,8 @@ VANLIG_KOD = {
     "las_underlagsperiod": "from las_underlag import las_underlagsperiod, UnderlagFilFel\n"
                            "period = las_underlagsperiod('underlag', '2025-01-01', '2025-01-31')\n"
                            "poster = period.underlag + period.arenden\n",
-    "matcha_period": "from las_matchningsformat import ladda_matchningsformat\nfrom matcha_bank import matcha_period\n"
-                     "resultat = matcha_period(None, None, ladda_matchningsformat('m.json'), '2025-01-31')\n",
+    "matcha_period": "from las_regelbok import las_regelbok\nfrom matcha_bank import matcha_period\n"
+                     "resultat = matcha_period(None, None, las_regelbok('r.json', None, None, None), '2025-01-31')\n",
     "las_matchningsformat": "from las_matchningsformat import las_matchningsformat, Matchningsformat\n"
                             "f = las_matchningsformat('m.json')\nx = (f.kontrollsumma, f.innehall)\n",
     "bankperiod": "from las_bank import Bankperiod, las_bankfil, sla_ihop_bankperioder\n"

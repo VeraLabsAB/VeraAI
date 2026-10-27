@@ -45,7 +45,8 @@ las_matchningsformat är den enda funktionen som läser filen. Den returnerar et
 som inte går att ändra och bara kan skapas av las_matchningsformat. Det har en kontrollsumma (SHA-256
 av filens bytes, som text med 64 tecken), räknad på exakt de bytes som sedan tolkas och kontrolleras,
 så att regelboken och varje konteringsförslag kan visa vilket matchningsformat som användes.
-ladda_matchningsformat ger samma innehåll som ett vanligt objekt (dict), för matcha_period.
+ladda_matchningsformat ger samma innehåll som ett vanligt objekt (dict). matcha_period tar inte emot
+det: den tar formatet från regelboken (Regelbok.matchningsformat, granskning 8, N3).
 matchningsregel_for_bankrad säger vilken regel i kraver_inte_underlag en bankrad passar.
 """
 
@@ -201,8 +202,8 @@ def _kontrollera_regler(regler, var):
 def kontrollera_matchningsformat(data, var="Matchningsformatet"):
     """Kontrollerar ett matchningsformat och returnerar det som ett nytt objekt, utan anteckningar.
 
-    Används av ladda_matchningsformat och igen av matcha_bank.matcha_period, så att ett trasigt
-    eller ändrat format aldrig används.
+    Används av las_matchningsformat, och igen av las_regelbok och matcha_bank.matcha_period (på
+    formatet ur regelboken), så att ett trasigt eller ändrat format aldrig används.
     """
     _nycklar(data, MATCHNINGSFORMAT_NYCKLAR, MATCHNINGSFORMAT_VALFRIA_NYCKLAR, var)
     _kontrollera_anteckning(data, var, _MATCHNINGSFORMAT)
@@ -300,6 +301,6 @@ def las_matchningsformat(sokvag):
 def ladda_matchningsformat(sokvag):
     """Läser och kontrollerar ett företags matchning.json med las_matchningsformat. Fel ger MatchningsformatFel.
 
-    Returnerar innehållet som ett vanligt objekt (dict), för matcha_period.
+    Returnerar innehållet som ett vanligt objekt (dict).
     """
     return las_matchningsformat(sokvag).innehall

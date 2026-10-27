@@ -3,14 +3,18 @@
 Testdatan är SYNTETISK (Syntet Testbutik AB, 2025-Q1). Rätt svar står i facit.json. De små
 bankfilerna och underlagen nedan är påhittade och skrivs i en tillfällig mapp för varje test. De
 läses alltid med las_bankfil och las_underlagsperiod, så att matchningen får samma sorts indata
-som i drift.
+som i drift. Matchningsformatet får matchningen bara genom en regelbok från las_regelbok
+(granskning 8, N3). För de små fallen skrivs formatet och en regelbok i en tillfällig mapp
+(regelbok_for).
 """
 
 import copy
 import datetime as dt
+import itertools
 import json
 import random
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -24,12 +28,21 @@ sys.path.insert(0, str(AGENT / "scripts"))
 import matcha_bank  # noqa: E402
 from las_bank import Bankperiod, BankfilFel, ladda_bankformat, las_bankfil, sla_ihop_bankperioder  # noqa: E402
 from las_kassa import normalisera_kassaregister  # noqa: E402
-from las_matchningsformat import MatchningsformatFel, kontrollera_matchningsformat, ladda_matchningsformat  # noqa: E402
+from las_kontoplan import las_kontoplan  # noqa: E402
+from las_matchningsformat import (  # noqa: E402
+    MatchningsformatFel, kontrollera_matchningsformat, ladda_matchningsformat, las_matchningsformat,
+)
+from las_momssatser import las_momssatser  # noqa: E402
+from las_regelbok import Regelbok, RegelbokFel, las_regelbok  # noqa: E402
 from las_underlag import UnderlagFilFel, Underlagsperiod, las_underlagsperiod  # noqa: E402
 from matcha_bank import MatchningFel, Matchningsresultat, matcha_period  # noqa: E402
 
 BANKFORMAT = ladda_bankformat(FORETAG / "bankformat.json")
 MATCHNINGSFORMAT = ladda_matchningsformat(FORETAG / "matchning.json")
+KONTOPLAN = las_kontoplan(FORETAG / "kontoplan.json")
+MOMSSATSER = las_momssatser(FORETAG / "momssatser.json")
+# Testbutikens egen regelbok, kontrollerad mot testbutikens matchningsformat, för testdatan.
+REGELBOK = las_regelbok(FORETAG / "regelbok.json", KONTOPLAN, MOMSSATSER, las_matchningsformat(FORETAG / "matchning.json"))
 GRUPPER_FOR_BANKRADER = ("matchningar", "arenden", "kraver_inte_underlag", "vantande")
 
 # Osynliga tecken byggs med chr(), så att de syns i koden (test_inga_dolda_tecken.py).
@@ -104,7 +117,7 @@ def bankrad_utan_underlag(kvartalet):
 def test_kvartalet_ger_exakt_det_planterade_felet_som_saknat_underlag(kvartalet):
     rad = bankrad_utan_underlag(kvartalet)
     # Mer än 7 dagar efter alla bankrader i kvartalet.
-    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], MATCHNINGSFORMAT, "2025-04-30")
+    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], REGELBOK,"2025-04-30")
     assert len(resultat.arenden) == 1
     arende = resultat.arenden[0]
     assert (arende["kontroll"], arende["typ"], arende["kandidater"]) == ("K3", "saknat underlag", ())
@@ -134,25 +147,25 @@ def test_kvartalet_fore_sju_dagar_ger_inget_arende_bara_att_raden_vantar(kvartal
     assert max(r["transaktionsdag"] for r in del_.rader) == "2025-02-19"
     # 7 dagar efter transaktionsdagen 2025-02-18: inte mer än 7 dagar, så raden väntar.
     for dag in ("2025-02-19", "2025-02-20", "2025-02-25"):
-        resultat = matcha_period(del_, kvartalet["period"], MATCHNINGSFORMAT, dag)
+        resultat = matcha_period(del_, kvartalet["period"], REGELBOK,dag)
         assert resultat.arenden == (), dag
         # Samma rad (id:t beror bara på radens innehåll), men ur en annan fil, så kalla_fil skiljer.
         assert [(post["bankrad"]["id"], post["bankrad"]["radnr"], post["arende_efter"]) for post in resultat.vantande
                 ] == [(rad["id"], 85, "2025-02-25")]
     # Dagen efter blir den ett ärende.
-    resultat = matcha_period(del_, kvartalet["period"], MATCHNINGSFORMAT, "2025-02-26")
+    resultat = matcha_period(del_, kvartalet["period"], REGELBOK,"2025-02-26")
     assert [(a["typ"], a["bankrad"]["id"]) for a in resultat.arenden] == [("saknat underlag", rad["id"])]
     assert resultat.vantande == ()
     # Hela kvartalet med samma bedömningsdatum stoppas: där finns bankrader efter 2025-02-26.
     with pytest.raises(MatchningFel, match="^Bedömningsdatumet 2025-02-26 ligger före transaktionsdagen"):
-        matcha_period(kvartalet["bankperiod"], kvartalet["period"], MATCHNINGSFORMAT, "2025-02-26")
+        matcha_period(kvartalet["bankperiod"], kvartalet["period"], REGELBOK,"2025-02-26")
 
 
 def test_dubbletten_kommer_fran_k4_och_inte_fran_matchningen(kvartalet):
     fel = planterat("dubblett_leverantorsfaktura")
     period = kvartalet["period"]
     assert [(a["kontroll"], a["id"]) for a in period.arenden] == [("K4", fel["id"])]
-    resultat = matcha_period(kvartalet["bankperiod"], period, MATCHNINGSFORMAT, "2025-04-30")
+    resultat = matcha_period(kvartalet["bankperiod"], period, REGELBOK,"2025-04-30")
     alla_id = json.dumps([list(map(dict, grupp)) for grupp in resultat], default=dict)
     assert fel["id"] not in alla_id  # dubbletten finns inte i matchningen alls
     # Originalet matchas med den enda betalningen.
@@ -162,7 +175,7 @@ def test_dubbletten_kommer_fran_k4_och_inte_fran_matchningen(kvartalet):
 
 
 def test_kvartalets_matchningar_ar_ratt(kvartalet):
-    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], MATCHNINGSFORMAT, "2025-04-30")
+    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], REGELBOK,"2025-04-30")
     leverantorsbetalningar = [rad for rad in kvartalet["rader"] if rad["referens"].startswith("SYNT-")]
     kortkop = [rad for rad in kvartalet["rader"] if rad["referens"].startswith("KORTKOP-")]
     assert (len(leverantorsbetalningar), len(kortkop)) == (16, 8)
@@ -206,7 +219,7 @@ def test_varje_bankrad_i_testdatan_finns_i_exakt_en_grupp(kvartalet):
     assert len(kvartalet["rader"]) == sum(manad["antal_rader"] for manad in facit()["bank"].values()) == 395
     # Bedömningsdatumen ligger på eller efter den sista bankraden (2025-03-31), annars stoppas de (J9).
     for dag in ("2025-03-31", "2025-04-07", "2025-04-08", "2025-04-30", "9999-12-31"):
-        resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], MATCHNINGSFORMAT, dag)
+        resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], REGELBOK,dag)
         kontrollera_grupperna(resultat, kvartalet["bankperiod"], kvartalet["period"])
 
 
@@ -214,14 +227,14 @@ def test_en_manad_i_taget_ger_samma_planterade_fel(kvartalet):
     # Februari för sig ger samma ärende. Underlagen från januari behövs, eftersom januaris fakturor
     # betalas i februari. Utan dem blir de bankraderna ärenden (nästa test).
     period = las_underlagsperiod(DATAMAPP / "underlag", "2025-01-01", "2025-02-28")
-    resultat = matcha_period(kvartalet["februari"], period, MATCHNINGSFORMAT, "2025-03-31")
+    resultat = matcha_period(kvartalet["februari"], period, REGELBOK,"2025-03-31")
     assert [(a["typ"], a["bankrad"]["radnr"]) for a in resultat.arenden] == [("saknat underlag", 85)]
 
 
 def test_utan_underlagen_fran_januari_blir_februaris_betalningar_arenden(kvartalet):
     # Skydd: testet ovan prövar verkligen något. Betalningarna av januaris fakturor saknar då underlag.
     period = las_underlagsperiod(DATAMAPP / "underlag", "2025-02-01", "2025-02-28")
-    resultat = matcha_period(kvartalet["februari"], period, MATCHNINGSFORMAT, "2025-03-31")
+    resultat = matcha_period(kvartalet["februari"], period, REGELBOK,"2025-03-31")
     saknade = [a["bankrad"] for a in resultat.arenden if a["typ"] == "saknat underlag"]
     assert 85 in [rad["radnr"] for rad in saknade]
     assert [rad for rad in saknade if rad["radnr"] != 85]
@@ -240,6 +253,36 @@ FORMAT = {
     "saknat_underlag_efter_dagar": 7,
 }
 RUBRIK = "Radnummer,Bokföringsdag,Transaktionsdag,Referens,Beskrivning,Belopp,Bokfört saldo"
+
+# En tillfällig mapp för regelbok_for. Den tas bort när testerna är klara.
+_REGELBOKSMAPP = tempfile.TemporaryDirectory(prefix="matcha-bank-")
+_NUMMER = itertools.count()
+_REGELBOCKER = {}
+
+
+def regelbok_for(format_, agare=("AGARE-1",)):
+    """En Regelbok från las_regelbok, kontrollerad mot matchningsformatet format_.
+
+    Formatet skrivs som matchning.json och läses med las_matchningsformat. Regelboken är testbutikens,
+    utan dess regler för bankrader (de pekar på testbutikens regler i matchningsformatet), och med
+    agare som ägare och närstående. Varje format läses en gång. Ett trasigt format stoppas av
+    las_matchningsformat eller las_regelbok, som i drift. Värden som inte finns i JSON (till exempel
+    bytes) skrivs som text, så att de fortfarande är fel."""
+    nyckel = json.dumps([format_, list(agare)], ensure_ascii=False, default=repr)
+    if nyckel not in _REGELBOCKER:
+        mapp = Path(_REGELBOKSMAPP.name) / str(next(_NUMMER))
+        mapp.mkdir()
+        (mapp / "matchning.json").write_text(json.dumps(format_, ensure_ascii=False, default=repr), encoding="utf-8")
+        data = json.loads((FORETAG / "regelbok.json").read_text(encoding="utf-8"))
+        data["regler"] = [regel for regel in data["regler"] if regel["galler"]["kalla"] != "bankrad"]
+        data["agare_och_narstaende"] = list(agare)
+        (mapp / "regelbok.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        _REGELBOCKER[nyckel] = las_regelbok(mapp / "regelbok.json", KONTOPLAN, MOMSSATSER,
+                                            las_matchningsformat(mapp / "matchning.json"))
+    return _REGELBOCKER[nyckel]
+
+
+FORMATETS_REGELBOK = regelbok_for(FORMAT)
 
 
 def bankrader(mapp, *rader, namn="bank.csv", ingaende=0):
@@ -277,8 +320,8 @@ def period(mapp, *poster):
     return las_underlagsperiod(mapp, "0001-01-01", "9999-12-31")
 
 
-def matcha(rader, underlagen, bedomning="2025-12-31", format_=None):
-    resultat = matcha_period(rader, underlagen, FORMAT if format_ is None else format_, bedomning)
+def matcha(rader, underlagen, bedomning="2025-12-31", format_=None, agare=("AGARE-1",)):
+    resultat = matcha_period(rader, underlagen, regelbok_for(FORMAT if format_ is None else format_, agare), bedomning)
     kontrollera_grupperna(resultat, rader, underlagen)
     return resultat
 
@@ -660,7 +703,7 @@ def test_bedomningsdatumet_jamfors_med_transaktionsdagen_inte_bokforingsdagen(tm
     for dag in ("2025-01-20", "2025-01-21"):
         assert sammanfattning(matcha(rader, underlagen, dag)) == tomt(matchningar=[(1, "U-1")]), dag
     with pytest.raises(MatchningFel, match="ligger före transaktionsdagen 2025-01-20"):
-        matcha_period(rader, underlagen, FORMAT, "2025-01-19")
+        matcha_period(rader, underlagen, FORMATETS_REGELBOK, "2025-01-19")
 
 
 def test_fakturanumret_ensamt_racker_inte(tmp_path):
@@ -800,15 +843,113 @@ def test_testdatans_avgifter_ligger_inom_gransen(kvartalet):
     assert bankavgift["hogst_belopp_ore"] == 25000
     lagre = copy.deepcopy(MATCHNINGSFORMAT)
     [r for r in lagre["kraver_inte_underlag"] if r["namn"] == "bankavgift"][0]["hogst_belopp_ore"] = 19899
-    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], lagre, "2025-04-30")
+    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], regelbok_for(lagre), "2025-04-30")
     over = [a for a in resultat.arenden if a["typ"] == "över gräns"]
     assert [(a["regel"], a["bankrad"]["belopp_ore"]) for a in over] == [("bankavgift", -19900)] * 3
     assert len(resultat.arenden) == 4  # och det planterade ärendet
     kontrollera_grupperna(resultat, kvartalet["bankperiod"], kvartalet["period"])
     # Exakt på 199 kr: inom gränsen, inga nya ärenden.
     [r for r in lagre["kraver_inte_underlag"] if r["namn"] == "bankavgift"][0]["hogst_belopp_ore"] = 19900
-    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], lagre, "2025-04-30")
+    resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], regelbok_for(lagre), "2025-04-30")
     assert [a["typ"] for a in resultat.arenden] == ["saknat underlag"]
+
+
+# --- Granskning 8, N3: ägarens bankrader kräver alltid underlag (beslutet 2026-10-27) ---
+
+AGARUTTAG = {"namn": "agaruttag", "riktning": "ut", "beskrivning_borjar_med": "UTTAG AGARE", "hogst_belopp_ore": 100000}
+MED_AGARUTTAG = {**FORMAT, "kraver_inte_underlag": FORMAT["kraver_inte_underlag"] + [AGARUTTAG]}
+
+
+def granskarens_rader(tmp_path):
+    """Granskarens prov ur granskning 8, N3. Rad 1–3 är mot ägaren AGARE-1, rad 4 och 5 kan vara andra motparter."""
+    return bankrader(tmp_path, ("UTTAG-1", "UTTAG AGARE-1", -50000, "2025-04-01"),
+                     ("UTTAG-2", "UTTAG AGARE-1/LAN", -10000, "2025-04-01"),
+                     ("UTTAG-3", "UTTAG AGARE-1.", -10000, "2025-04-02"),
+                     ("UTTAG-4", "UTTAG AGARE-1X", -10000, "2025-04-02"),
+                     ("UTTAG-5", "UTTAG AGARE-10", -10000, "2025-04-03"))
+
+
+def test_n3_granskarens_prov_agarens_rader_kraver_underlag(tmp_path):
+    # Förut hamnade alla fem raderna bland raderna som inte kräver underlag, eftersom matchningen inte
+    # visste vem som är ägare. Nu kräver rad 1–3 underlag: de väntar på det, och blir ärenden "saknat
+    # underlag" efter 7 dagar (K3). Rad 4 och 5 undantas fortfarande av regeln.
+    rader = granskarens_rader(tmp_path)
+    assert [rad["radnr"] for rad in rader.rader if regelbok_for(MED_AGARUTTAG).ar_bankrad_mot_agare_eller_narstaende(
+        rad)] == [1, 2, 3]
+    assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-03", format_=MED_AGARUTTAG)) == tomt(
+        vantande=[(1, "2025-04-08"), (2, "2025-04-08"), (3, "2025-04-09")],
+        kraver_inte=[(4, "agaruttag"), (5, "agaruttag")])
+    assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-30", format_=MED_AGARUTTAG)) == tomt(
+        arenden=[(1, "saknat underlag", ()), (2, "saknat underlag", ()), (3, "saknat underlag", ())],
+        kraver_inte=[(4, "agaruttag"), (5, "agaruttag")])
+    # Skydd: utan ägare i regelboken passar alla fem raderna regeln, så regeln prövas verkligen.
+    assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-30", format_=MED_AGARUTTAG, agare=())) == tomt(
+        kraver_inte=[(nummer, "agaruttag") for nummer in range(1, 6)])
+
+
+def test_n3_agarens_rad_over_gransen_kraver_underlag_och_ar_inte_over_grans(tmp_path):
+    # En rad mot ägaren över regelns gräns ska inte bli "över gräns" med regelns namn, eftersom regeln
+    # aldrig gäller den. Den kräver underlag som alla andra rader. En annan motpart över gränsen blir
+    # fortfarande "över gräns".
+    rader = bankrader(tmp_path, ("UTTAG-1", "UTTAG AGARE-1", -100001, "2025-04-01"),
+                      ("UTTAG-2", "UTTAG AGARE-10", -100001, "2025-04-01"),
+                      ("UTTAG-3", "UTTAG AGARE-1", -10 ** 12, "2025-04-01"))
+    assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-01", format_=MED_AGARUTTAG)) == tomt(
+        arenden=[over_grans(2)], vantande=[(1, "2025-04-08"), (3, "2025-04-08")])
+    assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-09", format_=MED_AGARUTTAG)) == tomt(
+        arenden=[over_grans(2), (1, "saknat underlag", ()), (3, "saknat underlag", ())])
+    # Skydd: utan ägare i regelboken är rad 1 och 3 också över gränsen.
+    assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-01", format_=MED_AGARUTTAG, agare=())) == tomt(
+        arenden=[over_grans(1), over_grans(2), over_grans(3)])
+
+
+def test_n3_agarens_rad_matchas_mot_ett_underlag(tmp_path):
+    # Raden behandlas som alla rader som kräver underlag: finns ett underlag matchas den med det.
+    rader = bankrader(tmp_path, ("UTTAG-1", "UTTAG AGARE-1", -50000, "2025-04-01"))
+    underlagen = period(tmp_path, underlag(motpart="AGARE-1", fakturanummer="UTTAG-1", belopp_ore=50000,
+                                           datum="2025-04-01"))
+    assert sammanfattning(matcha(rader, underlagen, format_=MED_AGARUTTAG)) == tomt(matchningar=[(1, "U-1")])
+
+
+@pytest.mark.parametrize("referens, beskrivning", [
+    ("TILL:AGARE-1", "UTTAG AGARE"),       # ägaren står i referensen
+    ("X", "UTTAG AGARE 1"),                # mellanslag i stället för bindestreck
+    ("X", "UTTAG AGARE" + TANKSTRECK + "1"),  # ett tankstreck i stället för bindestreck
+    ("X", "UTTAG AGARE (agare-1)"),        # små bokstäver, inom parentes
+])
+def test_n3_agaren_pekas_ut_med_regelbokens_uppslag(tmp_path, referens, beskrivning):
+    # Matchningen jämför inga namn själv: den använder regelbokens uppslag, med samma regler för hela ord.
+    rader = bankrader(tmp_path, (referens, beskrivning, -10000, "2025-04-01"))
+    assert regelbok_for(MED_AGARUTTAG).ar_bankrad_mot_agare_eller_narstaende(rader.rader[0])
+    # Skydd: regeln passar raden, så det är ägaren som gör att den kräver underlag.
+    assert regelbok_for(MED_AGARUTTAG, agare=()).matchningsregel_for_bankrad(rader.rader[0]) == "agaruttag"
+    assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-30", format_=MED_AGARUTTAG)) == tomt(
+        arenden=[(1, "saknat underlag", ())])
+
+
+def test_n3_en_narstaende_i_listan_galler_som_agaren(tmp_path):
+    # Listan heter agare_och_narstaende: en närstående behandlas som en ägare.
+    rader = bankrader(tmp_path, ("X", "UTTAG AGARE-2", -10000, "2025-04-01"), ("X", "UTTAG AGARE-1", -10000, "2025-04-01"))
+    assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-30", format_=MED_AGARUTTAG,
+                                 agare=("AGARE-1", "AGARE-2"))) == tomt(
+        arenden=[(1, "saknat underlag", ()), (2, "saknat underlag", ())])
+    assert sammanfattning(matcha(rader, period(tmp_path), "2025-04-30", format_=MED_AGARUTTAG, agare=("AGARE-2",))) == tomt(
+        arenden=[(1, "saknat underlag", ())], kraver_inte=[(2, "agaruttag")])
+
+
+def test_n3_testdatans_rader_ger_samma_resultat_som_utan_agare(kvartalet):
+    # Ingen av testdatans rader i Q1 är mot ägaren, så resultatet är exakt detsamma som med en regelbok
+    # utan ägare och närstående (som förut, då matchningen inte visste vilka som är ägare). Testerna
+    # ovan för kvartalet visar att resultatet är detsamma som förut, rad för rad.
+    assert not [rad for rad in kvartalet["rader"] if REGELBOK.ar_bankrad_mot_agare_eller_narstaende(rad)]
+    assert REGELBOK.agare_och_narstaende == ["AGARE-1"]
+    for dag in ("2025-03-31", "2025-04-30"):
+        med = matcha_period(kvartalet["bankperiod"], kvartalet["period"], REGELBOK, dag)
+        for regelbok in (regelbok_for(MATCHNINGSFORMAT), regelbok_for(MATCHNINGSFORMAT, agare=())):
+            assert matcha_period(kvartalet["bankperiod"], kvartalet["period"], regelbok, dag) == med
+        kontrollera_grupperna(med, kvartalet["bankperiod"], kvartalet["period"])
+    assert [(a["typ"], a["bankrad"]["radnr"]) for a in med.arenden] == [("saknat underlag", 85)]
+    assert (len(med.matchningar), len(med.kraver_inte_underlag), len(med.vantande)) == (23, 371, 0)
 
 
 def test_flera_bankfiler(tmp_path):
@@ -844,7 +985,7 @@ def test_bankraderna_ska_vara_en_bankperiod(tmp_path):
     ]:
         with pytest.raises(MatchningFel, match="^Bankraderna ska vara en Bankperiod från las_bankfil eller"
                                                " sla_ihop_bankperioder, inte " + text + r"\.$"):
-            matcha_period(varde, underlagen, FORMAT, "2025-12-31")
+            matcha_period(varde, underlagen, FORMATETS_REGELBOK, "2025-12-31")
     # Skydd: samma Bankperiod godtas.
     assert sammanfattning(matcha(bankperiod, underlagen)) == tomt(matchningar=[(1, "U-1")], kraver_inte=[(2, "insattning")])
 
@@ -859,7 +1000,7 @@ def test_en_bankrad_som_tas_bort_efter_inlasningen_blir_anda_ett_arende(tmp_path
     del rader[1]
     rader[0]["belopp_ore"] = -1
     with pytest.raises(MatchningFel, match="^Bankraderna ska vara en Bankperiod"):
-        matcha_period(rader, underlagen, FORMAT, "2025-12-31")
+        matcha_period(rader, underlagen, FORMATETS_REGELBOK, "2025-12-31")
     assert sammanfattning(matcha(bankperiod, underlagen)) == tomt(
         matchningar=[(1, "U-1")], arenden=[(2, "saknat underlag", ())])
 
@@ -882,14 +1023,41 @@ def test_underlagen_ska_vara_en_underlagsperiod(tmp_path):
                         (Underklass.__new__(Underklass), "Underklass")]:
         with pytest.raises(MatchningFel, match="^Underlagen ska vara en Underlagsperiod från las_underlagsperiod,"
                                                " inte " + text):
-            matcha_period(rader, varde, FORMAT, "2025-12-31")
+            matcha_period(rader, varde, FORMATETS_REGELBOK, "2025-12-31")
+
+
+def test_regelboken_ska_vara_en_regelbok(tmp_path):
+    # Granskning 8, N3: matchningen får matchningsformatet och listan över ägare och närstående bara
+    # genom en Regelbok från las_regelbok. Ett matchningsformat för sig, som ett vanligt objekt eller
+    # från las_matchningsformat, godtas inte längre: då skulle matchningen kunna använda ett annat format
+    # än regelboken kontrollerades mot, och inte veta vilka som är ägare.
+    rader = en_rad(tmp_path)
+    underlagen = period(tmp_path, underlag())
+
+    class Underklass(Regelbok):
+        __slots__ = ()
+
+    for varde, text in [(None, "None"), (FORMAT, "ett objekt"), (copy.deepcopy(MATCHNINGSFORMAT), "ett objekt"),
+                        (las_matchningsformat(FORETAG / "matchning.json"), "Matchningsformat"),
+                        ("regelbok", "'regelbok'"), (object.__new__(Underklass), "Underklass")]:
+        with pytest.raises(MatchningFel, match="^Regelboken ska vara en Regelbok från las_regelbok, inte " + text
+                                               + r"\.$"):
+            matcha_period(rader, underlagen, varde, "2025-12-31")
+    # Skydd: en Regelbok godtas.
+    assert sammanfattning(matcha(rader, underlagen)) == tomt(matchningar=[(1, "U-1")])
+
+
+def test_tom_regelbok_ger_matchningfel(tmp_path):
+    # Som för perioderna (J7): en Regelbok skapad med __new__, utan las_regelbok, saknar sitt innehåll.
+    with pytest.raises(MatchningFel, match=r"^Regelboken är tom eller trasig: den har inte skapats av las_regelbok\.$"):
+        matcha_period(en_rad(tmp_path), period(tmp_path), object.__new__(Regelbok), "2025-12-31")
 
 
 @pytest.mark.parametrize("varde", [None, "", "2025-1-01", "2025-02-30", "31/12/2025", 20251231,
                                    dt.date(2025, 12, 31), " 2025-12-31", "２０２５-12-31"])
 def test_bedomningsdatum_ska_vara_ett_giltigt_datum(tmp_path, varde):
     with pytest.raises(MatchningFel, match="^Bedömningsdatumet ska vara ett giltigt datum som text, ÅÅÅÅ-MM-DD"):
-        matcha_period(en_rad(tmp_path), period(tmp_path), FORMAT, varde)
+        matcha_period(en_rad(tmp_path), period(tmp_path), FORMATETS_REGELBOK, varde)
 
 
 def test_bedomningsdatum_fore_en_bankrad_stoppas(tmp_path):
@@ -898,7 +1066,7 @@ def test_bedomningsdatum_fore_en_bankrad_stoppas(tmp_path):
     underlagen = period(tmp_path, underlag())
     for dag in ("2025-02-28", "2025-01-19", "0001-01-01"):
         with pytest.raises(MatchningFel) as fel:
-            matcha_period(rader, underlagen, FORMAT, dag)
+            matcha_period(rader, underlagen, FORMATETS_REGELBOK, dag)
         assert str(fel.value).startswith(
             "Bedömningsdatumet " + dag + " ligger före transaktionsdagen 2025-03-01 för bankraden med radnummer 2"
             if dag == "2025-02-28" else "Bedömningsdatumet " + dag + " ligger före transaktionsdagen 2025-01-20 för"
@@ -916,9 +1084,9 @@ def test_fler_an_20_000_bankrader_stoppas(tmp_path):
     for_manga = bankrader(tmp_path, *rader)
     with pytest.raises(MatchningFel, match="^Matchningen stoppas: det finns 20 001 bankrader, men matchningen tar"
                                            " högst 20 000 åt gången"):
-        matcha_period(for_manga, period(tmp_path), FORMAT, "2025-12-31")
+        matcha_period(for_manga, period(tmp_path), FORMATETS_REGELBOK, "2025-12-31")
     precis = bankrader(tmp_path, *rader[:20_000])
-    assert len(matcha_period(precis, period(tmp_path), FORMAT, "2025-12-31").kraver_inte_underlag) == 20_000
+    assert len(matcha_period(precis, period(tmp_path), FORMATETS_REGELBOK, "2025-12-31").kraver_inte_underlag) == 20_000
     assert matcha_bank._HOGST_ANTAL == 20_000  # samma gräns gäller underlagen (nästa test)
 
 
@@ -929,13 +1097,13 @@ def test_fler_underlag_an_gransen_stoppas(tmp_path, monkeypatch):
     rader = bankrader(tmp_path, ("IN-1", "X", 1, "2025-01-20"))
     poster = [underlag(id="U-" + str(nummer), fakturanummer="F-" + str(nummer)) for nummer in range(1, 5)]
     with pytest.raises(MatchningFel, match="^Matchningen stoppas: det finns 4 underlag, men matchningen tar högst 3"):
-        matcha_period(rader, period(tmp_path, *poster), FORMAT, "2025-12-31")
+        matcha_period(rader, period(tmp_path, *poster), FORMATETS_REGELBOK, "2025-12-31")
     tre = tmp_path / "tre"
     tre.mkdir()
     assert len(matcha(rader, period(tre, *poster[:3])).oavstamda_underlag) == 3  # exakt på gränsen godtas
     fyra_rader = bankrader(tmp_path, *[("IN-" + str(nummer), "X", 1, "2025-01-20") for nummer in range(4)])
     with pytest.raises(MatchningFel, match="^Matchningen stoppas: det finns 4 bankrader"):
-        matcha_period(fyra_rader, period(tre), FORMAT, "2025-12-31")
+        matcha_period(fyra_rader, period(tre), FORMATETS_REGELBOK, "2025-12-31")
 
 
 def test_tom_bankperiod_eller_underlagsperiod_ger_matchningfel(tmp_path):
@@ -945,10 +1113,10 @@ def test_tom_bankperiod_eller_underlagsperiod_ger_matchningfel(tmp_path):
     underlagen = period(tmp_path, underlag())
     with pytest.raises(MatchningFel, match="^Bankperioden är tom eller trasig: den har inte skapats av las_bankfil"
                                            " eller sla_ihop_bankperioder"):
-        matcha_period(Bankperiod.__new__(Bankperiod), underlagen, FORMAT, "2025-12-31")
+        matcha_period(Bankperiod.__new__(Bankperiod), underlagen, FORMATETS_REGELBOK, "2025-12-31")
     with pytest.raises(MatchningFel, match="^Underlagsperioden är tom eller trasig: den har inte skapats av"
                                            " las_underlagsperiod"):
-        matcha_period(rader, Underlagsperiod.__new__(Underlagsperiod), FORMAT, "2025-12-31")
+        matcha_period(rader, Underlagsperiod.__new__(Underlagsperiod), FORMATETS_REGELBOK, "2025-12-31")
 
 
 def test_datumets_form_kontrolleras_aven_med_nyare_python(tmp_path, monkeypatch):
@@ -966,7 +1134,7 @@ def test_datumets_form_kontrolleras_aven_med_nyare_python(tmp_path, monkeypatch)
     monkeypatch.setattr(matcha_bank.dt, "date", Slapp)
     assert Slapp.fromisoformat("20251231") == dt.date(2025, 12, 31)  # skydd: efterliknandet fungerar
     with pytest.raises(MatchningFel, match="^Bedömningsdatumet ska vara ett giltigt datum"):
-        matcha_period(en_rad(tmp_path), period(tmp_path), FORMAT, "20251231")
+        matcha_period(en_rad(tmp_path), period(tmp_path), FORMATETS_REGELBOK, "20251231")
 
 
 @pytest.mark.parametrize("andring, text", [
@@ -979,13 +1147,15 @@ def test_datumets_form_kontrolleras_aven_med_nyare_python(tmp_path, monkeypatch)
     (lambda f: f["kraver_inte_underlag"][1].update(hogst_belopp_ore=0), "'hogst_belopp_ore' ska vara ett heltal"),
     (lambda f: f["kraver_inte_underlag"][0].update(hogst_belopp_ore=1), "har 'hogst_belopp_ore', men gäller pengar in"),
 ])
-def test_trasigt_format_stoppas_aven_nar_det_skickas_direkt(tmp_path, andring, text):
-    # Formatet kontrolleras igen i matcha_period, så att ett format som har ändrats efter
-    # ladda_matchningsformat aldrig används.
+def test_trasigt_format_i_regelboken_stoppas_anda(tmp_path, monkeypatch, andring, text):
+    # Formatet kommer från regelboken och kan inte längre skickas in direkt (granskning 8, N3). Det
+    # kontrolleras ändå igen i matcha_period. Här efterliknas en regelbok med ett trasigt format (det går
+    # inte att få fram med las_regelbok), så att testet visar att kontrollen finns kvar.
     format_ = copy.deepcopy(FORMAT)
     andring(format_)
+    monkeypatch.setattr(Regelbok, "matchningsformat", property(lambda bok: format_), raising=False)
     with pytest.raises(MatchningFel) as fel:
-        matcha_period(en_rad(tmp_path), period(tmp_path), format_, "2025-12-31")
+        matcha_period(en_rad(tmp_path), period(tmp_path), FORMATETS_REGELBOK, "2025-12-31")
     assert type(fel.value) is MatchningFel and text in str(fel.value), str(fel.value)
 
 
@@ -995,12 +1165,15 @@ def test_indatan_andras_aldrig(tmp_path):
     rader = bankrader(tmp_path, ("F-1", "LEV-A", -12500, "2025-01-20"), ("IN-1", "X", 100, "2025-01-20"),
                       ("X-1", "OKAND", -1, "2025-01-20"))
     underlagen = period(tmp_path, underlag(), underlag(id="U-2", fakturanummer="F-2", belopp_ore=1))
-    format_ = copy.deepcopy(FORMAT)
-    fore = (rader.rader, underlagen.underlag, underlagen.arenden, copy.deepcopy(format_))
-    resultat = matcha_period(rader, underlagen, format_, "2025-12-31")
-    assert (rader.rader, underlagen.underlag, underlagen.arenden, format_) == fore
-    # Resultatet är en kopia: att ändra indatan efteråt ändrar inte resultatet.
-    format_["kraver_inte_underlag"].clear()
+    regelbok = FORMATETS_REGELBOK
+    fore = (rader.rader, underlagen.underlag, underlagen.arenden, regelbok.matchningsformat,
+            regelbok.agare_och_narstaende, regelbok.kontrollsumma)
+    resultat = matcha_period(rader, underlagen, regelbok, "2025-12-31")
+    assert (rader.rader, underlagen.underlag, underlagen.arenden, regelbok.matchningsformat,
+            regelbok.agare_och_narstaende, regelbok.kontrollsumma) == fore
+    assert regelbok.matchningsformat == kontrollera_matchningsformat(FORMAT)
+    # Resultatet är en kopia: att ändra det som läses ur indatan efteråt ändrar inte resultatet.
+    regelbok.matchningsformat["kraver_inte_underlag"].clear()
     assert resultat.matchningar[0]["bankrad"]["belopp_ore"] == -12500
     assert len([post for grupp in GRUPPER_FOR_BANKRADER for post in getattr(resultat, grupp)]) == 3
 
@@ -1009,7 +1182,7 @@ def test_resultatet_gar_inte_att_andra(tmp_path):
     rader = bankrader(tmp_path, ("F-1", "LEV-A", -12500, "2025-01-20"), ("IN-1", "X", 100, "2025-01-20"),
                       ("X-1", "OKAND", -1, "2025-01-20"), ("X-2", "OKAND", -2, "2025-12-30"))
     underlagen = period(tmp_path, underlag(), underlag(id="U-2", fakturanummer="F-2", belopp_ore=3))
-    resultat = matcha_period(rader, underlagen, FORMAT, "2025-12-31")
+    resultat = matcha_period(rader, underlagen, FORMATETS_REGELBOK, "2025-12-31")
     assert type(resultat) is Matchningsresultat
     assert all(getattr(resultat, grupp) for grupp in Matchningsresultat._fields)  # alla grupper har något
     with pytest.raises(AttributeError):
@@ -1065,7 +1238,8 @@ def skada_rader(rng, rader, motparter):
         elif val == 1:
             dag = rng.choice(["2025-01-01", "2025-01-10", "2025-02-09", "9999-12-31", "0001-01-01"])
         elif val == 2:
-            beskrivning = rng.choice(motparter + ["X " + rng.choice(motparter), "AVGIFT X", "KORT IN"])
+            beskrivning = rng.choice(motparter + ["X " + rng.choice(motparter), "AVGIFT X", "KORT IN", "AVGIFT AGARE-1",
+                                                  "KORT IN AGARE-1"])
         else:
             referens = rng.choice(["IN-1", "K-1", "F-1", "", rng.choice(motparter)])
         rader[nummer] = (referens, beskrivning, belopp, dag)
@@ -1162,10 +1336,13 @@ def skada_underlag(rng, poster):
     return poster
 
 
-def ar_giltigt(resultat, bankperiod, underlagen, format_, bedomning):
-    """Ett resultat ska alltid följa reglerna i matcha_bank.py."""
-    format_ = kontrollera_matchningsformat(format_)
+def ar_giltigt(resultat, bankperiod, underlagen, regelbok, bedomning):
+    """Ett resultat ska alltid följa reglerna i matcha_bank.py, med regelbokens matchningsformat."""
+    format_ = kontrollera_matchningsformat(regelbok.matchningsformat)
     kontrollera_grupperna(resultat, bankperiod, underlagen)
+    # En rad mot en ägare eller närstående undantas aldrig av en regel (granskning 8, N3).
+    for post in resultat.kraver_inte_underlag + tuple(a for a in resultat.arenden if a["typ"] == "över gräns"):
+        assert not regelbok.ar_bankrad_mot_agare_eller_narstaende(post["bankrad"])
     assert all(rad["transaktionsdag"] <= bedomning for rad in bankperiod.rader)  # annars stoppas den (J9)
     dag = dt.date.fromisoformat(bedomning)
     for matchning in resultat.matchningar:
@@ -1212,12 +1389,15 @@ def test_fuzz_skadade_indata_ger_ratt_resultat_eller_matchningfel(tmp_path, kvar
     rng = random.Random(20251025)
     sma_rader = [("F-1", "LEV-A", -12500, "2025-01-20"), ("F-2", "LEV-B", -500, "2025-01-21"),
                  ("IN-1", "X", 100, "2025-01-21"), ("X-1", "AVGIFT KONTO", -125, "2025-01-31"),
-                 ("K-1", "KORT IN 2025-01-21", 300, "2025-01-22"), ("Z-1", "OKAND", -77, "2025-01-25")]
+                 ("K-1", "KORT IN 2025-01-21", 300, "2025-01-22"), ("Z-1", "OKAND", -77, "2025-01-25"),
+                 ("X-2", "AVGIFT AGARE-1", -150, "2025-01-25")]  # mot ägaren: passar regeln avgift, men kräver underlag
     sma_underlag = [underlag(), underlag(id="U-2", motpart="LEV-B", fakturanummer="F-2", belopp_ore=500,
                                          typ="kvitto", datum="2025-01-20"),
                     underlag(id="U-3", fakturanummer="F-3", belopp_ore=999)]
     motparter = ["LEV-A", "LEV-B", "lev-a", "LEV-TE", "KORTKOP BUTIK-STAD"]
-    resultat_antal = stoppade = over_grans_antal = 0
+    inte_en_regelbok = [None, FORMAT, MATCHNINGSFORMAT, las_matchningsformat(FORETAG / "matchning.json"), "regelbok",
+                        object.__new__(Regelbok)]
+    resultat_antal = stoppade = over_grans_antal = agarrader = 0
     for nummer in range(800):
         if nummer % 2:  # testdatans kvartal eller februari, med skadat format
             bankperiod = rng.choice([kvartalet["bankperiod"], kvartalet["februari"]])
@@ -1245,23 +1425,38 @@ def test_fuzz_skadade_indata_ger_ratt_resultat_eller_matchningfel(tmp_path, kvar
             elif val < 0.85 and isinstance(format_, dict) and isinstance(format_.get("kraver_inte_underlag"), list) \
                     and isinstance(format_.get("tidsfonster_dagar"), dict):
                 format_ = skada_format(rng, format_)
+        fore_formatet = copy.deepcopy(format_)
+        # Matchningen får formatet bara genom en regelbok. Ett trasigt format stoppas redan där, av
+        # las_matchningsformat eller las_regelbok, och når aldrig matchningen.
+        try:
+            regelbok = regelbok_for(format_)
+        except (MatchningsformatFel, RegelbokFel) as fel:
+            assert str(fel).startswith(("Matchningsformatet", "Regelboken")), str(fel)
+            stoppade += 1
+            continue
+        assert format_ == fore_formatet
+        if rng.random() < 0.1:
+            regelbok = rng.choice(inte_en_regelbok)
         # Ett bedömningsdatum före en bankrad stoppas (J9), så de flesta datum ligger efter raderna.
         bedomning = rng.choice(["2025-01-25", "2025-02-28", "2025-03-31", "2025-04-30", "2025-04-30", "9999-12-31",
                                 "2025-13-01", None])
-        fore = (ogonblick(bankperiod), copy.deepcopy(format_))
+        fore = ogonblick(bankperiod)
         try:
-            resultat = matcha_period(bankperiod, underlagen, format_, bedomning)
+            resultat = matcha_period(bankperiod, underlagen, regelbok, bedomning)
         except MatchningFel as fel:
             assert str(fel) and not str(fel).startswith(("Traceback", "'")), str(fel)
             stoppade += 1
         else:
-            assert type(bankperiod) is Bankperiod  # allt annat än en Bankperiod ska ge MatchningFel
-            over_grans_antal += ar_giltigt(resultat, bankperiod, underlagen, format_, bedomning)
+            # Allt annat än en Bankperiod och en Regelbok ska ge MatchningFel.
+            assert type(bankperiod) is Bankperiod and type(regelbok) is Regelbok
+            over_grans_antal += ar_giltigt(resultat, bankperiod, underlagen, regelbok, bedomning)
+            agarrader += len([rad for rad in bankperiod.rader if regelbok.ar_bankrad_mot_agare_eller_narstaende(rad)])
             resultat_antal += 1
-        assert (ogonblick(bankperiod), copy.deepcopy(format_)) == fore  # indatan är oförändrad
-    # Skydd: fuzzen ska ge både resultat och stopp, och ibland rader över en gräns, annars prövar den inte mycket.
-    assert resultat_antal > 100 and stoppade > 150 and over_grans_antal > 10, (resultat_antal, stoppade,
-                                                                                over_grans_antal)
+        assert ogonblick(bankperiod) == fore  # indatan är oförändrad
+    # Skydd: fuzzen ska ge både resultat och stopp, ibland rader över en gräns och ibland rader mot ägaren,
+    # annars prövar den inte mycket.
+    assert resultat_antal > 100 and stoppade > 150 and over_grans_antal > 10 and agarrader > 10, (
+        resultat_antal, stoppade, over_grans_antal, agarrader)
 
 
 def test_fuzz_skadad_matchningsfil_laddas_ratt_eller_stoppas(tmp_path):
