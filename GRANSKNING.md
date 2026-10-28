@@ -6617,3 +6617,215 @@ Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28, i chatten.
   stoppar allt om den inte kan köras.
 - **J2 läggs under Öppet.**
 - **J3 prövas i spärrtestet efter installationen.**
+
+## Granskning 20 (av b9b49cc till f92ec89, bara J1) (2026-10-28)
+
+Oberoende granskning av J1-ändringen, commits `b9b49cc`, `25933b5`, `ab305c7`, `4bcbabe`, `ad85b8e` och `f92ec89`,
+gjord på Hugos uppdrag i chatten 2026-10-28, i en ny session som inte har sett bygget. Granskat läge: commit
+`f92ec89` på grenen main (`git status` ren när granskningen började). Ingen kod, inga tester och inget i
+INSTALLERA.md är ändrat. Skrivet i projektet: bara det här avsnittet. Granskarens prov ligger i `scratchpad/g20/`.
+
+**Läget:** sessionen stod i läget **auto** från början till slut (det säger Claude Codes egna besked i sessionen).
+Det är tillåtet enligt uppdraget. Granskaren har inte bytt läge.
+
+### Viktigt först
+
+- **J1 är rättat som Hugo beslutade.** De låsta inställningarna startar vakten med
+  `/Library/Developer/CommandLineTools/usr/bin/python3`, `-I` och vaktens fulla sökväg i `args`, och
+  `"onFailure": "block"`. Bara den raden är ändrad i `managed-settings.json`.
+- **Inga fynd på nivån medel eller allvarligt.** Fem låga fynd, K1–K5. Enligt stoppregeln hindrar de inte
+  installationen. **K1 bör Hugo titta på före installationen på Caspers dator:** steg 2 b ser inte mapparna som
+  Python läser in kod ifrån när den startar.
+- **Steg 2 b på Hugos dator:** båda kommandona visar det som steget säger är rätt (Python 3.9.6, och bara `root`
+  utan `w` för gruppen och andra i hela kedjan).
+- **Kontrollsummorna stämmer**, alla fyra, med uppdraget och med INSTALLERA.md steg 4 g och 5.
+- **sudo-raderna är oförändrade** sedan `3abadaa`.
+- **Vakten blev inte mindre sträng.** I `kommandosparr.py` är bara texten överst ändrad.
+- **Testsviten:** 4 076 tester, alla gröna, inga överhoppade.
+
+### Fynd
+
+| Nr | Nivå | Kort |
+|---|---|---|
+| K1 | LÅG | Steg 2 b visar programfilen och mapparna ovanför, men inte mapparna där Python läser in kod när den startar, bland annat `/Library/Python/3.9/site-packages`, där en `.pth`-fil kör kod också med `-I` |
+| K2 | LÅG | Kan vakten inte skriva sitt fel (felkanalen stängd eller inte skrivbar), avslutar Python med kod 120, inte 2. Stoppas ändå av `onFailure: block` |
+| K3 | LÅG (utanför J1) | En tom `cwd` (`""`) släpps igenom: vakten räknar den som sin egen arbetsmapp |
+| K4 | LÅG | Två texter hänvisar till något som inte står där det sägs: testfilens rökprov med `/.vol` och "Hugos beslut" om steg 9 |
+| K5 | LÅG | Steg 2 b säger inte var andra omgången börjar, och visar en länk med en relativ sökväg som kan förväxlas med regeln för andra omgången |
+
+**K1 – Pythons egna mappar. LÅG.**
+- **Vad det är:** Python läser vid start in sitt standardbibliotek och mappar för tillägg (**site-packages**). En
+  fil som slutar på `.pth` i en sådan mapp kan köra kod varje gång Python startar, också med `-I` (`-I` stänger
+  bara av användarens egen mapp och miljövariablerna, inte systemets mappar). Kan någon skriva en sådan fil utan
+  lösenord, kan vakten ändras utan att den märker det, precis det som steg 2 b ska förhindra.
+- **Vad vaktens Python letar i** (granskarens prov, `sys.path` och `site.getsitepackages()` med `-I`):
+  `…/Python3.framework/Versions/3.9/lib/python3.9` och dess `site-packages` i utvecklarverktygen, och dessutom
+  `/Library/Python/3.9/site-packages`, `/AppleInternal/Library/Python/3.9/site-packages` och
+  `/AppleInternal/Tests/Python/3.9/site-packages`. De tre sista används bara om de finns.
+- **Hugos dator (granskarens prov, bara ägare och rättigheter, inga filer lästa):** biblioteket, `site-packages`,
+  `json`, `lib-dynload`, `site.py` och `os.py` ägs av `root` utan `w` för gruppen och andra. `/Library/Python` och
+  `/AppleInternal` finns inte, och `/Library` och `/` ägs av `root` (steg 2), så de kan inte skapas utan lösenord.
+  I `site-packages` finns redan `distutils-precedence.pth` (från setuptools, ägd av `root`), som körs vid varje
+  start. Ofarligt så länge `root` äger den.
+- **Vad steg 2 b täcker:** filen, filen dit länkarna leder och mapparna ovanför. Biblioteksmapparna ligger under
+  `Versions/3.9`, som visas, men själva mapparna och `/Library/Python` visas inte.
+- **Varför låg:** på Hugos dator är allt i ordning. Ett hål kräver att `/Library/Python` redan finns och går att
+  skriva i utan lösenord, och det är ovanligt. Caspers dator är okänd.
+- **Bör göras (Hugo avgör):** före installationen på Caspers dator, antingen en rad till i steg 2 b,
+  `ls -lde@ /Library/Python /AppleInternal` (väntat: `No such file or directory` för båda, eller `root` utan `w`),
+  eller att vakten startas med `-I -S` (`-S` gör att Python inte läser några tilläggsmappar alls; vakten använder
+  bara standardbiblioteket). Det senare ändrar `managed-settings.json` och kräver en ny granskning.
+
+**K2 – felet kan inte skrivas. LÅG.**
+- Prövat med vaktens Python och `-I`, med `rm -rf scripts` som kommando: när felkanalen (**stderr**, dit vakten
+  skriver varför den stoppar) är stängd i andra änden, eller är en fil som bara går att läsa, blir koden **120**,
+  inte 2. Vakten fångar felet och väljer 2, men när Python avslutas försöker den skriva ut felet igen, misslyckas
+  och byter då själv koden till 120.
+- **Stoppar det ändå?** Ja, om `onFailure: block` gäller: Claude Code ska stoppa vid alla andra koder än 0 och 2
+  (steg 1, kräver 2.1.295 eller senare). Kod 0, som släpper igenom, kommer aldrig. Felkanalen är dessutom alltid
+  öppen när Claude Code kör vakten, så fallet kräver att något redan har gått sönder.
+- Samma Python som förut (`/usr/bin/python3` startade samma 3.9.6), så det var likadant före J1. Testet
+  `test_j1_krasch_nar_felet_skrivs_stoppar` prövar ett annat fel (tecken som inte går att skriva som UTF-8), som
+  ger kod 2.
+- **Bör göras (Hugo avgör):** att vakten avslutar med kod 2 också då (till exempel genom att avsluta direkt utan
+  att Python skriver ut igen), med ett test. Kan ligga under Öppet.
+
+**K3 – tom `cwd`. LÅG (utanför J1).**
+- `{"tool_name": "Bash", "tool_input": {"command": "ls"}, "cwd": ""}` släpps igenom. Vakten räknar om `cwd` med
+  `os.path.realpath`, och en tom text blir då vaktens egen arbetsmapp, i provet projektmappen. En relativ `cwd`
+  räknas på samma sätt. Claude Code anger alltid en hel sökväg, så det är inte sett i verkligheten.
+- Det var likadant före J1, och beror inte på Python-versionen.
+- **Bör göras:** vakten stoppar en `cwd` som är tom eller inte börjar med `/`. Kan ligga under Öppet.
+
+**K4 – texter som hänvisar fel. LÅG.**
+- `test_beslut_granskning_19.py`, texten överst: "rökprovet i scratchpad prövade dem [sökvägar under `/.vol` och
+  `/.nofollow`] en gång med Python 3.9 (GRANSKNING.md)". Det står inte i GRANSKNING.md: efter granskning 19 är
+  bara Hugos beslut tillagda (`25933b5`). Om det provet gjordes kan granskaren inte se.
+- PROGRESS.md, Öppet punkt 13: "Steg 9 använder /usr/bin/python3 med sudo. Kan bytas till den fasta sökvägen
+  senare (Hugos beslut 2026-10-28 efter granskning 19)". Det beslutet står inte bland Hugos beslut efter
+  granskning 19 i GRANSKNING.md. Kanske sa Hugo det i byggsessionens chatt, men det går inte att se här
+  (CLAUDE.md: varje beslut skrivs in med namn och datum).
+- **Bör göras:** texten i testfilen rättas eller provet skrivs upp, och beslutet om steg 9 skrivs in under
+  "Hugos beslut 2026-10-28 (efter granskning 19)" om Hugo bekräftar det.
+
+**K5 – steg 2 b, två saker som kan förvirra. LÅG.**
+- Steget säger "Två omgångar", men inte var den andra börjar. Den börjar på raden efter den första raden som
+  slutar med ` /` (roten). Utan det kan man läsa fel rad som "första raden i andra omgången".
+- Första raden på Hugos dator slutar med `-> ../../Library/Frameworks/Python3.framework/Versions/3.9/bin/python3`,
+  en relativ sökväg (räknad från länkens mapp). Den börjar inte med `/Library/Developer/CommandLineTools/`, och
+  den som inte programmerar kan tro att det är fel. Regeln gäller bara första raden i andra omgången, som steget
+  säger, men ett exempel skulle hjälpa.
+- **Bör göras:** en mening om var andra omgången börjar, och ett exempel på hur raderna ser ut på Hugos dator.
+
+### Punkt 1: varje commit
+
+| Commit | Säger | Gör det, och inget mer? |
+|---|---|---|
+| `b9b49cc` | Granskning 19 | Ja: bara GRANSKNING.md |
+| `25933b5` | Hugos beslut efter granskning 19 | Ja: bara GRANSKNING.md, 11 rader. Att Hugo skrev just de orden i chatten kan granskaren inte se |
+| `ab305c7` | Rökprov, ingen kodändring i vakten | Ja: i `kommandosparr.py` är bara texten överst ändrad (vilken Python vakten körs med, att den ska fungera med 3.9). Ny testfil, `VAKTENS_PYTHON` i `test_kommandosparr.py` (fyra ställen där programmet körs, och kommentarer), ny summa för vakten i steg 5. 57 anrop i rökprovet, som meddelandet säger |
+| `4bcbabe` | Bara `command` i inställningarna | Ja: en rad i `managed-settings.json`, två jämförelser i `test_kommandosparr.py`, nya test och ny summa i steg 5 |
+| `ad85b8e` | Steg 2 b | Ja: nytt steg 2 b, två meningar som pekar på den nya sökvägen (steg 8 och provet i kontrollen efter installationen), en mening för Caspers dator, och de två kommandona i listan i testet. Steg 1 kräver redan 2.1.295 för `onFailure` |
+| `f92ec89` | PROGRESS.md och steg 4 g | Ja, utom K4: punkt 13 kallas Hugos beslut utan att stå bland besluten. Siffrorna (4 076 tester, summorna) stämmer |
+
+`git diff --stat b9b49cc f92ec89`: GRANSKNING.md, PROGRESS.md, `test_beslut_granskning_19.py`,
+`test_kommandosparr.py`, INSTALLERA.md, `kommandosparr.py` (6 rader, bara text) och `managed-settings.json` (1 rad).
+Inga andra filer.
+
+### Punkt 2: managed-settings.json
+
+- `"command": "/Library/Developer/CommandLineTools/usr/bin/python3"`: fast, hel sökväg, utan mellanslag. Bara den
+  raden är ändrad (`git show 4bcbabe`).
+- `"args": ["-I", "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"]`: `-I` före vakten, varje
+  argument för sig, så att inget skal tolkar raden. Vaktens sökväg är samma som målet i steg 7 och 8.
+- `"timeout": 10` och `"onFailure": "block"` oförändrade. `requiredMinimumVersion`, förbuden och de andra
+  inställningarna oförändrade.
+- Ingenting annat är ändrat. Testen `test_j1_installningen_startar_vakten_med_utvecklarverktygens_python` och
+  `test_installationsfilen_startar_vakten_med_hela_sokvagar_och_stoppar_om_den_…` kontrollerar exakt det.
+
+### Punkt 3: vakten med Python 3.9 och -I
+
+Egen provfil `scratchpad/g20/prov_vakten.py`, körd med `/Library/Developer/CommandLineTools/usr/bin/python3 -I`.
+Varje fall är ett eget program, som när Claude Code kör vakten. Låtsat projekt och tillfällig mapp i
+`scratchpad/g20/`. Inga länkar. **44 fall, 40 som väntat.** De fyra andra: K2 (två fall), K3, och ett där
+granskaren väntade fel (`git status` med ett argument på 20 MB är ett tillåtet kommando och släpps igenom, som det
+ska).
+
+- **Tom och trasig indata, alla stoppas med kod 2:** tom, bara radbrytning, bara mellanslag, `null`, `true`, en
+  text, ett tal, BOM först, skräp efter, två objekt efter varandra, latin-1, UTF-16, `NaN` och `1e999` som
+  kommando, kommandot som lista eller `null`, `tool_input` som text eller lista, verktyget `null` eller tomt,
+  `cwd` som tal, dubbla nycklar (sista `tool_name` gäller, `rm` stoppas), ett ensamt surrogattecken och NUL i
+  kommandot, och stdin från `/dev/null`.
+- **Krasch, alla stoppas med kod 2:** JSON kapslad 200 000 nivåer (lista, objekt, och inne i `tool_input`),
+  `pwd` som kraschar (`KeyError`, `MemoryError`) och `SystemExit(0)` inne i bedömningen (fångas, blir 2).
+  Undantaget är K2 (kod 120).
+- **`-I` håller:** en planterad `json.py` bredvid en kopia av vakten och i arbetsmappen läses inte in, och
+  `PYTHONPATH`, `PYTHONHOME`, `PYTHONSTARTUP`, `PYTHONINSPECT` och `PYTHONWARNINGS` gör ingen skillnad.
+- **Vanligt arbete går igenom:** `git status`, Read, Write i projektet. `sudo` och Write till `.git` stoppas.
+
+### Punkt 4: steg 2 b
+
+Körda på Hugos dator, med uppdragets tillstånd, i agentens skal (zsh):
+
+- `…/python3 --version` visade `Python 3.9.6`. **Rätt** enligt steget.
+- Kedjan visade 16 rader. Första omgången: `python3` är en länk (`lrwxr-xr-x root wheel`), sedan `usr/bin`, `usr`,
+  `CommandLineTools`, `Developer`, `/Library` och `/`, alla `drwxr-xr-x root wheel`. Andra omgången börjar med
+  `-rwxr-xr-x root wheel … /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/bin/python3.9`
+  och fortsätter upp till `/`, alla `drwxr-xr-x root wheel`. Inga `@` eller `+`. **Rätt** enligt steget.
+- **Begriplig?** Till största delen: steget säger vad varje del betyder, vad som är rätt och fel, och att stoppa
+  och fråga. Två saker kan förvirra (K5). Kommandot fungerar bara i zsh (`${f:A}` och `${p:h}`), som är
+  Terminals vanliga skal på macOS.
+
+### Punkt 5: blev vakten mindre sträng?
+
+Nej. I `kommandosparr.py` är bara texten överst ändrad, inga rader med kod. I testen byts
+`SYSTEMETS_PYTHON` mot `VAKTENS_PYTHON` där programmet körs, och jämförelsen med inställningarna gäller den nya
+sökvägen. Testet om installationskommandon godtar två nya kommandon, som bara visar. Inget test är borttaget eller
+lösare. Rökprovet hoppar över sig självt om Pythonen saknas, men `test_kommandosparr.py` kör också vakten med den
+och hoppar inte över, så en dator utan den ger röda tester. I granskarens körning hoppades inget över.
+
+### Punkt 6: kontrollsummor (sha256)
+
+Räknade med Pythons `hashlib` (`scratchpad/g20/prov_summor.py`) på filerna i projektet, där `git status` var rent:
+
+| Fil | sha256 | Uppdraget | INSTALLERA.md |
+|---|---|---|---|
+| `sparr/kommandosparr.py` | `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d` | **Stämmer** | **Stämmer** (steg 5) |
+| `sparr/managed-settings.json` | `ab34081665b9052c1ff7c35a1b3a983107fc6a763f1f1aab6476523109cb80b0` | **Stämmer** | **Stämmer** (steg 5) |
+| `sparr/kontrollera-skalet.zsh` | `10388d474a555e6d337a9468c5a1f5e2fd0ca04608e36024f73011dc5186d51f` | **Stämmer** | **Stämmer** (steg 4 g) |
+| `requirements.txt` | `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a` | **Stämmer** | **Stämmer** (steg 5) |
+
+### Punkt 7: sudo-raderna
+
+`git diff -Gsudo 3abadaa f92ec89 -- sparr/INSTALLERA.md` visar ingenting: ingen rad med `sudo` är tillagd,
+borttagen eller ändrad. 21 rader med `sudo` (`grep -c`), samma som i granskning 19.
+
+### Punkt 8: testsviten
+
+`.venv/bin/python -B -m pytest -p no:cacheprovider -q --tb=line -rfEs scripts/tests` (övergången i SPEC 7.1):
+**4 076 passed**, inga röda, inga överhoppade. Samma antal som PROGRESS.md.
+
+### Bokföring utan godkännande
+
+Nej. Ändringarna gäller bara vakten (text), inställningarna, INSTALLERA.md, PROGRESS.md, GRANSKNING.md och test.
+Inget i projektet kan bokföra något.
+
+### Kommandon i den här granskningen
+
+Från listan, ett i taget: `git status` (först och sist), `git log`, `git show`, `git diff --stat`,
+`git diff -Gsudo`, `grep -n`, `grep -c`, `grep -rn`, `wc -l`, `mkdir -p` och `cp -R` (vakten) till scratchpad, och
+`.venv/bin/python -B -m pytest -p no:cacheprovider` mot `scripts/tests`. Med uppdragets undantag: de två
+kommandona i steg 2 b, och `/Library/Developer/CommandLineTools/usr/bin/python3 -I` med fyra egna provfiler i
+`scratchpad/g20/`, skrivna med Write. Inga länkar.
+
+**Avsteg:** ett möjligt. Provet för K1 (`prov_agare.py`) läste ägare och rättigheter för Pythons biblioteksmappar,
+`/Library/Python` och `/AppleInternal`, och listade filnamnen i `site-packages`. Det är mer än steg 2 b, men bara
+läsande, och inga filer öppnades. Inga `cd`, `&&`, `|` eller `sed` utom i steg 2 b, inga `sudo`-kommandon, inget i
+`/Library` ändrat, inget pushat, ingen `git stash`.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **K1:** en rad till i steg 2 b (`ls -lde@ /Library/Python /AppleInternal`), eller `-I -S` i inställningarna
+   (ny granskning), eller under Öppet? Granskaren föreslår raden i steg 2 b före installationen på Caspers dator.
+2. **K2, K3, K5:** rättas nu eller under Öppet?
+3. **K4:** bekräftar Hugo beslutet om steg 9 (PROGRESS.md, Öppet punkt 13)? Då skrivs det in bland besluten.
