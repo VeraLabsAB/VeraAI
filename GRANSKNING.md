@@ -5624,3 +5624,18 @@ slutrutan. **Utanför listan över tillåtna verktyg i SPEC 7.1:** appens verkty
    kör du kommandona i punkt 2 före installationsdagen?
 3. **G3 och G7** (en ny version av vakten och inställningarna): ta bort `-R`, och förbjud `.ugrep`?
 4. **G2 och G6** (bara text): en mening i steg 4 h och en i SPEC 7.1?
+
+### Hugos beslut 2026-10-28 (efter granskning 16)
+
+Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28, i chatten.
+
+- **Rätta först, installera sedan** (svar på fråga 1).
+- **Provköra steg 4 h före installationen** (G1, svar på fråga 2).
+- **Ta bort `-R` och förbjuda `.ugrep`** (G3 och G7, svar på fråga 3).
+- **Lägga till meningarna i steg 4 h och SPEC 7.1, plus ett test för G4** (G2 och G6, svar på fråga 4). Testet
+  för G4 kör det riktiga, oförändrade kontrollskriptet i ett rent fall och visar att det skriver OK.
+- **Resultat av de fyra kommandona i punkt 2, på Hugos dator 2026-10-28** (svar på fråga 2): inget `@` eller
+  `+` på någon fil eller mapp. `/etc/zshrc` och `/etc/zshrc_Apple_Terminal`, `/usr/share/zsh/site-functions`
+  och `/usr/share/zsh/5.9/functions` ägs av root. `/usr/local` och `/usr/local/share` ägs av root.
+  `/usr/local/share/zsh` och `/usr/local/share/zsh/site-functions` finns inte.
+- **Caspers dator är inte kontrollerad.** Casper kör samma fyra kommandon före sin installation.
