@@ -218,6 +218,46 @@ ls -lde@ / /Library "/Library/Application Support" "/Library/Application Support
 **Kan gruppen eller andra skriva någonstans i kedjan, är ägaren inte `root`, eller finns `ClaudeCode`
 redan: avbryt installationen och fråga.**
 
+## Steg 2 b: kontrollera Python som vakten körs med (före installationen)
+
+De låsta inställningarna startar vakten med Python i Apples **utvecklarverktyg** (Command Line Tools, program
+för den som programmerar), med hela sökvägen och `-I` (granskning 19, J1, Hugos beslut 2026-10-28). Kan någon
+byta ut den Pythonen utan lösenord, kan vakten ändras utan att den märker det. Går den inte att starta, stoppar
+Claude Code allt (`"onFailure": "block"`, steg 1). Kommandona **bara visar**, ändrar ingenting och kräver inget
+lösenord. Gör steget på varje dator där vakten installeras.
+
+**a. Versionen:**
+
+```bash
+/Library/Developer/CommandLineTools/usr/bin/python3 --version
+```
+
+- **Rätt:** en enda rad, `Python 3.`, ett tal som är **9 eller större**, en punkt och ett tal, till exempel
+  `Python 3.9.6` (din dator 2026-10-28) eller `Python 3.12.1`. Alltså 3.9 eller nyare: `3.10` är nyare än `3.9`.
+- **Fel: stoppa och fråga.** Till exempel `no such file or directory` (utvecklarverktygen saknas), en version
+  äldre än `3.9` (som `Python 3.8.9`), en ruta som vill installera något (svara inte ja), eller annan text.
+
+**b. Ägare och rättigheter för filen, filen den leder till och alla mappar ovanför** (en enda lång rad):
+
+```bash
+f=/Library/Developer/CommandLineTools/usr/bin/python3; for p in $f ${f:A}; do while true; do ls -lde@ $p; [[ $p == / ]] && break; p=${p:h}; done; done
+```
+
+- `${f:A}` är sökvägen dit filen till sist leder, efter alla **länkar** (hänvisningar till en fil någon
+  annanstans). Kommandot visar med `ls -lde@` (som i steg 2) filen och varje mapp ovanför den upp till `/`, och
+  sedan samma sak för filen dit länkarna leder. Två omgångar alltså. Börjar första raden med `l` är filen en
+  länk (raden slutar med `->` och vart den pekar). Börjar den med `-` är omgångarna likadana. Båda är rätt.
+- **Varje rad**, i båda omgångarna, ska följa samma regel som i steg 2: ägaren är `root`, det står **inget `w`**
+  på plats 6 (gruppen) eller plats 9 (alla andra), till exempel `drwxr-xr-x` eller `lrwxr-xr-x`, och extra
+  uppgifter följer regeln där (bara `@` med exakt en indragen rad `com.apple.provenance` och en siffra är rätt,
+  och `+` efter de tio tecknen stoppar alltid). Gruppen får vara `wheel` eller `admin`.
+- **Första raden i andra omgången** är filen dit länkarna leder. Dess sökväg (sist på raden) ska börja med
+  `/Library/Developer/CommandLineTools/`, inte till exempel `/Applications/Xcode.app` eller din hemmapp.
+- **Fel: stoppa och fråga.** Ägaren är inte `root`, `w` på plats 6 eller 9, `No such file or directory`, ett fel
+  från Terminal, eller något annat än det som står här.
+
+**Visar a eller b något annat än det som står här: installera inte, och fråga.**
+
 ## Steg 3: förprov – stoppar Claude Code ett kommando när en vakt fallerar?
 
 `"onFailure": "block"` ska göra att ett kommando stoppas när vakten inte går att köra. Förprovet visar att
@@ -598,7 +638,8 @@ sudo chmod 644 "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
 ```
 
 - Systemet blir ägare av vakten. `644` på en fil betyder: ägaren (systemet) får ändra, alla andra får
-  bara läsa. Claude Code behöver kunna läsa vakten för att köra den med `/usr/bin/python3`.
+  bara läsa. Claude Code behöver kunna läsa vakten för att köra den med
+  `/Library/Developer/CommandLineTools/usr/bin/python3` (steg 2 b).
 - Går det bra visar båda kommandona ingenting. Visas något annat: stoppa och fråga.
 - **Varför 644 och inte 600?** `600` betyder att bara ägaren, systemet, får läsa filen. Claude Code körs
   som ditt vanliga konto, inte som systemet, och skulle då inte kunna läsa filerna. En inställningsfil som
@@ -774,7 +815,9 @@ Samma steg, i samma ordning, och samma versionskontroll i steg 1 (minst 2.1.295,
 skrivbordsappen och med `~/.local/bin/claude --version` i Terminal om Claude Code för Terminal finns där,
 med hela sökvägen och samma varning för installerarens förslag). Samma kontrollskript i steg 4 g och i
 kontrollen efter installationen, steg 1, och samma kontroll av agentens skal i steg 4 h. Samma förprov i
-steg 3 och samma kontroll av mapparna i steg 2 och 13. Samma `managed-settings.json` fungerar: regeln som hindrar agenten att skriva i
+steg 3 och samma kontroll av mapparna i steg 2 och 13. Samma kontroll av vaktens Python i steg 2 b: på
+Caspers dator är den inte kontrollerad, så den kan visa en annan version eller att utvecklarverktygen saknas.
+Då gäller samma sak: stoppa och fråga. Samma `managed-settings.json` fungerar: regeln som hindrar agenten att skriva i
 `.git` (`Edit(//**/.git/**)`) gäller varje `.git`-mapp på datorn och har inget användarnamn i sig.
 Skillnader:
 
@@ -911,7 +954,8 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
    **e. Starta en ny session** och gör steg 2 och 3 igen: `ls; ls` ska stoppas med "Stoppat av vakten",
    och `git status` ska gå igenom. Då är vakten tillbaka och fungerar.
 
-   **Vad provet visar.** När vakten saknas kan `/usr/bin/python3` inte öppna filen och avslutar med kod 2,
+   **Vad provet visar.** När vakten saknas kan vaktens Python
+   (`/Library/Developer/CommandLineTools/usr/bin/python3`, steg 2 b) inte öppna filen och avslutar med kod 2,
    och kod 2 betyder för Claude Code "stoppa". Provet visar alltså att en **saknad** vakt stoppar allt.
    Det prövar inte inställningen `onFailure: "block"` i sig, som gäller när vakten fallerar på andra sätt
    (en annan kod än 0 och 2, tidsgränsen, eller att programmet inte går att starta). Att Python ger kod 2

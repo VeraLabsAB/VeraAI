@@ -17,7 +17,19 @@ import subprocess
 
 import pytest
 
-from test_kommandosparr import INSTALLERAD_VAKT, INSTALLNINGAR, VAKTEN, VAKTENS_PYTHON
+from test_kommandosparr import (
+    INSTALLERA,
+    INSTALLERAD_VAKT,
+    INSTALLNINGAR,
+    VAKTEN,
+    VAKTENS_PYTHON,
+    VAKTENS_PYTHON_KEDJAN,
+    VAKTENS_PYTHON_VERSION,
+    _en_rad,
+    _forsta_sudo,
+    _installationskommandon,
+    _steg,
+)
 
 SOKVAG = "/usr/bin:/bin"
 FORSTA = "Stoppat av vakten: "
@@ -296,3 +308,76 @@ def test_j1_installningen_kor_inte_vakten_via_usr_bin_python3():
     # /usr/bin/python3 väljer utvecklarverktyg efter xcode-select eller DEVELOPER_DIR (granskning 19, J1).
     for vakt_ in _vakter():
         assert vakt_["command"] != "/usr/bin/python3" and "/usr/bin/python3" not in vakt_["args"], vakt_
+
+
+# ---------------------------------------------------------------------------------------------
+# INSTALLERA.md, steg 2 b: Hugo kontrollerar vaktens Python före installationen.
+
+def _steg_2_b():
+    (steget,) = [t for r, t in _steg(INSTALLERA.read_text(encoding="utf-8")) if r.startswith("## Steg 2 b:")]
+    return steget
+
+
+def test_j1_steg_2_b_finns_fore_forprovet_och_installationen():
+    text, rader = _installationskommandon()
+    rubriker = [r for r, _ in _steg(text)]
+    plats = [i for i, r in enumerate(rubriker) if r.startswith("## Steg 2 b:")]
+    assert plats and rubriker[plats[0] - 1].startswith("## Steg 2:") and rubriker[plats[0] + 1].startswith("## Steg 3:")
+    assert rader.index(VAKTENS_PYTHON_VERSION) < rader.index(VAKTENS_PYTHON_KEDJAN) < _forsta_sudo(rader)
+
+
+def test_j1_steg_2_b_har_bara_kommandon_som_visar():
+    steget = _steg_2_b()
+    kommandon = [rad.strip() for b in steget.split("```bash\n")[1:] for rad in b.split("```", 1)[0].splitlines()]
+    assert [k for k in kommandon if k] == [VAKTENS_PYTHON_VERSION, VAKTENS_PYTHON_KEDJAN]
+    for ord_ in ("sudo", "rm ", "mv ", "chmod", "chown", ">", "cp "):
+        assert ord_ not in VAKTENS_PYTHON_KEDJAN and ord_ not in VAKTENS_PYTHON_VERSION, ord_
+    assert "bara visar" in _en_rad(steget)
+
+
+def test_j1_kedjan_visar_filen_dit_lankarna_leder_och_alla_mappar_upp_till_roten():
+    # ${f:A} är sökvägen efter alla länkar, ${p:h} mappen ovanför, och slingan slutar först när / är visad.
+    assert VAKTENS_PYTHON_KEDJAN.startswith(f"f={VAKTENS_PYTHON}; for p in $f ${{f:A}}; ")
+    assert "ls -lde@ $p; [[ $p == / ]] && break; p=${p:h};" in VAKTENS_PYTHON_KEDJAN
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "3.9 eller nyare",
+        "9 eller större",
+        "ägaren är `root`",
+        "inget `w`** på plats 6 (gruppen) eller plats 9 (alla andra)",
+        "samma regel som i steg 2",
+        "`com.apple.provenance`",
+        "`+` efter de tio tecknen",
+        "ska börja med `/Library/Developer/CommandLineTools/`",
+        "`No such file or directory`",
+        "Stoppa och fråga",
+        "installera inte, och fråga",
+        "granskning 19, J1, Hugos beslut 2026-10-28",
+        '"onFailure": "block"',
+    ],
+)
+def test_j1_steg_2_b_sager_vad_som_ar_ratt_och_fel(text):
+    assert text.lower() in _en_rad(_steg_2_b()).lower()
+
+
+def test_j1_caspers_dator_gor_steg_2_b():
+    text = _en_rad(INSTALLERA.read_text(encoding="utf-8").split("## Caspers dator", 1)[1].split("\n## ", 1)[0])
+    assert "steg 2 b" in text
+
+
+def test_j1_installera_kraver_en_version_med_onfailure():
+    forsta = _en_rad(_steg(INSTALLERA.read_text(encoding="utf-8"))[0][1])
+    assert "onFailure" in forsta and "2.1.295 eller senare" in forsta
+
+
+def test_j1_installera_namner_inte_usr_bin_python3_for_vakten():
+    # /usr/bin/python3 står kvar bara i steg 9, där projektets Python skapas (en rad med sudo).
+    text = INSTALLERA.read_text(encoding="utf-8")
+    rader = [rad for rad in text.splitlines() if "/usr/bin/python3" in rad and "CommandLineTools" not in rad]
+    assert rader == [
+        'sudo /usr/bin/python3 -m venv "/Library/Application Support/ClaudeCode/vera/venv"',
+        "- `/usr/bin/python3 -m venv` skapar en **venv**: en egen mapp med Python och plats för paket, som inte",
+    ]

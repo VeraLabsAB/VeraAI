@@ -1647,6 +1647,13 @@ FORPROV_KOMMANDON = (
 )
 # ls -lde@ visar varje extra uppgift och rättighet (Hugos beslut 2026-10-28 kväll, samma regel som H1).
 KEDJAN = 'ls -lde@ / /Library "/Library/Application Support" "/Library/Application Support/ClaudeCode"'
+# Granskning 19, J1 (Hugos beslut 2026-10-28): steg 2 b visar vaktens Python, dess version och ägare och rättigheter
+# för filen, filen dit länkarna leder och alla mappar ovanför. Bara visar.
+VAKTENS_PYTHON_VERSION = f"{VAKTENS_PYTHON} --version"
+VAKTENS_PYTHON_KEDJAN = (
+    f"f={VAKTENS_PYTHON}; for p in $f ${{f:A}}; do while true; do ls -lde@ $p; [[ $p == / ]] && break; "
+    "p=${p:h}; done; done"
+)
 
 # Hugos beslut 2026-10-28 om vakten, beslut 2: INSTALLERA.md beskriver hur Hugo själv flyttar nvm-mappen
 # sist i PATH. Agenten ändrar inte Hugos skalfiler.
@@ -1732,7 +1739,7 @@ def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
             NVM_KOMMANDON
             + TERMINAL_KOMMANDON
             + TERMINAL_VERSION
-            + (KRYPTEX_LAGG_TILL, SKRIPT_KORNING, AGENT_KOMMANDO)
+            + (KRYPTEX_LAGG_TILL, SKRIPT_KORNING, AGENT_KOMMANDO, VAKTENS_PYTHON_VERSION, VAKTENS_PYTHON_KEDJAN)
         ), rad
 
 
