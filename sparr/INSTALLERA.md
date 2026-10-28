@@ -517,6 +517,11 @@ shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-set
 - Jämför de tre summorna, tecken för tecken, med dem som den oberoende granskningen har skrivit upp
   (Hugos beslut 2026-10-28). `requirements.txt` är listan över paket som installeras i steg 9 (granskning
   15, S6, Hugos beslut 2026-10-28). **Är någon summa olika: stoppa och fråga.** Kopiera ingenting.
+- Summorna ska vara exakt de här (byggsessionen 2026-10-28, efter Hugos beslut efter granskning 16). Den
+  oberoende granskningen ska skriva upp samma summor. Skiljer granskningens summor från dessa: stoppa och fråga.
+  - `sparr/kommandosparr.py`: `b730b27fff418430983f7c06ca2f58b04c890d3ff3bc7c9bf1d832e64bbad481`
+  - `sparr/managed-settings.json`: `e1222e168de38f819ebf861319e9a9b2fc134ce52b3729ec23ceacb57682d463`
+  - `requirements.txt`: `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a`
 
 ## Steg 6: skapa mapparna och låt systemet äga dem
 

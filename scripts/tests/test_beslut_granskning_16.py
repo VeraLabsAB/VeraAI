@@ -15,6 +15,7 @@
   chatten 2026-10-28: skriptet godtar den bara från zsh:s egen mapp, och filen ska ägas av root.
 """
 
+import hashlib
 import os
 
 import pytest
@@ -32,6 +33,7 @@ from test_beslut_granskning_15 import (
 )
 from test_kommandosparr import (  # noqa: F401 (fixturerna används av pytest via namnen)
     INSTALLERA,
+    PROJEKTET,
     _bedom,
     _en_rad,
     _installningar,
@@ -261,6 +263,15 @@ def test_g4_add_zsh_hook_som_inte_ags_av_root_avviker(tmp_path):
     resultat = _zsh(tmp_path, f"autoload -Uz +X add-zsh-hook\nsource {kopia}\n")
     rader = [r for r in _avvikelser(resultat) if "/functions/add-zsh-hook" in r]
     assert len(rader) == 1 and rader[0].startswith("AVVIKER: ls -l: ") and "ägs inte av root" in rader[0], resultat
+
+
+@pytest.mark.parametrize("fil", ["sparr/kommandosparr.py", "sparr/managed-settings.json", "requirements.txt"])
+def test_steg_5_har_filernas_kontrollsummor(fil):
+    # Uppdraget efter granskning 16, steg 6: summorna i INSTALLERA.md ska vara de för filerna som de ser ut nu.
+    # Kontrollskriptets summa i steg 4 g prövas i test_beslut_granskning_15.py.
+    summa = hashlib.sha256((PROJEKTET / fil).read_bytes()).hexdigest()
+    (steget,) = [t for r, t in _steg(INSTALLERA.read_text(encoding="utf-8")) if r.startswith("## Steg 5:")]
+    assert f"- `{fil}`: `{summa}`" in steget, f"summan för {fil} i steg 5 ska vara {summa}"
 
 
 def test_g4_installera_namner_add_zsh_hook():
