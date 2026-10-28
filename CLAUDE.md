@@ -28,9 +28,12 @@ Läs `SPEC.md` först. Svara alltid på svenska och förklara i klartext, utan j
 ```
 STATUS: grönt / gult / rött
 KAN JAG GÅ VIDARE: ja / nej, och varför
+ÄNDRINGAR I CLAUDE.md: vilka, eller "inga"
 BESLUT SOM BEHÖVS: ...
 NÄSTA STEG: ...
 ```
+
+- Varje ändring i CLAUDE.md nämns i slutrapporten, under ÄNDRINGAR I CLAUDE.md (Hugos beslut 2026-10-28).
 
 - Ordningen i byggstegen följs. Säg till om något hoppas över.
 - Om något rör säkerhet eller kan leda till bokföring utan godkännande: säg det tydligt först och prioritera det.
