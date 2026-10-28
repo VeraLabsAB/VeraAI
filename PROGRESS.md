@@ -55,16 +55,19 @@ granskning 11, Q1).
    (ett skydd i macOS som gör att kommandon bara kan skriva i vissa mappar). **Öppen, inte byggd.** Hugos
    beslut 2026-10-28: sandlådan byggs i spärrsteget, men ska vara klar **före uppgift 5, eller före första
    hela körningen på riktiga underlag om den kommer först**.
-5. **Frågor till granskningen av vakten** (Hugos beslut 2026-10-28, punkt 6): skills som kan köra kommandon
-   förbi vakten, worktree-sessioner i skrivbordsappen, formen `Edit(//**/.git/**)`, och andra filer med
-   samma risk som `~/.zshrc` (till exempel `~/.claude.json`, `.venv/**` och mappar i `PATH`). Listan står i
-   `GRANSKNING.md` under "Bygget av vakten för Q1".
+5. **Granskning 12 av vakten (2026-10-28)** står sist i `GRANSKNING.md`. Testsviten: 3 148 passed.
+   Frågorna från bygget är besvarade, och kontrollsummorna står där. **Inte komplett:** punkt 3 (omvägar
+   förbi vakten) gjordes inte, eftersom ett säkerhetsfilter stoppade den (P1, stoppar installationen).
+   Övriga fynd: P2 (provet där vakten fallerar togs bort ur kontrollen efter installationen), P3 (skills
+   som kör skalkommandon), P4 (kommandoverktyg känns igen på namnet), P5 (`.git` som fil), P6 (läget
+   "auto") och P7 (rättigheterna på `/Library/Application Support`). Beslut (a) och (b) väntar på Hugo
+   eller Casper.
 
 ## Nästa steg i byggordningen
 
 1. **Vakten för kommandolistan (granskning 11, Q1).** Byggsessionen är klar (f21a3a1, 773e919 och
-   6686166). Kvar: **oberoende granskning** i en ny session (med kontrollsummorna för vakten och
-   inställningsfilen), sedan kontrollerar Hugo versionen och installerar enligt `sparr/INSTALLERA.md`, och
+   6686166). Granskning 12 är gjord utom punkt 3 (omvägarna). Kvar: **punkt 3 i en ny
+   granskningssession**, beslut om fynden i granskning 12, sedan kontrollerar Hugo versionen och installerar enligt `sparr/INSTALLERA.md`, och
    därefter kontrollen efter installationen i en ny session (sist i `sparr/INSTALLERA.md`). Caspers dator
    får samma installation och samma kontroll. Före
    uppgift 4 (Hugos beslut 2026-10-28).

@@ -3396,3 +3396,317 @@ Avsteg från SPEC 7.1 och CLAUDE.md:
 - Två sidor ur dokumentationen sparades av Claude Code i filer i hemmappen, eftersom de var för långa. De
   filerna lästes inte.
 - `claude --version` kördes inte (Hugos val: han kontrollerar versionen själv).
+
+## Granskning 12 – vakten (Q1) (2026-10-28)
+
+Oberoende granskning av vakten för kommandolistan, gjord på Hugos uppdrag i chatten 2026-10-28, i en ny
+session som inte har sett bygget. Granskade commits: `f21a3a1`, `773e919`, `6686166` och `e125a82`. Ingen
+kod är ändrad. Bara den här texten och PROGRESS.md är skrivna.
+
+### Viktigt först
+
+- **Punkt 3 i uppdraget (försöka ta sig förbi vakten) är inte gjord.** När granskaren började med den
+  stoppades svaret av ett säkerhetsfilter i Claude Code. Det som filtret stoppade får inte göras om i
+  samma session. Därför är inga omvägar prövade i en kopia, och inga förslag till tester för omvägar står
+  här. Granskningen är alltså **inte komplett**, och den delen behöver göras i en ny granskningssession
+  (se P1).
+- Allt annat i uppdraget är gjort: commits, testsviten, de sju frågorna och tilläggsfrågan,
+  dokumentationen, INSTALLERA.md, kontrollsummorna och de öppna besluten.
+
+### Kontrollsummor
+
+Räknade när `git status` var ren och `git diff e125a82 -- sparr/` var tom (inga skillnader), med
+`shasum -a 256` (inte på listan i SPEC 7.1, Hugos OK i chatten 2026-10-28):
+
+```
+cf744be1e0b041d2866c5d653f5b5ca904896bfb27a01cc95ff473bd243e32e0  sparr/kommandosparr.py
+6bb3a34b7d6cdb8a2c2d8181806f0a0cdf966140e03b4c34619858273170789f  sparr/managed-settings.json
+```
+
+Summorna gäller filerna i `e125a82`. Ändras någon av filerna, till exempel efter fynden nedan, gäller de
+inte längre, och den nya versionen behöver nya summor från en ny granskning.
+
+### Commits (punkt 1)
+
+`git show --stat` för varje commit:
+
+| Commit | Filer | Stämmer med commit-meddelandet |
+|---|---|---|
+| `f21a3a1` | `scripts/tests/test_kommandosparr.py`, `sparr/INSTALLERA.md`, `sparr/kommandosparr.py`, `sparr/managed-settings.json` | Ja |
+| `773e919` | `scripts/tests/test_kommandosparr.py`, `sparr/INSTALLERA.md`, `sparr/managed-settings.json` | Ja |
+| `6686166` | `GRANSKNING.md`, `PROGRESS.md`, `SPEC.md`, `scripts/tests/test_kommandosparr.py`, `sparr/INSTALLERA.md`, `sparr/managed-settings.json` | Ja |
+| `e125a82` | `GRANSKNING.md`, `PROGRESS.md` | Ja, bara dokumentation |
+
+`git status`: ren ("nothing to commit, working tree clean").
+
+**8b452db jämfört med 6686166:** skillnaden är **inte bara** avsnittet "Kontroll efter installationen".
+`git diff --stat 8b452db 6686166` visar fyra filer: `GRANSKNING.md` (10 rader), `PROGRESS.md` (5),
+`scripts/tests/test_kommandosparr.py` (38) och `sparr/INSTALLERA.md` (55). Vakten och inställningsfilen är
+likadana i båda. Skillnaderna utöver avsnittet hänger ihop med det (nya tester för avsnittet, och antalet
+tester och testsviten, 3 141 → 3 148, i texterna). Men det nya avsnittet har också **tagit bort fyra
+kontroller** som den gamla texten hade: att `cd ..`, `su` och `echo x` stoppas, och att **en vakt som
+fallerar stoppar kommandot** (planens steg 5). Commit-meddelandet för 6686166 nämner inte det. Se P2.
+
+### Testsviten (punkt 2)
+
+`.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests`: **3148 passed in 26.93s**, 0 failed.
+Det stämmer med det förväntade.
+
+### Fynd
+
+| Nr | Nivå | Kort |
+|---|---|---|
+| P1 | STOPPAR INSTALLATION | Omvägarna förbi vakten (punkt 3) är inte prövade |
+| P2 | BÖR RÄTTAS FÖRE UPPGIFT 5 | Kontrollen efter installationen prövar inte längre att en vakt som fallerar stoppar kommandot |
+| P3 | BÖR RÄTTAS FÖRE UPPGIFT 5 | Skills kan köra skalkommandon, och det är inte bekräftat att vakten ser dem |
+| P4 | BÖR RÄTTAS FÖRE UPPGIFT 5 | Vakten känner igen kommandoverktyg på namnet, och flera verktyg i sessionen känns inte igen |
+| P5 | BÖR RÄTTAS FÖRE UPPGIFT 5 | Regeln för `.git` gäller mappar som heter `.git`, inte en fil som heter `.git` |
+| P6 | NOTERING | Läget "auto" är inte avstängt, och då frågar Claude Code inte före varje kommando |
+| P7 | NOTERING | Rättigheterna på mappen ovanför, `/Library/Application Support`, är inte kontrollerade |
+
+**P1 – Omvägarna förbi vakten är inte prövade. STOPPAR INSTALLATION.**
+- Vad: uppdragets punkt 3 (läsa `sparr/kommandosparr.py` rad för rad och pröva omvägar med git, find,
+  pytest, python, miljövariabler, program som startar andra program, hela sökvägar och flaggor i olika
+  former) gjordes inte. Se "Viktigt först".
+- Var: hela `sparr/kommandosparr.py`.
+- Hur det visades: svaret stoppades av ett säkerhetsfilter innan något prov kördes.
+- Förslag: en ny, oberoende granskningssession som bara gör punkt 3, med provfiler i en kopia i
+  scratchpad-mappen (SPEC 7.1, "Provfiler i kopian"), och som skriver förslag till tester för varje omväg
+  den hittar. INSTALLERA.md säger själv att den oberoende granskningen ska vara klar före installationen
+  ("Innan du börjar", punkt 1). Därför stoppar det här installationen tills den delen är gjord.
+
+**P2 – Kontrollen efter installationen prövar inte längre att en vakt som fallerar stoppar. BÖR RÄTTAS FÖRE
+UPPGIFT 5** (rekommendation: före installationen, se beslut a).
+- Vad: planens steg 5 (GRANSKNING.md, "Granskning 11 – plan för Q1", Arbetsgång punkt 5) kräver att "en vakt
+  som fallerar stoppar kommandot" prövas. Det stod med i 8b452db men togs bort i 6686166. `cd ..`, `su` och
+  `echo x` togs också bort.
+- Var: `sparr/INSTALLERA.md`, avsnittet "Kontroll efter installationen" (rad 174–208), och testet
+  `test_kontrollen_efter_installationen_har_hugos_steg` i `scripts/tests/test_kommandosparr.py` rad 182–197.
+- Hur det visades: `git diff 8b452db 6686166`.
+- Varför det spelar roll: `onFailure: "block"` är det som gör att en trasig eller saknad vakt inte släpper
+  igenom allt. Det är den inställning som hela versionskravet 2.1.295 finns för, och den prövas i dag bara
+  genom att filen innehåller rätt text.
+- Förslag: ett steg 8 enligt beslut (a) nedan, och en rad `"en vakt som fallerar"` i listan i testet ovan, så
+  att testet blir rött om steget tas bort igen.
+
+**P3 – Skills kan köra skalkommandon. BÖR RÄTTAS FÖRE UPPGIFT 5.**
+- Vad: en skill eller ett eget kommando kan ha rader med `` !`kommando` `` som körs innan Claude ser texten.
+  Dokumentationen säger att de körs genom Bash-verktyget och prövas mot behörighetsreglerna, men **inte** om
+  vakter (PreToolUse) körs för dem (code.claude.com/docs/en/skills). Det är alltså inte bekräftat att vakten
+  ser dem.
+- Var: `sparr/managed-settings.json` saknar inställningen som stänger av det. Vakten släpper igenom verktyget
+  `Skill` (`sparr/kommandosparr.py` rad 168–175).
+- Hur det visades: dokumentationen, se tabellen nedan. Inte prövat.
+- Förslag: lägg till `"disableSkillShellExecution": true` i de låsta inställningarna. Dokumentationen: "Each
+  command is replaced with `[shell command execution disabled by policy]` instead of being run", och
+  inställningen är "most useful in managed settings, where users cannot override it". Den gäller skills
+  från användaren, projektet och tillägg, inte inbyggda skills. Test: `assert
+  _installningar()["disableSkillShellExecution"] is True`.
+
+**P4 – Kommandoverktyg känns igen på namnet. BÖR RÄTTAS FÖRE UPPGIFT 5.**
+- Vad: regel 2 stoppar verktyg vars namn innehåller ett av orden i `KOMMANDOORD`. Allt annat släpps igenom.
+  Ett nytt verktyg med ett annat namn släpps alltså igenom. Det är motsatsen till vaktens egen princip
+  ("Allt som vakten inte känner igen stoppas", rad 27).
+- Var: `sparr/kommandosparr.py` rad 46–58 och 168–175.
+- Hur det visades: genom att jämföra namnen på verktygen som finns i den här sessionen med listan. Se
+  svaret på fråga 4 nedan. Inte prövat med vakten.
+- Förslag: vänd regeln till en lista över **tillåtna** verktyg (Bash prövas som i dag, fil-verktygen,
+  `AskUserQuestion` och de verktyg Hugo väljer släpps igenom, allt annat stoppas). Test: ett påhittat
+  verktygsnamn, till exempel `mcp__x__nytt_verktyg`, ska stoppas.
+
+**P5 – Regeln för `.git` gäller inte en fil som heter `.git`. BÖR RÄTTAS FÖRE UPPGIFT 5.**
+- Vad: `Edit(//**/.git/**)` gäller allt **inne i** en mapp som heter `.git`, på varje djup. I en worktree är
+  `.git` en **fil** som säger var git-mappen finns, inte en mapp. Den fångas inte av `/**` på slutet.
+- Var: `sparr/managed-settings.json` rad 11.
+- Hur det visades: dokumentationens regler för mönster (code.claude.com/docs/en/permissions, "How path
+  patterns match"). Inte prövat.
+- Förslag: lägg till `"Edit(//**/.git)"` bredvid den befintliga regeln, och den i listan i testet
+  `test_installningarna_nekar_sudo_su_och_att_skriva_i_git`. Testet
+  `test_git_regeln_galler_varje_git_mapp_pa_datorn` behöver inte ändras, eftersom den nya regeln inte
+  innehåller `/.git/`.
+
+**P6 – Läget "auto" är inte avstängt. NOTERING** (och ett beslut, se nedan).
+- Vad: i läget "auto" frågar Claude Code inte Hugo före varje kommando. I stället bedömer en
+  automatisk granskare det. Den här granskningssessionen körde i det läget. De låsta inställningarna stänger
+  av läget "hoppa över alla behörigheter", men inte "auto".
+- Var: `sparr/managed-settings.json` (nyckeln saknas), och `sparr/INSTALLERA.md` rad 189–190, som säger att
+  "Claude Code frågar dig som vanligt".
+- Vakten körs ändå i läget "auto", så kommandolistan gäller. Det som ändras är att Hugo inte ser varje
+  kommando innan det körs.
+- Förslag, om Hugo vill bli tillfrågad varje gång: `"disableAutoMode": "disable"` under `permissions`
+  (code.claude.com/docs/en/permissions: "To prevent `bypassPermissions` or `auto` mode from being used, set
+  `permissions.disableBypassPermissionsMode` or `permissions.disableAutoMode` to `"disable"`"), med ett
+  test som i `test_installningarna_lasar_vakter_och_regler`.
+
+**P7 – Rättigheterna på `/Library/Application Support` är inte kontrollerade. NOTERING.**
+- Vad: vakten och inställningarna skyddas av att `ClaudeCode`-mappen ägs av systemet. Om mappen ovanför går
+  att skriva i för gruppen `admin`, som Hugos konto tillhör, går `ClaudeCode` att flytta undan utan lösenord.
+  Granskaren kontrollerade det inte, eftersom läsande kommandon bara får läsa i projektet.
+- Det är bara möjligt via den kända luckan (en egen testfil), som sandlådan stänger före uppgift 5.
+- Förslag: ett steg i INSTALLERA.md där Hugo själv kör `ls -ld "/Library/Application Support"` och ser
+  att raden börjar med `drwxr-xr-x` (bara ägaren får skriva). Annars: stoppa och fråga.
+
+### Svar på slutrapportens frågor
+
+**(1) Kan en skill köra kommandon förbi vakten?** Kanske. Raderna med `` !`kommando` `` körs innan Claude ser
+skillen, "through the Bash tool", och prövas mot behörighetsreglerna. Det är **inte bekräftat** om vakten
+körs för dem (code.claude.com/docs/en/skills). Förbudsreglerna (`sudo`, `su`) gäller dem enligt sidan. Se P3:
+stäng av det med `disableSkillShellExecution`. En skill kan också ha egna vakter (`hooks`) i sitt huvud. Om
+`allowManagedHooksOnly` stänger av dem är **inte bekräftat** (sidan säger inget om det).
+
+**(2) Är cwd och CLAUDE_PROJECT_DIR samma mapp i en worktree-session?** Dokumentationen
+(code.claude.com/docs/en/hooks) säger att `CLAUDE_PROJECT_DIR` "stays put: it still points at the project
+root where the session started", och att "`cwd` follows Claude". För en session som **byter till** en
+worktree under arbetet blir de alltså olika, och då stoppar vakten allt med "annan mapp" (säkert). För en
+session som skrivbordsappen **startar** i en worktree är det **inte bekräftat**. Det beror på var appen
+startar sessionen. Steg 7 i kontrollen efter installationen prövar det, och båda utfallen där är säkra.
+
+**(3) Fångar `Edit(//**/.git/**)` `.git` på varje djup?** Ja, för mappar. `//` betyder datorns rot, och `**`
+följer gitignore-reglerna, så mönstret gäller varje mapp som heter `.git` var den än ligger.
+Dokumentationens motsvarande exempel: `Read(//**/.env)` gäller "any `.env` anywhere on the filesystem"
+(code.claude.com/docs/en/permissions, "How deep a pattern matches"). Men det fångar inte en **fil** som heter
+`.git`, som i en worktree. Se P5.
+
+**(4) Finns det verktyg som kör kommandon men inte känns igen på namnet?** Ja. I den här sessionen finns
+till exempel:
+- `mcp__Claude_Code_iOS_Simulator__control` (startar appar i simulatorn på den här datorn),
+- `mcp__…__COMPOSIO_REMOTE_WORKBENCH` och Vercels `create_sandboxes_*` (kör kod, men på andra datorer),
+- `mcp__ccd_session_mgmt__set_session_permission_mode` (ändrar en sessions behörighetsläge),
+- `CronCreate`, `RemoteTrigger` och `mcp__scheduled-tasks__*` (startar sessioner senare; lokala sessioner
+  får samma vakt).
+Ingen av dem innehåller orden i `KOMMANDOORD`. Se P4.
+
+**(5) Räcker reglerna för citattecken och ord i både zsh och bash?** Delvis besvarat. Vakten stoppar `$`,
+bakåtfnutt, omvänt snedstreck, radbrytning, `;`, `&`, `|`, `<` och `>` var de än står, och jokertecken, `~`,
+`^`, `#` och `=` först i ett ord utanför citattecken. Det är en försiktig regel som täcker det vanliga i
+båda skalen. Två saker vakten inte ser: alias och funktioner från `~/.zshrc` (som nu inte går att ändra med
+fil-verktygen), och inställningar som ändrar hur zsh läser ett ord. Ett noggrant prov hör till punkt 3 och
+är **inte gjort** (P1).
+
+**(6) SHA-256:** se rutan "Kontrollsummor" ovan.
+
+**(7) Ska någon av de andra riskfilerna få ett förbud?** Ja, de flesta. Se beslut (b) nedan.
+
+**Tillägg: kan en subagent eller `.mcp.json` starta program förbi vakten?**
+- **Subagent:** nej, enligt dokumentationen. "When a subagent calls a tool, tool events such as `PreToolUse`
+  and `PostToolUse` fire the same configured hooks as in the main conversation"
+  (code.claude.com/docs/en/hooks). Vakter i en subagents eget huvud från projektet används inte förrän
+  mappen är betrodd (code.claude.com/docs/en/permissions).
+- **`.mcp.json`:** ja, i princip. En koppling i `.mcp.json` är ett program som Claude Code startar. Det är
+  inte ett verktyg, så vakten ser inte när det startar. Skyddet i dag är att Claude Code frågar innan en
+  koppling från projektets `.mcp.json` används (`enableAllProjectMcpServers` är inte satt,
+  code.claude.com/docs/en/settings-reference). Att det inte finns någon vakt för starten av en koppling
+  står inte uttryckligen i dokumentationen: **inte bekräftat**. Förslag: förbud mot att skriva `.mcp.json`
+  (beslut b).
+
+### Dokumentationen (punkt 5)
+
+Läst 2026-10-28. Citaten står på engelska som på sidan.
+
+| Påstående i bygget | Sida | Resultat |
+|---|---|---|
+| `onFailure` finns, värden `"continue"` och `"block"`, kräver 2.1.295 | code.claude.com/docs/en/hooks | **Bekräftat**: "Whether the action that triggered the hook goes ahead when the hook fails: `"continue"` or `"block"` … Requires Claude Code v2.1.295 or later" |
+| Standard är att kommandot körs ändå | code.claude.com/docs/en/hooks | **Bekräftat** som allmän regel: "when a hook fails or times out, Claude Code still carries out the action". Tabellen för `command` anger inget standardvärde |
+| Det som räknas som fel: går inte att starta, annan kod än 0 eller 2, tidsgräns, ogiltigt svar | code.claude.com/docs/en/hooks | **Bekräftat** ("Can't start", "Exit code other than 0 or 2", "Timeout", "Invalid output") |
+| Kod 2 stoppar, och felet tas från standard fel | code.claude.com/docs/en/hooks | **Bekräftat** ("Blocks the tool call", "The message that comes with the block is your hook's stderr") |
+| `args` gör att programmet startas utan skal | code.claude.com/docs/en/hooks | **Bekräftat** ("spawned directly with `args` as the argument vector, with no shell involved") |
+| Vakten körs också för subagenter | code.claude.com/docs/en/hooks | **Bekräftat** (citat ovan) |
+| `cwd` följer agenten, `CLAUDE_PROJECT_DIR` är mappen där sessionen startade | code.claude.com/docs/en/hooks | **Bekräftat** |
+| `scratchpad_dir` finns i indata | code.claude.com/docs/en/hooks | **Bekräftat**, kräver 2.1.257 |
+| En vakt som stoppar kan inte hävas av en tillåtande regel | code.claude.com/docs/en/permissions | **Bekräftat**: "A hook that exits with code 2 stops the tool call before permission rules are evaluated" |
+| Sökvägen på macOS är `/Library/Application Support/ClaudeCode/managed-settings.json` | code.claude.com/docs/en/managed-settings | **Bekräftat** |
+| `/status` visar `Enterprise managed settings (file)` | code.claude.com/docs/en/managed-settings | **Bekräftat** |
+| Inställningar från claude.ai går före filen | code.claude.com/docs/en/managed-settings | **Bekräftat**: inställningar från servern rangordnas överst, och som standard gäller bara den första källan |
+| Skrivbordsappens egna inställningar ändrar inte filen | code.claude.com/docs/en/managed-settings | **Bekräftat**: "By default, Claude Code ignores parent settings whenever an admin source is present" |
+| `allowManagedHooksOnly`: bara vakter från de låsta inställningarna | code.claude.com/docs/en/settings-reference och /managed-settings | **Bekräftat** att nyckeln finns och bara kan sättas där ("Run only the hooks your organization deploys"). Exakt vad den stänger av (till exempel skills egna vakter): **inte bekräftat** |
+| `allowManagedPermissionRulesOnly`: bara regler från de låsta inställningarna | code.claude.com/docs/en/settings-reference | **Bekräftat**: "Claude Code then ignores `allow`, `ask`, and `deny` rules in user, project, local, and `--settings` files" |
+| `disableBypassPermissionsMode: "disable"` | code.claude.com/docs/en/permissions | **Bekräftat** |
+| `requiredMinimumVersion` gör att en äldre version inte startar | code.claude.com/docs/en/settings-reference och /managed-settings | **Bekräftat** ("Refuse to start on a version older than your organization requires"). Den gäller från nästa start och avslutar inte en session som redan körs. Ett ogiltigt värde släpps ("fail open"). `"2.1.295"` är giltigt |
+| `//**/x` gäller var som helst på datorn | code.claude.com/docs/en/permissions | **Bekräftat** för `Read(//**/.env)`. Samma mönsterregler gäller Read och Edit |
+| En förbudsregel gäller också via en symbolisk länk | code.claude.com/docs/en/permissions | **Bekräftat** ("Deny rules: apply when either the requested path or the file it resolves to matches") |
+| Edit-regler gäller alla inbyggda verktyg som ändrar filer | – | **Inte bekräftat** i den här granskningen |
+| Terminalen och skrivbordsappen har var sin version | code.claude.com/docs/en/desktop | **Inte bekräftat** (sidan lästes inte) |
+| En inställningsfil som systemet inte låter Claude Code läsa ignoreras | code.claude.com/docs/en/managed-settings | **Bekräftat** ("every session starts without that source's policies"). Därför är 644 (alla får läsa) rätt, och filen får inte göras läsbar bara för systemet |
+
+### INSTALLERA.md (punkt 6)
+
+| Steg | Kommando | Vad det gör, på enkel svenska |
+|---|---|---|
+| 1 | `claude --version` | Visar vilken version av Claude Code som finns i terminalen. Ändrar ingenting |
+| 2 och 8 | `shasum -a 256 …` | Räknar ut kontrollsumman (ett fingeravtryck) för de två filerna. Läser bara |
+| 3 | `sudo ditto <vakten> "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"` | Kopierar vakten dit, som administratör. Skapar mapparna `ClaudeCode` och `vera` om de inte finns |
+| 4 | `sudo chown -R root:wheel "/Library/Application Support/ClaudeCode"` | Gör systemet till ägare av mappen och allt i den |
+| 5 | `sudo chmod 755 <två mappar>` | Mapparna: bara ägaren (systemet) får ändra, alla får titta in |
+| 5 | `sudo chmod 644 <vakten>` | Vakten: bara ägaren får ändra, alla får läsa |
+| 6 | `sudo cp -i <inställningarna> "/Library/Application Support/ClaudeCode/managed-settings.json"` | Kopierar inställningsfilen dit. Frågar innan en fil som redan finns skrivs över |
+| 7 | `sudo chown root:wheel …managed-settings.json` och `sudo chmod 644 …` | Samma ägare och rättigheter för inställningsfilen |
+
+- **Skriver något utanför `/Library/Application Support/ClaudeCode/`?** Nej. Alla mål ligger i den mappen.
+  `claude --version` och `shasum` skriver ingenting.
+- **Går filerna att ändra utan administratörslösenord?** Nej, med ett förbehåll. Ägare `root:wheel` med 755
+  på mapparna och 644 på filerna gör att bara systemet får ändra. Förbehållet är mappen ovanför (P7), som
+  Hugo bör kontrollera.
+- **Hämtar något från internet?** Nej, inget av kommandona. Uppdateringen av Claude Code i steg 1 (om den
+  behövs) hämtar däremot en ny version. Det är ett eget steg som Hugo gör före installationen.
+- Ordningen är rätt: vakten kopieras och låses först, och inställningarna sist, eftersom de gäller direkt.
+
+### Öppna beslut (punkt 8)
+
+**(a) Ska provet där vakten fallerar vara med i kontrollen efter installationen?** Granskarens
+rekommendation: **ja**, som ett sista steg 8, gjort av Hugo själv i Terminal och inte av agenten:
+1. Flytta vakten tillfälligt: `sudo mv "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+   "/Library/Application Support/ClaudeCode/vera/kommandosparr.py.av"`. Inställningsfilen ändras inte.
+2. Starta en ny session och be agenten köra `git status`. Det ska stoppas, eftersom vakten inte går att
+   starta. Med `"matcher": "*"` stoppas då **alla** verktyg, också läsning, vilket är den säkra riktningen.
+3. Flytta tillbaka: `sudo mv "…/kommandosparr.py.av" "…/kommandosparr.py"`.
+4. Kör steg 8 i installationen igen (`shasum -a 256` på de installerade filerna). Summorna ska vara samma som
+   i rutan ovan.
+5. Starta en ny session och gör steg 2 och 3 i kontrollen igen.
+
+Det är säkrare än att ändra i inställningsfilen, eftersom filen aldrig skrivs om och summan visar att allt
+är återställt. Om `git status` går igenom i punkt 2: återställ direkt och stoppa, eftersom det betyder att
+`onFailure` inte fungerar.
+
+**(b) Vilka filer ska förbjudas?** Granskarens rekommendation:
+
+| Fil | Förbud? | Hindrar det något agenten behöver? |
+|---|---|---|
+| `~/.ssh/` | Ja: `Edit(~/.ssh/**)` | Nej. Agenten använder inte ssh, och `git push` står inte på listan |
+| `.mcp.json` | Ja: `Edit(//**/.mcp.json)` | Nej. Kopplingar läggs till av Hugo, inte av agenten |
+| Projektets `.claude/` | Ja: `Edit(//**/.claude/**)` (täcker också `~/.claude/**`) | Nej i dag. Projektet har inga egna skills eller inställningar. Claude Code skriver själv sina filer där, och det gäller inte för förbudsregler, som bara gäller verktygen |
+| `~/.claude.json` | Ja: `Edit(~/.claude.json)` | Nej. Claude Code skriver filen själv, inte via agentens verktyg |
+| Mappar i `PATH` utanför projektet | Ja, för de mappar Hugo äger, till exempel `Edit(~/bin/**)`, `Edit(~/.local/bin/**)` och `Edit(//opt/homebrew/**)` | Nej. Agenten installerar inga program. Vilka mappar som finns i `PATH` behöver Hugo själv se efter (`echo $PATH` i Terminal) |
+| `CLAUDE.md` | **Nej**, inget förbud | Ja: Hugo och Casper ber ibland agenten ändra den. En ändring syns i `git diff` och granskas. Ett förbud skulle tvinga dem att skriva den för hand |
+| `.venv/**` | Ja: `Edit(//**/.venv/**)` | Nej. Agenten installerar inga paket (`pip` är stoppat), och pytest bara läser därifrån |
+
+Varje förbud blir en ny rad i `sparr/managed-settings.json` med ett test i
+`test_installningarna_nekar_att_skriva_i_startfiler`. Det blir en ny version av filen, med nya
+kontrollsummor och en ny granskning.
+
+### Kommandon i den här granskningen
+
+Avsteg från SPEC 7.1 och CLAUDE.md:
+- `shasum -a 256 sparr/kommandosparr.py sparr/managed-settings.json` (inte på listan), med Hugos OK i
+  chatten 2026-10-28.
+- Två sidor ur dokumentationen sparades av Claude Code i filer i hemmappen
+  (`~/.claude/projects/…/tool-results/`), eftersom de var för långa. **Granskaren läste i dem** med `grep`
+  och fil-verktyget Read. Det är läsning utanför projektmappen, och det står inte i CLAUDE.md att det är
+  tillåtet. Inget skrevs där.
+- Dokumentationen hämtades med verktyget WebFetch, som inte är ett kommando.
+
+Alla andra kommandon stod på listan och kördes ett i taget: `grep`, `git log`, `git status`, `git show
+--stat`, `git diff`, `.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests`, `git add` och
+`git commit -F`.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **P1:** en ny granskningssession för punkt 3 (omvägarna). Installera inte förrän den är klar.
+2. **Beslut (a):** ska steg 8 (vakten flyttas undan tillfälligt) läggas till i kontrollen efter
+   installationen?
+3. **Beslut (b):** vilka av förbuden i tabellen ovan ska byggas?
+4. **P3:** `disableSkillShellExecution: true` i de låsta inställningarna?
+5. **P4:** ska vakten byggas om till en lista över tillåtna verktyg?
+6. **P6:** ska läget "auto" stängas av, så att Hugo tillfrågas före varje kommando?
+
+Ändringarna i P2–P6 och beslut (b) ger en ny version av vakten eller inställningsfilen. Den behöver
+tester, en oberoende granskning och nya kontrollsummor innan den installeras.
