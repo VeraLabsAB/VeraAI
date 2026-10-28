@@ -161,11 +161,56 @@ def test_agenten_kan_fraga_och_skriva_filer_i_vera(vakt, mappar):
     assert vakt.bedom(skriv, mappar["projekt"], mappar["hem"]) is None
 
 
-def test_installationen_kontrollerar_att_agenten_kan_fraga_och_skriva():
+KONTROLL_RUBRIK = "## Kontroll efter installationen"
+
+
+def _kontrollen():
     text = INSTALLERA.read_text(encoding="utf-8")
-    efterat = text.split("## Efteråt", 1)[1].split("\n## ", 1)[0]
-    assert "kan fråga dig" in efterat
-    assert "kan skriva filer i `~/VERA`" in efterat
+    assert KONTROLL_RUBRIK in text, "avsnittet saknas"
+    return text.split(KONTROLL_RUBRIK, 1)[1]
+
+
+def test_kontrollen_efter_installationen_ar_sista_avsnittet():
+    # Hugos beslut 2026-10-28: kontrollerna står i ett eget avsnitt sist i INSTALLERA.md.
+    assert "\n## " not in _kontrollen()
+
+
+def test_kontrollen_gors_i_en_ny_session():
+    assert "ny session" in _kontrollen()
+
+
+@pytest.mark.parametrize(
+    "steg",
+    [
+        "Enterprise managed settings (file)",  # /status, code.claude.com/docs/en/managed-settings
+        "`ls; ls`",
+        "`git status`",
+        "`sudo ls`",
+        "kan fortfarande fråga dig",
+        "kan fortfarande skriva filer i `~/VERA`",
+        "worktree",
+    ],
+)
+def test_kontrollen_efter_installationen_har_hugos_steg(steg):
+    # Hugos beslut 2026-10-28: /status, ls; ls stoppas, git status går igenom, sudo stoppas, agenten kan
+    # fråga och skriva i ~/VERA, och en worktree-session fungerar eller stoppas på ett säkert sätt.
+    assert steg in _kontrollen()
+
+
+def test_installationen_jamfor_kontrollsummor_fore_och_efter_kopieringen():
+    # Hugos beslut 2026-10-28, punkt 4: Hugo jämför summorna med dem som granskningen skriver upp
+    # innan han kopierar, och kontrollerar efteråt att det är samma filer som ligger på plats.
+    _, rader = _installationskommandon()
+    summor = [i for i, r in enumerate(rader) if r.startswith("shasum -a 256 ")]
+    forsta_kopian = min(i for i, r in enumerate(rader) if r.startswith(("sudo ditto", "sudo cp")))
+    sista_kopian = max(i for i, r in enumerate(rader) if r.startswith(("sudo ditto", "sudo cp")))
+    fore = [i for i in summor if i < forsta_kopian]
+    efter = [i for i in summor if i > sista_kopian]
+    assert fore and efter
+    for i in fore:
+        assert "sparr/kommandosparr.py" in rader[i] and "sparr/managed-settings.json" in rader[i]
+    for i in efter:
+        assert INSTALLERAD_VAKT in rader[i] and INSTALLERADE_INSTALLNINGAR in rader[i]
 
 
 # ---------------------------------------------------------------------------------------------
@@ -695,10 +740,48 @@ def test_git_regeln_galler_varje_git_mapp_pa_datorn():
     # "How path patterns match", exemplet Read(//**/.env)). Ingen regel får ha ett användarnamn eller
     # en hemmapp i sig.
     neka = _installningar()["permissions"]["deny"]
-    git_regler = [regel for regel in neka if ".git" in regel]
+    git_regler = [regel for regel in neka if "/.git/" in regel]
     assert git_regler == ["Edit(//**/.git/**)"]
     text = INSTALLNINGAR.read_text(encoding="utf-8")
-    assert "/Users/" not in text and "hugolindholmer" not in text and "~/" not in text
+    assert "/Users/" not in text and "hugolindholmer" not in text
+
+
+# Filer som körs eller läses in av skalet, git, Claude Code eller macOS och som kan få ett tillåtet
+# kommando att göra något annat (Hugos beslut 2026-10-28, punkt 5). ~/ är hemmappen för den som kör
+# Claude Code (code.claude.com/docs/en/permissions, "How path patterns match", Read(~/.zshrc)).
+STARTFILER = [
+    "Edit(~/.zshrc)",
+    "Edit(~/.zshenv)",
+    "Edit(~/.zprofile)",
+    "Edit(~/.zlogin)",
+    "Edit(~/.bashrc)",
+    "Edit(~/.bash_profile)",
+    "Edit(~/.profile)",
+    "Edit(~/.gitconfig)",
+    "Edit(~/.config/git/**)",
+    "Edit(~/.claude/**)",
+    "Edit(~/Library/LaunchAgents/**)",
+]
+
+
+@pytest.mark.parametrize("regel", STARTFILER)
+def test_installningarna_nekar_att_skriva_i_startfiler(regel):
+    assert regel in _installningar()["permissions"]["deny"]
+
+
+def test_filregler_har_en_form_som_galler_pa_varje_dator():
+    # Varje Edit-regel börjar med // (datorns rot) eller ~/ (hemmappen). En regel med en ensam / eller
+    # utan början gäller i förhållande till inställningsfilen eller arbetsmappen, inte där det är tänkt.
+    for regel in _installningar()["permissions"]["deny"]:
+        if regel.startswith("Edit("):
+            assert regel.endswith(")")
+            assert regel[len("Edit("):].startswith(("//", "~/")), regel
+
+
+def test_installningarna_kraver_lagst_den_version_som_kan_stoppa_vid_krasch():
+    # onFailure kräver Claude Code 2.1.295 (code.claude.com/docs/en/hooks). En äldre version ska inte
+    # starta alls (Hugos beslut 2026-10-28, punkt 3).
+    assert _installningar()["requiredMinimumVersion"] == "2.1.295"
 
 
 def _installationskommandon():
@@ -709,7 +792,7 @@ def _installationskommandon():
 
 def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
     _, rader = _installationskommandon()
-    tillatna = ("claude --version", "sudo ditto ", "sudo cp -i ", "sudo chown ", "sudo chmod ")
+    tillatna = ("claude --version", "shasum -a 256 ", "sudo ditto ", "sudo cp -i ", "sudo chown ", "sudo chmod ")
     assert rader
     for rad in rader:
         assert rad.startswith(tillatna), rad

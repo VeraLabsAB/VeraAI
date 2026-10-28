@@ -1,4 +1,5 @@
 {
+  "requiredMinimumVersion": "2.1.295",
   "allowManagedHooksOnly": true,
   "allowManagedPermissionRulesOnly": true,
   "permissions": {
@@ -7,7 +8,18 @@
       "Bash(sudo *)",
       "Bash(su *)",
       "Bash(su)",
-      "Edit(//**/.git/**)"
+      "Edit(//**/.git/**)",
+      "Edit(~/.zshrc)",
+      "Edit(~/.zshenv)",
+      "Edit(~/.zprofile)",
+      "Edit(~/.zlogin)",
+      "Edit(~/.bashrc)",
+      "Edit(~/.bash_profile)",
+      "Edit(~/.profile)",
+      "Edit(~/.gitconfig)",
+      "Edit(~/.config/git/**)",
+      "Edit(~/.claude/**)",
+      "Edit(~/Library/LaunchAgents/**)"
     ]
   },
   "hooks": {

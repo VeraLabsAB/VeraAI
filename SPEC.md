@@ -173,7 +173,9 @@ En saknad Z-rapport blir ett ärende på nivå D (avsnitt 5). Månaden summeras 
 
 Listan gäller byggarbetet i Claude Code, inklusive granskningar. Veras egen lista med vad hon får köra hos en kund skrivs när hennes skript finns.
 
-**Godkänd av Hugo 2026-10-25. Skriven om 2026-10-26 på Hugos uppdrag**, så att den stämmer med hur den faktiskt används: `cd` är borttaget, och testsviten körs mot en kopia med kopians sökväg i stället för inifrån kopian. **Kompletterad 2026-10-27 på Hugos uppdrag** efter granskning 8 (N5): skälet för att `cd` inte används, ett kommando i taget, läsa i kopior, provfiler i kopian och `sed`. Listan bygger på de kommandon som faktiskt används i projektet. Allt körs från projektmappen.
+**Godkänd av Hugo 2026-10-25. Skriven om 2026-10-26 på Hugos uppdrag**, så att den stämmer med hur den faktiskt används: `cd` är borttaget, och testsviten körs mot en kopia med kopians sökväg i stället för inifrån kopian. **Kompletterad 2026-10-27 på Hugos uppdrag** efter granskning 8 (N5): skälet för att `cd` inte används, ett kommando i taget, läsa i kopior, provfiler i kopian och `sed`. Listan bygger på de kommandon som faktiskt används i projektet. Allt körs från projektmappen. **Kompletterad 2026-10-28 på Hugos beslut** (granskning 11, Q1): vakten och reglerna den håller, nedan.
+
+**Spärras tekniskt (granskning 11, Q1, Hugos beslut 2026-10-28).** Listan hålls av en vakt, `sparr/kommandosparr.py`, som Claude Code kör före varje verktyg. Den körs från de låsta inställningarna i `/Library/Application Support/ClaudeCode/`: förslaget står i `sparr/managed-settings.json` och installationen i `sparr/INSTALLERA.md`. Vakten stoppar allt som inte står här, gäller i alla mappar (ingen mapp undantas) och stoppar alltid `sudo` och `su`. Om vakten kraschar eller inte svarar stoppas kommandot (`onFailure: block`, kräver Claude Code 2.1.295 eller senare). **En ändrad lista blir en ny version av vakten:** den byggs med tester, granskas oberoende, godkänns av Hugo och installeras av Hugo (och på Caspers dator). Tills dess gäller den installerade versionen. Säger texten och vakten olika gäller den strängaste, och skillnaden rättas.
 
 | Kommando | Till vad |
 |---|---|
@@ -196,7 +198,7 @@ Listan gäller byggarbetet i Claude Code, inklusive granskningar. Veras egen lis
 | `tar` | Packa upp eller packa ihop filer, bara med mål i en tillfällig mapp utanför projektet (se nedan) |
 
 - `mkdir`, `cp -R` och `git archive` får bara ha mål i en tillfällig mapp utanför projektet (till exempel scratchpad-mappen), aldrig inne i projektmappen. Samma gräns gäller `tar`.
-- `find` används bara för att söka. Tilläggen `-delete` och `-exec`, som raderar filer eller kör andra kommandon, är förbjudna.
+- `find` används bara för att söka. Tilläggen `-delete`, `-exec`, `-execdir`, `-ok`, `-okdir`, `-fprint`, `-fprint0`, `-fprintf` och `-fls`, som raderar filer, kör andra kommandon eller skriver filer, är förbjudna.
 - **`cd` används inte.** Arbetsmappen finns kvar mellan kommandona, så ett `cd` gäller också alla kommandon efter det, och då kan ett kommando köras i fel mapp utan att det syns (granskning 7 såg det, och granskning 8, N5, rättade skälet här). Allt körs därför från projektmappen, med hela sökvägar till kopior utanför projektet.
 - **Ett kommando i taget.** Kommandon kopplas inte ihop: inget `;`, `|` eller `&&`, och utskriften styrs inte om med `>`, `2>&1` eller `2>/dev/null`. Inte heller `echo`, `for`-slingor eller `$(...)`. Varje kommando på listan körs för sig, så att det syns exakt vad som körs (granskning 8, N5).
 - **Läsa i kopior.** `ls`, `cat`, `head`, `tail`, `grep`, `diff`, `wc` och `sort` får också läsa kopior, provfiler och utfallsfiler i en tillfällig mapp utanför projektet, till exempel scratchpad-mappen (granskning 8, N5).
@@ -205,6 +207,22 @@ Listan gäller byggarbetet i Claude Code, inklusive granskningar. Veras egen lis
 - **Testsviten mot en kopia.** Pytest-kommandot får köras mot en kopia utanför projektet (gjord med `git archive`, `tar` och `cp -R`), med kopians sökväg som argument i stället för `scripts/tests`. Kommandot körs från projektmappen, med projektets Python, eftersom `.venv` inte följer med i kopian. `-B` och `-p no:cacheprovider` gör att inget skrivs.
 - **Tillägg till pytest som bara ändrar vad som visas** får läggas till i båda pytest-kommandona: `--tb` (hur mycket av ett fel som visas), `-q` och `-qq` (kortare utskrift), `-r` (en sammanfattning av till exempel röda tester), `-k` (bara tester vars namn passar ett mönster) och `-p no:randomly` (testerna i fast ordning). Andra tillägg får inte användas.
 - Nya filer i projektet skapas med Claudes fil-verktyg (Write och Edit), inte med skalkommandon (kommandon i terminalen). Ändringar i en kopia utanför projektet, till exempel ett mutationstest, görs också med fil-verktygen.
+- **Andra verktyg som kör kommandon** än Bash är stoppade, till exempel terminalverktyget i appen, PowerShell, Monitor, fjärrkommandon via kopplingar och verktyg som startar en server eller bygger en app. Fil-verktygen släpps igenom.
+- **Projektmappen.** Allt körs i mappen där sessionen startade. En session som startar i hemmappen eller ovanför den får inte köra några kommandon.
+- **Citattecken** (Hugos beslut 2026-10-28). Tecken som skalet byter ut mot något annat får bara stå inom citattecken: `*`, `?`, `[`, `{`, `(`, `)`, `~`, `^`, `#`, och `=` först i ett ord. Till exempel `find . -name '*.py'` och `git show 'HEAD~1:SPEC.md'`. Osynliga och styrande tecken stoppas, också tabb och hårt mellanslag.
+- **Tillägg** (Hugos beslut 2026-10-28 om `mkdir -p`):
+  - `mkdir` bara med `-p` och `-v`.
+  - `cp` bara med `-R`, `-p` och `-v`.
+  - `tar` bara med `-c`, `-x`, `-t`, `-f`, `-C`, `-v`, `-z` och `--exclude`, skrivna med bindestreck. `tar -x` måste ha `-C` med en tillfällig mapp, och `tar -c` skriver arkivet bara i en tillfällig mapp.
+  - `git archive` bara med `--format`, `--prefix`, `-o`/`--output` och `-v`.
+- **git:**
+  - Inga tillägg före underkommandot, till exempel `git -C` och `git -c`.
+  - Inga tillägg som skriver filer, kör andra program, läser filer utanför git eller öppnar ett fönster. Det gäller bland annat `--output`, `-c`, `--exec-path`, `--ext-diff`, `--textconv`, `--no-index` och `-O`, och för `add` och `commit` också `-p`, `-i`, `-e` och `--template`. Förkortningar stoppas också, till exempel `--out`.
+  - `git commit -F` får bara läsa en fil i projektet eller i den tillfälliga mappen. Ett meddelande med `<`, `>` eller flera stycken skrivs med fil-verktygen i den tillfälliga mappen och tas med `-F` (Hugos beslut 2026-10-28).
+- **Läsande kommandon** får bara ha sökvägar i projektet och i den tillfälliga mappen, också inne i tillägg. Ett sökmönster till `grep` prövas som en sökväg, så ett mönster som börjar med `/` stoppas (Hugos beslut 2026-10-28). `sort -o`, `--output`, `--compress-program`, `-T` och `grep -f`/`--file` stoppas.
+- **pytest:** målet är `scripts/tests`, eller en kopia eller en testfil i en kopia i den tillfälliga mappen. `-p` får bara användas som `-p no:randomly`.
+- **Den tillfälliga mappen** är den som Claude Code anger för sessionen (scratchpad-mappen). En mapp i projektet, eller en mapp som rymmer hemmappen, räknas inte.
+- **Det vakten inte stoppar:** en egen testfil i en kopia, fil-verktygen och andra datorer. Det stoppas först av sandlådan och spärrsteget, före uppgift 5, eller före första hela körningen på riktiga underlag om den kommer först.
 
 ---
 

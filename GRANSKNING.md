@@ -3274,3 +3274,125 @@ Följd av beslut 1 och 8: också sessioner i Hugos andra mappar utanför `~/VERA
 Avgjorda samma dag (Hugos beslut 2026-10-28, andra omgången): undantag (ingen mapp, beslut 8), `su`
 (stoppas alltid, beslut 7) och när sandlådan ska vara klar (före uppgift 5, eller före första hela körningen
 på riktiga underlag om den kommer först, beslut 6).
+
+## Bygget av vakten för Q1 (2026-10-28)
+
+Planens steg 1 (byggsessionen), gjord på Hugos uppdrag i chatten 2026-10-28. **Inget är installerat.**
+Commitarna är `f21a3a1`, `773e919` och commiten som lägger till det här avsnittet. Ingen av dem är pushad.
+
+### Vad som byggdes
+
+- `sparr/kommandosparr.py`: vakten. Körs med `/usr/bin/python3 -I` och bara Pythons egna delar. Reglerna
+  står överst i filen och i SPEC 7.1.
+- `sparr/managed-settings.json`: de låsta inställningarna, med `onFailure: "block"`,
+  `requiredMinimumVersion: "2.1.295"` och förbud mot att skriva i `.git` och i startfilerna nedan.
+- `sparr/INSTALLERA.md`: Hugos kommandon i Terminal: versionskontroll, kontrollsummor, kopiering, ägare
+  och rättigheter, och sist avsnittet "Kontroll efter installationen" med sju steg som Hugo gör i en ny
+  session (Hugos beslut 2026-10-28).
+- `scripts/tests/test_kommandosparr.py`: 344 tester. Alla var röda innan vakten och filerna fanns.
+- SPEC 7.1 skriven om efter Hugos OK 2026-10-28.
+
+Testsviten: **3 148 passed**, 0 misslyckade.
+
+### Vad dokumentationen säger (kontrollerat i byggsessionen)
+
+- `onFailure` med värdena `"continue"` och `"block"`, kräver Claude Code 2.1.295 eller senare
+  (code.claude.com/docs/en/hooks, tabellen över fälten för en vakt av typen `command`).
+- Terminalen och skrivbordsappen har var sin Claude Code med var sitt versionsnummer. I appen visar
+  `/status` versionen på raden **Claude Code** (code.claude.com/docs/en/desktop, "Claude Code version in the
+  Code tab").
+- `~/` i en regel betyder hemmappen, `//` datorns rot och `**` valfritt antal mappar. `Read(//**/.env)` är
+  dokumentationens exempel för "var som helst på datorn". Edit-regler gäller alla inbyggda verktyg som
+  ändrar filer. En förbudsregel gäller också om sökvägen går via en symbolisk länk
+  (code.claude.com/docs/en/permissions, "How path patterns match"). Exakt formen `//**/.git/**` står inte
+  som exempel.
+- `requiredMinimumVersion` gör att en äldre Claude Code inte startar (code.claude.com/docs/en/settings-example,
+  organisationens exempelfil).
+
+### Mutationstester
+
+Gjorda i en kopia av `sparr/` och `scripts/` i scratchpad-mappen, ändrad med fil-verktygen. Testfilen kördes
+mot kopian. Den oförändrade kopian gav 320 gröna (322 efter de två nya krasch-testerna). Kopian är
+återställd, och `diff` visar inga skillnader mot projektet.
+
+| Mutation | Hur vakten ändrades | Röda tester |
+|---|---|---|
+| (a) släpper igenom `&&` | `&` togs bort ur listan över tecken som kopplar ihop kommandon | 2 |
+| (b) släpper igenom `sudo` och `su` | Sudo-regeln togs bort, och `sudo`/`su` som första ord släpps igenom | 14 |
+| (c) släpper igenom ett kommando som inte står på listan | Okända kommandon släpps igenom i stället för att stoppas | 33 |
+| (d) släpper igenom när vakten kraschar, före rättelsen | Båda ställena som fångar en krasch släpper igenom | 0 |
+| (d) samma mutation, efter två nya tester | Samma | 2 |
+| Den gamla `.git`-regeln med Hugos sökväg | `Edit(//Users/hugolindholmer/VERA/agent/.git/**)` i stället för `Edit(//**/.git/**)` | 2 |
+
+Mutation (d) visade en lucka: inget test fick vakten att krascha på riktigt. Två tester lades till i
+`773e919`. Vakten har inte ändrats efter mutationstesterna.
+
+### Hugos beslut 2026-10-28, tredje omgången
+
+Skrivna i chatten av Hugo 2026-10-28:
+
+1. SPEC 7.1: OK med två ändringar ("godkänns av Hugo", och sandlådan "före uppgift 5, eller före första
+   hela körningen på riktiga underlag om den kommer först"). Inskriven.
+2. Ja till `mkdir -p`, citatregeln, stopp för `grep`-mönster som börjar med `/`, och commit-meddelanden
+   via fil.
+3. Ja till `"requiredMinimumVersion": "2.1.295"`, med test.
+4. Ja till kontrollsumma: `shasum -a 256` i INSTALLERA.md, före och efter kopieringen. **Hugo jämför
+   summorna med dem som granskningen skriver upp, innan han kopierar.**
+5. Förbud mot att skriva i skalets startfiler (`~/.zshrc`, `~/.zshenv`, `~/.zprofile`, `~/.zlogin`,
+   `~/.bashrc`, `~/.bash_profile`, `~/.profile`), `~/.gitconfig`, `~/.config/git/**`, `~/.claude/**` och
+   `~/Library/LaunchAgents/**`. Byggt, med tester. Följd: agenten kan inte längre spara sitt minne i
+   `~/.claude/projects/…/memory`.
+6. Skills och worktree-sessioner blir frågor till granskningen (nedan). Kontrollen av worktree-sessioner
+   ligger sist i INSTALLERA.md, i avsnittet "Kontroll efter installationen" (steg 7). Med "SPÄRRTEST" menade
+   Hugo den kontrollen, inte listan över spärrtester i SPEC 7 (Hugo i chatten 2026-10-28).
+7. PROGRESS.md och GRANSKNING.md uppdateras (det här avsnittet).
+
+### Andra filer med samma risk (förslag, inte byggda)
+
+Filer som agenten kan skriva i med fil-verktygen och som kan få ett tillåtet kommando, eller nästa session,
+att göra något annat:
+
+- `~/.claude.json`: Claude Codes egen fil med bland annat MCP-servrar (kopplingar som kan köra program).
+  Den ligger **utanför** `~/.claude/` och fångas inte av regeln där.
+- Projektets `.claude/` och `.mcp.json`: kommandon, skills och kopplingar för projektet. Vakter och regler
+  därifrån gäller inte längre, men skills, kommandon och kopplingar kan fortfarande läsas in.
+- `CLAUDE.md` i projektet: agentens instruktioner. En ändring syns i git men stoppas inte.
+- `.venv/**` i projektet: `.venv/bin/python` och pytest körs därifrån. En ändrad fil där kör vad som helst
+  med pytest-kommandot på listan.
+- Mappar som står tidigt i `PATH` och som Hugo äger, till exempel `~/bin`, `~/.local/bin` och
+  `/opt/homebrew/bin`: ett program med namnet `git` eller `ls` där körs i stället för det riktiga. Vilka
+  mappar som finns i `PATH` är inte kontrollerat (det kräver ett kommando utanför listan).
+- `~/.ssh/**` (till exempel `config`, som kan köra kommandon vid anslutning), `~/.zlogout`, `~/.bash_login`
+  och `~/.bash_logout`.
+
+### Frågor till den oberoende granskningen
+
+1. **Skills:** kan en skill köra kommandon (till exempel med `!` i texten) utan att det blir ett verktyg som
+   vakten ser? Vakten stoppar inte verktyget Skill.
+2. **Worktree-sessioner:** är `cwd` och `CLAUDE_PROJECT_DIR` samma mapp i en worktree-session i
+   skrivbordsappen? Om inte stoppar vakten allt där (säkert, men det måste vara känt). Kontrolleras också
+   efter installationen.
+3. **`Edit(//**/.git/**)`:** fångar regeln `.git` på varje djup, också `/Users/…/VERA/agent/.git/config`?
+   Formen bygger på två dokumenterade delar, men står inte som exempel.
+4. **Andra verktyg som kör kommandon:** vakten känner igen dem på namnet (ord som `bash`, `shell`,
+   `terminal`, `command`, `exec` och `run_`). Finns det verktyg i sessionen som kör kommandon men har ett
+   annat namn?
+5. **Skalet:** Bash-verktyget kör med zsh på Hugos dator. Är reglerna för citattecken och ord tillräckliga
+   för både zsh och bash, också med inställningar från Hugos `~/.zshrc`?
+6. **Kontrollsummor:** granskningen skriver upp SHA-256 för `sparr/kommandosparr.py` och
+   `sparr/managed-settings.json` i den commit som granskas, så att Hugo kan jämföra (beslut 4).
+7. **Andra filer med samma risk:** ska någon av filerna i listan ovan få ett förbud?
+
+### Kommandon i byggsessionen
+
+Avsteg från SPEC 7.1 och CLAUDE.md:
+- Det första kommandot var ihopkopplat (`cd`, `&&`, `;`, `|` och `2>/dev/null`). Det läste bara filnamn och
+  rubriker.
+- `git rev-parse --show-toplevel` (inte på listan), på Hugos uppdrag i chatten.
+- `~/.claude/settings.json` lästes med fil-verktyget Read (utanför projektmappen), på Hugos uppdrag i chatten.
+  Filen har inga deny- eller ask-regler. Projektets `.claude/settings.json` och `.claude/settings.local.json`
+  finns inte.
+- Ett `grep` med `*` utan citattecken stoppades av zsh. Det kördes om med citattecken.
+- Två sidor ur dokumentationen sparades av Claude Code i filer i hemmappen, eftersom de var för långa. De
+  filerna lästes inte.
+- `claude --version` kördes inte (Hugos val: han kontrollerar versionen själv).

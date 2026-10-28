@@ -6,8 +6,8 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **2 804 passed**, 0 misslyckade (körd 2026-10-28 på commit 16000a8, både i projektet och i en
-ren kopia av commiten tagen med `git archive`).
+Testsviten: **3 148 passed**, 0 misslyckade (körd 2026-10-28 i projektet, i byggsessionen för vakten,
+granskning 11, Q1).
 
 ## Klart
 
@@ -30,6 +30,7 @@ ren kopia av commiten tagen med `git archive`).
 | Granskning 8, N3, det som var kvar: `matcha_period` får regelboken, och ägarens bankrad kräver alltid underlag | ea51c97, de14da7 |
 | Efter granskning 9: en saknad, tom eller oläsbar ägarlista stoppar körningen (a), och ägarens bankrad märks "kräver mänsklig bedömning" i matchningen och blir aldrig en vanlig matchning (b) | dd0e1cf |
 | Efter granskning 10 (P1): en motpart i ägarlistan utan bokstäver och siffror, till exempel `-`, stoppar körningen | 16000a8 |
+| Granskning 11, Q1: vakten för kommandolistan (`sparr/kommandosparr.py`), förslaget till låsta inställningar, INSTALLERA.md och SPEC 7.1. **Inte granskad och inte installerad** | f21a3a1, 773e919 och commiten efter |
 
 ## Öppet
 
@@ -47,18 +48,26 @@ ren kopia av commiten tagen med `git archive`).
    granskning 8:s punkt 6): regelbokens namn bara latinska, regel-id bara a–z, siffror och bindestreck, en
    roll per konto, och ägarens bankrader som hela ord. Valen gjordes i en byggsession, inte av en människa.
    BESLUTSFATTARE SAKNAS.
-4. **Sandlådan (granskning 11, Q1).** Kommandolistan i SPEC 7.1 ska spärras av en vakt i Claude Codes låsta
-   inställningar (planen står i `GRANSKNING.md` under "Granskning 11 – plan för Q1"). Vakten kan inte stoppa
+4. **Sandlådan (granskning 11, Q1).** Kommandolistan i SPEC 7.1 spärras av en vakt i Claude Codes låsta
+   inställningar (planen står i `GRANSKNING.md` under "Granskning 11 – plan för Q1", bygget under "Bygget av
+   vakten för Q1"). Vakten kan inte stoppa
    en egen testfil som körs med pytest och raderar eller skriver i projektet. Det stoppas av en **sandlåda**
    (ett skydd i macOS som gör att kommandon bara kan skriva i vissa mappar). **Öppen, inte byggd.** Hugos
    beslut 2026-10-28: sandlådan byggs i spärrsteget, men ska vara klar **före uppgift 5, eller före första
    hela körningen på riktiga underlag om den kommer först**.
+5. **Frågor till granskningen av vakten** (Hugos beslut 2026-10-28, punkt 6): skills som kan köra kommandon
+   förbi vakten, worktree-sessioner i skrivbordsappen, formen `Edit(//**/.git/**)`, och andra filer med
+   samma risk som `~/.zshrc` (till exempel `~/.claude.json`, `.venv/**` och mappar i `PATH`). Listan står i
+   `GRANSKNING.md` under "Bygget av vakten för Q1".
 
 ## Nästa steg i byggordningen
 
-1. **Vakten för kommandolistan (granskning 11, Q1)**, enligt planen i `GRANSKNING.md` under "Granskning 11 –
-   plan för Q1": byggsession, oberoende granskning, Hugo kontrollerar versionen och installerar. Före uppgift 4
-   (Hugos beslut 2026-10-28). Byggsessionen startas när Hugo eller Casper säger till.
+1. **Vakten för kommandolistan (granskning 11, Q1).** Byggsessionen är klar (f21a3a1, 773e919 och commiten
+   efter). Kvar: **oberoende granskning** i en ny session (med kontrollsummorna för vakten och
+   inställningsfilen), sedan kontrollerar Hugo versionen och installerar enligt `sparr/INSTALLERA.md`, och
+   därefter kontrollen efter installationen i en ny session (sist i `sparr/INSTALLERA.md`). Caspers dator
+   får samma installation och samma kontroll. Före
+   uppgift 4 (Hugos beslut 2026-10-28).
 2. **Uppgift 4**: flöde a, b och e (leverantörsfakturor, kvitton och bankavgifter) med K5 och K8.
 3. Uppgift 5: Z-rapporter, kortinlösen, Swish och kontantinsättningar (och M9 från granskning 7).
 4. Uppgift 6: nivåerna A–D och K9, med nivå D för ägarens bankrader. Därefter en oberoende granskning.
@@ -94,6 +103,13 @@ avsnitt 8, med namn och datum.
   fallerar (minst 2.1.295). Hugo godtar att superpowers vakter slutar fungera. Sandlådan byggs i
   spärrsteget, men är klar före uppgift 5, eller före första hela körningen på riktiga underlag om den kommer
   först. Hela planen och besluten: `GRANSKNING.md`, "Granskning 11 – plan för Q1".
+- **Hugos beslut 2026-10-28 (granskning 11, Q1, tredje omgången):** SPEC 7.1 skrivs om med vakten ("godkänns
+  av Hugo", sandlådan före uppgift 5 eller före första hela körningen på riktiga underlag om den kommer först).
+  Ja till `mkdir -p`, citatregeln, stopp för `grep`-mönster som börjar med `/` och commit-meddelanden via
+  fil. Ja till `requiredMinimumVersion` 2.1.295 och till kontrollsummor (`shasum -a 256`) i INSTALLERA.md,
+  som Hugo jämför med granskningens innan han kopierar. Förbud mot att skriva i skalets och gits startfiler,
+  `~/.claude/**` och `~/Library/LaunchAgents/**`. Skills och worktree-sessioner blir frågor till
+  granskningen. Byggt, inte installerat. Detaljer: `GRANSKNING.md`, "Bygget av vakten för Q1".
 - **Hugos beslut i chatten 2026-10-27:** listan över ägare och närstående ligger kvar i
   `foretag/<namn>/regelbok.json` tills spärrsteget, eftersom SPEC inte säger var den skyddade mappen ska
   ligga. Testet att listan ligger utanför alla mappar agenten får skriva i skrivs då.
