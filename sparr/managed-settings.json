@@ -70,7 +70,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3",
+            "command": "/Library/Developer/CommandLineTools/usr/bin/python3",
             "args": ["-I", "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"],
             "timeout": 10,
             "onFailure": "block"

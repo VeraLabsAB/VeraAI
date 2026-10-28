@@ -1496,7 +1496,7 @@ def test_installningarna_kor_vakten_fore_varje_verktyg_och_stoppar_om_den_faller
     assert vakter[0]["hooks"] == [
         {
             "type": "command",
-            "command": SYSTEMETS_PYTHON,
+            "command": VAKTENS_PYTHON,
             "args": ["-I", INSTALLERAD_VAKT],
             "timeout": 10,
             "onFailure": "block",
@@ -1518,7 +1518,7 @@ def test_installationsfilen_startar_vakten_med_hela_sokvagar_och_stoppar_om_den_
     for vakt_ in alla:
         assert vakt_["onFailure"] == "block", vakt_
         tolken = vakt_["command"]
-        assert os.path.isabs(tolken) and " " not in tolken and tolken == SYSTEMETS_PYTHON, tolken
+        assert os.path.isabs(tolken) and " " not in tolken and tolken == VAKTENS_PYTHON, tolken
         skript = [a for a in vakt_["args"] if not a.startswith("-")]
         assert skript == [INSTALLERAD_VAKT] and os.path.isabs(skript[0]), vakt_["args"]
         assert skript[0].startswith("/Library/Application Support/ClaudeCode/")

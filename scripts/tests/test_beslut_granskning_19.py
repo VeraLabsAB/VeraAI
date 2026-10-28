@@ -17,7 +17,7 @@ import subprocess
 
 import pytest
 
-from test_kommandosparr import VAKTEN, VAKTENS_PYTHON
+from test_kommandosparr import INSTALLERAD_VAKT, INSTALLNINGAR, VAKTEN, VAKTENS_PYTHON
 
 SOKVAG = "/usr/bin:/bin"
 FORSTA = "Stoppat av vakten: "
@@ -267,3 +267,32 @@ def test_j1_saknad_vakt_stoppar(mappar):
 
 def test_j1_rokprovet_har_minst_30_anrop():
     assert len(FALL) + len(TRASIG) >= 30
+
+
+# ---------------------------------------------------------------------------------------------
+# Inställningen för vakten (sparr/managed-settings.json).
+
+def _vakter():
+    installningar = json.loads(INSTALLNINGAR.read_text(encoding="utf-8"))
+    return [vakt_ for grupper in installningar["hooks"].values() for grupp in grupper for vakt_ in grupp["hooks"]]
+
+
+def test_j1_installningen_startar_vakten_med_utvecklarverktygens_python():
+    # Formen med "args": command är bara programmet, och varje argument står för sig, så att inget skal tolkar
+    # raden. -I står före vaktens sökväg, och onFailure block stoppar allt om vakten inte kan köras.
+    assert _vakter() == [
+        {
+            "type": "command",
+            "command": "/Library/Developer/CommandLineTools/usr/bin/python3",
+            "args": ["-I", INSTALLERAD_VAKT],
+            "timeout": 10,
+            "onFailure": "block",
+        }
+    ]
+    assert VAKTENS_PYTHON == "/Library/Developer/CommandLineTools/usr/bin/python3"
+
+
+def test_j1_installningen_kor_inte_vakten_via_usr_bin_python3():
+    # /usr/bin/python3 väljer utvecklarverktyg efter xcode-select eller DEVELOPER_DIR (granskning 19, J1).
+    for vakt_ in _vakter():
+        assert vakt_["command"] != "/usr/bin/python3" and "/usr/bin/python3" not in vakt_["args"], vakt_
