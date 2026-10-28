@@ -4,6 +4,12 @@
   sandlådan, som ska vara klar före uppgift 5.
 - H1 och H2, alternativ 1: kontrollskriptet godtar exakt en extra uppgift, och bara om den heter exakt
   com.apple.provenance. Andra namn, flera uppgifter och alla extra rättigheter (+) avviker som förut.
+- Steg 2 och 13 i INSTALLERA.md: samma regel som H1 (Hugos beslut 2026-10-28 kväll).
+- H6: vakten prövar sökvägen för verktygen som skriver eller ändrar filer mot förbuden i managed-settings.json,
+  utan hänsyn till stora och små bokstäver, och så att ../, ~ och andra sätt att skriva samma namn inte hjälper.
+  Kommandon prövas på samma sätt. Sökvägar till systemets filer (till exempel /etc) prövas bara som text med
+  vaktens funktioner för förbuden, och kommandon prövas med en tom PATH, så att vakten inte tittar på systemets
+  program.
 
 Testen här läser bara filer i projektet och skriver bara i testets tillfälliga mapp (H3). De gör inga länkar.
 macOS sätter själv com.apple.provenance på filer som skapas där (granskning 17, H1), så det riktiga fallet prövas
@@ -15,6 +21,7 @@ en tom fpath, som i test_beslut_granskning_15.py. Det kör /bin/ls på /usr/loca
 skriptet alltid gör, men läser inte innehållet i någon systemfil.
 """
 
+import os
 import subprocess
 
 import pytest
@@ -32,7 +39,19 @@ from test_beslut_granskning_15 import (
     _zsh,
     inget_zsh,
 )
-from test_kommandosparr import INSTALLERA, PROJEKTET, _en_rad, _spec_7_1, _steg
+from test_kommandosparr import (  # noqa: F401 (fixturerna används av pytest via namnen)
+    INSTALLERA,
+    PROJEKTET,
+    _bedom,
+    _en_rad,
+    _fyll_i,
+    _indata,
+    _installningar,
+    _spec_7_1,
+    _steg,
+    mappar,
+    vakt,
+)
 
 CLAUDE_MD = PROJEKTET / "CLAUDE.md"
 LS = "/bin/ls"
@@ -227,3 +246,223 @@ def test_steg_2_och_13_har_samma_regel_som_skriptet():
     # Skriptet godtar samma sak som stegen: exakt en uppgift, com.apple.provenance, och aldrig +.
     skriptet = SKRIPTET.read_text(encoding="utf-8")
     assert f"$'\\t'{PROVENANCE}$'\\t'" in skriptet and "${#rader} == 2" in skriptet
+
+
+# ---------------------------------------------------------------------------------------------
+# H6: verktygen som skriver filer, och sökvägar i kommandon, utan hänsyn till stora och små bokstäver.
+
+FORBJUDEN = "är förbjuden för fil-verktygen"
+# Kommandona prövas med en tom PATH, så att vakten inte tittar på systemets program (H3). Ett kommando som klarar
+# alla andra regler stoppas då först av PATH-regeln, som prövas sist.
+PATH_SAKNAS = "(PATH saknas)"
+
+
+def _skriv(vakt, mappar, sokvag, verktyg="Write"):
+    """Vaktens svar när verktyget skriver till sokvag. <P> är projektet, <T> den tillfälliga mappen och <H>
+    hemmappen, alla i testets tillfälliga mapp."""
+    indata = _indata(mappar, "", verktyg)
+    sokvag = _fyll_i(sokvag, mappar).replace("<H>", mappar["hem"])
+    falt = "notebook_path" if verktyg == "NotebookEdit" else "file_path"
+    indata["tool_input"] = {falt: sokvag, "content": "x", "old_string": "a", "new_string": "b"}
+    return vakt.bedom(indata, mappar["projekt"], mappar["hem"], "")
+
+
+GIT_SKRIVNINGAR = [
+    "<P>/.GIT/hooks/pre-commit",
+    "<P>/.Git/HOOKS/x",
+    "<P>/.git/hooks/x",
+    "<P>/scripts/../.git/hooks/x",
+    "<P>/scripts/../.GIT/hooks/pre-commit",
+    "<P>/scripts/tests/../../.Git/HOOKS/x",
+    "scripts/../.GIT/hooks/pre-commit",
+    ".git/hooks/x",
+    ".GIT/hooks/pre-commit",
+    "<P>//.GIT//hooks/x",
+    "<P>/./.GIT/./hooks/x",
+    "<P>/.GIT/hooks/",
+    "<P>/.GIT",
+    "<P>/.Git/config",
+    "<T>/kopia/.GIT/hooks/x",
+    "<T>/../hem/projekt/.git/hooks/x",
+]
+
+
+@pytest.mark.parametrize("sokvag", GIT_SKRIVNINGAR)
+@pytest.mark.parametrize("verktyg", ["Write", "Edit"])
+def test_h6_skrivverktyg_till_git_stoppas(vakt, mappar, verktyg, sokvag):
+    fel = _skriv(vakt, mappar, sokvag, verktyg)
+    assert fel is not None and FORBJUDEN in fel and "granskning 17, H6" in fel, fel
+
+
+@pytest.mark.parametrize("sokvag", ["<P>/.GIT/hooks/x.ipynb", "<P>/scripts/x.ipynb"])
+def test_h6_notebookedit_stoppas(vakt, mappar, sokvag):
+    # NotebookEdit står inte på listan i SPEC 7.1 och stoppas alltid. Sökvägen prövas också.
+    assert _skriv(vakt, mappar, sokvag, "NotebookEdit") is not None
+
+
+ANDRA_FORBUD = [
+    "<H>/.ZSHRC",
+    "<H>/.Zshenv",
+    "~/.zshrc",
+    "~/.ZPROFILE",
+    "<H>/.zshrc.ZWC",
+    "<H>/.ZCOMPDUMP-abc",
+    "<H>/.NVM/nvm.sh",
+    "<H>/LIBRARY/LaunchAgents/x.plist",
+    "<H>/Library/launchagents/x.plist",
+    "<H>/.CLAUDE/settings.json",
+    "~/.Claude/settings.json",
+    "<H>/.Claude.json",
+    "<H>/.local/BIN/claude",
+    "<H>/.LOCAL/share/claude/x",
+    "<H>/library/application support/claude/x",
+    "<H>/.SSH/config",
+    "<H>/.GITCONFIG",
+    "<H>/.config/GIT/config",
+    "<H>/BIN/x",
+    "<H>/.UGREP",
+    "<P>/.CLAUDE/settings.json",
+    "<P>/.MCP.json",
+    "<P>/.VENV/bin/python",
+    "<P>/scripts/.Ugrep",
+    "<P>/../.ZSHRC",
+    "<P>/../../hem/.zshrc",
+]
+
+
+@pytest.mark.parametrize("sokvag", ANDRA_FORBUD)
+def test_h6_andra_forbud_galler_oavsett_bokstaver(vakt, mappar, sokvag):
+    fel = _skriv(vakt, mappar, sokvag, "Edit")
+    assert fel is not None and FORBJUDEN in fel, fel
+
+
+def test_h6_en_lank_till_git_stoppas(vakt, mappar):
+    # Länken och målet ligger båda i testets tillfälliga mapp.
+    os.mkdir(os.path.join(mappar["projekt"], ".git"))
+    os.symlink(os.path.join(mappar["projekt"], ".git"), os.path.join(mappar["projekt"], "ser-oskyldig-ut"))
+    fel = _skriv(vakt, mappar, "<P>/ser-oskyldig-ut/hooks/pre-commit")
+    assert fel is not None and FORBJUDEN in fel, fel
+
+
+@pytest.mark.parametrize(
+    "sokvag",
+    ["<P>/SPEC.md", "<P>/scripts/ny.py", "scripts/ny.py", "<P>/.gitignore", "<P>/git/hooks/x", "<P>/.github/x",
+     "<P>/x.git", "<T>/kopia/SPEC.md", "<H>/VERA/prov.txt", "<H>/.zshrc.fore-vera", "<P>/.claudex"],
+)
+@pytest.mark.parametrize("verktyg", ["Write", "Edit"])
+def test_h6_vanliga_filer_gar_att_skriva(vakt, mappar, verktyg, sokvag):
+    assert _skriv(vakt, mappar, sokvag, verktyg) is None
+
+
+@pytest.mark.parametrize(
+    "tool_input",
+    [{}, {"file_path": ""}, {"file_path": None}, {"file_path": 3}, {"file_path": "<P>/x\x00"}],
+)
+def test_h6_skrivverktyg_utan_en_sokvag_stoppas(vakt, mappar, tool_input):
+    indata = _indata(mappar, "", "Write")
+    indata["tool_input"] = {k: (_fyll_i(v, mappar) if isinstance(v, str) else v) for k, v in tool_input.items()}
+    assert vakt.bedom(indata, mappar["projekt"], mappar["hem"], "") is not None
+
+
+@pytest.mark.parametrize(
+    "sokvag,regel",
+    [
+        ("/ETC/zshrc", "//etc/zshrc"),
+        ("/private/etc/zshrc", "//etc/zshrc"),
+        ("/PRIVATE/ETC/ZSHRC_Apple_Terminal", "//etc/zshrc_*"),
+        ("/System/Volumes/Data/private/etc/zshenv", "//etc/zshenv"),
+        ("/system/volumes/data/Users/vera/.zshrc", "~/.zshrc"),
+        ("/System/Volumes/Data/Users/vera/projekt/.GIT/hooks/x", "//**/.git/**"),
+        ("/applications/CLAUDE.app/Contents/x", "//Applications/Claude.app/**"),
+        ("/OPT/Homebrew/bin/git", "//opt/homebrew/**"),
+        ("/Users/VERA/Library/Application Support/Claude/claude-code/x",
+         "~/Library/Application Support/Claude/claude-code/**"),
+        ("/Users/vera/.zcompdump-dator-5.9", "~/.zcompdump*"),
+        ("/users/vera/./x/../.zshrc", "~/.zshrc"),
+        ("/Users/vera/.git", "//**/.git"),
+        ("/Users/vera/.cláude/x", None),
+        ("/Users/vera/VERA/agent/SPEC.md", None),
+    ],
+)
+def test_h6_forbuden_som_text(vakt, sokvag, regel):
+    # Bara text: ingen fil läses. Hemmappen är /Users/vera.
+    assert vakt._forbud_som_passar(vakt._andra_namn(sokvag), ["/Users/vera"]) == regel
+
+
+def test_h6_samma_namn_skrivet_pa_olika_satt_jamfors_lika(vakt):
+    # é som ett tecken och som e med accent, och stora och små bokstäver (macOS skiljer inte på dem).
+    assert vakt._jamforbar("café") == vakt._jamforbar("café") == vakt._jamforbar("CAFÉ")
+
+
+def test_h6_vakten_har_samma_forbud_som_installningarna(vakt):
+    edit = [r[len("Edit("):-1] for r in _installningar()["permissions"]["deny"] if r.startswith("Edit(")]
+    assert list(vakt.SKRIVFORBUD) == edit
+
+
+def test_h6_vakten_provar_alla_skrivverktyg(vakt):
+    assert vakt.SKRIVVERKTYG == {
+        "Write": "file_path",
+        "Edit": "file_path",
+        "MultiEdit": "file_path",
+        "NotebookEdit": "notebook_path",
+    }
+
+
+# Kommandon: mål i den tillfälliga mappen som är förbjudna för fil-verktygen stoppas också, och mål i projektet
+# stoppas som förut (de ligger inte i den tillfälliga mappen).
+KOMMANDON_TILL_GIT = [
+    "cp -R SPEC.md .GIT/hooks/pre-commit",
+    "cp -R SPEC.md <P>/.Git/HOOKS/x",
+    "cp -R SPEC.md scripts/../.git/hooks/x",
+    "mkdir -p .git/hooks/x",
+    "mkdir -p <T>/.GIT/hooks",
+    "mkdir <T>/kopia/.Git",
+    "cp -R SPEC.md <T>/kopia/.Git/HOOKS/pre-commit",
+    "cp -R SPEC.md <T>/../tillfallig/.GIT/hooks/x",
+    "cp -R SPEC.md <T>/../hem/projekt/.git/hooks/x",
+    "tar -x -f <T>/kopia.tar -C <T>/.GIT",
+    "git archive -o <T>/.Git/x.tar HEAD",
+    "cp -R .GIT <T>/kopia",
+    "mkdir -p <T>/.CLAUDE/x",
+    "mkdir -p <T>/x/.VENV/bin",
+    "cp -R SPEC.md <T>/.MCP.json",
+]
+
+
+@pytest.mark.parametrize("kommando", KOMMANDON_TILL_GIT)
+def test_h6_kommandon_till_git_stoppas(vakt, mappar, kommando):
+    fel = _bedom(vakt, mappar, kommando, sokvag="")
+    assert fel is not None and PATH_SAKNAS not in fel, fel
+
+
+@pytest.mark.parametrize(
+    "kommando", ["mkdir -p <T>/kopia/scripts", "cp -R SPEC.md <T>/kopia/.gitignore", "cp -R scripts <T>/kopia"]
+)
+def test_h6_vanliga_kommandon_klarar_reglerna_fore_path_regeln(vakt, mappar, kommando):
+    fel = _bedom(vakt, mappar, kommando, sokvag="")
+    assert fel is not None and PATH_SAKNAS in fel, fel
+
+
+def test_h6_session_i_hemmappen_skriven_med_andra_bokstaver_stoppas(vakt, mappar):
+    # Projektmappen är hemmappen, men hemmappen anges med stora bokstäver.
+    hem = mappar["hem"]
+    indata = _indata(mappar, "git status")
+    indata["cwd"] = hem
+    fel = vakt.bedom(indata, hem, os.path.join(os.path.dirname(hem), "HEM"), "")
+    assert fel is not None and "hemmappen" in fel, fel
+
+
+def test_h6_tillfallig_mapp_i_projektet_skriven_med_andra_bokstaver_godtas_inte(vakt, mappar):
+    # Den tillfälliga mappen ligger i projektet, men anges med stora bokstäver. Den godtas inte, så mkdir stoppas.
+    projekt = mappar["projekt"]
+    tillfallig = os.path.join(os.path.dirname(projekt), "PROJEKT", "kopia")
+    indata = _indata(mappar, f"mkdir -p {tillfallig}/x")
+    indata["scratchpad_dir"] = tillfallig
+    fel = vakt.bedom(indata, projekt, mappar["hem"], "")
+    assert fel is not None and "tillfällig mapp" in fel, fel
+
+
+def test_h6_star_i_spec():
+    spec = _spec_7_1()
+    assert "**Fil-verktygen och förbuden** (granskning 17, H6, Hugos beslut 2026-10-28)" in spec
+    assert "utan hänsyn till stora och små bokstäver" in spec and "`Write`" in spec and "`Edit`" in spec

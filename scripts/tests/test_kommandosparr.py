@@ -214,8 +214,12 @@ def test_vakten_har_samma_verktygslista_som_spec(vakt):
 
 @pytest.mark.parametrize("verktyg", VERKTYGSLISTAN)
 def test_alla_verktyg_pa_listan_slapps_igenom(vakt, mappar, verktyg):
-    # Bash prövas mot kommandolistan, så det får ett kommando som står där.
-    assert _bedom(vakt, mappar, "git status", verktyg) is None
+    # Bash prövas mot kommandolistan, så det får ett kommando som står där. Write och Edit prövas mot förbuden för
+    # fil-verktygen (granskning 17, H6), så de får en vanlig fil i projektet.
+    indata = _indata(mappar, "git status", verktyg)
+    if verktyg in ("Write", "Edit"):
+        indata["tool_input"] = {"file_path": os.path.join(mappar["projekt"], "SPEC.md"), "content": "x"}
+    assert vakt.bedom(indata, mappar["projekt"], mappar["hem"], SYSTEMETS_SOKVAG) is None
 
 
 OKANDA_VERKTYG = [

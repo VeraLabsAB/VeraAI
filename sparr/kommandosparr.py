@@ -15,14 +15,22 @@ Reglerna, i den ordning de prövas (planen i GRANSKNING.md, "Granskning 11 – p
 2. Bara verktygen på listan i SPEC 7.1 ("Tillåtna verktyg") släpps igenom. Allt annat stoppas, också
    verktyg som vakten inte känner till (granskning 12, P4, Hugos beslut 2026-10-28). Bash prövas
    vidare mot reglerna nedan. De andra verktygen på listan kör inga kommandon.
+2 b. Verktygen som skriver eller ändrar filer (Write och Edit, och MultiEdit och NotebookEdit om de skulle stå på
+   listan) får inte skriva där förbuden i managed-settings.json säger, och sökvägen jämförs utan hänsyn till stora
+   och små bokstäver (granskning 17, H6, Hugos beslut 2026-10-28). Sökvägen prövas som den står, med ~ som
+   hemmappen, efter ../ och dit länkarna leder, och med macOS andra namn för samma mapp (till exempel
+   /private/etc för /etc).
 3. Ingen mapp undantas (Hugos beslut 8). Kommandot ska köras i mappen där sessionen startade
-   (CLAUDE_PROJECT_DIR), och den mappen får inte vara hemmappen eller en mapp ovanför den.
+   (CLAUDE_PROJECT_DIR), och den mappen får inte vara hemmappen eller en mapp ovanför den. Där vakten stoppar
+   jämförs sökvägar utan hänsyn till stora och små bokstäver, och där den släpper igenom jämförs de exakt
+   (granskning 17, H6).
 4. Inga ihopkopplade kommandon: inget ;, &, |, <, >, $, bakåtfnutt, omvänt snedstreck eller
    radbrytning, inte heller inom citattecken. Inga osynliga eller styrande tecken. Inga tecken som
    skalet byter ut mot något annat (jokertecken, ~ och liknande) utanför citattecken.
 5. Första ordet ska stå på listan i SPEC 7.1.
 6. Reglerna under listan: mål bara i den tillfälliga mappen, ingen fil eller mapp som heter .ugrep
-   (granskning 16, G7, Hugos beslut 2026-10-28), grep bara med tillägg som söker, pytest bara
+   (granskning 16, G7, Hugos beslut 2026-10-28), inga mål eller källor till cp -R som förbuden för
+   fil-verktygen gäller (regel 2 b), grep bara med tillägg som söker, pytest bara
    i de två formerna, inga git-tillägg som skriver filer eller kör program, och läsande kommandon bara i
    projektet och i den tillfälliga mappen. find står inte på listan (granskning 15, S1, Hugos beslut
    2026-10-28): i agentens skal är find Claude Codes bfs, som raderar med -rm.
@@ -142,6 +150,76 @@ GREP_TILLATNA = (
 # Namnet jämförs utan hänsyn till stora och små bokstäver, eftersom macOS i regel inte skiljer på dem.
 UGREP_FIL = ".ugrep"
 
+# Regel 2 b (granskning 17, H6, Hugos beslut 2026-10-28). Verktygen som skriver eller ändrar filer, och fältet där
+# sökvägen står. MultiEdit och NotebookEdit står inte på listan i SPEC 7.1 och stoppas av regel 2, men står här
+# också, om listan ändras.
+SKRIVVERKTYG = {"Write": "file_path", "Edit": "file_path", "MultiEdit": "file_path", "NotebookEdit": "notebook_path"}
+# Förbuden för fil-verktygen i managed-settings.json (Edit(...)), i samma ordning. Ett test jämför dem. // är datorns
+# rot och ~/ hemmappen. ** står för valfritt antal mappar (sist i ett förbud minst en), och * för vad som helst inom
+# ett namn.
+SKRIVFORBUD = (
+    "//**/.git/**",
+    "//**/.git",
+    "//**/.ugrep",
+    "~/.ugrep",
+    "~/.zshrc",
+    "~/.zshenv",
+    "~/.zprofile",
+    "~/.zlogin",
+    "~/.zlogout",
+    "//etc/zshenv",
+    "//etc/zprofile",
+    "//etc/zshrc",
+    "//etc/zshrc_*",
+    "//etc/zlogin",
+    "//etc/zlogout",
+    "~/.zshrc.zwc",
+    "~/.zshenv.zwc",
+    "~/.zprofile.zwc",
+    "~/.zlogin.zwc",
+    "~/.zlogout.zwc",
+    "//etc/zshenv.zwc",
+    "//etc/zprofile.zwc",
+    "//etc/zshrc.zwc",
+    "//etc/zlogin.zwc",
+    "//etc/zlogout.zwc",
+    "~/.nvm/**",
+    "~/.zkbd/**",
+    "~/.zsh_sessions/**",
+    "~/.zcompdump",
+    "~/.zcompdump*",
+    "~/.zcompdump.zwc",
+    "~/.bashrc",
+    "~/.bash_profile",
+    "~/.profile",
+    "~/.gitconfig",
+    "~/.config/git/**",
+    "~/.claude/**",
+    "~/Library/LaunchAgents/**",
+    "~/.ssh/**",
+    "//**/.mcp.json",
+    "//**/.claude/**",
+    "~/.claude.json",
+    "~/bin/**",
+    "~/.local/bin/**",
+    "~/.local/bin/claude",
+    "~/.local/share/claude/**",
+    "~/Library/Application Support/Claude/claude-code/**",
+    "~/Library/Application Support/Claude/**",
+    "//Applications/Claude.app/**",
+    "//opt/homebrew/**",
+    "//**/.venv/**",
+)
+# macOS har flera namn för samma mapp: /etc, /tmp och /var är länkar till mappar i /private, och hela datavolymen
+# (där bland annat hemmappen ligger) syns också under /System/Volumes/Data. Sökvägen prövas med varje namn, bara
+# som text.
+MACOS_ANDRA_NAMN = (
+    ("/System/Volumes/Data", ""),
+    ("/private/etc", "/etc"),
+    ("/private/tmp", "/tmp"),
+    ("/private/var", "/var"),
+)
+
 GIT_UNDERKOMMANDON = ("status", "log", "diff", "add", "commit", "show", "archive")
 # git godtar förkortade långa tillägg (--out för --output), så ett tillägg stoppas om dess namn är
 # början på ett förbjudet namn. GIT_SAKRA är hela namn som är början på ett förbjudet namn men som
@@ -198,9 +276,10 @@ class _Stopp(Exception):
 
 
 class _Lage:
-    def __init__(self, projekt, tillfallig):
+    def __init__(self, projekt, tillfallig, hem):
         self.projekt = projekt
         self.tillfallig = tillfallig
+        self.hem = hem
 
 
 def bedom(indata, projektmapp, hemmapp, sokvag):
@@ -233,6 +312,10 @@ def _bedom(indata, projektmapp, hemmapp, sokvag):
             f"verktyget '{verktyg}' står inte på listan över tillåtna verktyg i SPEC 7.1 och är stoppat. "
             "Bara Bash får köra kommandon, och bara de som står i SPEC 7.1."
         )
+
+    # Regel 2 b.
+    if verktyg in SKRIVVERKTYG:
+        _skrivverktyg(verktyg, verktygsdata, indata.get("cwd"), projektmapp, hemmapp)
     if verktyg != "Bash":
         return
 
@@ -316,7 +399,7 @@ def _sessionen(projektmapp, hemmapp, cwd, tillfallig):
         )
     projekt = os.path.realpath(projektmapp)
     hem = os.path.realpath(hemmapp)
-    if _inom(hem, projekt):
+    if _inom_oavsett_bokstaver(hem, projekt):
         raise _Stopp(
             f"sessionen är startad i hemmappen eller i en mapp ovanför den ({projekt}). Då skulle "
             "läsande kommandon nå allt i hemmappen. Starta sessionen i projektmappen."
@@ -329,9 +412,13 @@ def _sessionen(projektmapp, hemmapp, cwd, tillfallig):
     godkand = None
     if isinstance(tillfallig, str) and tillfallig:
         mapp = os.path.realpath(tillfallig)
-        if not (_inom(mapp, projekt) or _inom(projekt, mapp) or _inom(hem, mapp)):
+        if not (
+            _inom_oavsett_bokstaver(mapp, projekt)
+            or _inom_oavsett_bokstaver(projekt, mapp)
+            or _inom_oavsett_bokstaver(hem, mapp)
+        ):
             godkand = mapp
-    return _Lage(projekt, godkand)
+    return _Lage(projekt, godkand, hemmapp)
 
 
 def _dela_upp(kommando):
@@ -379,6 +466,122 @@ def _inom(sokvag, rot):
     return sokvag == rot or sokvag.startswith(rot.rstrip(os.sep) + os.sep)
 
 
+def _jamforbar(text):
+    """Texten som macOS jämför namn: utan hänsyn till stora och små bokstäver, och med é skrivet som ett tecken
+    eller som e med accent lika (granskning 17, H6)."""
+    return unicodedata.normalize("NFD", unicodedata.normalize("NFD", text).casefold())
+
+
+def _inom_oavsett_bokstaver(sokvag, rot):
+    """Som _inom, men utan hänsyn till stora och små bokstäver. Används bara där vakten stoppar."""
+    return _inom(_jamforbar(sokvag), _jamforbar(rot))
+
+
+# ---------------------------------------------------------------------------------------------
+# Regel 2 b: förbuden för fil-verktygen (granskning 17, H6, Hugos beslut 2026-10-28)
+
+def _delar(sokvag):
+    return [_jamforbar(del_) for del_ in sokvag.split("/") if del_ and del_ != "."]
+
+
+def _passar_namn(namn, monster):
+    """Sant om namnet passar mönstret, där * står för vad som helst (också ingenting) inom ett namn."""
+    bitar = monster.split("*")
+    if len(bitar) == 1:
+        return namn == monster
+    forst, sist = bitar[0], bitar[-1]
+    if len(namn) < len(forst) + len(sist) or not (namn.startswith(forst) and namn.endswith(sist)):
+        return False
+    plats, slut = len(forst), len(namn) - len(sist)
+    for bit in bitar[1:-1]:
+        hittad = namn.find(bit, plats, slut)
+        if hittad < 0:
+            return False
+        plats = hittad + len(bit)
+    return True
+
+
+def _passar(delar, monster):
+    """Sant om sökvägens delar passar förbudets delar. ** står för valfritt antal mappar, och sist i förbudet för
+    minst en (allt i mappen, men inte mappen själv)."""
+    if not monster:
+        return not delar
+    if monster[0] == "**":
+        minst = 1 if len(monster) == 1 else 0
+        return any(_passar(delar[i:], monster[1:]) for i in range(minst, len(delar) + 1))
+    return bool(delar) and _passar_namn(delar[0], monster[0]) and _passar(delar[1:], monster[1:])
+
+
+def _andra_namn(sokvag):
+    """Sökvägen efter ../ och ./ (bara som text), och med macOS andra namn för samma mapp."""
+    former = [os.path.normpath(sokvag)]
+    for form in former:
+        for langt, kort in MACOS_ANDRA_NAMN:
+            if _jamforbar(form).startswith(_jamforbar(langt) + "/"):
+                ny = kort + form[len(langt):]
+                if ny not in former:
+                    former.append(ny)
+    return former
+
+
+def _forbud_som_passar(former, hemmar):
+    """Det första förbudet som någon av sökvägens former passar, annars None. Bara text: ingen fil läses."""
+    for regel in SKRIVFORBUD:
+        if regel.startswith("//"):
+            baser = ["/"]
+        elif regel.startswith("~/"):
+            baser = hemmar
+        else:
+            return regel
+        for bas in baser:
+            monster = _delar(bas) + _delar(regel[2:])
+            if any(_passar(_delar(form), monster) for form in former):
+                return regel
+    return None
+
+
+def _forbud_for(sokvag, baser, hem):
+    """Förbudet som sökvägen passar, eller None. Sökvägen prövas som den står och med ~ som hemmappen, i
+    förhållande till varje mapp i baser om den inte börjar med /, och både som text och dit länkarna leder."""
+    tolkningar = [sokvag]
+    if sokvag == "~" or sokvag.startswith("~/"):
+        tolkningar.append(hem + sokvag[1:])
+    former = []
+    for tolkning in tolkningar:
+        hela = [tolkning] if os.path.isabs(tolkning) else [os.path.join(bas, tolkning) for bas in baser]
+        for sok in hela:
+            former += _andra_namn(sok) + _andra_namn(os.path.realpath(sok))
+    return _forbud_som_passar(former, [hem, os.path.realpath(hem)])
+
+
+def _forbjuden_text(sokvag, regel):
+    return (
+        f"'{sokvag}' är förbjuden för fil-verktygen (Edit({regel}) i de låsta inställningarna), också skriven med "
+        "andra stora och små bokstäver, med ../, ~ eller via en länk (granskning 17, H6, Hugos beslut 2026-10-28)."
+    )
+
+
+def _skrivverktyg(verktyg, verktygsdata, cwd, projektmapp, hemmapp):
+    falt = SKRIVVERKTYG[verktyg]
+    if not isinstance(verktygsdata, dict):
+        _indatafel("tool_input saknas")
+    sokvag = verktygsdata.get(falt)
+    if not isinstance(sokvag, str) or not sokvag or "\x00" in sokvag:
+        _indatafel(f"sökvägen ({falt}) saknas, är inte text eller har ett NUL-tecken")
+    baser = [bas for bas in (cwd, projektmapp) if isinstance(bas, str) and bas]
+    if not baser and not os.path.isabs(sokvag):
+        _indatafel("sökvägen är inte hel, och mappen den gäller (cwd) saknas")
+    regel = _forbud_for(sokvag, baser, hemmapp)
+    if regel:
+        raise _Stopp(f"{verktyg}: {_forbjuden_text(sokvag, regel)}")
+
+
+def _skrivforbud_kommando(sokvag, etikett, lage):
+    regel = _forbud_for(sokvag, [lage.projekt], lage.hem)
+    if regel:
+        raise _Stopp(f"{etikett}: {_forbjuden_text(sokvag, regel)}")
+
+
 def _verklig(sokvag, bas):
     if not os.path.isabs(sokvag):
         sokvag = os.path.join(bas, sokvag)
@@ -409,6 +612,7 @@ def _ugrep(sokvag, etikett, lage):
 def _mal(sokvag, etikett, lage):
     if sokvag:
         _ugrep(sokvag, etikett, lage)
+        _skrivforbud_kommando(sokvag, etikett, lage)
     if not lage.tillfallig:
         raise _Stopp(
             f"{etikett}: får bara ha mål i en tillfällig mapp (scratchpad-mappen), och sessionen har "
@@ -869,8 +1073,9 @@ def _cp(ordlista, lage):
         raise _Stopp("cp -R: ange vad som ska kopieras och vart.")
     for operand in operander[:-1]:
         _las(operand, "cp -R", lage)
-        # Kopian får samma namn som källan (granskning 16, G7).
+        # Kopian får samma namn som källan (granskning 16, G7, och granskning 17, H6).
         _ugrep(operand, "cp -R", lage)
+        _skrivforbud_kommando(operand, "cp -R", lage)
     _mal(operander[-1], "cp -R", lage)
 
 
