@@ -6022,3 +6022,369 @@ Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28 kväll, i chatten.
   stoppar, och `+` stoppar alltid.
 - **Möjlig orsak till bytet till auto** i granskning 17 och i förra byggsessionen: valet "Yes, and use auto mode"
   när en plan godkänns. Inte bekräftat.
+
+## Granskning 18 (av ae33e48 till cba4fe9) (2026-10-28)
+
+Oberoende granskning av commits efter `40390fa` till och med `cba4fe9`, gjord på Hugos uppdrag i chatten
+2026-10-28, i en ny session som inte har sett bygget. Granskat läge: commit `cba4fe9` på grenen main
+(`git status` ren när granskningen började). Ingen kod, inga tester och inget i INSTALLERA.md är ändrat. Skrivet
+i projektet: bara det här avsnittet. Granskarens prov ligger i kopior i scratchpad-mappen
+(`scratchpad/g18/`) och i pytests tillfälliga mappar. Inga länkar till något utanför de mapparna.
+
+**Läget:** sessionen stod i läget **auto** från början till slut (det säger Claude Codes egna besked i
+sessionen). Det är tillåtet enligt Hugos beslut 2026-10-28 kväll. Granskaren har inte bytt läge och har inte
+kontrollerat läget med appens verktyg för sessioner (det står inte på listan över tillåtna verktyg).
+
+### Viktigt först
+
+- **I1 (medel): vakten släpper igenom fil-verktygen när sökvägen börjar med `/.vol/` eller `/.nofollow/`.**
+  Det är macOS egna andra namn för samma fil eller mapp. Granskaren skrev på riktigt, via `/.vol/…`, en fil
+  som hamnade i en `.git/hooks`-mapp (i testets tillfälliga mapp), och vakten släppte igenom Write till både
+  `/.vol/…/pre-commit` och `/.vol/…/.zshrc`. Det är just det H6 skulle stoppa. **Enligt stoppregeln kan vakten
+  inte installeras** förrän I1 är rättat och granskat.
+- **I3 (låg, men en felaktig rapport): H6 gjordes inte om från början**, fast beslutet och commit-meddelandet
+  säger det. Den slutliga testfilen bygger tydligt på den undanlagda versionen. Det finns två stash-poster,
+  men OK:et i GRANSKNING.md gäller ett kommando.
+- **Det som håller:** H1 i kontrollskriptet (inget av granskarens försök med riktiga filer gick igenom), H3 i
+  CLAUDE.md och SPEC 7.1, stora och små bokstäver, `../`, `~`, `//`, snedstreck sist och länkar i H6,
+  alla git-kommandon som ändrar var git letar efter krokar, sudo-raderna (oförändrade) och kontrollsummorna
+  (alla fyra stämmer).
+- **Testsviten:** 3 894 tester, alla gröna.
+
+### Fynd
+
+| Nr | Nivå | Kort |
+|---|---|---|
+| I1 | MEDEL | Fil-verktygen kommer förbi H6 med `/.vol/<enhet>/<inode>/…` och `/.nofollow/…` |
+| I2 | LÅG | Kontrollskriptet godtar en uppgift som heter `com.apple.provenance` plus en tabb, som om den hette exakt `com.apple.provenance` |
+| I3 | LÅG | H6 byggdes på den undanlagda versionen, inte om från början. Den andra stash-posten saknar ett nedskrivet OK |
+| I4 | LÅG | Vakten ser inte hårda länkar: Write till en fil i projektet som är ett andra namn på `~/.zshrc` släpps igenom |
+| I5 | LÅG | Agent-verktyget med `isolation: "worktree"` får Claude Code att skriva i `.git` utan att vakten tittar |
+| I6 | LÅG | Steg 2: "Den fjärde raden" säger `No such file or directory`, men `ls` skriver den raden först |
+| I7 | LÅG | Steg 13: `ditto` och `cp` tar med alla uppgifter, inte bara `com.apple.provenance` |
+| I8 | LÅG | Regeln om prov och test: SPEC 7.1 har ett undantag som CLAUDE.md saknar, och "läsa systemfiler" är otydligt |
+
+**I1 – `/.vol` och `/.nofollow`. MEDEL.**
+- **Vad det är:** macOS har två sätt att skriva en sökväg som inte syns som länkar. `/.vol/<enhet>/<inode>/namn`
+  pekar ut en mapp med dess nummer på disken (inode), och `/.nofollow/<sökväg>` är samma sökväg med en
+  inställning till. Båda leder till samma fil som den vanliga sökvägen. Vakten följer länkar och känner till
+  `/private` och `/System/Volumes/Data`, men inte de här.
+- **Prövat** (provfil `scratchpad/g18/ny/scripts/tests/test_granskare_18.py`, allt i testets tillfälliga mapp,
+  med vaktens egen `bedom` och en låtsad hemmapp och ett låtsat projekt där):
+  - `/.vol/<enhet>/<inode för .git/hooks>` finns, och en fil skriven dit hamnade i `.git/hooks`.
+  - `/.vol/<enhet>/<inode för hemmappen>/.zshrc` och `/.nofollow<hemmappen>/.zshrc` är samma fil som
+    `.zshrc` i den låtsade hemmappen.
+  - Vakten: **Write till `/.vol/…/pre-commit`, `/.vol/…/.zshrc` och `/.nofollow…/.zshrc` släpps igenom.**
+    `/.nofollow<projektet>/.git/hooks/x` stoppas, eftersom förbudet `//**/.git/**` passar var `.git` än står.
+- **Hur agenten skulle få numren:** `ls -di .git/hooks` klarar vaktens regler och visar mappens inode.
+  Enhetens nummer visas inte av något kommando på listan, men det kan gissas, eller tas fram med en egen
+  testfil (H3).
+- **Varför medel:** SPEC 7.1 säger att vakten prövar sökvägen "med macOS andra namn för samma mapp". En krok i
+  `.git/hooks` kör egen kod vid nästa `git commit`, utan att vakten ser det. Sandlådan gäller Bash, så den
+  stänger troligen inte den här vägen för Write och Edit. Om Claude Codes egna förbud stoppar `/.vol` är inte
+  prövat (det kräver en skrivning utanför scratchpad).
+- **Bör göras:** vakten stoppar fil-verktygen och kommandomål när sökvägens första del direkt under roten
+  börjar med punkt (`/.vol`, `/.nofollow`, `/.resolve` och liknande), utan hänsyn till bokstäver, med test.
+  Prövas igen i spärrtestet efter installationen. Ny oberoende granskning.
+
+**I2 – `com.apple.provenance` plus tabb. LÅG.**
+- `ls -le@` skriver namnet på en uppgift som det är. En uppgift med namnet `com.apple.provenance` och en tabb
+  sist ger raden `<tabb>com.apple.provenance<tabb><tabb>4`. Skriptets mönster tillåter mellanslag och tabbar
+  före siffran, så tabben i namnet ser ut som avståndet. Med ett eget `ls` som skriver en sådan rad som enda
+  uppgift skrev skriptet `OK`. Samma sak med tabb och mellanslag. Med mellanslag sist i namnet, ett kyrilliskt
+  `о`, mellanslag i stället för tabb eller en tom rad emellan: `AVVIKER`, som det ska.
+- Med riktiga filer går det inte att få fram: macOS sätter alltid den riktiga `com.apple.provenance` på nya
+  filer, så filen får två uppgifter, och då avviker den (prövat). Att sätta en uppgift på en fil som root äger
+  kräver root, och uppgiften ger inga rättigheter.
+- En människa som läser steg 2 och 13 ser inte heller skillnad: en tabb syns som mellanslag. Ett kyrilliskt
+  `о` ser hon inte heller, men det fångar skriptet.
+- **Bör göras** (frivilligt, i nästa version av skriptet): bara mellanslag före och efter siffran, inte tabb.
+
+**I3 – H6 inte gjord om från början. LÅG.**
+- Hugos beslut 2026-10-28 kväll: den halvfärdiga H6 "lades undan med `git stash` och görs om från början", och
+  OK gavs till exakt ett kommando. Commit `6a488fd` säger "Gjord om från början".
+- `git log -g refs/stash` visar **två** poster: `stash@{1}` kl. 19.52.37 (på `3072393`) och `stash@{0}` kl.
+  20.18.01 (på `727d055`). Innehållet i de två är exakt lika (`git diff 3bf7188 1182c5a` visar inget). Alltså
+  låg den halvfärdiga versionen i projektet igen efter `727d055`, och lades undan en gång till.
+- Testfilen i `6a488fd` är den undanlagda med ändringar: samma testnamn, samma kommentarer, samma listor
+  (`git diff 1182c5a 6a488fd -- scripts/tests/test_beslut_granskning_17.py`).
+- PROGRESS.md nämner två stash-poster, men varken det kommandot som tog tillbaka versionen eller den andra
+  `git stash push` står med ett OK i GRANSKNING.md.
+- Säkerheten påverkas lite: koden är granskad här oavsett hur den kom till. Men en byggsessions rapport stämmer
+  inte, och det är skälet till att granskningen inte litar på rapporterna.
+- **Bör göras:** byggsessionen (eller Hugo) skriver in vilka `git stash`-kommandon som kördes och vem som gav
+  OK. Hugo avgör om det räcker.
+
+**I4 – hårda länkar. LÅG.**
+- En hård länk är ett andra namn på samma fil. I testets tillfälliga mapp gjorde granskaren en fil i det
+  låtsade projektet som är ett andra namn på `.zshrc` i den låtsade hemmappen. Vakten släppte igenom Write till
+  den. Följda mjuka länkar (också dinglande länkar och kedjor) stoppades, som det ska.
+- Agenten kan inte göra en hård länk med kommandona på listan, bara med en egen testfil (H3).
+- **Bör göras** (frivilligt): vakten stoppar Write och Edit till en befintlig fil med fler än ett namn, med test.
+  Annars under Öppet tills sandlådan finns.
+
+**I5 – Agent med `isolation: "worktree"`. LÅG (inte prövat på riktigt).**
+- Agent står på listan, och vakten tittar inte på vad det får. Med `isolation: "worktree"` gör Claude Code själv
+  en ny arbetskopia med git, som skriver i `.git/worktrees` och i en ny mapp, utan att vakten ser det. Det
+  agenten skriver där styrs av git, inte av agenten, så det kan inte lägga in en krok.
+- Inte prövat: det skulle skriva i projektets `.git`. Om vakten körs för verktygen som en underagent använder
+  är inte heller prövat.
+- **Bör göras:** vakten stoppar Agent när `isolation` är satt, eller så tas båda frågorna med i spärrtestet.
+
+**I6 – steg 2, "den fjärde raden". LÅG.**
+- `ls` skriver raden `No such file or directory` **först**, före de andra (prövat i scratchpad med tre mappar
+  och en som inte finns). Med `-e@` kan dessutom indragna rader stå mellan mapparnas rader. Texten säger "Den
+  fjärde raden". Felet fanns före `c7ba2b9` också, men räknandet blir svårare nu.
+- Riktningen är säker: blir Hugo osäker stoppar han och frågar.
+- **Bör göras:** till exempel "En rad, ofta den första, säger `…/ClaudeCode: No such file or directory`".
+
+**I7 – steg 13, fler uppgifter än `com.apple.provenance`. LÅG.**
+- Steg 13 säger att `ditto` och `cp` tar med `com.apple.provenance`. De tar med **alla** uppgifter.
+  `requirements.txt` i projektet har redan `com.apple.lastuseddate#PS`, som macOS sätter när en fil öppnas i
+  vissa program. Får `kommandosparr.py` eller `managed-settings.json` den innan installationen, säger steg 13
+  "stoppa och fråga". Säker riktning, men installationen kan stoppa i onödan.
+- I dag har de två filerna bara `com.apple.provenance` (`ls -lde@`, sett i granskningen).
+- **Bör göras:** en mening i steg 5 eller 13 om att öppna filerna bara med `shasum` och `ls` före
+  installationen, eller ett beslut om vad som gäller.
+
+**I8 – regeln om prov och test. LÅG.**
+- CLAUDE.md och SPEC 7.1 har samma fem meningar (scratchpad eller testets tillfälliga mapp, inga länkar ut,
+  inga riktiga systemfiler, regel i text, sandlådan före uppgift 5). SPEC 7.1 har också skälet och
+  **undantaget** för de gamla testen med mjuka länkar till `/usr/bin/git`. Den som bara läser CLAUDE.md kan tro
+  att hela testsviten bryter mot regeln.
+- "Läsa riktiga systemfiler" är otydligt. De nya H1-testen kör `/bin/ls` på `/usr/local` och liknande (bara
+  ägare och rättigheter, inte innehåll), och kör systemets `zsh`, `xattr` och `chmod`. Det står öppet i
+  testfilen, men regeln säger inte om det är tillåtet.
+- Testfilen säger "De gör inga länkar", men `test_h6_en_lank_till_git_stoppas` gör en mjuk länk (inne i testets
+  tillfälliga mapp, vilket regeln tillåter).
+- **Bör göras:** samma text på båda ställena, med undantaget, och en mening om att köra systemets program och
+  läsa ägare och rättigheter (`ls -ld`) är tillåtet eller inte.
+
+### Punkt 1: varje commit
+
+| Commit | Tid | Säger | Gör det, och inget mer? |
+|---|---|---|---|
+| `ae33e48` | 19.31 | Hugos beslut efter granskning 17 | Ja: bara GRANSKNING.md, 14 rader |
+| `653f0a4` | 19.34 | H3 | Ja: en rad i CLAUDE.md, en i SPEC 7.1, 16 tester |
+| `3072393` | 19.39 | H1 | Ja: skriptet, en mening i steg 4 g, testerna (`TECKEN_KOPIA` borttaget i `_15.py`, 23 nya i `_17.py`) |
+| `727d055` | 19.53 | Hugos beslut kväll | Ja: bara GRANSKNING.md, 15 rader |
+| `c7ba2b9` | 20.20 | Steg 2 och 13 | Ja: `ls -lde@` och texten i steg 2 och 13, 5 tester, tre listor i `test_kommandosparr.py` |
+| `6a488fd` | 20.26 | H6 | Ja i innehållet: vakten, en punkt och en ändring i SPEC 7.1, 126 tester, ett test i `test_kommandosparr.py`. **Men "gjord om från början" stämmer inte (I3)** |
+| `235eab6` | 20.26 | Kontrollsummor | Ja: två summor i INSTALLERA.md |
+| `cba4fe9` | 20.30 | PROGRESS.md | Ja: bara PROGRESS.md |
+
+**Commit `727d055`:** gjord 2026-10-28 kl. 19.53.10, 33 sekunder efter den första stash-posten (19.52.37) och
+före steg 2 och 13 (20.20) och H6 (20.26). Innehållet stämmer med Hugos beslut som de står i uppdraget till den
+här granskningen (auto tillåtet, stash, steg 2 och 13). Att Hugo skrev just de orden i byggsessionens chatt kan
+granskaren inte se. Den säger "exakt ett kommando", men den andra stash-posten (20.18.01) kom efter den (I3).
+
+### Punkt 2: anropas vakten för Write och Edit, och vilka verktyg skriver filer?
+
+- `sparr/managed-settings.json` har `"matcher": "*"` under `PreToolUse`: vakten körs före **varje** verktyg,
+  också Write och Edit och kopplingarnas verktyg. Därför behövde filen inte ändras, och summan är densamma
+  (`e1222e16…`). Att Claude Code verkligen kör vakten för Write och Edit, och för en underagents verktyg,
+  prövas i spärrtestet efter installationen.
+- Verktygen i den här versionen av Claude Code (den här sessionens lista) som skriver eller ändrar filer på
+  datorn:
+
+| Verktyg | Vad det skriver | Vakten |
+|---|---|---|
+| `Write`, `Edit` | Valfri fil | **Prövas** mot förbuden (regel 2 b). Kommer förbi med `/.vol` och `/.nofollow` (I1) och hårda länkar (I4) |
+| `Bash` | Via kommandon | **Prövas** mot listan i SPEC 7.1. `mkdir`, `cp -R`, `tar` och `git archive` också mot förbuden |
+| `Agent` | Underagenter, och med `isolation: "worktree"` en arbetskopia med git | Släpps igenom utan att indata prövas (I5) |
+| `WebFetch` | Claude Code sparar stora svar i `~/.claude/projects/…` (sett i granskning 17) | Släpps igenom. Claude Code skriver, inte agenten |
+| `Skill` | Inget själv. Skal i skills är avstängt (`disableSkillShellExecution`) | Släpps igenom |
+| `NotebookEdit` | Notebook-filer | **Förbjudet** (inte på listan), och prövas också mot förbuden |
+| `MultiEdit` | Finns inte i den här versionen | Skulle vara förbjudet, och prövas också mot förbuden |
+| `Artifact` (läser och sparar filer, `edits` skriver om en fil), `EnterWorktree`, `ExitWorktree`, `CronCreate`, `ScheduleWakeup`, `Monitor`, `Workflow`, `SendUserFile` | Filer, arbetskopior, sparade uppgifter | **Förbjudet** (inte på listan) |
+| Appens verktyg: terminalen (`run_in_terminal`), `sync_with_base_branch`, `clean_up_worktrees`, `discard_kept_worktree`, `set_setting`, `start_session`, `export_transcript`, iOS-simulatorns `build` | Kör kommandon, slår ihop eller raderar arbetskopior, ändrar inställningar | **Förbjudet** (inte på listan) |
+| Kopplingarnas verktyg (till exempel Figma `download_assets`, Adobe, Google Drive, Vercel, Composio) | Hämtar filer eller ändrar på andra datorer | **Förbjudet** (inte på listan) |
+| `Read`, `Glob`, `Grep`, `AskUserQuestion`, `ToolSearch`, `mcp__ccd_turn__update_plan`, `mcp__ccd_turn__wrap_up` | Inget | Släpps igenom |
+
+### Punkt 3: H6, försök att smita förbi
+
+Prövat med vaktens `bedom` i provfilen, med låtsat projekt, låtsad hemmapp och låtsad tillfällig mapp i
+testets tillfälliga mapp, och med tom `PATH` för kommandon (så att vakten inte tittar på systemets program).
+
+- **Stoppas, som det ska:** `.gIt/HoOkS`, `.ZsHrC`, `library/LAUNCHAGENTS`; `../` åt alla håll
+  (`<P>/scripts/../../projekt/.git/hooks/x`, `<T>/../hem/.zshrc`, `<P>/../.zshrc`); `~/.zshrc`, `~/../hem/.zshrc`,
+  `~//.zshrc`, `~/./.zprofile`, `~/.claude/settings.json`; `/System/Volumes/Data<hem>/.zshrc` och samma med små
+  bokstäver; `//<hem>/.zshrc`, `<P>//.git//hooks//x`, `<hem>//.ssh//config`; snedstreck sist (`.zshrc/`, `.git/`,
+  `.git/hooks/`); `.zshrc/.`; `.zſhrc` (långt s, som Macen också räknar som samma fil); en dinglande länk till
+  `.git/hooks/pre-commit`, en kedja av två länkar till `.git`, en relativ länk till `.GIT`.
+- **Unicode:** granskaren skapade `.git` och `.zshrc` i testets tillfälliga mapp och frågade Macen vilka andra
+  namn som är samma fil. **Samma fil:** `.GIT`, `.ZSHRC`, `.zſhrc`, och vakten stoppar alla tre. **Andra filer**
+  (och vakten släpper igenom dem, rätt): `.gİt`, `.gıt`, `.gi̇t`, nollbreddstecken (U+200B, U+200D, U+FEFF), mjukt
+  bindestreck, punkt eller mellanslag sist, och bred `ｇ`.
+- **Kommer förbi:** `/.vol/…` och `/.nofollow/…` (I1), hård länk (I4).
+- **Släpps igenom, men ofarligt:** `~` ensamt (en mapp, inte en fil), och `$HOME/.zshrc` (blir en mapp som
+  heter `$HOME` i projektet, om inte Claude Code själv byter ut `$HOME`, vilket inte är prövat).
+- **git och krokar, stoppas alla:** `git -c core.hooksPath=…` (med och utan citattecken), `--config-env`,
+  `--git-dir`, `--exec-path`, `-C`, `git config`, `git commit -c`, `--template`, `--output` för `log`, `diff` och
+  `show`, `git archive -o` och `--output` till `.git/hooks` (också via `../` och `.GIT`), `--remote` och `--exec`,
+  `'GIT_DIR=…' git` och `env GIT_DIR=…`. `git commit --no-verify` klarar reglerna (det stänger av krokar).
+- **Blev vakten mindre sträng?** Nej. Ändringarna i `_sessionen` gör jämförelserna strängare där vakten
+  stoppar, och de nya kontrollerna läggs till efter de gamla.
+- **Stoppar den något som ska gå igenom?** Nej i granskarens prov: `GRANSKNING.md`, en ny testfil, en testfil i en
+  kopia i den tillfälliga mappen, `~/VERA/prov.txt`, `.gitignore`, `.github/…`, `.venv-anteckning.md`, `git status`,
+  `git commit -m`, `git archive -o <T>/x.tar`, `mkdir -p <T>/g18/ny` och `cp -R . <T>/kopia` klarar reglerna.
+  Väntat: Write i `~/.claude/**` stoppas, alltså också Claude Codes egna minnesfiler (samma förbud fanns redan
+  i de låsta inställningarna).
+- **Värt att veta:** `cp -R . <T>/kopia` och `tar -x` kopierar en mapp som innehåller `.git` eller `.claude` till
+  den tillfälliga mappen. Vakten prövar bara namnet på det som kopieras, inte vad det innehåller. Det skriver bara
+  i den tillfälliga mappen, och git körs aldrig där.
+
+### Punkt 4: `com.apple.provenance` i kontrollskriptet
+
+Prövat med det riktiga skriptet i `_kor_skriptet` från `test_beslut_granskning_17.py`, med filer i testets
+tillfälliga mapp. macOS sätter själv `com.apple.provenance` på nya filer där.
+
+| Försök | Skriptet |
+|---|---|
+| Fil med bara `com.apple.provenance` | OK |
+| Mapp med bara `com.apple.provenance` | OK |
+| + en uppgift till: `com.apple.provenance<tabb>`, `…<tabb>   `, `com.apple.provenance ` (mellanslag), `com.apple.prоvenance` (kyrilliskt о), `com.apple.provenance<radbrytning>`, `com.apple.provenance2`, `com.apple.quarantine` | AVVIKER (två indragna rader) |
+| Filen heter `com.apple.provenance`, eller `a b  c`, eller `x <tabb> com.apple.provenance` | OK (namnet på filen spelar ingen roll) |
+| Filen heter `x<radbrytning><tabb>com.apple.provenance<tabb>   11 ` | AVVIKER (tre rader) |
+| Mapp med `+` (`chmod +a "everyone deny delete"`) | AVVIKER |
+| Eget `ls`: bara en uppgift som heter `com.apple.provenance<tabb>` eller `…<tabb> ` | **OK (I2)** |
+| Eget `ls`: mellanslag sist i namnet, mellanslag i stället för tabb, kyrilliskt о, tom rad emellan, `+` med provenance, `@+` | AVVIKER |
+| Eget `ls`: extra mellanslag efter siffran, tom rad sist | OK (rätt: samma uppgift) |
+
+### Punkt 5: steg 2 och 13
+
+- **Tydligt för någon som inte programmerar?** Mest ja. Regeln står i tre punkter (inget, `@` med exakt en
+  indragen rad `com.apple.provenance` och en siffra, allt annat stoppa och fråga), med exempel på fel. Två saker
+  kan förvirra: "den fjärde raden" (I6), och att "exakt en indragen rad" gäller under varje mapp för sig, när
+  kommandot visar fyra mappar på en gång. Steg 13 hänvisar till steg 2 och säger att `@` med provenance väntas.
+- **Samma regel som skriptet?** Ja, med två små skillnader: skriptet fångar ett kyrilliskt `о` som en människa
+  inte ser, och varken skriptet eller en människa ser en tabb i namnet (I2). `+` stoppar alltid på båda ställena.
+
+### Punkt 6: regeln om prov och test
+
+Likadan i sak, och tydlig. Skillnaden: SPEC 7.1 har skälet och undantaget för de gamla testen, CLAUDE.md inte
+(I8).
+
+### Punkt 7: röda före rättelsen
+
+De nya testen i `test_beslut_granskning_17.py` från `cba4fe9`, kopierade med `cp -R` till rena kopior av
+versionen före varje rättelse (`git archive`, `tar -x`), och körda där med pytest:
+
+| Rättelse | Kopia av | Röda | Gröna | Stämmer med commit-meddelandet? |
+|---|---|---|---|---|
+| H3 | `ae33e48` | 14 | 2 | Ja |
+| H1 | `653f0a4` | 5 | 18 | Ja |
+| Steg 2 och 13 | `727d055` | 4 | 1 | Ja |
+| H6 | `c7ba2b9` | 94 | 32 | Ja |
+
+Röda före är bland annat `test_h1_en_fil_med_bara_com_apple_provenance_godtas`,
+`test_h1_paahittade_rader_fran_ls[tio-tecken-med-en-rad-till]`, `test_steg_2_sager_regeln_i_enkla_ord`,
+`test_h6_skrivverktyg_till_git_stoppas[Write-<P>/.GIT/hooks/pre-commit]`,
+`test_h6_andra_forbud_galler_oavsett_bokstaver` och `test_h6_session_i_hemmappen_skriven_med_andra_bokstaver_stoppas`.
+De gröna före är fall som redan stoppades eller som ska gå igenom.
+
+### Punkt 8: kontrollsummor (sha256)
+
+Räknade med Pythons `hashlib` i en provfil i en ren kopia av `cba4fe9` (`git archive`, `tar -x`):
+
+| Fil | sha256 | Uppdraget | INSTALLERA.md |
+|---|---|---|---|
+| `sparr/kommandosparr.py` | `273e37f00faede9d3402c70fd7fdd585a97e064e21fbdd732018af273e5c2ad3` | **Stämmer** | **Stämmer** (steg 5) |
+| `sparr/managed-settings.json` | `e1222e168de38f819ebf861319e9a9b2fc134ce52b3729ec23ceacb57682d463` | **Stämmer** | **Stämmer** (steg 5) |
+| `sparr/kontrollera-skalet.zsh` | `10388d474a555e6d337a9468c5a1f5e2fd0ca04608e36024f73011dc5186d51f` | **Stämmer** | **Stämmer** (steg 4 g) |
+| `requirements.txt` | `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a` | **Stämmer** | **Stämmer** (steg 5) |
+
+Rättas I1, gäller inte summan för `kommandosparr.py` längre.
+
+### Punkt 9: sudo-raderna
+
+`git diff -Gsudo 40390fa cba4fe9 -- sparr/INSTALLERA.md` visar ingenting: ingen rad med `sudo` är tillagd,
+borttagen eller ändrad. Före och efter finns 21 rader med `sudo`, med exakt samma text (jämförda med `grep -n`).
+Bara radnumren har flyttats (12 rader nedåt fram till steg 11, sedan 17), av texten i steg 2, 4 g och 13.
+
+### Punkt 10: bokföring utan godkännande
+
+Nej. Ändringarna gäller bara vakten, kontrollskriptet, INSTALLERA.md, SPEC 7.1, CLAUDE.md, PROGRESS.md,
+GRANSKNING.md och tester (`git diff --stat 40390fa cba4fe9`). Ingen kod i `scripts/` utanför testerna är
+ändrad, och inget i projektet kan bokföra något.
+
+### Punkt 11: testsviten
+
+`.venv/bin/python -B -m pytest -p no:cacheprovider -qq --tb=line -rfE scripts/tests` (övergången i SPEC 7.1):
+**3 894 tester, alla gröna** (54 hela rader med 72 punkter och en med 6, inga röda). Samma antal som
+PROGRESS.md.
+
+### Punkt 12: kommandon för Hugo (utanför projektet)
+
+Granskaren har inte läst något utanför projektet och scratchpad. Hugo kör de här själv i **Terminal**, ett i
+taget. De bara visar, och ändrar ingenting.
+
+```bash
+find ~/.zshrc ~/.zprofile ~/.gitconfig ~/.claude/settings.json ~/Library/LaunchAgents /usr/local -newerct '2026-10-28 08:00' -print
+```
+
+- `find` letar upp filer och mappar. `-newerct '2026-10-28 08:00'` väljer det som har **ändrats på något sätt**
+  efter kl. 08.00 i dag: innehållet, rättigheterna, en extra uppgift, eller (för en mapp) en fil som lagts till
+  eller tagits bort. `-print` skriver ut namnet. Inget raderas.
+- **Inget svar alls** (prompten kommer direkt tillbaka): inget av det har ändrats sedan kl. 08. Det är det väntade.
+- **En rad med en sökväg:** just den filen eller mappen har ändrats efter kl. 08. Det behöver inte vara farligt
+  (till exempel om du själv gjorde steg 4 i INSTALLERA.md, då ändras `~/.zshrc`, eller om macOS satte en
+  uppgift på filen). Kör nästa kommando för den raden, och **stoppa och fråga** om du inte vet varför den ändrats.
+- `No such file or directory`: filen finns inte. Det är bra (till exempel om du inte har någon `~/.zprofile`).
+- `Permission denied`: `find` fick inte titta i en mapp i `/usr/local`. Skriv upp raden och fråga.
+
+```bash
+ls -lTde@ ~/.zshrc ~/.zprofile ~/.gitconfig ~/.claude/settings.json ~/Library/LaunchAgents /usr/local
+```
+
+- Visar en rad per fil och mapp med datum och **exakt tid** för senaste ändring av innehållet (`-T`), och
+  indragna rader för extra uppgifter. Tiden ska vara före 2026-10-28 08:00, om du inte själv har ändrat filen.
+
+```bash
+ls -lTa ~/Library/LaunchAgents
+```
+
+- Visar varje fil i mappen för program som startar av sig själva när du loggar in, med tid. Finns det en fil
+  med en tid efter 2026-10-28 08:00 som du inte känner igen: **stoppa och fråga**, och öppna den inte.
+
+Har du gjort steg 4 a–c (de två raderna i `~/.zshrc`) efter kl. 08, jämför också med säkerhetskopian. Den här
+visar bara skillnaden, och ska visa exakt de två raderna från steg 4 b och c (med `>` först):
+
+```bash
+diff ~/.zshrc.fore-vera ~/.zshrc
+```
+
+### Kommandon i den här granskningen
+
+Från listan, ett i taget: `git status`, `git log` (också `--stat`, `--format`, `-g refs/stash`), `git show` (också
+`--stat`), `git diff` (också `--stat` och `-Gsudo`), `grep -n`, `grep -c`, `grep -A`, `wc -l`, `tail -n`, `cat`, `ls -lde@`
+(på tre filer i projektet och mappar i scratchpad), `mkdir -p`, `git archive --format=tar -o` och `tar -x -f … -C`
+till scratchpad-mappen, `cp -R` av en testfil från kopian till fyra äldre kopior, och `.venv/bin/python -B -m pytest -p
+no:cacheprovider` mot `scripts/tests` och mot filer i kopiorna (med `-q`, `-qq`, `--tb`, `-r` och `-k`). Egen provfil
+skriven med Write och Edit i kopian (`test_granskare_18.py`). Den skrev utfallsfiler i `scratchpad/g18/utfall/`, och
+gjorde allt annat i pytests tillfälliga mappar: filer, mappar, en hård och fyra mjuka länkar inom samma mapp,
+uppgifter med `/usr/bin/xattr`, en extra rättighet med `/bin/chmod +a`, och en fil skriven via `/.vol/…` som
+hamnade i en mapp där.
+
+**Avsteg:**
+- De tre första Bash-kommandona började med `cd /Users/hugolindholmer/VERA/agent &&`: (1) `git status && git
+  log --oneline -15`, (2) `ls && grep -n … SPEC.md | head -60`, (3) `sed -n 155,235p SPEC.md`. `cd`, `&&`, `|` och
+  `sed` står inte på listan. Allt bara läste i projektet. Efter det kördes inget av dem.
+- Kontrollskriptet i provet kör `/bin/ls` på `/usr/local` och liknande (bara ägare och rättigheter), som
+  projektets egna H1-test gör. Inget innehåll i någon systemfil lästes.
+- Inga `sudo`-kommandon, inget i `/etc` eller `/Library` rört, inga filer i hemmappen lästa eller ändrade, inget
+  skrivet i en mapp som heter `.git` utom via `git commit`, inget pushat.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **I1:** ska vakten stoppa sökvägar som börjar med `/.` direkt under roten (`/.vol`, `/.nofollow` och
+   liknande)? Granskaren föreslår ja. Det ger en ny version av vakten, och en ny oberoende granskning.
+2. **I3:** räcker det att stash-kommandona skrivs in i efterhand, eller ska något mer göras?
+3. **I2, I4–I8** (låga): rättas i samma version som I1, eller läggs under Öppet?
+
+### Hugos beslut 2026-10-28 (efter H6)
+
+Skrivna av Hugo i uppdraget till granskning 18, i chatten 2026-10-28.
+
+- **De två stash-posterna ligger kvar tills efter installationen.**
+- **H6 prövas på riktigt i spärrtestet efter installationen, inte i INSTALLERA.md.**
