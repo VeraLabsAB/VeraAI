@@ -472,12 +472,48 @@ builtin print -rl -- ${(ko)functions:#(_*|nvm*|shell_session*|update_terminal_cw
 - **Väntat: en enda rad, `SLUT`.**
 - **Står något annat än `SLUT`, före `SLUT` eller i stället för det: stoppa och fråga.** Installera
   inte. Det gäller också om `SLUT` saknas: då har något dolt utskriften, till exempel en funktion som
-  heter `builtin` eller `print`.
+  heter `builtin`.
 - Särskilt farligt är ett namn som är ett kommando på listan i SPEC 7.1: `git`, `ls`, `cat`, `head`,
   `tail`, `grep`, `diff`, `find`, `wc`, `sort`, `mkdir`, `cp` och `tar`, eller ett namn med ett snedstreck
   (`/`) i sig, till exempel `/usr/bin/git`, eller ett namn som börjar med `'/Library`: zsh kan ha alias och
   funktioner med en hel sökväg som namn, och då gäller de också när agenten skriver hela sökvägen. Men
   stoppa och fråga för **varje** namn som visas, inte bara för dem.
+
+**Kroklistor och särskilda funktioner** (Hugos svar 2026-10-28 efter granskning 14, punkt 1). zsh har
+**kroklistor**: listor med namn på funktioner som zsh kör av sig själv, till exempel före varje kommando
+(`preexec_functions`) eller när skalet avslutas (`zshexit_functions`). De ska vara tomma. Funktionerna
+`preexec`, `precmd`, `chpwd`, `periodic`, `zshexit`, `command_not_found_handler` och alla funktioner som
+börjar med `TRAP` körs också av sig själva, och de ska inte finnas. Kör, i samma Terminal-fönster:
+
+```bash
+builtin print -rl -- "preexec_functions=(${preexec_functions[*]})" "precmd_functions=(${precmd_functions[*]})" "chpwd_functions=(${chpwd_functions[*]})" "periodic_functions=(${periodic_functions[*]})" "zshaddhistory_functions=(${zshaddhistory_functions[*]})" "zshexit_functions=(${zshexit_functions[*]})" ${(Mko)functions:#(TRAP*|preexec|precmd|chpwd|periodic|zshexit|command_not_found_handler)} SLUT
+```
+
+- Kommandot är en enda lång rad, kopiera hela. Det visar de sex kroklistorna, en per rad, med innehållet
+  mellan parenteserna. Sedan visar det namnet på varje särskild funktion som finns, och sist ordet `SLUT`.
+  Det bara visar, och ändrar ingenting.
+- **Väntat: exakt de här sju raderna**, i den här ordningen, med **ingenting** mellan parenteserna:
+
+  ```
+  preexec_functions=()
+  precmd_functions=()
+  chpwd_functions=()
+  periodic_functions=()
+  zshaddhistory_functions=()
+  zshexit_functions=()
+  SLUT
+  ```
+
+- **Stoppa och fråga**, och installera inte, om:
+  - det står något mellan parenteserna på någon rad, till exempel `precmd_functions=(update_terminal_cwd)`,
+  - det står en rad till före `SLUT`, till exempel `TRAPDEBUG` eller `preexec` (en särskild funktion
+    finns),
+  - en rad saknas, eller `SLUT` saknas (då kan något ha dolt utskriften), eller
+  - Terminal skriver ett fel i stället.
+- **Inte bekräftat:** om Terminal själv lägger in sina egna funktioner (`update_terminal_cwd` och namn som
+  börjar med `shell_session`) i en kroklista. Apples fil för det (`/etc/zshrc_Apple_Terminal`) är inte
+  läst i den här versionen. Står ett sådant namn mellan parenteserna: stoppa och fråga ändå. Då behövs
+  ett beslut om det namnet.
 
 **h. Kontrollera vilka filer zsh läser in** (granskning 14, R2, Hugos beslut 2026-10-28). De låsta
 inställningarna förbjuder agenten att skriva i de filer som zsh läser in på Hugos dator (`~/.nvm` med mera).
@@ -848,9 +884,16 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
    builtin print -rl -- ${(ko)functions:#(_*|nvm*|shell_session*|update_terminal_cwd|compinit|compdef|compdump|compaudit|compinstall|bashcompinit|compgen|complete|getent)} SLUT
    ```
 
+   ```bash
+   builtin print -rl -- "preexec_functions=(${preexec_functions[*]})" "precmd_functions=(${precmd_functions[*]})" "chpwd_functions=(${chpwd_functions[*]})" "periodic_functions=(${periodic_functions[*]})" "zshaddhistory_functions=(${zshaddhistory_functions[*]})" "zshexit_functions=(${zshexit_functions[*]})" ${(Mko)functions:#(TRAP*|preexec|precmd|chpwd|periodic|zshexit|command_not_found_handler)} SLUT
+   ```
+
    Samma vända kontroll som i installationens steg 4 g (granskning 14, R3, Hugos beslut 2026-10-28):
    `alias` ska visa exakt två rader, `run-help=man` och `which-command=whence`, `alias -s` ska inte visa
-   något, och det sista kommandot ska visa en enda rad, `SLUT`. **Står något annat där, eller saknas något av det: stoppa och fråga**,
+   något, och det tredje kommandot ska visa en enda rad, `SLUT`. Det fjärde kommandot visar kroklistorna
+   och de särskilda funktionerna (Hugos svar 2026-10-28 efter granskning 14, punkt 1): väntat är exakt de
+   sju raderna i steg 4 g, från `preexec_functions=()` till `SLUT`, med ingenting mellan parenteserna och
+   ingen rad till före `SLUT`. **Står något annat där, eller saknas något av det: stoppa och fråga**,
    och kör inte uppgift 4. Varje namn som visas stoppar, inte bara de som är farligast: ett kommando på
    listan (`git`, `ls`, `cat`, `head`, `tail`, `grep`, `diff`, `find`, `wc`, `sort`, `mkdir`, `cp` och
    `tar`), ett namn med ett snedstreck (`/`) i sig, eller ett särskilt namn som `TRAPDEBUG`.

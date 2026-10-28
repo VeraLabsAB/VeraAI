@@ -22,6 +22,9 @@ from test_kommandosparr import (
     FPATH_KOMMANDON,
     FUNKTIONER_KOMMANDO,
     INSTALLERA,
+    KROK_KOMMANDO,
+    KROK_VANTAT,
+    KROKLISTOR,
     ZSH_FILER_KOMMANDO,
     _en_rad,
     _forsta_sudo,
@@ -188,7 +191,7 @@ def test_r3_installera_har_den_vanda_kontrollen_fore_och_efter():
     _, rader = _installationskommandon()
     assert rader.count(FUNKTIONER_KOMMANDO) == 2
     assert "typeset -f +" not in rader
-    assert ALIAS_KOMMANDON == ("alias", "alias -s", FUNKTIONER_KOMMANDO)
+    assert ALIAS_KOMMANDON == ("alias", "alias -s", FUNKTIONER_KOMMANDO, KROK_KOMMANDO)
     fore = _en_rad(_steg_4().split("**g. Kontrollera alias och funktioner**", 1)[1].split("**h. ", 1)[0])
     efter = _en_rad(_kontrollen().split("**Alias och funktioner, igen efter installationen**", 1)[1].split("\n2. ", 1)[0])
     for steget in (fore, efter):
@@ -233,6 +236,8 @@ def test_r3_utan_nvm_visas_ocksa_bara_slut(tmp_path):
         "/usr/bin/git",
         "status",
         "nmv",
+        "print",
+        "alias",
     ],
 )
 @inget_zsh
@@ -241,11 +246,11 @@ def test_r3_en_funktion_som_inte_ar_vantad_visas_fore_slut(tmp_path, namn):
     assert ut.stdout.splitlines() == [namn, "SLUT"], ut.stdout
 
 
-@pytest.mark.parametrize("namn", ["builtin", "print"])
 @inget_zsh
-def test_r3_en_funktion_som_doljer_utskriften_syns_pa_att_slut_saknas(tmp_path, namn):
-    ut = _zsh(tmp_path, NVM_COMPINIT + VANTADE + f"{namn}() {{ }}\n" + FUNKTIONER_KOMMANDO)
-    assert ut.stdout != "SLUT\n", ut.stdout
+def test_r3_en_funktion_som_heter_builtin_doljer_utskriften_och_syns_pa_att_slut_saknas(tmp_path):
+    # Bara en funktion som heter builtin kan dölja utskriften. En som heter print syns (listan ovan).
+    ut = _zsh(tmp_path, NVM_COMPINIT + VANTADE + "builtin() { }\n" + FUNKTIONER_KOMMANDO)
+    assert ut.stdout == "", ut.stdout
 
 
 @inget_zsh
@@ -281,6 +286,74 @@ def test_r3_alias_for_filandelser_syns_bara_i_alias_s(tmp_path):
 def test_r3_en_funktion_som_heter_alias_syns_pa_att_raderna_saknas(tmp_path):
     rader = _zsh(tmp_path, "alias() { }\nalias").stdout.splitlines()
     assert set(rader) != VANTADE_ALIAS
+
+
+# ---------------------------------------------------------------------------------------------
+# Hugos svar 2026-10-28 efter granskning 14, punkt 1: kroklistorna är tomma, och de särskilda funktionerna
+# finns inte.
+
+KROK_BESLUT = "Hugos svar 2026-10-28 efter granskning 14, punkt 1"
+
+
+def test_svar_1_kroklistorna_kontrolleras_fore_och_efter_installationen():
+    _, rader = _installationskommandon()
+    platser = [i for i, r in enumerate(rader) if r == KROK_KOMMANDO]
+    assert len(platser) == 2
+    assert platser[0] < _forsta_sudo(rader) < platser[1]
+    # Kommandot nämner varje kroklista och varje särskild funktion som beslutet räknar upp.
+    for namn in KROKLISTOR + ("TRAP*", "preexec", "precmd", "chpwd", "periodic", "zshexit", "command_not_found_handler"):
+        assert namn in KROK_KOMMANDO, namn
+    fore = _steg_4().split("**g. Kontrollera alias och funktioner**", 1)[1].split("**h. ", 1)[0]
+    assert "\n".join(f"  {rad}" for rad in KROK_VANTAT.splitlines()) in fore, "de sju väntade raderna"
+    fore = _en_rad(fore)
+    assert KROK_BESLUT in fore and "**Stoppa och fråga**" in fore
+    assert "det står något mellan parenteserna" in fore and "`SLUT` saknas" in fore
+    assert "**Inte bekräftat:**" in fore and "`update_terminal_cwd`" in fore
+    efter = _en_rad(_kontrollen().split("**Alias och funktioner, igen efter installationen**", 1)[1].split("\n2. ", 1)[0])
+    assert KROK_BESLUT in efter and "sju raderna i steg 4 g" in efter
+
+
+@inget_zsh
+def test_svar_1_med_tomma_kroklistor_och_utan_sarskilda_funktioner_visas_de_sju_raderna(tmp_path):
+    for start in ("", NVM_COMPINIT + VANTADE):
+        assert _zsh(tmp_path, start + KROK_KOMMANDO).stdout == KROK_VANTAT
+
+
+@pytest.mark.parametrize("lista", KROKLISTOR)
+@inget_zsh
+def test_svar_1_en_kroklista_som_inte_ar_tom_syns(tmp_path, lista):
+    ut = _zsh(tmp_path, f"{lista}+=(nagot)\n" + KROK_KOMMANDO).stdout
+    assert f"{lista}=(nagot)\n" in ut and ut != KROK_VANTAT, ut
+
+
+@inget_zsh
+def test_svar_1_add_zsh_hook_syns_i_kroklistan(tmp_path):
+    # Program lägger oftast in sig med add-zsh-hook, som skriver i kroklistan.
+    ut = _zsh(tmp_path, "autoload -Uz add-zsh-hook\nadd-zsh-hook preexec nagot\n" + KROK_KOMMANDO).stdout
+    assert "preexec_functions=(nagot)\n" in ut, ut
+
+
+@pytest.mark.parametrize(
+    "namn",
+    ["preexec", "precmd", "chpwd", "periodic", "zshexit", "command_not_found_handler", "TRAPDEBUG", "TRAPEXIT", "TRAPZERR", "TRAPINT"],
+)
+@inget_zsh
+def test_svar_1_en_sarskild_funktion_syns_fore_slut(tmp_path, namn):
+    ut = _zsh(tmp_path, NVM_COMPINIT + VANTADE + f"{namn}() {{ }}\n" + KROK_KOMMANDO).stdout
+    assert ut.splitlines()[-2:] == [namn, "SLUT"], ut
+
+
+@inget_zsh
+def test_svar_1_en_funktion_som_heter_builtin_syns_pa_att_raderna_saknas(tmp_path):
+    assert _zsh(tmp_path, "builtin() { }\n" + KROK_KOMMANDO).stdout == ""
+
+
+@inget_zsh
+def test_svar_1_en_funktion_som_heter_print_doljer_inget(tmp_path):
+    # builtin går förbi funktioner, så en funktion som heter print ändrar inte utskriften. Den syns i
+    # stället i kontrollen av funktioner (R3), eftersom den inte står bland de väntade.
+    assert _zsh(tmp_path, "print() { }\n" + KROK_KOMMANDO).stdout == KROK_VANTAT
+    assert _zsh(tmp_path, "print() { }\n" + FUNKTIONER_KOMMANDO).stdout.splitlines() == ["print", "SLUT"]
 
 
 # ---------------------------------------------------------------------------------------------

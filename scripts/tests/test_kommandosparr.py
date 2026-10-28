@@ -1613,8 +1613,25 @@ VANTADE_FUNKTIONER = (
     "|bashcompinit|compgen|complete|getent"
 )
 FUNKTIONER_KOMMANDO = f"builtin print -rl -- ${{(ko)functions:#({VANTADE_FUNKTIONER})}} SLUT"
+# Hugos svar 2026-10-28 efter granskning 14, punkt 1: zsh:s kroklistor ska vara tomma, och de särskilda
+# funktionerna ska inte finnas. Väntat: KROK_VANTAT.
+KROKLISTOR = (
+    "preexec_functions",
+    "precmd_functions",
+    "chpwd_functions",
+    "periodic_functions",
+    "zshaddhistory_functions",
+    "zshexit_functions",
+)
+SARSKILDA_FUNKTIONER = "TRAP*|preexec|precmd|chpwd|periodic|zshexit|command_not_found_handler"
+KROK_KOMMANDO = (
+    "builtin print -rl -- "
+    + " ".join(f'"{lista}=(${{{lista}[*]}})"' for lista in KROKLISTOR)
+    + f" ${{(Mko)functions:#({SARSKILDA_FUNKTIONER})}} SLUT"
+)
+KROK_VANTAT = "".join(f"{lista}=()\n" for lista in KROKLISTOR) + "SLUT\n"
 # alias visar inte alias för filändelser, så de visas med alias -s (väntat: ingenting).
-ALIAS_KOMMANDON = ("alias", "alias -s", FUNKTIONER_KOMMANDO)
+ALIAS_KOMMANDON = ("alias", "alias -s", FUNKTIONER_KOMMANDO, KROK_KOMMANDO)
 # Hugos beslut 2026-10-28, granskning 14, R2: vilka filer zsh läser in. R1: zsh:s mappar för funktioner.
 ZSH_FILER_KOMMANDO = "grep -n -E 'source|\\. |eval|compinit|autoload|fpath|ZDOTDIR' ~/.zshenv ~/.zprofile ~/.zshrc ~/.zlogin"
 FPATH_KOMMANDON = (

@@ -6,8 +6,8 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **3 434 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
-Hugos svar 2026-10-28 efter granskning 14).
+Testsviten: **3 456 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
+Hugos svar 2026-10-28 efter granskning 14, fortsättning).
 
 ## Läge 2026-10-28, efter Hugos beslut om granskning 14
 
@@ -69,9 +69,17 @@ fanns redan och står kvar.
   kommandon i INSTALLERA.md ändrade i `test_kommandosparr.py`, markeringen `xfail` borttagen i
   `test_granskning_14.py`. Hela testsviten: **3 434 passed**, 0 misslyckade.
 
-**Beslut som behövs:** (1) bash-vägen, om Hugo vill pröva den med ett eget prov i appen, (2) listan över
-väntade funktioner i R3, som är större än granskarens förslag, (3) steg 4 h också på Hugos dator, (4) en ny
-oberoende granskning av den nya versionen, med kontrollsummor, före installationen.
+**Hugos svar 2026-10-28 efter granskning 14, fortsättning:** (1) ja till listan över väntade funktioner,
+med tillägget att steg 4 g också visar att zsh:s kroklistor är tomma och att de särskilda funktionerna
+(`preexec`, `precmd`, `chpwd`, `periodic`, `zshexit`, `command_not_found_handler` och `TRAP…`) inte finns.
+Byggt, med 21 tester, före och efter installationen. (2) Steg 4 h gäller båda datorerna. (3) Bash-vägen
+prövas inte nu (Öppet, punkt 7). Testsviten: se överst.
+
+**Inte bekräftat:** om Terminal själv lägger in sina funktioner i en kroklista. Gör det det, stoppar Hugo i
+steg 4 g, och då behövs ett beslut om just de namnen.
+
+**Beslut som behövs:** en ny oberoende granskning av den nya versionen, med kontrollsummor, före
+installationen.
 
 ## Läge 2026-10-28, efter Hugos beslut om granskning 13
 
@@ -302,6 +310,14 @@ fattade och byggda, se avsnittet ovan.)
    läser ett ord på som skiljer sig från vaktens uppdelning. **Öppen, inte gjord.** Dit hör också skalets
    inställningar (`setopt`), som Claude Code tar med från `~/.zshrc` till agentens kommandon och som
    kontrollen i INSTALLERA.md steg 4 g inte prövar (granskning 14, bygget efter Hugos svar 2026-10-28).
+7. **Bash-vägen: Bash-verktyget i `/bin/bash` i stället för zsh** (`CLAUDE_CODE_SHELL=/bin/bash` i `env` i
+   den låsta inställningsfilen). Hugos svar 2026-10-28 efter granskning 14, punkt 3: **prövas inte nu.**
+   Den prövas **efter installationen, i samma veva som sandlådan** (punkt 4), med ett prov i
+   skrivbordsappen. Skälet: dokumentationen bekräftar att variabeln gäller i Terminal och att User-,
+   Project- och Local-inställningar inte kan skriva över den, men inte att den gäller i skrivbordsappen,
+   eftersom appens startmiljö går före `env` i alla inställningsfiler (svaren med länkar: "Läge 2026-10-28,
+   efter Hugos beslut om granskning 14", steg 1). Vilka filer bash läser in (`~/.bash_profile`, `BASH_ENV`)
+   är inte heller bekräftat. **Öppen, inte gjord.**
 
 ## Nästa steg i byggordningen
 

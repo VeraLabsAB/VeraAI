@@ -4758,8 +4758,9 @@ Eftersom (a) inte är bekräftat för skrivbordsappen, där agenten körs, byggd
     `getent`), prövat. Inget kommando på listan i SPEC 7.1 och inget av zsh:s särskilda namn (`TRAP…`,
     `preexec`, `precmd`, `chpwd`, `periodic`, `zshexit`, `zshaddhistory`, `zsh_directory_name`,
     `command_not_found_handler`) börjar med `_` eller står bland de nio.
-  - `SLUT` sist: en funktion som heter `builtin` eller `print` döljer all utskrift (prövat). Saknas `SLUT`
-    stoppar Hugo. Med `setopt SH_GLOB` läser zsh inte mönstret, och då visas alla namn: det säkra hållet
+  - `SLUT` sist: en funktion som heter `builtin` döljer all utskrift (prövat). Saknas `SLUT` stoppar Hugo.
+    (En funktion som heter `print` döljer inget, eftersom `builtin` går förbi funktioner, och den syns
+    själv i listan. Rättat efter Hugos svar 2026-10-28 efter granskning 14, se nedan.) Med `setopt SH_GLOB` läser zsh inte mönstret, och då visas alla namn: det säkra hållet
     (prövat).
 - **R4.** SPEC 7.1, PATH-regeln: "och mappen där varje länk i kedjan däremellan ligger … Länkfilen själv
   prövas inte: en länk kan inte ändras, bara bytas ut, och det kräver skrivrätt i mappen där den ligger".
@@ -4776,7 +4777,7 @@ Eftersom (a) inte är bekräftat för skrivbordsappen, där agenten körs, byggd
 **Tester:** ny fil `scripts/tests/test_beslut_granskning_14.py` (56 tester). De kör kommandona ur
 INSTALLERA.md i `/bin/zsh -f` med en tillfällig hemmapp och bara `/usr/bin:/bin` i `PATH`: R2 (nvm:s rader
 visas, åtta andra sorters rader visas, inget utan nvm), R3 (bara `SLUT` med de väntade namnen, 16 farliga
-funktionsnamn visas, `builtin` och `print` syns på att `SLUT` saknas, `SH_GLOB`, globala alias och alias för
+funktionsnamn visas, `builtin` syns på att `SLUT` saknas, `SH_GLOB`, globala alias och alias för
 filändelser), R1 (förbuden, och att `fpath` på den här datorn är den som steg 4 i väntar sig), R4 och R5.
 Ändrat i `test_kommandosparr.py`: `ALIAS_KOMMANDON` är `alias`, `alias -s` och filterkommandot i stället för
 `alias` och `typeset -f +`, och listan över kommandon som får stå i INSTALLERA.md har de nya kommandona i
@@ -4823,3 +4824,53 @@ Allt annat stod på listan och kördes ett i taget: `.venv/bin/python -B -m pyte
    nio från `compinit`). Godkänns den?
 3. **Steg 4 h på Hugos dator också** (R2 gällde Casper). Godkänns det?
 4. Därefter: en ny oberoende granskning av den nya versionen, med kontrollsummor, före installationen.
+
+#### Hugos svar 2026-10-28 efter granskning 14, fortsättning
+
+Skrivna av Hugo i chatten 2026-10-28, som svar på beslut 1–3 ovan:
+
+1. **Ja till listan över väntade funktioner** (Hugos svar 2026-10-28 efter granskning 14, punkt 1), med ett
+   tillägg: kontrollen i steg 4 g ska också visa att zsh:s kroklistor är tomma (`preexec_functions`,
+   `precmd_functions`, `chpwd_functions`, `periodic_functions`, `zshaddhistory_functions`,
+   `zshexit_functions`), och att funktionerna `preexec`, `precmd`, `chpwd`, `periodic`, `zshexit`,
+   `command_not_found_handler` och alla `TRAP`-funktioner inte finns. Vad Hugo ska se och när han ska
+   stoppa, och test.
+2. **Ja, steg 4 h gäller båda datorerna** (punkt 2).
+3. **Bash-vägen prövas inte nu** (punkt 3). Den står i PROGRESS.md under "Öppet": prövas efter
+   installationen, i samma veva som sandlådan, med ett prov i skrivbordsappen.
+
+**Byggt 2026-10-28** (inte installerat, inte granskat):
+
+- **Punkt 1.** INSTALLERA.md steg 4 g, efter filtret för funktioner, och kontrollen efter installationen,
+  steg 1 (före och efter, som resten av P1 a): ett kommando, `builtin print -rl -- "preexec_functions=(…)" …
+  ${(Mko)functions:#(TRAP*|preexec|precmd|chpwd|periodic|zshexit|command_not_found_handler)} SLUT`. Väntat:
+  exakt sju rader, `preexec_functions=()` till `zshexit_functions=()` och sist `SLUT`. Stoppa och fråga om
+  något står mellan parenteserna, om en rad till står före `SLUT` (en särskild funktion finns), om en rad
+  eller `SLUT` saknas, eller om Terminal skriver ett fel. Att kontrollen också görs efter installationen
+  är byggsessionens val, så att steg 4 g och kontrollen efter är samma kontroll.
+- **Punkt 2.** Inget att bygga: steg 4 h säger redan "båda datorerna".
+- **Punkt 3.** PROGRESS.md, "Öppet", punkt 7.
+- **Rättelse i R3:** texten sa att en funktion som heter `print` döljer utskriften. Det stämmer inte:
+  `builtin` går förbi funktioner, så bara en funktion som heter `builtin` kan dölja den. En funktion som
+  heter `print` (eller `alias`) syns i stället i filtret, eftersom den inte står bland de väntade. Testet som
+  påstod det andra var grönt av fel skäl. Det är rättat, och testerna prövar nu båda fallen.
+
+**Inte bekräftat:** vad Terminal själv lägger in. Apples fil `/etc/zshrc_Apple_Terminal` finns inte i Apples
+öppna källkod för zsh (github.com/apple-oss-distributions/zsh, läst 2026-10-28), och byggsessionen läser inte
+Hugos fil. Lägger Terminal in `update_terminal_cwd` eller en funktion som börjar med `shell_session` i en
+kroklista, eller gör det med funktionen `add-zsh-hook` (som inte står bland de väntade funktionerna i R3),
+stoppar Hugo i steg 4 g. Det är den säkra riktningen, men då behövs ett beslut om just de namnen. INSTALLERA.md
+säger det.
+
+**Tester:** 21 nya i `scripts/tests/test_beslut_granskning_14.py` för punkt 1, och två till i R3
+(funktioner som heter `print` och `alias` syns i filtret). Hela testsviten: **3 456 passed**, 0
+misslyckade. Punkt 1: kommandot står före och efter
+installationen och nämner varje kroklista och särskild funktion, texten har de sju väntade raderna och när
+Hugo ska stoppa, de sju raderna visas med och utan nvm:s `compinit`, varje kroklista som inte är tom syns (6),
+`add-zsh-hook` syns, varje särskild funktion syns före `SLUT` (10), en funktion som heter `builtin` syns på att
+raderna saknas, och en funktion som heter `print` döljer inget. Två tester i R3 är rättade (se ovan), och
+`ALIAS_KOMMANDON` i `test_kommandosparr.py` har det nya kommandot.
+
+**Kommandon i byggsessionen:** bara från listan, ett i taget (`.venv/bin/python -B -m pytest
+-p no:cacheprovider`, `grep`, `git status`, `git diff`, `git add` och `git commit`), och WebFetch för Apples
+källkod. Inga avsteg.
