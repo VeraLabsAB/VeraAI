@@ -13,7 +13,11 @@ Hugos beslut 2026-10-28 om granskning 13 (`GRANSKNING.md`, "Granskning 11 – pl
 och funktioner före och efter installationen (P1 a, steg 4 g och kontrollen efter installationen, steg 1),
 förbud för filerna som zsh läser vid start och de filer de läser in (P1 b), Claude Code för Terminal med
 hela sökvägen `~/.local/bin/claude` och en varning för installerarens förslag (P3 b, steg 1), och förbud för
-Claude Code för Terminal, skrivbordsappens Claude Code och appen (P4 a).
+Claude Code för Terminal, skrivbordsappens Claude Code och appen (P4 a). Ändrad igen samma dag efter Hugos
+beslut 2026-10-28 om granskning 14 (`GRANSKNING.md`, "Hugos svar 2026-10-28 efter granskning 14"): förbud
+för `~/.zcompdump` och en kontroll av zsh:s mappar för funktioner (R1, steg 4 i), en kontroll av vilka filer
+zsh läser in (R2, steg 4 h), en vänd kontroll av alias och funktioner där allt som inte är väntat stoppar
+(R3, steg 4 g), och vad du ska se när ett steg går bra, och steg 4 d på en dator utan nvm (R5).
 
 Den här beskrivningen är till **Hugo** (och sedan **Casper**, på sin dator). Agenten kör inga av
 kommandona. Du kör dem själv i programmet **Terminal**, ett i taget, och skriver ditt
@@ -29,7 +33,8 @@ Agenten kan därför inte ändra filerna.
 | Fil i projektet | Kopieras till | Vad den gör |
 |---|---|---|
 | `sparr/kommandosparr.py` | `/Library/Application Support/ClaudeCode/vera/kommandosparr.py` | **Vakten.** Ett litet program som Claude Code kör före varje verktyg. Det stoppar allt som inte står på listan i SPEC 7.1. Det stoppar också ett kommando vars program ligger i en mapp som du kan ändra utan lösenord, och kommandon som ändrar `PATH` (PATH-regeln, se nedan). |
-| `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.295 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Inte heller i filerna som zsh läser när det startar och de filer som de läser in: nvm-mappen `~/.nvm`, `~/.zkbd`, `~/.zsh_sessions`, `~/.zlogout` och systemets zsh-filer i `/etc` (granskning 13, P1 b). Inte heller i Claude Code för Terminal (`~/.local/bin/claude` och `~/.local/share/claude`), i skrivbordsappens egen Claude Code (`~/Library/Application Support/Claude/claude-code`) eller i appen (`/Applications/Claude.app`) (granskning 13, P4 a). Inte heller någonstans i hela `~/Library/Application Support/Claude`, där också skrivbordsappens egna inställningar ligger (Hugos svar 2026-10-28 efter granskning 13, punkt 3). Läget "auto" går inte att använda, och skills kan inte köra skalkommandon. |
+| `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.295 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Inte heller i filerna som zsh läser när det startar och de filer som de läser in: nvm-mappen `~/.nvm`, `~/.zkbd`, `~/.zsh_sessions`, `~/.zlogout` och systemets zsh-filer i `/etc` (granskning 13, P1 b), och `~/.zcompdump`,
+som zsh:s `compinit` läser in vid start (granskning 14, R1). Inte heller i Claude Code för Terminal (`~/.local/bin/claude` och `~/.local/share/claude`), i skrivbordsappens egen Claude Code (`~/Library/Application Support/Claude/claude-code`) eller i appen (`/Applications/Claude.app`) (granskning 13, P4 a). Inte heller någonstans i hela `~/Library/Application Support/Claude`, där också skrivbordsappens egna inställningar ligger (Hugos svar 2026-10-28 efter granskning 13, punkt 3). Läget "auto" går inte att använda, och skills kan inte köra skalkommandon. |
 | `requirements.txt` (listan över paket) | `/Library/Application Support/ClaudeCode/vera/venv` (skapas, kopieras inte) | **Projektets Python med pytest**, som testsviten körs med. Den låg förut i mappen `.venv` i projektet, som du äger, och då stoppade PATH-regeln testsviten. Nu ligger den där bara systemet kan ändra den (Hugos beslut 2026-10-28 om vakten, beslut 1). |
 
 Inställningarna börjar gälla så fort filen finns, i terminalen och i skrivbordsappen. Därför kopieras
@@ -66,6 +71,10 @@ vakten, beslut 1). Den gamla mappen `.venv` i projektet används inte längre n�
    `/Library/Application Support/ClaudeCode`. Om Finder säger att mappen inte finns: bra, gå vidare.
    Om mappen finns och har filer i sig: **stoppa och fråga**, så att inget som redan ligger där skrivs
    över.
+3. **Visar ett kommando något annat än det som står vid steget: stoppa och fråga** (granskning 14, R5,
+   Hugos beslut 2026-10-28). Det gäller varje steg, också när det inte står uttryckligen. Kör inte nästa
+   kommando förrän du har fått svar. Många kommandon visar **ingenting alls** när det går bra: du får bara
+   en ny rad att skriva på. Det står vid varje sådant steg.
 
 ## Steg 1: kontrollera Claude Codes version (före allt annat)
 
@@ -298,7 +307,7 @@ rmdir ~/vera-forprov
 
 **Stoppades `ls` inte i e: avbryt installationen.** Gå vidare till steg 4 bara om `ls` stoppades.
 
-## Steg 4: flytta nvm-mappen och Cryptexes-mappen sist i PATH, och kontrollera alias och funktioner (före installationen)
+## Steg 4: flytta nvm-mappen och Cryptexes-mappen sist i PATH, och kontrollera alias, funktioner och zsh:s filer (före installationen)
 
 Vakten kräver att varje mapp i `PATH` före programmet ägs av systemet och inte går att ändra för någon
 annan (Hugos beslut 2026-10-28 om vakten, beslut 2). På din dator står två mappar före `/usr/bin` och
@@ -332,8 +341,10 @@ cp -i ~/.zshrc ~/.zshrc.fore-vera
 
 - `cp` kopierar filen `~/.zshrc` till `~/.zshrc.fore-vera`. `-i` gör att datorn frågar innan den skriver
   över en fil som redan finns. Om den frågar: svara `n` (nej), och stoppa och fråga.
-- Säger kommandot `No such file or directory` finns ingen `~/.zshrc`, och då läggs nvm in från en annan
-  fil. Stoppa och fråga.
+- Går det bra visas ingenting.
+- Säger kommandot `No such file or directory` finns ingen `~/.zshrc`. Det är vanligt på en ny dator och
+  inget fel, men då läggs nvm (om det finns) in från en annan fil, och raderna nedan kan hamna i fel fil.
+  Stoppa och fråga, så att rätt fil ändras.
 
 **b. Lägg till raden för nvm-mappen sist i filen** (kommandot är en enda rad, kopiera hela):
 
@@ -370,6 +381,9 @@ tail -n 3 ~/.zshrc
   exakt de två raderna från b och c, i den ordningen:
   - `[ -n "$NVM_BIN" ] && path=( ${path:#$NVM_BIN} $NVM_BIN )`
   - `path=( ${path:#/System/Cryptexes/App/usr/bin} /System/Cryptexes/App/usr/bin )`
+- **På en dator utan nvm** (till exempel Caspers, om nvm inte finns där) har du bara lagt in raden från c,
+  inte den från b. Då ska bara den **sista** raden vara Cryptexes-raden ovan, och raden för nvm ska inte
+  stå bland de tre (granskning 14, R5, Hugos beslut 2026-10-28).
 - Står något annat där, eller står en rad två gånger: hämta tillbaka säkerhetskopian med
   `cp ~/.zshrc.fore-vera ~/.zshrc`, och fråga.
 
@@ -398,6 +412,7 @@ echo $PATH
     ```
 
     Har nvm bytt version sedan dess kan siffrorna efter `node/v` vara andra.
+  - På en dator utan nvm finns ingen nvm-mapp i raden, och `/System/Cryptexes/App/usr/bin` står sist.
 - Står nvm-mappen eller `/System/Cryptexes/App/usr/bin` före `/usr/bin`: stoppa och fråga. Då läggs de
   troligen in från en annan fil, till exempel `~/.zprofile` eller `~/.zlogin`, efter `~/.zshrc`.
 - `~/.local/bin` (på din dator `/Users/hugolindholmer/.local/bin`) ska **inte** stå någonstans i raden
@@ -416,24 +431,110 @@ kör. Vakten ser dem inte. Heter ett alias eller en funktion som ett kommando p�
 kör skalet aliaset eller funktionen i stället för programmet som vakten prövade. Gör det här i samma nya
 Terminal-fönster som i e, ett kommando i taget:
 
+**Kontrollen är vänd** (granskning 14, R3, Hugos beslut 2026-10-28): du letar inte efter farliga namn,
+utan kontrollerar att **bara väntade namn** finns. Allt annat stoppar, också namn som verkar ofarliga.
+Skälet: ett farligt alias eller en farlig funktion behöver inte heta som ett kommando på listan. Ett
+**globalt alias** (`alias -g`) byts ut var det än står i ett kommando, så ett alias som heter `status`
+gör om `git status` till något annat. Och funktioner med vissa särskilda namn körs av zsh av sig själv,
+till exempel `TRAPDEBUG` (före varje kommando) och andra namn som börjar med `TRAP`, `preexec`, `precmd`,
+`chpwd`, `periodic`, `zshexit`, `zshaddhistory`, `zsh_directory_name` och `command_not_found_handler`.
+
 ```bash
 alias
 ```
 
+- `alias` visar alla alias, också globala alias, ett per rad, som `namn=vad det byts ut mot`. Det bara
+  visar, och ändrar ingenting.
+- **Väntat: exakt två rader**, `run-help=man` och `which-command=whence` (i valfri ordning). zsh har dem
+  alltid.
+- **Står någon annan rad där, eller visas ingenting alls: stoppa och fråga.** Installera inte. (Visas
+  ingenting kan något ha dolt utskriften.)
+
 ```bash
-typeset -f +
+alias -s
 ```
 
-- `alias` visar alla alias, ett per rad, som `namn=vad det byts ut mot`. `typeset -f +` visar namnen på
-  alla funktioner, ett per rad. Båda bara visar, och ändrar ingenting. Det är väntat att `alias` visar
-  `run-help=man` och `which-command=whence`, och att `typeset -f +` visar många namn som börjar med
-  `nvm` eller `shell_session`, och `update_terminal_cwd`.
-- **Leta efter namnen på kommandona i listan i SPEC 7.1:** `git`, `ls`, `cat`, `head`, `tail`, `grep`,
-  `diff`, `find`, `wc`, `sort`, `mkdir`, `cp` och `tar`. Hos `alias` är namnet det som står före `=`. Hos
-  `typeset -f +` är det hela raden. Leta också efter ett namn med ett snedstreck (`/`) i sig, till exempel
-  `/usr/bin/git`, eller ett namn som börjar med `'/Library`: zsh kan ha alias och funktioner med en hel
-  sökväg som namn, och då gäller de också när agenten skriver hela sökvägen.
-- **Finns något av dem där: stoppa och fråga.** Installera inte.
+- `alias -s` visar alias för filändelser (till exempel att en fil som slutar på `.txt` öppnas med ett
+  visst program). `alias` ovan visar inte dem. Det bara visar, och ändrar ingenting.
+- **Väntat: ingenting.** Visas någon rad: stoppa och fråga. Installera inte.
+
+```bash
+builtin print -rl -- ${(ko)functions:#(_*|nvm*|shell_session*|update_terminal_cwd|compinit|compdef|compdump|compaudit|compinstall|bashcompinit|compgen|complete|getent)} SLUT
+```
+
+- Kommandot är en enda lång rad, kopiera hela. Det visar namnen på alla funktioner **utom de väntade**,
+  ett per rad, och sist ordet `SLUT`. Det bara visar, och ändrar ingenting.
+- **Väntade funktioner**, som kommandot inte visar: namn som börjar med `_` (zsh:s hjälp för att fylla i
+  kommandon med tabb, ofta flera hundra), med `nvm` (nvm) eller med `shell_session` (Terminal), och
+  `update_terminal_cwd` (Terminal). Dessutom de nio som zsh:s `compinit` och `bashcompinit` lägger in när
+  nvm läses in: `compinit`, `compdef`, `compdump`, `compaudit`, `compinstall`, `bashcompinit`, `compgen`,
+  `complete` och `getent` (prövat med zsh 5.9 på Hugos dator 2026-10-28, i ett test utan Hugos filer).
+- **Väntat: en enda rad, `SLUT`.**
+- **Står något annat än `SLUT`, före `SLUT` eller i stället för det: stoppa och fråga.** Installera
+  inte. Det gäller också om `SLUT` saknas: då har något dolt utskriften, till exempel en funktion som
+  heter `builtin` eller `print`.
+- Särskilt farligt är ett namn som är ett kommando på listan i SPEC 7.1: `git`, `ls`, `cat`, `head`,
+  `tail`, `grep`, `diff`, `find`, `wc`, `sort`, `mkdir`, `cp` och `tar`, eller ett namn med ett snedstreck
+  (`/`) i sig, till exempel `/usr/bin/git`, eller ett namn som börjar med `'/Library`: zsh kan ha alias och
+  funktioner med en hel sökväg som namn, och då gäller de också när agenten skriver hela sökvägen. Men
+  stoppa och fråga för **varje** namn som visas, inte bara för dem.
+
+**h. Kontrollera vilka filer zsh läser in** (granskning 14, R2, Hugos beslut 2026-10-28). De låsta
+inställningarna förbjuder agenten att skriva i de filer som zsh läser in på Hugos dator (`~/.nvm` med mera).
+Läser din zsh in andra filer, till exempel från oh-my-zsh, Homebrew, conda eller iTerm2, har de filerna inget
+förbud. Gör det här på **båda** datorerna, i samma Terminal-fönster:
+
+```bash
+grep -n -E 'source|\. |eval|compinit|autoload|fpath|ZDOTDIR' ~/.zshenv ~/.zprofile ~/.zshrc ~/.zlogin
+```
+
+- `grep` visar raderna i zsh:s fyra startfiler där en annan fil läses in (`source` eller en punkt), där
+  kod körs (`eval`), där zsh:s hjälp för tabb startas eller får fler mappar (`compinit`, `autoload`,
+  `fpath`), eller där zsh:s filer flyttas (`ZDOTDIR`). Varje rad börjar med filens namn och radnumret. Det
+  bara läser, och ändrar ingenting.
+- **Väntat på en dator med nvm:** två rader från `~/.zshrc`, de som läser in nvm:s två filer `nvm.sh` och
+  `bash_completion` (radnumren, och texten efter `#`, kan vara andra):
+  - `…/.zshrc:2:[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm`
+  - `…/.zshrc:3:[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion`
+- **Väntat på en dator utan nvm:** inga rader från filerna.
+- Rader som `grep: …/.zshenv: No such file or directory` är väntade: filen finns inte, och det är bra.
+- **Står någon annan rad där: stoppa och fråga.** Installera inte. Det behövs då en ny version av
+  inställningsfilen med förbud för de filer som raden läser in.
+
+**i. Kontrollera zsh:s mappar för funktioner** (granskning 14, R1, Hugos beslut 2026-10-28). nvm:s fil
+`bash_completion` startar zsh:s `compinit`. `compinit` läser in filen `~/.zcompdump` och funktioner från
+mapparna i zsh:s lista `fpath`. Den som kan skriva där kan lägga in funktioner som gäller i agentens
+kommandon. De låsta inställningarna förbjuder agenten att skriva i `~/.zcompdump`. Mapparna skyddas bara av
+att systemet äger dem, och det kontrollerar du här, i samma Terminal-fönster, ett kommando i taget:
+
+```bash
+print -rl -- $fpath
+```
+
+- Visar mapparna i `fpath`, en per rad, och ändrar ingenting.
+- **Väntat:** varje rad börjar med `/usr/share/zsh/` eller är `/usr/local/share/zsh/site-functions`. Med
+  zsh 5.9 på Hugos dator är det tre rader (prövat 2026-10-28 i ett test utan Hugos filer):
+  `/usr/local/share/zsh/site-functions`, `/usr/share/zsh/site-functions` och
+  `/usr/share/zsh/5.9/functions`. Siffrorna `5.9` kan vara andra med en annan version av zsh.
+- **Står någon annan mapp där**, till exempel en i din hemmapp, `/opt/homebrew`, `.oh-my-zsh` eller `.nvm`:
+  stoppa och fråga. Installera inte.
+
+```bash
+ls -ld $fpath
+```
+
+```bash
+ls -ld /usr/local /usr/local/share /usr/local/share/zsh /usr/local/share/zsh/site-functions
+```
+
+- Det första visar mapparna i `fpath`, det andra mapparna ovanför `/usr/local/share/zsh/site-functions`.
+  Båda bara läser, och ändrar ingenting. Läs raderna som i steg 2.
+- **Väntat på varje rad som finns:** ägaren är `root`, det står **inget `w`** på plats 6 eller 9, och inget
+  `+` eller `@` efter de tio tecknen.
+- En rad som säger `No such file or directory` är bra: mappen finns inte. Då ska mappen ovanför, som finns,
+  vara rätt enligt raden ovan. Det andra kommandot visar den.
+- **Är ägaren inte `root`, står det `w` på plats 6 eller 9, eller `+` eller `@`: stoppa och fråga.**
+  Installera inte.
 
 Ångra steget: `cp ~/.zshrc.fore-vera ~/.zshrc`, och starta om Terminal och Claude-appen. Då stoppar vakten
 alla kommandon igen.
@@ -451,6 +552,14 @@ shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-set
 
 ## Steg 6: skapa mapparna och låt systemet äga dem
 
+**Så ser det ut när det går bra, i steg 6–11** (granskning 14, R5, Hugos beslut 2026-10-28). Kommandona
+med `sudo mkdir`, `sudo chown`, `sudo chmod`, `sudo ditto` och `sudo cp -i` visar **ingenting** när de går
+bra: datorn frågar kanske efter ditt lösenord, och sedan får du bara en ny rad att skriva på. **Stoppa och
+fråga** om ett av dem skriver något, till exempel `Operation not permitted`, `Permission denied`,
+`No such file or directory`, `File exists` eller `illegal option`. Säger datorn `Sorry, try again.` efter
+lösenordet har du skrivit fel lösenord: skriv det igen. Säger den `sudo: 3 incorrect password attempts`:
+kör samma kommando igen.
+
 ```bash
 sudo mkdir "/Library/Application Support/ClaudeCode"
 ```
@@ -463,6 +572,7 @@ sudo mkdir "/Library/Application Support/ClaudeCode/vera"
   när du skriver, det är normalt.
 - `mkdir` skapar en mapp: först `ClaudeCode`, sedan `vera` inuti den, där vakten ska ligga. Säger
   kommandot `File exists` finns mappen redan: stoppa och fråga.
+- Går det bra visas ingenting. Visas något annat: stoppa och fråga.
 
 ```bash
 sudo chown root:wheel "/Library/Application Support/ClaudeCode" "/Library/Application Support/ClaudeCode/vera"
@@ -470,6 +580,7 @@ sudo chown root:wheel "/Library/Application Support/ClaudeCode" "/Library/Applic
 
 - `chown` byter ägare. `root:wheel` är systemets administratör och dess grupp. En ny mapp får annars
   gruppen från mappen ovanför (`admin`), och därför sätts gruppen uttryckligen här.
+- Går det bra visas ingenting. Visas något annat: stoppa och fråga.
 
 ```bash
 sudo chmod 755 "/Library/Application Support/ClaudeCode" "/Library/Application Support/ClaudeCode/vera"
@@ -477,6 +588,7 @@ sudo chmod 755 "/Library/Application Support/ClaudeCode" "/Library/Application S
 
 - `chmod` sätter vem som får läsa, skriva och öppna. `755` på en mapp betyder: ägaren (systemet) får
   ändra, alla andra får bara titta in. Claude Code behöver kunna titta in för att hitta filerna.
+- Går det bra visas ingenting. Visas något annat: stoppa och fråga.
 
 ## Steg 7: kopiera vakten
 
@@ -486,6 +598,8 @@ sudo ditto ~/VERA/agent/sparr/kommandosparr.py "/Library/Application Support/Cla
 
 - `ditto` kopierar en fil. `~/VERA/agent/sparr/kommandosparr.py` är vakten i projektet, och den sista
   sökvägen är dit den kopieras.
+- Går det bra visas ingenting. Visas något annat, till exempel `No such file or directory` (då ligger
+  vakten inte där kommandot letar): stoppa och fråga.
 
 ## Steg 8: låt systemet äga vakten och sätt rättigheterna
 
@@ -499,6 +613,7 @@ sudo chmod 644 "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
 
 - Systemet blir ägare av vakten. `644` på en fil betyder: ägaren (systemet) får ändra, alla andra får
   bara läsa. Claude Code behöver kunna läsa vakten för att köra den med `/usr/bin/python3`.
+- Går det bra visar båda kommandona ingenting. Visas något annat: stoppa och fråga.
 - **Varför 644 och inte 600?** `600` betyder att bara ägaren, systemet, får läsa filen. Claude Code körs
   som ditt vanliga konto, inte som systemet, och skulle då inte kunna läsa filerna. En inställningsfil som
   Claude Code inte får läsa **hoppas över utan varning**: sessionen startar som om filen inte fanns, och
@@ -520,6 +635,7 @@ sudo /usr/bin/python3 -m venv "/Library/Application Support/ClaudeCode/vera/venv
 - `/usr/bin/python3 -m venv` skapar en **venv**: en egen mapp med Python och plats för paket, som inte
   blandas med något annat på datorn. Det är samma Python som projektets gamla `.venv` och vakten använder.
   Säger kommandot `File exists` eller `already exists`: stoppa och fråga.
+- Går det bra visas ingenting (det kan ta några sekunder). Visas något annat: stoppa och fråga.
 
 ```bash
 sudo "/Library/Application Support/ClaudeCode/vera/venv/bin/python" -m pip install --only-binary ':all:' --no-cache-dir -r ~/VERA/agent/requirements.txt
@@ -546,6 +662,7 @@ sudo chmod -R go-w "/Library/Application Support/ClaudeCode/vera/venv"
 - `-R` gör att kommandot gäller mappen och allt i den. `chown -R root:wheel` gör systemet till ägare av
   allt, och `chmod -R go-w` tar bort rätten att ändra för gruppen (`g`) och alla andra (`o`). Ingenting
   annat ändras.
+- Går det bra visar båda kommandona ingenting. Visas något annat: stoppa och fråga.
 
 ## Steg 10: kopiera de låsta inställningarna (sist, nu börjar de gälla)
 
@@ -555,6 +672,7 @@ sudo cp -i ~/VERA/agent/sparr/managed-settings.json "/Library/Application Suppor
 
 - `cp` kopierar en fil. `-i` gör att datorn frågar innan den skriver över en fil som redan finns. Om
   den frågar: svara `n` (nej) och stoppa, eftersom filen då inte borde finnas (se "Innan du börjar").
+- Går det bra visas ingenting. Visas något annat: stoppa och fråga.
 
 ## Steg 11: låt systemet äga inställningarna och sätt rättigheterna
 
@@ -568,6 +686,7 @@ sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
 
 - Samma som i steg 8, för inställningsfilen: systemet äger den, alla får läsa den, bara en
   administratör får ändra den.
+- Går det bra visar båda kommandona ingenting. Visas något annat: stoppa och fråga.
 
 ## Steg 12: kontrollera att det är samma filer som ligger på plats
 
@@ -655,6 +774,8 @@ tio tecknen: installationen räknas som misslyckad. Stoppa och fråga.**
     - **Har ett program redan lagt in raden:** stoppa och fråga innan nästa session med agenten.
     - Samma sak gäller `~/.zshenv`, `~/.zprofile` och `~/.zlogin`, och en rad som lägger till ett alias
       eller en funktion. Gör efteråt kontrollen av alias och funktioner i steg 4 g igen.
+    - Samma sak gäller en rad med `eval`, `compinit`, `autoload`, `fpath` eller `ZDOTDIR`. Gör efteråt
+      kontrollerna i steg 4 h och 4 i igen (granskning 14, R1 och R2, Hugos beslut 2026-10-28).
 
 ## Caspers dator
 
@@ -670,8 +791,19 @@ Skillnader:
   ligger på Caspers dator.
 - Steg 4: kör `echo $PATH` från steg 4 e först. Raden för Cryptexes-mappen (steg 4 c) läggs in också
   på Caspers dator (Hugos svar 2026-10-28, punkt 1). Raden för nvm-mappen (steg 4 b) behövs bara om nvm
-  finns där. Står någon annan mapp än systemets före `/usr/bin`, till exempel Homebrew
-  (`/opt/homebrew/bin`): stoppa och fråga, eftersom vakten då stoppar alla kommandon.
+  finns där. Utan nvm ska bara den sista raden i steg 4 d vara Cryptexes-raden (se steg 4 d). Står någon
+  annan mapp än systemets före `/usr/bin`, till exempel Homebrew (`/opt/homebrew/bin`): stoppa och fråga,
+  eftersom vakten då stoppar alla kommandon.
+- **Steg 4 h, vilka filer Caspers zsh läser in** (granskning 14, R2, Hugos beslut 2026-10-28). Förbuden i
+  de låsta inställningarna bygger på vad zsh läser in på Hugos dator. Casper gör därför steg 4 h på sin
+  dator före installationen. Visar `grep` något annat än nvm:s två rader (eller inga rader alls, utan nvm),
+  till exempel oh-my-zsh, Homebrews `brew shellenv`, conda eller iTerm2: stoppa och fråga. Installera
+  inte förrän en ny version av inställningsfilen har förbud för de filerna.
+- **Claude Code för Terminal behövs på Caspers dator** (granskning 14, R5, Hugos beslut 2026-10-28). Raden
+  Setting sources syns bara i Terminal (steg 1, "Efteråt" punkt 2 och kontrollen efter installationen,
+  steg 1). Utan Claude Code för Terminal i `~/.local/bin/claude` går det inte att se att de låsta
+  inställningarna gäller, och då **går installationen inte att kontrollera**. Säger
+  `~/.local/bin/claude --version` `no such file or directory`: stoppa och fråga innan installationen.
 
 Kontrollen nedan görs också på Caspers dator.
 
@@ -709,12 +841,19 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
    ```
 
    ```bash
-   typeset -f +
+   alias -s
    ```
 
-   Leta efter samma namn som i installationens steg 4 g: `git`, `ls`, `cat`, `head`, `tail`, `grep`,
-   `diff`, `find`, `wc`, `sort`, `mkdir`, `cp` och `tar`, och namn med ett snedstreck (`/`) i sig. **Finns
-   något av dem där: stoppa och fråga**, och kör inte uppgift 4.
+   ```bash
+   builtin print -rl -- ${(ko)functions:#(_*|nvm*|shell_session*|update_terminal_cwd|compinit|compdef|compdump|compaudit|compinstall|bashcompinit|compgen|complete|getent)} SLUT
+   ```
+
+   Samma vända kontroll som i installationens steg 4 g (granskning 14, R3, Hugos beslut 2026-10-28):
+   `alias` ska visa exakt två rader, `run-help=man` och `which-command=whence`, `alias -s` ska inte visa
+   något, och det sista kommandot ska visa en enda rad, `SLUT`. **Står något annat där, eller saknas något av det: stoppa och fråga**,
+   och kör inte uppgift 4. Varje namn som visas stoppar, inte bara de som är farligast: ett kommando på
+   listan (`git`, `ls`, `cat`, `head`, `tail`, `grep`, `diff`, `find`, `wc`, `sort`, `mkdir`, `cp` och
+   `tar`), ett namn med ett snedstreck (`/`) i sig, eller ett särskilt namn som `TRAPDEBUG`.
 2. **Ihopkopplade kommandon stoppas.** Be agenten köra `ls; ls`. Det ska stoppas med ett fel som börjar
    "Stoppat av vakten" och säger att kommandon inte kopplas ihop.
 3. **Ett kommando på listan går igenom.** Be agenten köra `git status`. Claude Code frågar dig som vanligt

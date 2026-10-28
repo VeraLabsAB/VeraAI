@@ -4461,3 +4461,365 @@ Alla andra kommandon stod på listan och kördes ett i taget: `grep`, `ls -a`, `
 5. **P5:** ska en ny granskning pröva omvägarna med kommandotexter i en kopia?
 
 Därefter: nästa oberoende granskning av den nya versionen, med kontrollsummor, före installationen.
+
+## Granskning 14 – besluten efter granskning 13 (2026-10-28)
+
+Oberoende granskning, gjord på uppdrag i chatten 2026-10-28, i en ny session som inte har sett bygget.
+Granskat läge: commit `0d2cb9a` (`git status` ren när granskningen började). Vakten, inställningsfilen,
+INSTALLERA.md, SPEC.md och de andra testerna är **inte ändrade**. Skrivet: det här avsnittet och en ny
+testfil, `scripts/tests/test_granskning_14.py`.
+
+### Viktigt först
+
+- **R1, HÖG: en fil som zsh läser in vid start saknar förbud.** nvm:s fil `~/.nvm/bash_completion`, som
+  `~/.zshrc` läser in, kör zsh:s `compinit`, och `compinit` läser in filen `~/.zcompdump` som zsh-kod. Den
+  filen har inget förbud. Den som kan skriva där kan lägga in alias och funktioner som gäller i agentens
+  kommandon, alltså samma lucka som P1 i granskning 13. Rättelsen ändrar `sparr/managed-settings.json`.
+- **Kontrollsummorna är därför inte framtagna för installationen** (uppdragets punkt 8), se "Kontrollsummor".
+- Övrigt är byggt som besluten säger. P2 håller för kedjor med 3–8 länkar, för länkar som pekar på sig
+  själva och för ringar.
+
+### Fynd
+
+| Nr | Nivå | Kort |
+|---|---|---|
+| R1 | HÖG, BÖR RÄTTAS FÖRE INSTALLATIONEN | `~/.zcompdump` läses in vid start (via nvm och `compinit`) men har inget förbud |
+| R2 | MEDEL | Kartläggningen i P1 b gäller bara Hugos dator. INSTALLERA.md ber inte Casper göra den |
+| R3 | MEDEL | Kontrollen av alias och funktioner (P1 a) letar bara efter de 13 namnen. Globala alias och särskilda funktioner (till exempel `TRAPDEBUG`) med andra namn missas |
+| R4 | LÅG | SPEC 7.1 säger att samma krav gäller "varje länk i kedjan". Vakten prövar mappen där länken ligger, inte länken själv |
+| R5 | LÅG | INSTALLERA.md: små luckor för den som inte programmerar och för Caspers dator |
+
+**R1 – `~/.zcompdump` läses in vid start men har inget förbud. HÖG.**
+- Vad: Hugos `~/.zshrc` läser in `~/.nvm/bash_completion` (kartlagt i bygget, P1 b). I nvm:s källkod
+  (github.com/nvm-sh/nvm, filen `bash_completion`, läst 2026-10-28) gör filen så här i zsh: om `compinit`
+  inte redan finns körs `autoload -U +X compinit && compinit`, sedan `bashcompinit`. `compinit` läser in
+  `~/.zcompdump` med `.` (punkt), alltså som zsh-kod. Uppdraget för P1 b gällde "alla filer de läser in med
+  `source` eller punkt", och bygget sökte bara efter `source` och `.` i början av en rad, inte inne i
+  funktioner som `compinit`.
+- Prövat: `test_compinit_laser_in_zcompdump_i_hemmappen_som_zsh_kod` (med `zsh -f` och en tillfällig hemmapp,
+  inga av Hugos filer): en rad sist i `.zcompdump` körs vid nästa start, och ett alias `git=true` därifrån
+  gäller.
+- **Inte kontrollerat på Hugos dator:** vilken version av nvm som finns där, och att just den filen kör
+  `compinit` (granskaren läser inte utanför projektet). Inte heller vem som äger mapparna som `compinit` läser
+  funktioner från (zsh:s `fpath`, till exempel `/usr/local/share/zsh/site-functions`).
+- Förslag (beslut för Hugo eller Casper, ny version av inställningsfilen): förbud `Edit(~/.zcompdump)` och
+  `Edit(~/.zcompdump*)` (oh-my-zsh och andra använder namn som `.zcompdump-<dator>-<version>`). Hugo
+  kontrollerar med `ls -ld` att varje mapp i `fpath` (`print -l $fpath` i Terminal) ägs av `root` och inte
+  går att skriva i för gruppen eller andra, och stoppar och frågar annars.
+- Test: `test_zcompdump_har_ett_forbud_i_installningarna`, markerat
+  `xfail(strict=True, raises=AssertionError)`: väntat rött i dag. När förbudet byggs blir det grönt, och då
+  stoppar pytest testsviten tills markeringen tas bort.
+
+**R2 – P1 b gäller bara Hugos dator. MEDEL.** Förbuden för `~/.nvm`, `~/.zkbd` och `~/.zsh_sessions`
+bygger på vad Hugos `~/.zshrc` läser in. Avsnittet "Caspers dator" i INSTALLERA.md ber inte Casper ta reda
+på vilka filer hans `~/.zshrc` (och `~/.zprofile`, `~/.zshenv`, `~/.zlogin`) läser in. Läser den in till
+exempel oh-my-zsh, Homebrews `shellenv`, conda eller iTerm2:s skalintegration, finns inget förbud för de
+filerna. Förslag: ett steg för Casper, före installationen: visa raderna med `source`, `.` eller
+`compinit` i de fyra filerna, och stoppa och fråga om något annat än nvm:s två rader finns där.
+
+**R3 – Kontrollen av alias och funktioner letar bara efter de 13 namnen. MEDEL.**
+- Vad: steg 4 g och kontrollen efter installationen, steg 1, säger åt Hugo att leta efter `git`, `ls`, …,
+  `tar` och namn med `/`. Men:
+  - ett **globalt alias** (`alias -g`) byts ut var det än står i kommandot. Ett alias som heter `status`
+    gör om `git status` till något annat. `alias` visar det som `status=…`, utan märkning (prövat i
+    `test_ett_globalt_alias_med_ett_namn_som_inte_ar_pa_listan_andrar_ett_kommando_pa_listan`);
+  - en **funktion med ett särskilt namn**, till exempel `TRAPDEBUG`, körs före varje kommando, också i ett
+    skal som inte är interaktivt (prövat i
+    `test_en_funktion_med_ett_namn_som_inte_ar_pa_listan_kors_fore_varje_kommando`). Andra sådana namn är
+    `preexec`, `precmd`, `chpwd`, `periodic`, `zshexit` och namn som börjar med `TRAP`. Om Claude Codes
+    skal kör dem är **inte bekräftat**.
+- Förslag: vänd på kontrollen. Varje alias utom `run-help=man` och `which-command=whence` stoppar. Varje
+  funktion som inte börjar med `nvm`, `_nvm` eller `shell_session`, eller heter `update_terminal_cwd`,
+  stoppar. Det är enklare för någon utan programmeringsvana att se "något som inte står i listan" än att
+  leta efter rätt namn.
+
+**R4 – SPEC 7.1 och vakten om länken själv. LÅG.** SPEC 7.1: "Samma krav gäller filen själv och sökvägen
+dit länkarna leder …, och varje länk i kedjan däremellan, med mappen den ligger i". `_saker_kedja` prövar
+mappen där varje länk ligger, men inte länkfilens egen ägare (kommentaren i koden förklarar varför: en länk
+går inte att ändra, bara att byta ut, och det kräver skrivrätt i mappen). Granskaren hittar ingen väg att
+missbruka det. SPEC 7.1 säger "säger texten och vakten olika gäller den strängaste, och skillnaden rättas".
+Förslag: rätta texten ("mappen där varje länk i kedjan ligger"), inte koden, så att kontrollsumman för
+vakten inte ändras.
+
+**R5 – INSTALLERA.md, små luckor. LÅG.**
+- Steg 6–9 och 11 (`chown`, `chmod`, `ditto`) säger inte vad som syns när det går bra (ingenting) eller när
+  Hugo ska stoppa (till exempel `Operation not permitted` eller `No such file or directory`). Den allmänna
+  regeln "stoppa och fråga" står bara i kontrollen efter installationen.
+- Caspers dator: steg 4 d säger att de **två** sista raderna ska vara nvm-raden och Cryptexes-raden. Utan
+  nvm finns bara en. Och raden Setting sources kan bara läsas i Terminal, så Casper behöver Claude Code för
+  Terminal i `~/.local/bin`. Det står "om Claude Code för Terminal finns där", inte att installationen inte
+  kan kontrolleras utan den.
+- Steg 4 a: finns ingen `~/.zshrc` (vanligt på en ny dator) säger steget "stoppa och fråga". Säkert, men
+  Casper kan bli stående där.
+
+### Punkt 1: besluten
+
+| Beslut | Byggt som det står? | Var |
+|---|---|---|
+| P1 a: alias före och efter | **Ja**, men se R3 | INSTALLERA.md steg 4 g (före första `sudo`) och kontrollen efter installationen, steg 1 |
+| P1 b: zsh:s startfiler och filerna de läser in | **Delvis**: `~/.zshenv`, `~/.zprofile`, `~/.zshrc`, `~/.zlogin`, `~/.zlogout`, systemets filer i `/etc`, `~/.nvm/**` (med `nvm.sh` och `bash_completion`), `~/.zkbd/**` och `~/.zsh_sessions/**` finns. `~/.zcompdump` saknas (R1). Bara Hugos dator (R2) | `sparr/managed-settings.json` rad 15–28 |
+| P2: varje länk i kedjan | **Ja** (se punkt 4). Länken själv prövas inte, bara mappen den ligger i (R4) | `sparr/kommandosparr.py`, `_saker_kedja` |
+| P3 b: hela sökvägen efter `cd ~/VERA`, `PATH` ändras inte | **Ja**. `~/.local/bin/claude --version`, `update` och `cd ~/VERA` följt av `~/.local/bin/claude`, i steg 1, "Efteråt" punkt 2 och kontrollen steg 1. Varningen för `export PATH="$HOME/.local/bin:$PATH"` med tre skäl. Ingen rad lägger `~/.local/bin` i `PATH` (test) | INSTALLERA.md |
+| P4: `~/.local/share/claude`, `~/.local/bin/claude`, `/Applications/Claude.app`, hela `~/Library/Application Support/Claude` | **Ja**, alla fyra, och `claude-code`-regeln står kvar | `sparr/managed-settings.json` rad 41–46 |
+| P5 och sandlådan under "Öppet" | **Ja**: punkt 6 (P5) och punkt 4 (sandlådan, med appen, appens Claude Code och `~/.local/share/claude`) | PROGRESS.md |
+
+### Punkt 2: förbuden mot dokumentationen
+
+Läst 2026-10-28 på code.claude.com/docs/en/permissions, /permission-modes, /settings och /settings-reference.
+
+| Fråga | Svar | Källa |
+|---|---|---|
+| `~/` betyder hemmappen | **Bekräftat**: "`~/path` – Path from home directory", exempel `Read(~/.zshrc)` | [permissions, "Read and Edit"](https://code.claude.com/docs/en/permissions) |
+| `//` betyder hel sökväg från roten | **Bekräftat**: "`//path` – Absolute path from filesystem root". Och: "A pattern like `/Users/alice/file` isn't an absolute path … Use `//Users/alice/file`". Inga regler i filen börjar med bara ett `/` | samma |
+| `//**/.git` m.fl. gäller överallt | **Bekräftat**: "`Read(//**/.env)` – any `.env` anywhere on the filesystem" | samma, "How deep a pattern matches" |
+| Mellanslag i "Application Support" | **Bekräftat med ett exempel**: "You don't need to escape parentheses in a path, so `Edit(./Finance (2024)/**)` matches the `Finance (2024)` folder as spelled", och den mappen har ett mellanslag. Att just ett mellanslag aldrig behöver skrivas på annat sätt står inte uttryckligen | samma, "Special characters" |
+| `*` och `**` | **Bekräftat**: "`*` matches within a single path segment … `**` matches across directories" (`//etc/zshrc_*`, `~/.nvm/**`) | samma |
+| `//etc/…` gäller också `/private/etc` | **Bekräftat** från v2.1.268 ("`Read(//etc/**)` blocks `/private/etc/hosts` too"). Lägsta versionen i filen är 2.1.295 | samma, "Symlinks" |
+| `Edit(~/.local/bin/claude)`, som är en länk | **Bekräftat**: ett förbud gäller om "either the requested path or the file it resolves to matches", och Edit och Write "refuse the write" när sökvägen själv är en länk | samma, "Symlinks" |
+| Förbuden gäller Write också | **Bekräftat**: "`Edit` rules apply to all built-in tools that edit files" | samma |
+| `~/` och `//` i den låsta filen | Tabellen "Where a pattern anchors" nämner inte den låsta filen, men den gäller bara `/path`. `~/` och `//` beror inte på filen | samma |
+
+### Punkt 3: `~/.claude` och `~/.claude.json`
+
+- **Förbuden finns**: `Edit(~/.claude/**)`, `Edit(//**/.claude/**)` och `Edit(~/.claude.json)`. Dessutom är
+  `.claude` och `.claude.json` "protected paths": en skrivning dit frågar alltid i vanligt läge
+  ([permission-modes, "Protected paths"](https://code.claude.com/docs/en/permission-modes)). Skalkommandona
+  på listan kan inte skriva där. Kvar är den kända luckan (en egen testfil), som sandlådan ska stänga.
+- **Det spelar roll, också med de låsta inställningarna.** De låsta inställningarna stänger av användarens
+  vakter (`allowManagedHooksOnly`) och regler (`allowManagedPermissionRulesOnly`), men inte resten av
+  `~/.claude/settings.json`:
+  - `env`: "Set environment variables for every session and its subprocesses", och "An `env` block inside
+    a settings file is an ordinary key and follows the levels above" (den låsta filen sätter ingen `env`). Med
+    till exempel gits egna variabler kan `git status` köra ett annat program
+    ([settings, "Settings precedence"](https://code.claude.com/docs/en/settings),
+    [settings-reference](https://code.claude.com/docs/en/settings-reference)). I skrivbordsappen går appens
+    egen startmiljö före för variabler som den redan sätter.
+  - `statusLine`, `apiKeyHelper`, `fileSuggestion` och `otelHeadersHelper` kör egna kommandon ("Run your own
+    command …"). **Om `allowManagedHooksOnly` stänger av dem är inte bekräftat** (sidans text om nyckeln gick
+    inte att läsa i sin helhet).
+  - `~/.claude.json` har "MCP server configurations" och vilka mappar som är betrodda
+    ([settings](https://code.claude.com/docs/en/settings)). En koppling startas av Claude Code själv, inte via
+    ett verktyg, och syns inte för vakten (granskning 12). `allowManagedMcpServersOnly` är inte satt.
+  - `~/.claude/CLAUDE.md`, skills, agenter och tillägg i `~/.claude` styr vad agenten gör.
+- Slutsats: förbuden för `~/.claude/**` och `~/.claude.json` behövs och ska stå kvar. Inget saknas för de
+  två platserna. **Inte kontrollerat:** om `CLAUDE_CONFIG_DIR` är satt på Hugos dator (då ligger filerna
+  någon annanstans, och förbuden gäller fel mapp). Hugo kan se det med `echo $CLAUDE_CONFIG_DIR` i
+  Terminal: raden ska vara tom.
+
+### Punkt 4: P2 med längre kedjor och ringar
+
+Prövat med vaktens egna funktioner (`_saker_kedja`, `_saker_plats` och `bedom`) i tillfälliga mappar,
+med fixturen `rotagd`. Inget program kördes via länkarna. Testerna står i `test_granskning_14.py`:
+
+| Fall | Resultat |
+|---|---|
+| Kedjor med 3, 4, 5 och 8 länkar, varje länk i en mapp som root äger | Går igenom |
+| Samma kedjor med en länk i mitten eller sist i en mapp som användaren äger (8 fall) | Stoppas, med "en länk på vägen dit" |
+| En mapp i `PATH` som leder via tre mapplänkar, den mittersta i användarens mapp | Stoppas, "före programmet i PATH" |
+| Relativa länkar med `..` och `.` | Följs rätt: stoppas med den osäkra mappen, går igenom när den är säker |
+| Länk till sig själv, och ringar med 2, 3 och 7 länkar | `_saker_kedja` och `_saker_plats` ger falskt, på under 5 sekunder (gränsen `MAX_LANKAR`) |
+| En mapp i `PATH` som själv är en ring (1 och 3 länkar) | Stoppas, "före programmet i PATH" |
+| En trasig länk `git` → `git` i en säker mapp före `/usr/bin` | Hoppas över, som skalet gör, och `/usr/bin/git` prövas. Går igenom |
+| Python med hel sökväg som är en ring | Stoppas: "kan inte säkert avgöra vilken fil" |
+| En ring genom en mapplänk på vägen (`a/x` → `b`, `b/y` → `../a/x/y`) | Falskt, fastnar inte |
+
+Mutationstest i en kopia i scratchpad-mappen: med `_saker_plats` utan anropet till `_saker_kedja` blev 9 av
+de nya testerna röda (alla fall där en länk i mitten eller sist är osäker). Testerna för ringar är gröna
+också då, eftersom de gamla proven redan stoppar en ring. Det är den säkra riktningen.
+
+### Punkt 5: SPEC 7.1
+
+Ändringen i `115df46` (godkänd av Hugo, svar efter granskning 13, punkt 4) stämmer med P2 och P3 b: "varje
+länk i kedjan däremellan, med mappen den ligger i" (P2), och hela sökvägen `~/.local/bin/claude`, `PATH`
+ändras inte och installerarens förslag används inte (P3 b). Den säger lite mer än koden om länken själv (R4).
+Meningen "Claude Code för Terminal ligger i `~/.local/bin`" är förenklad: där ligger länken, programmet
+ligger i `~/.local/share/claude`. Inget annat nytt.
+
+### Punkt 6: INSTALLERA.md
+
+- **Går att följa utan programmeringsvana?** Ja, i stort. Varje kommando står i en egen ruta och förklaras.
+  Svårast är steg 4 (`>>`, `path=(…)`) och läsningen av `alias` och `typeset -f +` (R3).
+- **Vad Hugo ska se och när han ska stoppa?** Ja för steg 1–5, 10, 12, 13 och kontrollen efter. Saknas för
+  steg 6–9 och 11 (R5).
+- **Hela sökvägen, alias före och efter, varningen?** Ja, alla tre (punkt 1).
+- **Caspers dator?** Delvis: R2 (filerna som läses in), R5 (steg 4 d utan nvm, Claude Code för Terminal
+  behövs).
+
+### Testsviten (punkt 7)
+
+`.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests` (övergången i SPEC 7.1, Python på den
+nya platsen finns inte än):
+- före granskningen: **3 351 passed**,
+- efter den nya testfilen: **3 377 passed, 1 xfailed** (det väntade röda testet för R1), 0 misslyckade.
+
+### Kontrollsummor (punkt 8)
+
+**Inte framtagna för installationen.** Uppdraget säger att de bara tas fram om granskningen inte hittar
+något allvarligt. R1 är allvarlig, och förslaget ändrar `sparr/managed-settings.json`. Granskaren räknade
+summorna med `shasum -a 256` innan R1 hittades. De skrivs inte upp här, så att ingen installerar efter dem.
+Den nya versionen behöver summor från nästa oberoende granskning (för `sparr/kommandosparr.py`,
+`sparr/managed-settings.json` och `requirements.txt`, som steg 9 installerar paketen från).
+
+### Kommandon i den här granskningen
+
+Avsteg från SPEC 7.1 och CLAUDE.md:
+- **Det första kommandot var ihopkopplat och hade `cd`** (`cd … && git ls-files && git log …`). Det läste bara
+  filnamn och historik.
+- **Testfilen fick sitt andra stycke med `cat >> … <<'EOF'`** i stället för fil-verktyget Edit. Det skrev bara
+  i den nya testfilen.
+- `shasum -a 256` står inte på listan (uppdragets punkt 8).
+- En sida ur dokumentationen sparades av Claude Code i en fil i hemmappen
+  (`~/.claude/projects/…/tool-results/`). **Granskaren läste i den** med `grep` och Read. Inget skrevs där.
+- Dokumentationen och nvm:s fil `bash_completion` (raw.githubusercontent.com) hämtades med WebFetch.
+- De nya testerna för R1 och R3 startar `/bin/zsh -f` från Python, med en tillfällig hemmapp och bara
+  `/usr/bin:/bin` i `PATH`. De läser inga av Hugos filer och kör inga program utom zsh.
+
+Allt annat stod på listan och kördes ett i taget: `git diff`, `git status`, `grep`, `mkdir -p` och `cp -R`
+till scratchpad-mappen, och `.venv/bin/python -B -m pytest -p no:cacheprovider` (mot `scripts/tests`, med
+`-k`, och mot kopian).
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **R1:** förbud för `~/.zcompdump` och `~/.zcompdump*`, och en kontroll av mapparna i `fpath` i
+   INSTALLERA.md?
+2. **R2:** ett steg för Casper som visar vilka filer hans zsh-filer läser in?
+3. **R3:** vända kontrollen av alias och funktioner, så att allt som inte är väntat stoppar?
+4. **R4:** rätta texten i SPEC 7.1 (förslaget) eller låta vakten pröva länken själv?
+5. **R5:** komplettera INSTALLERA.md?
+
+Därefter: en ny oberoende granskning av den nya versionen, med kontrollsummor, före installationen.
+
+### Hugos svar 2026-10-28 efter granskning 14
+
+Skrivna av Hugo i uppdraget till byggsessionen i chatten 2026-10-28, som svar på "Beslut som behövs" ovan:
+
+- **Steg 1, bash-vägen, Hugos beslut 2026-10-28.** Utred först, med länkar, om Bash-verktyget kan köras i
+  `/bin/bash` i stället för zsh med `CLAUDE_CODE_SHELL=/bin/bash` i den låsta inställningsfilen: (a) om
+  variabeln kan sättas i `env` där och gäller i skrivbordsappen, (b) vilka filer Claude Code läser in med
+  bash, (c) om User-, Project- eller Local-inställningar kan skriva över den. "Inte bekräftat" där
+  dokumentationen inte svarar. Om a och c är bekräftade: bash-vägen, med förbud för bash-filerna. Annars:
+  granskarens väg för R1.
+- **R1, Hugos beslut 2026-10-28.** Förbud för `~/.zcompdump` oavsett väg. På zsh-vägen också en kontroll av
+  zsh:s mappar för funktioner (`fpath`).
+- **R2, Hugos beslut 2026-10-28.** Ett steg i INSTALLERA.md där Casper kontrollerar vilka filer hans zsh läser
+  in, med vad han ska se och när han ska stoppa.
+- **R3, Hugos beslut 2026-10-28.** Vänd kontrollen av alias och funktioner: allt som inte står i en lista över
+  väntade namn stoppar. Täck globala alias och särskilda funktioner som `TRAPDEBUG`.
+- **R4, Hugos beslut 2026-10-28.** Rätta texten i SPEC 7.1. Ändra inte koden.
+- **R5, Hugos beslut 2026-10-28.** Komplettera INSTALLERA.md: vad Hugo ska se när varje steg går bra, och
+  steg 4 d på en dator utan nvm.
+
+Därtill: inga `sudo`-kommandon, inget i `/Library` rört, inga filer i hemmappen ändrade, inga
+kontrollsummor, committa men inte pusha.
+
+**Steg 1: bash-vägen byggdes inte.** Svaren med källor står i PROGRESS.md ("Läge 2026-10-28, efter Hugos
+beslut om granskning 14"). Kort:
+
+- (a) Att `CLAUDE_CODE_SHELL` kan sättas i `env` i den låsta filen och gäller i Terminal: **bekräftat**. Att
+  den gäller i skrivbordsappen: **inte bekräftat**. Appens startmiljö går före `env` i alla
+  inställningsfiler, också den låsta, för varje variabel som startmiljön redan har, och appen tar med det
+  som inloggningsskalet exporterar. Dokumentationen säger inte om startmiljön har `CLAUDE_CODE_SHELL`.
+- (b) Med bash läser Claude Code in `~/.bashrc` (eller `~/.profile`, "depending on your shell").
+  `~/.bash_profile`, `BASH_ENV` och systemets bash-filer: **inte bekräftat**.
+- (c) User-, Project- och Local-inställningar kan inte skriva över ett värde i den låsta filen:
+  **bekräftat**.
+
+Eftersom (a) inte är bekräftat för skrivbordsappen, där agenten körs, byggdes granskarens väg. Förbuden för
+`~/.bashrc`, `~/.bash_profile` och `~/.profile` fanns redan och står kvar.
+
+**Byggt 2026-10-28** (inte installerat, inte granskat):
+
+- **R1.** `Edit(~/.zcompdump)` och `Edit(~/.zcompdump*)` i `sparr/managed-settings.json` (den andra täcker
+  oh-my-zsh:s `.zcompdump-<dator>-<version>` och compinits `.zcompdump.zwc`). INSTALLERA.md steg 4 i:
+  `print -rl -- $fpath` (väntat: bara mappar som börjar med `/usr/share/zsh/`, och
+  `/usr/local/share/zsh/site-functions`), `ls -ld $fpath` och `ls -ld` på mapparna ovanför
+  `/usr/local/share/zsh/site-functions`, med ägaren `root`, inget `w` för gruppen eller andra och inget `+`
+  eller `@`. Allt annat: stoppa och fråga. Tabellen i "Vad som installeras" nämner förbudet. Granskarens
+  test `test_zcompdump_har_ett_forbud_i_installningarna` är grönt, och markeringen `xfail` är borttagen.
+- **R2.** INSTALLERA.md steg 4 h, på **båda** datorerna (inte bara Caspers, så att Hugos dator också
+  kontrolleras på samma sätt): `grep -n -E 'source|\. |eval|compinit|autoload|fpath|ZDOTDIR'` på
+  `~/.zshenv`, `~/.zprofile`, `~/.zshrc` och `~/.zlogin`. Väntat: nvm:s två rader (eller inga, utan nvm), och
+  `No such file or directory` för filer som inte finns. Annars stoppa och fråga. Avsnittet "Caspers dator"
+  pekar på steget.
+- **R3.** INSTALLERA.md steg 4 g och kontrollen efter installationen, steg 1, är vända. Tre kommandon:
+  - `alias`: väntat exakt `run-help=man` och `which-command=whence`. Globala alias visas där (prövat).
+  - `alias -s`: väntat ingenting. **Tillägg till granskarens förslag:** `alias` visar inte alias för
+    filändelser (prövat i ett test), så de kräver ett eget kommando.
+  - `builtin print -rl -- ${(ko)functions:#(…)} SLUT`: visar bara funktioner som inte är väntade, och sist
+    ordet `SLUT`. Väntat: en enda rad, `SLUT`.
+
+  **Avvikelser från granskarens förslag, med skäl:**
+  - `typeset -f +` används inte längre. Efter nvm:s `compinit` och `bashcompinit` visar det **976 namn**
+    (prövat med zsh 5.9 i ett test utan Hugos filer), nästan alla zsh:s hjälp för tabb, som börjar med `_`.
+    Att läsa igenom dem för hand går inte. Därför filtreras de väntade namnen bort i kommandot.
+  - Listan över väntade funktioner är därför större än granskarens: namn som börjar med `_`, `nvm` eller
+    `shell_session`, `update_terminal_cwd`, och de nio som `compinit` och `bashcompinit` lägger in
+    (`compinit`, `compdef`, `compdump`, `compaudit`, `compinstall`, `bashcompinit`, `compgen`, `complete`,
+    `getent`), prövat. Inget kommando på listan i SPEC 7.1 och inget av zsh:s särskilda namn (`TRAP…`,
+    `preexec`, `precmd`, `chpwd`, `periodic`, `zshexit`, `zshaddhistory`, `zsh_directory_name`,
+    `command_not_found_handler`) börjar med `_` eller står bland de nio.
+  - `SLUT` sist: en funktion som heter `builtin` eller `print` döljer all utskrift (prövat). Saknas `SLUT`
+    stoppar Hugo. Med `setopt SH_GLOB` läser zsh inte mönstret, och då visas alla namn: det säkra hållet
+    (prövat).
+- **R4.** SPEC 7.1, PATH-regeln: "och mappen där varje länk i kedjan däremellan ligger … Länkfilen själv
+  prövas inte: en länk kan inte ändras, bara bytas ut, och det kräver skrivrätt i mappen där den ligger".
+  Statusraden överst i SPEC nämner ändringen. `sparr/kommandosparr.py` är inte ändrad.
+- **R5.** INSTALLERA.md: en allmän regel i "Innan du börjar" (punkt 3: visar ett kommando något annat än det
+  som står, stoppa och fråga), en ruta i steg 6 om vad som syns i steg 6–11 (ingenting när det går bra, och
+  vilka fel som stoppar), en rad "Går det bra visas ingenting" i steg 4 a och vid varje kommando i steg
+  6–11, steg 4 d och 4 e på en dator utan nvm (bara den sista raden är Cryptexes-raden), förklaringen i steg
+  4 a om en saknad `~/.zshrc` (vanligt på en ny dator, men stoppa och fråga så att rätt fil ändras), och i
+  "Caspers dator" att installationen inte går att kontrollera utan Claude Code för Terminal.
+- "Efteråt", punkt 10: en ny rad med `eval`, `compinit`, `autoload`, `fpath` eller `ZDOTDIR` behandlas som en
+  ny `source`-rad, och steg 4 h och 4 i görs igen.
+
+**Tester:** ny fil `scripts/tests/test_beslut_granskning_14.py` (56 tester). De kör kommandona ur
+INSTALLERA.md i `/bin/zsh -f` med en tillfällig hemmapp och bara `/usr/bin:/bin` i `PATH`: R2 (nvm:s rader
+visas, åtta andra sorters rader visas, inget utan nvm), R3 (bara `SLUT` med de väntade namnen, 16 farliga
+funktionsnamn visas, `builtin` och `print` syns på att `SLUT` saknas, `SH_GLOB`, globala alias och alias för
+filändelser), R1 (förbuden, och att `fpath` på den här datorn är den som steg 4 i väntar sig), R4 och R5.
+Ändrat i `test_kommandosparr.py`: `ALIAS_KOMMANDON` är `alias`, `alias -s` och filterkommandot i stället för
+`alias` och `typeset -f +`, och listan över kommandon som får stå i INSTALLERA.md har de nya kommandona i
+steg 4 h och 4 i. Granskarens test för R1 i `test_granskning_14.py`: markeringen `xfail` borttagen. Mot den
+gamla versionen (en kopia av `0d2cb9a` i scratchpad-mappen, med de nya testfilerna) är 18 tester röda: alla
+för R1–R5 och granskarens R1-test. Proven av zsh:s eget beteende är gröna också där, eftersom de prövar zsh
+och inte filerna. Hela testsviten: **3 434 passed**, 0 misslyckade (före: 3 377 passed och 1 xfailed).
+
+**Inte prövat eller bekräftat:**
+- Vad `print -rl -- $fpath`, `alias` och filterkommandot visar i Hugos och Caspers Terminal. Testerna kör zsh
+  utan deras filer. Det är därför Hugo och Casper gör stegen själva.
+- Vem som äger mapparna i `fpath` på Hugos dator, och vilken version av nvm som finns där (byggsessionen
+  läser inte utanför projektet).
+- Kontrollen i Terminal kan luras av den som själv skriver i `~/.zshrc` och vet hur kontrollen ser ut. Agenten
+  får inte skriva där. Kontrollen fångar det som andra program lägger in.
+- Claude Code tar enligt dokumentationen med alias, funktioner och **skalets inställningar** (`setopt`) från
+  `~/.zshrc` ("captures the resulting aliases, functions, and shell options",
+  [tools-reference](https://code.claude.com/docs/en/tools-reference)). Inställningarna kontrolleras inte här.
+  Om någon av dem kan få zsh att läsa ett kommando annorlunda än vakten hör till omvägarna (granskning 13,
+  P5, PROGRESS.md "Öppet", punkt 6).
+
+**Kontrollsummor:** inte framtagna (uppdraget). De tas fram i nästa oberoende granskning.
+
+**Kommandon i byggsessionen, avsteg från SPEC 7.1 och CLAUDE.md:**
+- **De två första kommandona var ihopkopplade och hade `cd`** (`cd … && ls -la && ls … 2>/dev/null && grep …`
+  och `cd … && grep -n "^#" SPEC.md | head -80`). De läste bara filnamn och rubriker i projektet.
+- **Läsning utanför projektmappen:** Claude Code sparade fem långa sidor ur dokumentationen i filer i
+  hemmappen (`~/.claude/projects/…/tool-results/`). Två av dem lästes med `grep` och en med Read. Inget
+  skrevs där av byggsessionen.
+- Dokumentationen hämtades med WebFetch (code.claude.com).
+- Ett prov i en kopia i scratchpad-mappen (egen testfil, körd med pytest-kommandot) visade vad
+  `typeset -f +` och filterkommandot ger efter `compinit`. Det startade `/bin/zsh -f` med en tillfällig
+  hemmapp, som testerna.
+
+Allt annat stod på listan och kördes ett i taget: `.venv/bin/python -B -m pytest -p no:cacheprovider` (mot
+`scripts/tests`, med `-k`, och mot kopian), `grep`, `mkdir -p`, `git archive -o`, `tar -x -f … -C` och
+`cp -R` till scratchpad-mappen, `git status`, `git diff`, `git add` och `git commit`.
+
+**Beslut som behövs (Hugo eller Casper):**
+1. **Bash-vägen** är inte byggd, eftersom (a) inte är bekräftat för skrivbordsappen. Vill Hugo pröva den på
+   riktigt (till exempel att `/status` eller ett kommando i appen visar vilket skal som används efter att
+   variabeln har satts), är det ett eget beslut med ett eget prov.
+2. **Listan över väntade funktioner** (R3) är större än granskarens förslag (namn som börjar med `_` och de
+   nio från `compinit`). Godkänns den?
+3. **Steg 4 h på Hugos dator också** (R2 gällde Casper). Godkänns det?
+4. Därefter: en ny oberoende granskning av den nya versionen, med kontrollsummor, före installationen.

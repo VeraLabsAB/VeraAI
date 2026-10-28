@@ -1605,8 +1605,23 @@ NVM_KOMMANDON = (NVM_KOPIA, NVM_LAGG_TILL, "tail -n 3 ~/.zshrc", "echo $PATH")
 TERMINAL_CLAUDE = "~/.local/bin/claude"
 TERMINAL_KOMMANDON = ("cd ~/VERA", TERMINAL_CLAUDE)
 TERMINAL_VERSION = (f"{TERMINAL_CLAUDE} --version", f"{TERMINAL_CLAUDE} update")
-# Hugos beslut 2026-10-28, granskning 13, P1 a: Hugo visar alias och funktioner i Terminal.
-ALIAS_KOMMANDON = ("alias", "typeset -f +")
+# Hugos beslut 2026-10-28, granskning 13, P1 a: Hugo visar alias och funktioner i Terminal. Hugos beslut
+# 2026-10-28, granskning 14, R3: kontrollen är vänd. I stället för typeset -f + (alla namn, efter nvm:s
+# compinit fler än 900) visas bara de funktioner som inte är väntade, och sist ordet SLUT.
+VANTADE_FUNKTIONER = (
+    "_*|nvm*|shell_session*|update_terminal_cwd|compinit|compdef|compdump|compaudit|compinstall"
+    "|bashcompinit|compgen|complete|getent"
+)
+FUNKTIONER_KOMMANDO = f"builtin print -rl -- ${{(ko)functions:#({VANTADE_FUNKTIONER})}} SLUT"
+# alias visar inte alias för filändelser, så de visas med alias -s (väntat: ingenting).
+ALIAS_KOMMANDON = ("alias", "alias -s", FUNKTIONER_KOMMANDO)
+# Hugos beslut 2026-10-28, granskning 14, R2: vilka filer zsh läser in. R1: zsh:s mappar för funktioner.
+ZSH_FILER_KOMMANDO = "grep -n -E 'source|\\. |eval|compinit|autoload|fpath|ZDOTDIR' ~/.zshenv ~/.zprofile ~/.zshrc ~/.zlogin"
+FPATH_KOMMANDON = (
+    "print -rl -- $fpath",
+    "ls -ld $fpath",
+    "ls -ld /usr/local /usr/local/share /usr/local/share/zsh /usr/local/share/zsh/site-functions",
+)
 
 
 def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
@@ -1630,7 +1645,12 @@ def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
     assert rader
     for rad in rader:
         assert rad.startswith(tillatna) or rad in (
-            NVM_KOMMANDON + TERMINAL_KOMMANDON + TERMINAL_VERSION + ALIAS_KOMMANDON + (KRYPTEX_LAGG_TILL,)
+            NVM_KOMMANDON
+            + TERMINAL_KOMMANDON
+            + TERMINAL_VERSION
+            + ALIAS_KOMMANDON
+            + (KRYPTEX_LAGG_TILL, ZSH_FILER_KOMMANDO)
+            + FPATH_KOMMANDON
         ), rad
 
 

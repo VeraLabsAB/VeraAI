@@ -6,8 +6,72 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **3 351 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
-Hugos svar 2026-10-28 efter granskning 13).
+Testsviten: **3 434 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
+Hugos svar 2026-10-28 efter granskning 14).
+
+## Läge 2026-10-28, efter Hugos beslut om granskning 14
+
+**Byggt** (inte installerat, inte granskat, inga `sudo`-kommandon körda, inget i `/Library` rört, inga filer
+i hemmappen ändrade, inga kontrollsummor). Besluten och detaljerna står i `GRANSKNING.md`, "Hugos svar
+2026-10-28 efter granskning 14".
+
+**Steg 1: kan Bash-verktyget köras i `/bin/bash` i stället för zsh?** Läst i Claude Codes dokumentation
+2026-10-28.
+
+- **(a) Kan `CLAUDE_CODE_SHELL` sättas i `env` i den låsta inställningsfilen, och gäller den då i
+  skrivbordsappen?**
+  - Variabeln finns: "Set the shell Claude Code uses to run Bash tool commands. Accepts a path to a `bash` or
+    `zsh` binary … If the value is not a working `bash` or `zsh` path, Claude Code ignores it and falls back
+    to auto-detection" ([env-vars](https://code.claude.com/docs/en/env-vars), tabellen "Variables").
+  - `env` får stå i den låsta filen ("Managed settings | Everyone in your organization",
+    [env-vars, "Set variables in settings files"](https://code.claude.com/docs/en/env-vars)), och
+    `CLAUDE_CODE_SHELL` står inte bland variablerna som Claude Code bortser från i `env`
+    ([settings-reference, "Variables Claude Code ignores in env"](https://code.claude.com/docs/en/settings-reference#env)).
+    Ett värde där "overwrites the same variable exported in your shell" (samma ställe, "How env values
+    interact with your shell"). **I Terminal: bekräftat.**
+  - **I skrivbordsappen: inte bekräftat.** "When the Claude Desktop app … starts the session, the launch
+    environment it builds takes precedence instead: Claude Code ignores an `env` value from any settings
+    file for a variable the launch environment already sets" (samma ställe). Appen tar med det som
+    inloggningsskalet exporterar ("When Desktop starts, it reads what your login shell exports",
+    [desktop](https://code.claude.com/docs/en/desktop)). Dokumentationen säger inte om startmiljön har
+    `CLAUDE_CODE_SHELL`. Inte heller bekräftat: att skalet väljs efter att `env` från inställningarna har
+    lagts in.
+- **(b) Vilka filer läser Claude Code in när skalet är bash?** "At session start, Claude Code sources
+  `~/.zshrc`, `~/.bashrc`, or `~/.profile` depending on your shell, captures the resulting aliases,
+  functions, and shell options, and applies them to every Bash command"
+  ([tools-reference, "What persists between commands"](https://code.claude.com/docs/en/tools-reference)).
+  Alltså `~/.bashrc` eller `~/.profile`. När det är `~/.profile`: **inte bekräftat**. `~/.bash_profile`,
+  `BASH_ENV` och systemets filer (`/etc/profile`, `/etc/bashrc`): **inte bekräftat** (nämns inte).
+- **(c) Kan User-, Project- eller Local-inställningar skriva över den?** Nej: "Between settings files, `env`
+  values follow settings precedence, so a managed settings entry overrides the same variable in user or
+  project settings" ([env-vars, "Precedence"](https://code.claude.com/docs/en/env-vars)), och "Nothing in
+  your own settings files or `--settings` overrides a managed key"
+  ([settings, "Settings precedence"](https://code.claude.com/docs/en/settings)). **Bekräftat.** Men appens
+  startmiljö går före alla inställningsfiler, också den låsta (a).
+
+**Slutsats: zsh-vägen byggdes, inte bash-vägen**, eftersom (a) inte är bekräftat för skrivbordsappen, där
+agenten körs. `CLAUDE_CODE_SHELL` är inte satt. Förbuden för `~/.bashrc`, `~/.bash_profile` och `~/.profile`
+fanns redan och står kvar.
+
+- **R1:** förbud för `~/.zcompdump` och `~/.zcompdump*`, och INSTALLERA.md steg 4 i: Hugo kontrollerar
+  mapparna i zsh:s `fpath` med `print -rl -- $fpath` och `ls -ld`. Granskarens väntade test är grönt.
+- **R2:** INSTALLERA.md steg 4 h, på båda datorerna: `grep` visar raderna i zsh:s fyra startfiler som läser
+  in filer eller kör kod. Väntat: bara nvm:s två rader. Avsnittet "Caspers dator" pekar på steget.
+- **R3:** kontrollen av alias och funktioner är vänd: `alias` (väntat exakt två rader), `alias -s` (väntat
+  ingenting) och ett kommando som bara visar oväntade funktioner och sist `SLUT` (väntat bara `SLUT`).
+  `typeset -f +` används inte längre: efter nvm:s `compinit` visar det 976 namn.
+- **R4:** SPEC 7.1 säger att vakten prövar mappen där varje länk ligger, inte länkfilen själv. Koden är inte
+  ändrad.
+- **R5:** INSTALLERA.md säger vad som syns när steg 4 a och 6–11 går bra (ingenting), vilka fel som stoppar,
+  steg 4 d och 4 e utan nvm, och att Caspers installation inte går att kontrollera utan Claude Code för
+  Terminal. En allmän regel i "Innan du börjar": visar ett kommando något annat, stoppa och fråga.
+- **Tester:** 56 nya i `scripts/tests/test_beslut_granskning_14.py`, `ALIAS_KOMMANDON` och listan över
+  kommandon i INSTALLERA.md ändrade i `test_kommandosparr.py`, markeringen `xfail` borttagen i
+  `test_granskning_14.py`. Hela testsviten: **3 434 passed**, 0 misslyckade.
+
+**Beslut som behövs:** (1) bash-vägen, om Hugo vill pröva den med ett eget prov i appen, (2) listan över
+väntade funktioner i R3, som är större än granskarens förslag, (3) steg 4 h också på Hugos dator, (4) en ny
+oberoende granskning av den nya versionen, med kontrollsummor, före installationen.
 
 ## Läge 2026-10-28, efter Hugos beslut om granskning 13
 
@@ -235,7 +299,9 @@ fattade och byggda, se avsnittet ovan.)
 6. **Granskning 13, P5: omvägarna förbi vakten med kommandotexter i en kopia.** Hugos beslut 2026-10-28 (P5
    a): görs i **en egen session före uppgift 5**. Granskning 12 och 13 kunde inte göra det provet, eftersom
    ett säkerhetsfilter i Claude Code stoppade svaret. Det som inte är uteslutet är framför allt sätt som zsh
-   läser ett ord på som skiljer sig från vaktens uppdelning. **Öppen, inte gjord.**
+   läser ett ord på som skiljer sig från vaktens uppdelning. **Öppen, inte gjord.** Dit hör också skalets
+   inställningar (`setopt`), som Claude Code tar med från `~/.zshrc` till agentens kommandon och som
+   kontrollen i INSTALLERA.md steg 4 g inte prövar (granskning 14, bygget efter Hugos svar 2026-10-28).
 
 ## Nästa steg i byggordningen
 

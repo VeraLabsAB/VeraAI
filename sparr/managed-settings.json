@@ -26,6 +26,8 @@
       "Edit(~/.nvm/**)",
       "Edit(~/.zkbd/**)",
       "Edit(~/.zsh_sessions/**)",
+      "Edit(~/.zcompdump)",
+      "Edit(~/.zcompdump*)",
       "Edit(~/.bashrc)",
       "Edit(~/.bash_profile)",
       "Edit(~/.profile)",
