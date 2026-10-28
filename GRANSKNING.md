@@ -3093,6 +3093,14 @@ Skrivna i chatten av Hugo 2026-10-28, i hans ordning:
    fråga i PROGRESS.md.
 5. **`sudo` ska alltid stoppas**, också i en mapp som har undantagits.
 
+**Hugos beslut 2026-10-28, andra omgången** (skrivna i chatten av Hugo samma dag, efter planens första
+version). De ersätter beslut 1 och 4 ovan där de skiljer sig:
+
+6. **Det finns inget "steg 5 (torrkörningen)"** (Hugos egen rättelse). **Sandlådan ska vara klar före
+   uppgift 5, eller före första hela körningen på riktiga underlag om den kommer först.**
+7. **`su` ska också alltid stoppas**, precis som `sudo`.
+8. **Ingen mapp undantas.**
+
 ### Vad dokumentationen säger (kontrollerat 2026-10-28)
 
 Läst på code.claude.com/docs/en/hooks, /permissions, /settings och /managed-settings. Citaten är översatta.
@@ -3128,13 +3136,13 @@ Läst på code.claude.com/docs/en/hooks, /permissions, /settings och /managed-se
 använder. Det släpper bara igenom det som SPEC 7.1 tillåter, och svarar annars med ett stopp och ett fel på
 svenska som säger vad som stoppades och varför. Reglerna, i den ordning de prövas:
 
-1. **`sudo` stoppas alltid**, oavsett mapp (Hugos beslut 5). Förslag som kräver OK: samma för `su`.
+1. **`sudo` och `su` stoppas alltid** (Hugos beslut 5 och 7).
 2. **Andra verktyg som kör kommandon än Bash stoppas helt**, till exempel terminalverktyget i appen,
    fjärrkommandon via kopplingar och övervakning som kör ett kommando. Vanliga fil-verktyg (läsa, skriva,
    redigera) släpps igenom, eftersom 7.1 bara gäller kommandon.
-3. **Undantagna mappar** (listan är tom tills Hugo säger annat): bara om både startmappen
-   (`CLAUDE_PROJECT_DIR`) och arbetsmappen (`cwd`) ligger i en undantagen mapp släpps kommandot igenom utan
-   listan, och inte heller då om det nämner en sökväg i `~/VERA`.
+3. **Inga undantagna mappar** (Hugos beslut 8). Vakten byggs utan någon regel för undantag och gäller
+   likadant i alla mappar. Ska en mapp undantas senare, blir det en ny version av vakten som Hugo eller Casper
+   godkänner och Hugo installerar.
 4. **Inga ihopkopplade kommandon.** Stopp vid `;`, `&`, `|`, `<`, `>`, `$`, bakåtfnuttar, radbrytning och
    omvänt snedstreck någonstans i kommandot (SPEC 7.1: ett kommando i taget, ingen omdirigering, inget
    `$(...)`). Det stoppar också uttryck i `-k` för pytest som använder parenteser eller `|`, vilket är godtagbart.
@@ -3168,6 +3176,8 @@ kontrollerar varje nyckel mot dokumentationen igen innan filen lämnas till Hugo
     "disableBypassPermissionsMode": "disable",
     "deny": [
       "Bash(sudo *)",
+      "Bash(su *)",
+      "Bash(su)",
       "Edit(//Users/hugolindholmer/VERA/agent/.git/**)"
     ]
   },
@@ -3194,11 +3204,12 @@ kontrollerar varje nyckel mot dokumentationen igen innan filen lämnas till Hugo
   Det krävs ett administratörslösenord för att ändra där, så agenten kan inte ändra dem.
 - Regeln mot att skriva i `.git` stänger ett hål: annars kan agenten lägga ett eget program i `.git/hooks`
   eller ändra `.git/config`, och git kör det vid nästa `git commit` eller `git diff`, förbi vakten.
-- Listan med undantagna mappar ligger också i den skyddade mappen, inte i projektet. Den är tom från början.
+- Det finns ingen lista med undantagna mappar (Hugos beslut 8).
 
-**Skydd 3: sandlådan (spärrsteget, före steg 5).** Ett skydd i macOS som gör att kommandon och allt de
-startar bara kan skriva i vissa mappar. Det behövs för hålet nedan. Hugos beslut 4: den väntar till
-spärrsteget, men ska vara klar före steg 5 (torrkörningen).
+**Skydd 3: sandlådan (spärrsteget, före uppgift 5).** Ett skydd i macOS som gör att kommandon och allt de
+startar bara kan skriva i vissa mappar. Det behövs för hålet nedan. Hugos beslut 4 och 6: den byggs i
+spärrsteget, men ska vara klar före uppgift 5, eller före första hela körningen på riktiga underlag om den
+kommer först.
 
 ### Det vakten inte stoppar
 
@@ -3211,35 +3222,33 @@ spärrsteget, men ska vara klar före steg 5 (torrkörningen).
 - **Andra datorer.** Inställningarna gäller bara den dator där de installeras. Caspers dator behöver samma
   installation.
 
-### Mappar under `~/VERA`, och förslag till undantag
+### Mappar under `~/VERA`, och undantag
 
 Läst med `ls` på `/Users/hugolindholmer/VERA` i den här sessionen (bara översta nivån):
 
-| Namn | Vad det är (av namnet att döma) | Förslag |
+| Namn | Vad det är (av namnet att döma) | Beslut |
 |---|---|---|
-| `agent` | Veras bokföringsagent, det här projektet | **Undantas aldrig** |
-| `varumarke` | Varumärket | Undantas inte. Om arbetet där behöver andra kommandon läggs de till på en egen lista, efter OK |
-| `veralabs-hemsida` | Hemsidan för Vera Labs | Undantas inte nu, se frågan nedan |
-| `.obsidian` | Inställningar för programmet Obsidian (`~/VERA` används som Obsidian-valv) | Ingen arbetsmapp, inget undantag |
-| `.DS_Store`, `.cmp-test.html` | Filer, inte mappar | Inget undantag |
+| `agent` | Veras bokföringsagent, det här projektet | Undantas inte |
+| `varumarke` | Varumärket | Undantas inte |
+| `veralabs-hemsida` | Hemsidan för Vera Labs | Undantas inte |
+| `.obsidian` | Inställningar för programmet Obsidian (`~/VERA` används som Obsidian-valv) | Undantas inte |
+| `.DS_Store`, `.cmp-test.html` | Filer, inte mappar | – |
 
-**Granskarens rekommendation: undanta ingen mapp nu.** Skälen:
+**Hugos beslut 8: ingen mapp undantas**, som granskaren rekommenderade. Skälen till rekommendationen:
 - Hugos beslut säger att sessioner som startar i `~/VERA` ska vara skyddade, och alla mappar ovan ligger där.
-- En session i en undantagen mapp kan nå `~/VERA/agent` med hela sökvägar. Vakten stoppar kommandon som
-  nämner `~/VERA`, men en undantagen mapp skulle ändå ha mycket friare kommandon.
+- En session i en undantagen mapp kan nå `~/VERA/agent` med hela sökvägar, med mycket friare kommandon.
 - Hemsidan behöver troligen andra kommandon (till exempel för att bygga och visa sidan). Två vägar, som Hugo
   väljer mellan när det behövs: flytta hemsidan till en mapp utanför `~/VERA` och undanta den, eller ge den en
   egen kort lista i vakten.
 
-Följd av beslut 1: också sessioner i Hugos andra mappar utanför `~/VERA` får bara Veras lista, tills en mapp
-undantas.
+Följd av beslut 1 och 8: också sessioner i Hugos andra mappar utanför `~/VERA` får bara Veras lista.
 
 ### Arbetsgång
 
 1. **Byggsession** (ny session, startas bara när Hugo eller Casper säger till):
    - skriver vakten i projektet, förslagsvis `sparr/kommandosparr.py`, och tester i `scripts/tests`,
    - testerna ska visa att varje kommando i SPEC 7.1 går igenom och att varje omväg ovan stoppas, till
-     exempel `ls; rm x`, `ls && rm x`, `ls | head`, `cat $(x)`, kommandon på två rader, `cd`, `sed`, `sudo`,
+     exempel `ls; rm x`, `ls && rm x`, `ls | head`, `cat $(x)`, kommandon på två rader, `cd`, `sed`, `sudo`, `su`,
      `git -C`, `git diff --output=x`, `find -exec`, `mkdir` i projektet, `cp -R` och `tar` in i projektet,
      `git archive -o` i projektet, pytest med andra tillägg, en vakt som får trasig indata, och andra verktyg
      som kör kommandon,
@@ -3252,7 +3261,7 @@ undantas.
    `managed-settings.json` till `/Library/Application Support/ClaudeCode/`. Agenten gör det inte.
 5. **Kontroll efter installationen**, i en ny session:
    - under Status ska de låsta inställningarna synas som källa (inte inställningar från claude.ai),
-   - `git status` går igenom, medan `ls; ls`, `cd ..`, `sudo ls` och `echo x` stoppas,
+   - `git status` går igenom, medan `ls; ls`, `cd ..`, `sudo ls`, `su` och `echo x` stoppas,
    - en vakt som fallerar stoppar kommandot (prövas genom att Hugo tillfälligt pekar inställningen mot en fil
      som inte finns, och sedan återställer).
 6. **Caspers dator** får samma installation.
@@ -3260,10 +3269,8 @@ undantas.
 
 ### Öppna frågor till Hugo eller Casper
 
-1. **Undantag:** ska någon mapp undantas? Rekommendation: ingen nu (se ovan).
-2. **`su`:** ska också `su` alltid stoppas, som `sudo`? Rekommendation: ja.
-3. **"Steg 5 (torrkörningen)":** projektets filer har inget steg som heter torrkörning. Uppgift 5 i
-   byggordningen (DESIGN-regelbok.md avsnitt 7) är flöde c och d (Z-rapporter, kortinlösen, Swish och
-   kontantinsättningar), och SPEC 9 har faserna 0–4. Vilket steg menas? Tills det är klart räknas sandlådan
-   som ett krav före uppgift 5, eller före en torrkörning om den kommer först.
-4. **SPEC 7.1:** byggsessionen föreslår texten, och den ändras först efter OK.
+1. **SPEC 7.1:** byggsessionen föreslår texten, och den ändras först efter Hugos eller Caspers OK.
+
+Avgjorda samma dag (Hugos beslut 2026-10-28, andra omgången): undantag (ingen mapp, beslut 8), `su`
+(stoppas alltid, beslut 7) och när sandlådan ska vara klar (före uppgift 5, eller före första hela körningen
+på riktiga underlag om den kommer först, beslut 6).

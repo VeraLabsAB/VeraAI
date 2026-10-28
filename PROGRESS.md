@@ -50,10 +50,9 @@ ren kopia av commiten tagen med `git archive`).
 4. **Sandlådan (granskning 11, Q1).** Kommandolistan i SPEC 7.1 ska spärras av en vakt i Claude Codes låsta
    inställningar (planen står i `GRANSKNING.md` under "Granskning 11 – plan för Q1"). Vakten kan inte stoppa
    en egen testfil som körs med pytest och raderar eller skriver i projektet. Det stoppas av en **sandlåda**
-   (ett skydd i macOS som gör att kommandon bara kan skriva i vissa mappar). Hugos beslut 2026-10-28:
-   sandlådan byggs i spärrsteget, men ska vara klar före steg 5 (torrkörningen). **Öppen fråga:** vilket steg
-   är "steg 5 (torrkörningen)"? Projektets filer har inget steg med det namnet. Uppgift 5 i byggordningen är
-   flöde c och d. Tills det är klart gäller kravet före uppgift 5, eller före en torrkörning om den kommer först.
+   (ett skydd i macOS som gör att kommandon bara kan skriva i vissa mappar). **Öppen, inte byggd.** Hugos
+   beslut 2026-10-28: sandlådan byggs i spärrsteget, men ska vara klar **före uppgift 5, eller före första
+   hela körningen på riktiga underlag om den kommer först**.
 
 ## Nästa steg i byggordningen
 
@@ -90,10 +89,11 @@ avsnitt 8, med namn och datum.
   rättas bara i texten i SPEC avsnitt 11, inte i koden. Dokumentationen (`DESIGN-regelbok.md`,
   `foretag/README.md` och PROGRESS.md) rättas i en egen commit.
 - **Hugos beslut 2026-10-28 (granskning 11, Q1):** kommandolistan i SPEC 7.1 spärras tekniskt nu, före
-  uppgift 4, i en fil utanför projektet. Vakten gäller strikt överallt utom i mappar Hugo uttryckligen
-  undantar (ingen än), `sudo` stoppas alltid, Claude Code uppdateras först till en version som kan stoppa
-  kommandot när vakten fallerar, Hugo godtar att superpowers vakter slutar fungera, och sandlådan byggs i
-  spärrsteget före steg 5. Hela planen och besluten: `GRANSKNING.md`, "Granskning 11 – plan för Q1".
+  uppgift 4, i en fil utanför projektet. Vakten gäller strikt överallt, och ingen mapp undantas. `sudo` och
+  `su` stoppas alltid. Claude Code uppdateras först till en version som kan stoppa kommandot när vakten
+  fallerar (minst 2.1.295). Hugo godtar att superpowers vakter slutar fungera. Sandlådan byggs i
+  spärrsteget, men är klar före uppgift 5, eller före första hela körningen på riktiga underlag om den kommer
+  först. Hela planen och besluten: `GRANSKNING.md`, "Granskning 11 – plan för Q1".
 - **Hugos beslut i chatten 2026-10-27:** listan över ägare och närstående ligger kvar i
   `foretag/<namn>/regelbok.json` tills spärrsteget, eftersom SPEC inte säger var den skyddade mappen ska
   ligga. Testet att listan ligger utanför alla mappar agenten får skriva i skrivs då.
