@@ -6,8 +6,8 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **3 669 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
-Hugos beslut om granskning 15).
+Testsviten: **3 724 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
+rättelserna efter granskning 16).
 
 **Regler tills vakten är installerad** (Hugos beslut 2026-10-28 efter granskning 15):
 
@@ -16,6 +16,39 @@ Hugos beslut om granskning 15).
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-10-28, efter rättelserna efter granskning 16
+
+**Rättat, inte granskat, inte installerat.** Byggsession i läget Manual (`permissionMode: default`). Inga
+sudo-kommandon körda, inget i `/Library` rört, inga filer i hemmappen ändrade, inget pushat. Besluten står i
+`GRANSKNING.md`, "Hugos beslut 2026-10-28 (efter granskning 16)".
+
+- **G3** (1dbedb1): `-R` borttaget ur `grep` i vakten och SPEC 7.1, i alla former (`-nR`, `-Rn`,
+  `--dereference-recursive` och förkortningar). `-r` står kvar.
+- **G7** (8cfba7c): `.ugrep` förbjuden. Vakten stoppar kommandon som skulle skriva en fil eller mapp med det
+  namnet (som mål, som källa till `cp -R`, via en länk, oavsett stora och små bokstäver), och
+  `managed-settings.json` har `Edit(//**/.ugrep)` och `Edit(~/.ugrep)`. `grep`-tillägg för en egen
+  inställningsfil stod aldrig på listan.
+- **G2 och G6** (43ea3b5): meningen i INSTALLERA.md steg 4 h (allt som inte är exakt de elva raderna: stoppa och
+  fråga) och meningen i SPEC 7.1 om att Claude Codes `grep` inte söker i allt (texten godkänd av Hugo i chatten).
+- **G4** (77dce23): ett test kör det riktiga kontrollskriptet så som Terminal startar, och kräver `OK`. **Fynd:**
+  med det gamla skriptet skrev testet `AVVIKER: funktion: add-zsh-hook`, eftersom Apples Terminal-fil läser in
+  zsh:s egen `add-zsh-hook`. Det hade troligen stoppat installationen i steg 4 g. Hugos beslut i chatten: skriptet
+  godtar den bara från `/usr/share/zsh/<version>/functions`, med root som ägare. Skriptet har därför en ny
+  kontrollsumma.
+- **Kontrollsummor (sha256)** (58daf69), räknade med Pythons `hashlib` i en ren kopia:
+  `sparr/kommandosparr.py` `b730b27fff418430983f7c06ca2f58b04c890d3ff3bc7c9bf1d832e64bbad481`,
+  `sparr/managed-settings.json` `e1222e168de38f819ebf861319e9a9b2fc134ce52b3729ec23ceacb57682d463`,
+  `sparr/kontrollera-skalet.zsh` `8ae712451b55f75dda5ecf429161ccbb34f1e98d90b53d03e5293319965e1583` och
+  `requirements.txt` `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a` (oförändrad). Står i
+  INSTALLERA.md steg 4 g och 5. Summorna efter granskning 16 (nedan) gäller inte längre, utom för
+  `requirements.txt`.
+- **Testsviten:** 3 724 passed, 0 misslyckade (före: 3 669). 57 nya tester i
+  `scripts/tests/test_beslut_granskning_16.py`, och två fall borttagna (`grep -R` som tillåtet, och
+  `add-zsh-hook` i listan över funktioner som avviker, som nu prövas i de nya testen). Varje rättelse prövad mot en
+  kopia av versionen före den.
+- **Nästa steg:** (1) en oberoende granskning (granskning 17) i en ny session, med kontrollsummor, (2) en session
+  provkör steg 4 h med Hugos OK i chatten (G1), (3) Hugo installerar enligt `sparr/INSTALLERA.md`.
 
 ## Läge 2026-10-28, efter granskning 16 (av abd0745)
 
@@ -383,13 +416,20 @@ fattade och byggda, se avsnittet ovan.)
    `@` eller `+`, och testet för OK prövar en ändrad kopia. G5: minst 40 av de nya och ändrade testerna är
    gröna redan före abd0745. G6: Claude Codes `grep` hoppar över filer i `.gitignore` och binära filer, vilket
    inte står i SPEC 7.1. G7: inget förbud för `.ugrep`, och skyddet bygger på hur Claude Codes funktion ser ut
-   i dag. **Öppna, väntar på beslut från Hugo eller Casper.**
+   i dag. **Hugos beslut 2026-10-28: G2, G3, G4, G6 och G7 är rättade** (se "Läge 2026-10-28, efter rättelserna
+   efter granskning 16"). **Kvar:** G1 (en session provkör steg 4 h med Hugos OK, före installationen), G5
+   (bara en anmärkning om gamla tester), och tre saker från rättelserna: (a) om Claude Codes förbud
+   `Edit(//**/.ugrep)` också gäller `.UGREP` (stora bokstäver) är inte bekräftat, och samma fråga gäller de andra
+   förbuden, (b) vakten ser bara namnen i kommandot, inte innehållet i en mapp som kopieras eller ett arkiv som
+   packas upp, men det hamnar bara i den tillfälliga mappen, där `ugrep` inte letar, och (c) granskningens förslag
+   att visa `typeset -f grep` i steg 4 h ingick inte i beslutet och är inte gjort.
 
 ## Nästa steg i byggordningen
 
 1. **Vakten för kommandolistan (granskning 11, Q1).** Byggsessionen är klar (f21a3a1, 773e919 och
-   6686166), och fynden i granskning 12 är byggda (5cb9080, 08a3370, c066188). Kvar: **en ny oberoende
-   granskning av den nya versionen, med punkt 3 (omvägarna)** och nya kontrollsummor, sedan kontrollerar
+   6686166), och fynden i granskning 12 är byggda (5cb9080, 08a3370, c066188). Rättelserna efter granskning
+   16 är gjorda (1dbedb1 till 58daf69). Kvar: **oberoende granskning 17 i en ny session**, med nya
+   kontrollsummor, sedan provkörs steg 4 h i en session med Hugos OK (G1), sedan kontrollerar
    Hugo versionen och installerar enligt `sparr/INSTALLERA.md`, och
    därefter kontrollen efter installationen i en ny session (sist i `sparr/INSTALLERA.md`). Caspers dator
    får samma installation och samma kontroll. Före
