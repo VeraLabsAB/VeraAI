@@ -128,20 +128,26 @@ sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
 
 1. **Starta nya sessioner** i terminalen och i skrivbordsappen. Sessioner som redan är öppna kan ha
    läst inställningarna innan filen fanns.
-2. **Kontrollen efter installationen görs i en ny session** (planens steg 5): under `/status` ska de
-   låsta inställningarna synas som källa, `git status` ska gå igenom, och `ls; ls`, `cd ..`,
-   `sudo ls`, `su` och `echo x` ska stoppas med ett fel på svenska. Agenten gör inte det steget utan
-   att du säger till.
+2. **Kontrollen efter installationen görs i en ny session** (planens steg 5). Agenten gör inte det
+   steget utan att du säger till. Kontrollera att
+   - de låsta inställningarna syns som källa under `/status` (inte inställningar från claude.ai),
+   - `git status` går igenom,
+   - `ls; ls`, `cd ..`, `sudo ls`, `su` och `echo x` stoppas med ett fel på svenska,
+   - **agenten fortfarande kan fråga dig** (be den ställa en fråga med svarsknappar, och svara),
+   - **agenten fortfarande kan skriva filer i `~/VERA`** (be den skapa en liten provfil i
+     `~/VERA/agent` med fil-verktyget Write, och ta sedan bort den själv i Finder),
+   - en vakt som fallerar stoppar kommandot (planens steg 5).
+
+   Om agenten inte kan fråga dig eller skriva filer: stoppa och fråga, innan något annat görs.
 3. **Vakterna i tillägget superpowers slutar fungera** (Hugos beslut 2026-10-28, 2), eftersom bara
    vakter från de låsta inställningarna får köras.
 
 ## Caspers dator
 
 Samma steg, i samma ordning, och samma versionskontroll i steg 1 (både terminalen och
-skrivbordsappen, minst 2.1.295). Två skillnader:
+skrivbordsappen, minst 2.1.295). Samma `managed-settings.json` fungerar: regeln som hindrar agenten att
+skriva i `.git` (`Edit(//**/.git/**)`) gäller varje `.git`-mapp på datorn och har inget användarnamn i
+sig. En skillnad:
 
 - Sökvägen till projektet kan vara en annan. Byt `~/VERA/agent` i steg 2 och 5 mot där projektet
   ligger på Caspers dator.
-- Regeln i `managed-settings.json` som hindrar agenten att skriva i `.git` har Hugos sökväg
-  (`/Users/hugolindholmer/VERA/agent/.git`). Casper behöver en version av filen med sin egen sökväg,
-  som granskas på samma sätt innan den installeras.

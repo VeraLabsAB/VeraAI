@@ -20,11 +20,13 @@ skapas på nytt för varje test, så att inget test rör det riktiga projektet.
 
 import ast
 import importlib.util
+import io
 import json
 import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -146,6 +148,24 @@ def test_vanliga_filverktyg_slapps_igenom(vakt, mappar, verktyg):
     indata = _indata(mappar, "", verktyg)
     indata["tool_input"] = {"file_path": mappar["projekt"] + "/SPEC.md"}
     assert vakt.bedom(indata, mappar["projekt"], mappar["hem"]) is None
+
+
+def test_agenten_kan_fraga_och_skriva_filer_i_vera(vakt, mappar):
+    # Kontrollen efter installationen (INSTALLERA.md): agenten ska fortfarande kunna fråga Hugo och
+    # skriva filer i ~/VERA. Vakten ska alltså släppa igenom båda, också utanför projektmappen.
+    fraga = _indata(mappar, "", "AskUserQuestion")
+    fraga["tool_input"] = {"questions": [{"question": "Prov?", "header": "Prov", "options": []}]}
+    assert vakt.bedom(fraga, mappar["projekt"], mappar["hem"]) is None
+    skriv = _indata(mappar, "", "Write")
+    skriv["tool_input"] = {"file_path": os.path.join(mappar["hem"], "VERA", "prov.txt"), "content": "x"}
+    assert vakt.bedom(skriv, mappar["projekt"], mappar["hem"]) is None
+
+
+def test_installationen_kontrollerar_att_agenten_kan_fraga_och_skriva():
+    text = INSTALLERA.read_text(encoding="utf-8")
+    efterat = text.split("## Efteråt", 1)[1].split("\n## ", 1)[0]
+    assert "kan fråga dig" in efterat
+    assert "kan skriva filer i `~/VERA`" in efterat
 
 
 # ---------------------------------------------------------------------------------------------
@@ -582,6 +602,28 @@ def test_programmet_stoppar_trasig_indata(mappar, indata):
     assert svar.returncode == 2 and "indata" in svar.stderr.decode("utf-8")
 
 
+def test_programmet_stoppar_nar_vakten_kraschar_mitt_i_bedomningen(vakt, mappar, monkeypatch):
+    # Bedömningen byts mot en som kraschar. Kommandot ska då stoppas med kod 2, inte släppas igenom
+    # (mutationstest d, 2026-10-28: utan det här testet var inget test rött när kraschen släppte igenom).
+    def kraschar(*_):
+        raise RuntimeError("prov")
+
+    monkeypatch.setattr(vakt, "bedom", kraschar)
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(json.dumps(_indata(mappar, "ls")).encode())))
+    fel = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+    monkeypatch.setattr(sys, "stderr", fel)
+    assert vakt.main() == 2
+    fel.flush()
+    assert "oväntat fel" in fel.buffer.getvalue().decode("utf-8")
+
+
+def test_programmet_stoppar_nar_vakten_kraschar_vid_inlasningen(mappar):
+    # JSON som är kapslad för djupt får Python att krascha (RecursionError) redan vid inläsningen,
+    # utanför vaktens vanliga felhantering. Kommandot ska ändå stoppas.
+    svar = _kor_programmet(mappar, b"[" * 100000)
+    assert svar.returncode == 2
+
+
 def test_programmet_stoppar_utan_projektmapp(mappar):
     svar = _kor_programmet(mappar, _indata(mappar, "git status"), projektmapp=False)
     assert svar.returncode == 2 and "CLAUDE_PROJECT_DIR" in svar.stderr.decode("utf-8")
@@ -643,8 +685,20 @@ def test_installningarna_kor_vakten_fore_varje_verktyg_och_stoppar_om_den_faller
 
 def test_installningarna_nekar_sudo_su_och_att_skriva_i_git():
     neka = _installningar()["permissions"]["deny"]
-    for regel in ["Bash(sudo *)", "Bash(su *)", "Bash(su)", "Edit(//Users/hugolindholmer/VERA/agent/.git/**)"]:
+    for regel in ["Bash(sudo *)", "Bash(su *)", "Bash(su)", "Edit(//**/.git/**)"]:
         assert regel in neka
+
+
+def test_git_regeln_galler_varje_git_mapp_pa_datorn():
+    # Regeln ska gälla .git var den än ligger, så att samma fil fungerar på Caspers dator. I Claude Codes
+    # regler betyder // datorns rot och ** valfritt antal mappar (code.claude.com/docs/en/permissions,
+    # "How path patterns match", exemplet Read(//**/.env)). Ingen regel får ha ett användarnamn eller
+    # en hemmapp i sig.
+    neka = _installningar()["permissions"]["deny"]
+    git_regler = [regel for regel in neka if ".git" in regel]
+    assert git_regler == ["Edit(//**/.git/**)"]
+    text = INSTALLNINGAR.read_text(encoding="utf-8")
+    assert "/Users/" not in text and "hugolindholmer" not in text and "~/" not in text
 
 
 def _installationskommandon():

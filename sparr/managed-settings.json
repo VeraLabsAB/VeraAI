@@ -7,7 +7,7 @@
       "Bash(sudo *)",
       "Bash(su *)",
       "Bash(su)",
-      "Edit(//Users/hugolindholmer/VERA/agent/.git/**)"
+      "Edit(//**/.git/**)"
     ]
   },
   "hooks": {
