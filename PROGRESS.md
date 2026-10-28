@@ -6,8 +6,8 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **3 148 passed**, 0 misslyckade (körd 2026-10-28 i projektet, i byggsessionen för vakten,
-granskning 11, Q1).
+Testsviten: **3 193 passed**, 0 misslyckade (körd 2026-10-28 i projektet, i byggsessionen som härdade
+vakten efter granskning 12).
 
 ## Klart
 
@@ -30,7 +30,8 @@ granskning 11, Q1).
 | Granskning 8, N3, det som var kvar: `matcha_period` får regelboken, och ägarens bankrad kräver alltid underlag | ea51c97, de14da7 |
 | Efter granskning 9: en saknad, tom eller oläsbar ägarlista stoppar körningen (a), och ägarens bankrad märks "kräver mänsklig bedömning" i matchningen och blir aldrig en vanlig matchning (b) | dd0e1cf |
 | Efter granskning 10 (P1): en motpart i ägarlistan utan bokstäver och siffror, till exempel `-`, stoppar körningen | 16000a8 |
-| Granskning 11, Q1: vakten för kommandolistan (`sparr/kommandosparr.py`), förslaget till låsta inställningar, INSTALLERA.md och SPEC 7.1. **Inte granskad och inte installerad** | f21a3a1, 773e919, 6686166 |
+| Granskning 11, Q1: vakten för kommandolistan (`sparr/kommandosparr.py`), förslaget till låsta inställningar, INSTALLERA.md och SPEC 7.1 | f21a3a1, 773e919, 6686166 |
+| Efter granskning 12 (Hugos beslut 2026-10-28): lista över tillåtna verktyg i vakten och SPEC 7.1 (P4), skills utan skalkommandon (P3), förbud för filen `.git` (P5), läget "auto" avstängt (P6), nya skrivförbud (beslut b), provet med en vakt som fallerar i INSTALLERA.md (P2, beslut a). **Inte granskad och inte installerad** | 5cb9080, 08a3370, c066188 |
 
 ## Öppet
 
@@ -60,14 +61,21 @@ granskning 11, Q1).
    förbi vakten) gjordes inte, eftersom ett säkerhetsfilter stoppade den (P1, stoppar installationen).
    Övriga fynd: P2 (provet där vakten fallerar togs bort ur kontrollen efter installationen), P3 (skills
    som kör skalkommandon), P4 (kommandoverktyg känns igen på namnet), P5 (`.git` som fil), P6 (läget
-   "auto") och P7 (rättigheterna på `/Library/Application Support`). Beslut (a) och (b) väntar på Hugo
-   eller Casper.
+   "auto") och P7 (rättigheterna på `/Library/Application Support`). **P2–P6 och beslut (a) och (b) är
+   byggda** efter Hugos beslut 2026-10-28 (5cb9080, 08a3370, c066188). Kvar: P1 (omvägarna), P7 (inget
+   beslut), vilka mappar i Hugos `PATH` som ska förbjudas (förbuden mot `~/bin`, `~/.local/bin` och
+   `/opt/homebrew` är granskarens förslag, inte kontrollerade mot Hugos `PATH`), och att lägsta version
+   för `disableSkillShellExecution` och `disableAutoMode` inte är bekräftad i dokumentationen.
+   Kontrollsummorna i granskning 12 gäller inte längre, eftersom vakten och inställningarna är ändrade.
+   Provet med en vakt som fallerar visar att en **saknad** vakt stoppar (Python ger kod 2), men prövar inte
+   `onFailure` i sig (INSTALLERA.md, steg 8).
 
 ## Nästa steg i byggordningen
 
 1. **Vakten för kommandolistan (granskning 11, Q1).** Byggsessionen är klar (f21a3a1, 773e919 och
-   6686166). Granskning 12 är gjord utom punkt 3 (omvägarna). Kvar: **punkt 3 i en ny
-   granskningssession**, beslut om fynden i granskning 12, sedan kontrollerar Hugo versionen och installerar enligt `sparr/INSTALLERA.md`, och
+   6686166), och fynden i granskning 12 är byggda (5cb9080, 08a3370, c066188). Kvar: **en ny oberoende
+   granskning av den nya versionen, med punkt 3 (omvägarna)** och nya kontrollsummor, sedan kontrollerar
+   Hugo versionen och installerar enligt `sparr/INSTALLERA.md`, och
    därefter kontrollen efter installationen i en ny session (sist i `sparr/INSTALLERA.md`). Caspers dator
    får samma installation och samma kontroll. Före
    uppgift 4 (Hugos beslut 2026-10-28).
@@ -113,6 +121,14 @@ avsnitt 8, med namn och datum.
   som Hugo jämför med granskningens innan han kopierar. Förbud mot att skriva i skalets och gits startfiler,
   `~/.claude/**` och `~/Library/LaunchAgents/**`. Skills och worktree-sessioner blir frågor till
   granskningen. Byggt, inte installerat. Detaljer: `GRANSKNING.md`, "Bygget av vakten för Q1".
+- **Hugos beslut 2026-10-28 (granskning 12):** `disableSkillShellExecution: true` (P3). Vakten släpper bara
+  igenom verktygen på listan i SPEC 7.1 (P4), och Hugo valde listan i chatten samma dag. Förbud mot att
+  skriva i filen `.git` på varje djup (P5). `permissions.disableAutoMode: "disable"` (P6). Förbud mot att
+  skriva i `~/.ssh/**`, `.mcp.json`, projektets `.claude/**`, `~/.claude.json`, mappar i `PATH` som Hugo
+  äger och `.venv/**`, men inget förbud för CLAUDE.md. Varje ändring i CLAUDE.md nämns i slutrapporten.
+  Provet med en vakt som fallerar i kontrollen efter installationen, gjort av Hugo i Terminal. Lägsta
+  version för P3 och P6 är inte bekräftad, och Hugo beslöt i chatten att de byggs in ändå. Byggt i
+  5cb9080, 08a3370 och c066188.
 - **Hugos beslut i chatten 2026-10-27:** listan över ägare och närstående ligger kvar i
   `foretag/<namn>/regelbok.json` tills spärrsteget, eftersom SPEC inte säger var den skyddade mappen ska
   ligga. Testet att listan ligger utanför alla mappar agenten får skriva i skrivs då.
