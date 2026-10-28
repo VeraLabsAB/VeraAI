@@ -6388,3 +6388,13 @@ Skrivna av Hugo i uppdraget till granskning 18, i chatten 2026-10-28.
 
 - **De två stash-posterna ligger kvar tills efter installationen.**
 - **H6 prövas på riktigt i spärrtestet efter installationen, inte i INSTALLERA.md.**
+
+### Hugos beslut 2026-10-28 (efter granskning 18)
+
+Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28, i chatten.
+
+- **I1 rättas som granskaren föreslog:** vakten stoppar sökvägar som börjar med `/.` direkt under roten (till
+  exempel `/.vol`, `/.nofollow` och `/.resolve`).
+- **I2–I8 läggs under Öppet**, så att vakten kan installeras snart (PROGRESS.md, Öppet).
+- **I3, den riktiga historiken:** den slutliga H6-versionen bygger på den undanlagda versionen, och gjordes alltså
+  inte om från början. Den andra stash-posten (`stash@{0}`, kl. 20.18) har inget nedskrivet OK.
