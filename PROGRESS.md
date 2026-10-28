@@ -6,10 +6,58 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **3 312 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, i
-byggsessionen efter Hugos svar 1–3).
+Testsviten: **3 350 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, i
+byggsessionen efter Hugos beslut om granskning 13).
+
+## Läge 2026-10-28, efter Hugos beslut om granskning 13
+
+**Byggt** (inte installerat, inte granskat, inga `sudo`-kommandon körda, inget i `/Library` rört, `~/.zshrc`
+och andra filer i hemmappen inte ändrade, inga kontrollsummor). Besluten och detaljerna står i
+`GRANSKNING.md`, "Granskning 11 – plan för Q1", "Hugos beslut 2026-10-28 om fynden i granskning 13".
+
+- **P1 a:** INSTALLERA.md steg 4 g och kontrollen efter installationen, steg 1: Hugo kör `alias` och
+  `typeset -f +` i Terminal och stoppar om ett namn på listan i SPEC 7.1 (eller ett namn med `/`) finns där.
+- **P1 b:** förbud i `sparr/managed-settings.json` för filerna som zsh läser vid start och filerna de läser
+  in: `~/.nvm/**`, `~/.zkbd/**`, `~/.zsh_sessions/**`, `~/.zlogout` och zsh-filerna i `/etc` (de fyra i
+  hemmappen var redan förbjudna). På Hugos dator läser `~/.zshrc` in `~/.nvm/nvm.sh` och
+  `~/.nvm/bash_completion`. INSTALLERA.md "Efteråt", punkt 10: vad Hugo gör med en ny `source`-rad.
+- **P2 a:** vakten prövar varje länk i kedjan (`_saker_kedja`). Granskarens väntade test är grönt.
+- **P3 b:** INSTALLERA.md använder `~/.local/bin/claude --version`, `~/.local/bin/claude update` och
+  `~/.local/bin/claude`, och varnar för installerarens förslag. `PATH` ändras inte. SPEC 7.1 är ändrad till
+  samma sak (med beslutet angivet).
+- **P4 a:** förbud för `~/.local/bin/claude`, `~/.local/share/claude/**`, skrivbordsappens Claude Code och
+  appen (se nedan).
+- **Fråga 2:** INSTALLERA.md säger att Claude Code för Terminal omfattas av samma låsta inställningar.
+- **Tester:** 31 nya i `scripts/tests/test_beslut_granskning_13.py`, tre ändrade i `test_kommandosparr.py`.
+  Hela testsviten: **3 350 passed**, 0 misslyckade.
+
+**Vad som hittades om Claude Code och appen (P4 a, läst med `ls -l` 2026-10-28):**
+
+- Claude Code för Terminal: `~/.local/bin/claude` → `~/.local/share/claude/versions/2.1.312`, allt ägt av Hugo.
+- **Skrivbordsappens egen Claude Code** ligger i
+  `~/Library/Application Support/Claude/claude-code/<version>/<kod>/claude.app/Contents/MacOS/claude`
+  (versionerna 2.1.308 och 2.1.309 finns). Ägs av Hugo (`hugolindholmer staff`).
+- **`/Applications/Claude.app` ägs av Hugo** (`hugolindholmer staff`), liksom mapparna i den.
+  `/Applications` ägs av root med gruppen `admin` och kan skrivas i av gruppen (`drwxrwxr-x`).
+
+**Öppet beslut (P4):** appen och appens Claude Code ägs av Hugo, inte av systemet. Förbuden stoppar agentens
+fil-verktyg, men inte program som Hugo själv kör eller den kända luckan (en egen testfil). Ska ägandet
+ändras, eller räcker förbuden? Inget ägande är ändrat.
+
+**Beslut som behövs:**
+
+1. **P4:** se det öppna beslutet ovan.
+2. **P3 b, tolkning:** `cd ~/VERA` står kvar före `~/.local/bin/claude` (bara `claude` är utbytt mot hela
+   sökvägen). Bekräftas?
+3. **`~/Library/Application Support/Claude`** har också skrivbordsappens egna inställningar. Bara mappen
+   `claude-code` är förbjuden nu. Ska hela mappen förbjudas? Inte kontrollerat vad mer som ligger där.
+4. **Ny oberoende granskning** av den nya versionen, med kontrollsummor, före installationen. P5 (omvägarna
+   i en kopia) görs i en egen session före uppgift 5 (Öppet, punkt 6).
 
 ## Läge 2026-10-28, efter Hugos svar 1–3
+
+(Läget nedan gällde före Hugos beslut om granskning 13. Att `claude` inte hittas i Terminal gäller inte
+längre: Claude Code för Terminal ligger i `~/.local/bin/claude` och startas med hela sökvägen.)
 
 **Byggt** (inte installerat, inga `sudo`-kommandon körda, inget i `/Library` rört, `~/.zshrc` inte rörd).
 Besluten och detaljerna står i `GRANSKNING.md`, "Granskning 11 – plan för Q1", "Hugos svar 2026-10-28 på de
@@ -184,6 +232,10 @@ fattade och byggda, se avsnittet ovan.)
    Kontrollsummorna i granskning 12 gäller inte längre, eftersom vakten och inställningarna är ändrade.
    Provet med en vakt som fallerar visar att en **saknad** vakt stoppar (Python ger kod 2), men prövar inte
    `onFailure` i sig (INSTALLERA.md, steg 8).
+6. **Granskning 13, P5: omvägarna förbi vakten med kommandotexter i en kopia.** Hugos beslut 2026-10-28 (P5
+   a): görs i **en egen session före uppgift 5**. Granskning 12 och 13 kunde inte göra det provet, eftersom
+   ett säkerhetsfilter i Claude Code stoppade svaret. Det som inte är uteslutet är framför allt sätt som zsh
+   läser ett ord på som skiljer sig från vaktens uppdelning. **Öppen, inte gjord.**
 
 ## Nästa steg i byggordningen
 
@@ -264,6 +316,11 @@ avsnitt 8, med namn och datum.
   platsen finns, och den gamla tas bort efter installationen, (3) bara en annan låst källa på raden Setting
   sources underkänner installationen (ersätter beslut 4 ovan), raden läses i Terminal, och ett sista steg i
   skrivbordsappen visar att vakten stoppar `date`. Byggt, inte installerat.
+- **Hugos beslut 2026-10-28 om granskning 13:** P1 a och b (kontroll av alias och funktioner, förbud för
+  zsh:s filer och filerna de läser in), P2 a (vakten prövar varje länk i kedjan), P3 b (`PATH` ändras inte,
+  hela sökvägen `~/.local/bin/claude`, varning för installerarens förslag), P4 a (förbud för Claude Code för
+  Terminal, appens Claude Code och appen), P5 a (omvägarna i en egen session före uppgift 5) och fråga 2
+  (Claude Code för Terminal behålls, utanför `PATH`). Byggt, inte installerat. Detaljer: `GRANSKNING.md`.
 - **Hugos beslut i chatten 2026-10-27:** listan över ägare och närstående ligger kvar i
   `foretag/<namn>/regelbok.json` tills spärrsteget, eftersom SPEC inte säger var den skyddade mappen ska
   ligga. Testet att listan ligger utanför alla mappar agenten får skriva i skrivs då.

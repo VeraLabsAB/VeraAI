@@ -3391,6 +3391,150 @@ inte rörd):
   `date`).
 - OVERLAMNING.md nämner inte längre `.venv`: den nya platsen och INSTALLERA.md i stället.
 
+### Hugos beslut 2026-10-28 om fynden i granskning 13
+
+Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28 (fynden står i "Granskning 13" längst ned i den
+här filen):
+
+- **P1 (a) och (b), Hugos beslut 2026-10-28.** (a) INSTALLERA.md får ett steg före och ett efter
+  installationen där Hugo i Terminal kör `alias` och `typeset -f +`, med namnen på kommandona i listan i SPEC
+  7.1 att leta efter, och att han stoppar och frågar om något av dem finns där. (b) Byggsessionen tar reda på
+  alla filer som zsh läser vid start (`~/.zshenv`, `~/.zprofile`, `~/.zshrc`, `~/.zlogin`) och alla filer de
+  läser in med `source` eller punkt, och lägger till förbud för agentens fil-verktyg att skriva i dem i den
+  låsta inställningsfilen. Filerna ändras inte. INSTALLERA.md säger vad Hugo gör om han senare lägger till en
+  ny rad med `source` i `~/.zshrc`.
+- **P2 (a), Hugos beslut 2026-10-28.** Vakten kontrollerar varje länk i kedjan, inte bara den första och
+  slutmålet. Det väntande testet ska bli grönt.
+- **P3 (b), Hugos beslut 2026-10-28.** `PATH` ändras inte. INSTALLERA.md använder hela sökvägen:
+  `~/.local/bin/claude --version`, `~/.local/bin/claude update` och `~/.local/bin/claude`. Det ersätter "cd
+  ~/VERA, sedan claude" i beslut 3. Raden som lägger `~/.local/bin` i `PATH` tas bort, och INSTALLERA.md
+  varnar tydligt för installerarens förslag `export PATH="$HOME/.local/bin:$PATH"` och förklarar varför.
+- **P4 (a), Hugos beslut 2026-10-28.** Förbud för agentens fil-verktyg att skriva i `~/.local/share/claude`
+  och `~/.local/bin/claude`. Byggsessionen tar reda på var skrivbordsappens egen Claude Code ligger, och vem
+  som äger den mappen och `/Applications/Claude.app` (bara läsa, med `ls -l`), och lägger till samma sorts
+  förbud för de platserna. Ägs appen av Hugo blir det ett öppet beslut, och inget ägande ändras.
+- **P5 (a), Hugos beslut 2026-10-28.** Omvägarna prövas med kommandotexter i en kopia, i en egen session före
+  uppgift 5 (PROGRESS.md, "Öppet").
+- **Fråga 2, Hugos beslut 2026-10-28.** Claude Code för Terminal behålls, utanför `PATH`, med förbudet i P4.
+  INSTALLERA.md ska visa att den omfattas av samma låsta inställningar som appen.
+
+Därtill: inga `sudo`-kommandon, inget i `/Library` rört, `~/.zshrc` och andra filer i hemmappen inte
+ändrade, inga kontrollsummor (de tas fram i nästa granskning), committa men inte pusha.
+
+**Byggt 2026-10-28** (inte installerat, inte granskat):
+
+- **P1 a.** INSTALLERA.md steg 4 g (före installationen, i det nya Terminal-fönstret från steg 4 e) och
+  kontrollen efter installationen, steg 1 (efter): `alias` och `typeset -f +`, vad som är väntat (`run-help`,
+  `which-command`, nvm:s och Terminals egna funktioner), de 13 namnen i SPEC 7.1 och namn med ett
+  snedstreck, och "stoppa och fråga". Steget ligger i steg 4 i stället för som ett eget numrerat steg, så att
+  numren på stegen efter (som SPEC, PROGRESS och testerna hänvisar till) inte ändras. Steg 4 har fått det i
+  sin rubrik. Nämns också för Caspers dator.
+- **P1 b.** Kartlagt på Hugos dator 2026-10-28, bara läsande (`ls -la`, `grep`, `wc -l` och Read):
+  - `~/.zshrc` finns (4 rader). Den läser in `~/.nvm/nvm.sh` och `~/.nvm/bash_completion` (raderna
+    `[ -s "$NVM_DIR/…" ] && \. "$NVM_DIR/…"`). Inga av dem läser in fler filer (sökt efter `source` och
+    `.` i början av ett kommando).
+  - `~/.zshenv`, `~/.zprofile`, `~/.zlogin` och `~/.zlogout` finns inte. zsh läser dem om de skapas.
+  - Systemets filer: `/etc/zprofile` och `/etc/zshrc` finns (root, `r--r--r--`). `/etc/zshenv`, `/etc/zlogin`
+    och `/etc/zlogout` finns inte. `/etc/zshrc` läser in `~/.zkbd/<terminaltyp>-<tillverkare>` om filen finns
+    (den finns inte i dag) och `/etc/zshrc_$TERM_PROGRAM`. Den enda sådana filen är
+    `/etc/zshrc_Apple_Terminal` (root), som i Terminal läser in och sedan raderar
+    `~/.zsh_sessions/<session>.session`. `/etc/zprofile` kör `/usr/libexec/path_helper`, som läser
+    `/etc/paths` och `/etc/paths.d` (root).
+  - `ZDOTDIR` (som flyttar zsh:s egna filer till en annan mapp) sätts ingenstans.
+
+  Nya förbud i `sparr/managed-settings.json`: `Edit(~/.zlogout)`, `Edit(//etc/zshenv)`,
+  `Edit(//etc/zprofile)`, `Edit(//etc/zshrc)`, `Edit(//etc/zshrc_*)`, `Edit(//etc/zlogin)`,
+  `Edit(//etc/zlogout)`, `Edit(~/.nvm/**)`, `Edit(~/.zkbd/**)` och `Edit(~/.zsh_sessions/**)`.
+  `~/.zshenv`, `~/.zprofile`, `~/.zshrc` och `~/.zlogin` var redan förbjudna. Filerna i `/etc` ägs av root och
+  går redan inte att skriva i för Hugos konto, men får förbudet ändå, eftersom uppdraget gäller alla filer som
+  zsh läser vid start. Enligt dokumentationen gäller `//etc/…` också den verkliga platsen `/private/etc`
+  ("a deny or ask rule written through a symlinked directory … also applies at the directory's real
+  location", code.claude.com/docs/en/permissions, "Symlinks", från version 2.1.268). Hela nvm-mappen förbjuds,
+  inte bara de två filerna, eftersom `nvm.sh` också läser `~/.nvm/alias` (vilken Node-version som gäller) och
+  programmen i `~/.nvm/versions`. INSTALLERA.md "Efteråt", punkt 10: vad Hugo gör om han senare lägger till en
+  rad med `source` (eller en punkt) i `~/.zshrc`, `~/.zshenv`, `~/.zprofile` eller `~/.zlogin`: lägg inte
+  till raden förrän en ny version av inställningsfilen med ett förbud för den nya filen är byggd, granskad
+  och installerad, och gör om kontrollen av alias och funktioner.
+- **P2 a.** `sparr/kommandosparr.py`, ny funktion `_saker_kedja`, som `_saker_plats` nu också kräver. Den
+  följer sökvägen en del i taget från `/`, som datorn gör, och följer varje länk på vägen för sig (också en
+  mapp som är en länk, och en länk med `..`). Varje mapp som gås igenom, och filen själv, ska ägas säkert av
+  root. En länk kan bara bytas ut av den som får skriva i mappen där länken ligger, och den mappen prövas.
+  Länkfilen själv prövas inte för sig: en länk går inte att ändra, bara att byta ut. En kedja med fler än 32
+  länkar (`MAX_LANKAR`, som macOS egen gräns) stoppas, liksom en länk som inte går att läsa. De gamla
+  proven (sökvägen som den står och slutmålet, med alla mappar ovanför) är kvar. Felet säger nu "filen, en
+  länk på vägen dit eller en mapp ovanför dem". Granskarens test
+  `test_lank_via_en_lank_i_en_mapp_som_anvandaren_ager_stoppas` är grönt, och markeringen `xfail` är
+  borttagen.
+- **P3 b.** INSTALLERA.md steg 1: Claude Code för Terminal startas alltid med hela sökvägen,
+  `~/.local/bin/claude --version`, `~/.local/bin/claude update` (om versionen är äldre än 2.1.295) och
+  `cd ~/VERA` följt av `~/.local/bin/claude` för raden Setting sources. Samma sak i "Efteråt", punkt 2, och i
+  kontrollen efter installationen, steg 1. "Säger Terminal `command not found: claude`: stoppa" är ersatt med
+  "`no such file or directory`: stoppa". Varningen för installerarens förslag står i steg 1, med tre skäl:
+  mappen hamnar först och Hugo äger den, så vakten stoppar allt; ett program där med samma namn som ett på
+  listan körs i stället för systemets, utan lösenord; och skrivbordsappen läser `PATH` från skalet, så raden
+  gäller agenten också. Steg 4 e: `~/.local/bin` ska inte stå i `PATH`. **Raden som lägger `~/.local/bin` i
+  `PATH`:** en sådan rad fanns inte i INSTALLERA.md (granskning 13 föreslog den i P3, punkt 2, men den
+  byggdes aldrig). Den läggs inte till, och ett nytt test visar att INSTALLERA.md inte har någon sådan rad.
+  Granskarens tester i `test_granskning_13.py` för den föreslagna raden (`LOKAL_BIN_RAD`) är kvar
+  oförändrade: de visar bara att raden skulle ha fungerat, och den används inte.
+  **Tolkning, att bekräfta:** "Det ersätter 'cd ~/VERA, sedan claude'" är byggt som att `claude` byts mot
+  hela sökvägen, medan `cd ~/VERA` står kvar först, som i granskning 13:s förslag. Då startar Claude Code
+  för Terminal i samma mapp som förut.
+  SPEC 7.1 hade samma mening ("`cd ~/VERA`, `claude`, `/status`" och stoppet vid `command not found`). Den
+  är ändrad efter beslutet, med beslutet angivet, så att SPEC och INSTALLERA.md inte säger olika. Samma sak
+  för P2 (PATH-regeln i 7.1), och statusraden överst i SPEC.
+- **P4 a.** Läst med `ls -l` och `ls -ld` 2026-10-28:
+  - Claude Code för Terminal: `~/.local/bin/claude` är en länk till
+    `~/.local/share/claude/versions/2.1.312`. Mapparna `~/.local/bin`, `~/.local/share/claude` och
+    `versions` ägs av Hugo (`hugolindholmer staff`, `drwxr-xr-x`).
+  - **Skrivbordsappens egen Claude Code** ligger i
+    `~/Library/Application Support/Claude/claude-code/<version>/<kod>/claude.app/Contents/MacOS/claude`. I dag
+    finns versionerna 2.1.308 och 2.1.309 (2.1.309 i mappen `5af865b9901c`). Allt ägs av Hugo
+    (`hugolindholmer staff`). Mappen `~/Library/Application Support/Claude` har `drwx------`.
+  - **`/Applications/Claude.app` ägs av Hugo** (`hugolindholmer staff`, `drwxr-xr-x`), och så gör
+    `Contents`, `Contents/MacOS` och `Contents/Resources`. `/Applications` ägs av root med gruppen `admin`
+    och `drwxrwxr-x`, så alla i gruppen `admin` (där Hugo troligen är med, inte kontrollerat) kan byta ut
+    appen.
+
+  Nya förbud: `Edit(~/.local/bin/claude)` (länken själv, utöver `Edit(~/.local/bin/**)` som redan fanns),
+  `Edit(~/.local/share/claude/**)`, `Edit(~/Library/Application Support/Claude/claude-code/**)` och
+  `Edit(//Applications/Claude.app/**)`. Att mellanslag fungerar i en regel står i dokumentationen
+  (`Edit(./Finance (2024)/**)`, code.claude.com/docs/en/permissions, "Special characters"). **Öppet beslut:**
+  appen och appens Claude Code ägs av Hugo, inte av root. Förbuden gäller agentens fil-verktyg, inte den
+  kända luckan (en egen testfil i en kopia) eller program som Hugo själv kör. Inget ägande är ändrat.
+- **Fråga 2.** INSTALLERA.md, "Vad som installeras": Claude Code för Terminal omfattas av samma låsta
+  inställningar som appen, med källan (code.claude.com/docs/en/managed-settings, "Surfaces"), och att det syns
+  på raden Setting sources i Terminal efter installationen.
+
+**Tester:** ny fil `scripts/tests/test_beslut_granskning_13.py` (31 tester): P2 (fem tester: en kedja där
+varje länk ligger i en mapp som root äger går igenom, en relativ länk i mitten stoppas, en mapp i `PATH` som
+leder via en länk i Hugos mapp stoppas, en för lång kedja stoppas, och systemets program går fortfarande
+igenom), P1 b (14 förbud och punkt 10 i "Efteråt"), P4 (fyra förbud), P1 a, P3 b (tre tester) och fråga 2.
+Tre befintliga tester och en konstant i `test_kommandosparr.py` är ändrade efter P3 b (granskning 13 räknade
+med fyra tester):
+`test_installationen_kontrollerar_versionen_forst` (kräver nu `~/.local/bin/claude --version` och `update`,
+och att bara `claude` aldrig står som kommando), `test_setting_sources_lases_i_terminal` (hela sökvägen och
+`no such file or directory`), `test_installationen_bara_kopierar_och_satter_agare_och_rattigheter` (godtar
+de nya kommandona för Terminal och `alias` och `typeset -f +`) och konstanten `TERMINAL_KOMMANDON`, som
+`test_installera_har_raden_som_lagger_cryptexes_mappen_sist` inte använder och därför inte behövde ändras.
+De nya testerna för P2 och granskarens test var röda mot den gamla vakten (prövat i en kopia av `9eabc16` i
+scratchpad-mappen). Hela testsviten: **3 350 passed**, 0 misslyckade (före: 3 318 passed och 1 xfailed).
+
+**Kommandon i byggsessionen, avsteg från SPEC 7.1 och CLAUDE.md:**
+- **Det första kommandot var ihopkopplat och hade `cd`** (`cd … && git ls-files | head -100 && wc -l …`). Det
+  läste bara filnamn och antal rader.
+- **Ett `ls -ld` hade omvänt snedstreck** (`Application\ Support`) i stället för citattecken. Det bara läste.
+- **Läsning utanför projektmappen**, på Hugos uppdrag (P1 b och P4 a): `ls -la`, `ls -ld`, `ls -l`, `ls -lR`,
+  `grep` och `wc -l` på zsh:s filer i hemmappen och `/etc`, på `~/.nvm`, `~/.local`,
+  `~/Library/Application Support/Claude` och `/Applications`, och Read på `/etc/zshrc_Apple_Terminal`. Inget
+  skrevs där. `~/.zshrc` lästes i sin helhet (4 rader, bara nvm), eftersom `grep` inte hittade raderna med
+  `\.`.
+- En sida ur dokumentationen hämtades med WebFetch, och Claude Code sparade den i en fil i hemmappen
+  (`~/.claude/projects/…/tool-results/`). Den lästes med `grep` och Read.
+- Allt annat stod på listan och kördes ett i taget: `.venv/bin/python -B -m pytest -p no:cacheprovider` (mot
+  `scripts/tests` och mot en kopia i scratchpad-mappen), `mkdir -p`, `git archive -o`, `tar -x -f … -C` och
+  `cp -R` till scratchpad-mappen, `grep`, `git status`, `git diff`, `git add` och `git commit`.
+
 ## Bygget av vakten för Q1 (2026-10-28)
 
 Planens steg 1 (byggsessionen), gjord på Hugos uppdrag i chatten 2026-10-28. **Inget är installerat.**

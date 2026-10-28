@@ -9,10 +9,9 @@ Fynden står i GRANSKNING.md under "Granskning 13".
 2. Raderna i ~/.zshrc: med zsh, utan Hugos egna filer (-f), visas att nvm-raden, den föreslagna raden för
    ~/.local/bin och Cryptexes-raden, i den ordningen, ger den PATH som INSTALLERA.md väntar sig, också om
    installerarens förslag (~/.local/bin först) redan har körts.
-3. P2 i granskning 13: en länk som leder via en annan länk i en mapp som användaren äger. Vakten prövar i
-   dag bara länken och slutmålet, inte länken i mitten. Testet är markerat xfail (väntat rött) tills vakten
-   rättas i en ny version. Det är strikt: när vakten rättas blir testet grönt, och då måste markeringen tas
-   bort.
+3. P2 i granskning 13: en länk som leder via en annan länk i en mapp som användaren äger. Vakten prövade
+   bara länken och slutmålet, inte länken i mitten. Testet var markerat xfail (väntat rött). Vakten prövar
+   nu varje länk i kedjan (Hugos beslut 2026-10-28, P2 a), och markeringen är borttagen i byggsessionen.
 """
 
 import os
@@ -117,11 +116,6 @@ def test_installerarens_forslag_lagger_mappen_forst():
     assert INSTALLERARENS_RAD.split('"')[1].startswith("$HOME/.local/bin:")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="Granskning 13, P2: vakten prövar inte en länk i mitten av en kedja av länkar (inte rättat)",
-)
 def test_lank_via_en_lank_i_en_mapp_som_anvandaren_ager_stoppas(vakt, mappar, tmp_path, rotagd):
     # rot/bin/git -> mitten/git -> mal/bin/git. rot och mal låtsas ägas av root (rotagd), men mitten
     # ägs av användaren, som kan byta ut mitten/git mot en länk till ett annat program.

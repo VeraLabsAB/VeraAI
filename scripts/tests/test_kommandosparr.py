@@ -1270,11 +1270,16 @@ def test_bara_en_annan_last_kalla_underkanner_installationen():
 
 
 def test_setting_sources_lases_i_terminal():
+    # Hugos beslut 2026-10-28, granskning 13, P3 b: hela sökvägen ~/.local/bin/claude ersätter claude.
+    # Finns inte programmet där säger Terminal "no such file or directory", och då stoppar Hugo.
     _, rader = _installationskommandon()
-    assert rader.index("cd ~/VERA") + 1 == rader.index("claude")
+    assert rader.index("cd ~/VERA") + 1 == rader.index(TERMINAL_CLAUDE)
+    assert "claude" not in rader
     for stalle in _setting_sources_stallen():
-        assert "Terminal" in stalle and "`cd ~/VERA`" in stalle and "`claude`" in stalle and "`/status`" in stalle
-        assert "command not found" in stalle
+        assert "Terminal" in stalle and "`cd ~/VERA`" in stalle and "`/status`" in stalle
+        assert f"`{TERMINAL_CLAUDE}`" in stalle and "Hugos beslut 2026-10-28, granskning 13, P3 b" in stalle
+        assert "no such file or directory" in stalle
+        assert "command not found: claude`: stoppa" not in stalle
 
 
 # Hugos svar 2026-10-28, punkt 3: ett sista steg i skrivbordsappen visar att vakten stoppar ett kommando som
@@ -1595,8 +1600,13 @@ NVM_KOPIA = "cp -i ~/.zshrc ~/.zshrc.fore-vera"
 NVM_RAD = '[ -n "$NVM_BIN" ] && path=( ${path:#$NVM_BIN} $NVM_BIN )'
 NVM_LAGG_TILL = f"echo '{NVM_RAD}' >> ~/.zshrc"
 NVM_KOMMANDON = (NVM_KOPIA, NVM_LAGG_TILL, "tail -n 3 ~/.zshrc", "echo $PATH")
-# Hugos svar 2026-10-28, punkt 3: raden Setting sources läses i Terminal.
-TERMINAL_KOMMANDON = ("cd ~/VERA", "claude")
+# Hugos svar 2026-10-28, punkt 3: raden Setting sources läses i Terminal. Hugos beslut 2026-10-28, granskning
+# 13, P3 b: Claude Code för Terminal ligger i ~/.local/bin, utanför PATH, och startas med hela sökvägen.
+TERMINAL_CLAUDE = "~/.local/bin/claude"
+TERMINAL_KOMMANDON = ("cd ~/VERA", TERMINAL_CLAUDE)
+TERMINAL_VERSION = (f"{TERMINAL_CLAUDE} --version", f"{TERMINAL_CLAUDE} update")
+# Hugos beslut 2026-10-28, granskning 13, P1 a: Hugo visar alias och funktioner i Terminal.
+ALIAS_KOMMANDON = ("alias", "typeset -f +")
 
 
 def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
@@ -1619,7 +1629,9 @@ def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
     ) + FORPROV_KOMMANDON
     assert rader
     for rad in rader:
-        assert rad.startswith(tillatna) or rad in NVM_KOMMANDON + TERMINAL_KOMMANDON + (KRYPTEX_LAGG_TILL,), rad
+        assert rad.startswith(tillatna) or rad in (
+            NVM_KOMMANDON + TERMINAL_KOMMANDON + TERMINAL_VERSION + ALIAS_KOMMANDON + (KRYPTEX_LAGG_TILL,)
+        ), rad
 
 
 def test_beslut_2_installera_beskriver_hur_nvm_mappen_flyttas_sist_i_path():
@@ -1643,15 +1655,21 @@ def _steg(text):
 
 
 def test_installationen_kontrollerar_versionen_forst():
-    # Hugos beslut 2026-10-28, beslut 3: versionen kontrolleras med /status i en Claude Code-session och
-    # ska vara 2.1.295 eller senare. Kommandot claude finns inte i Terminal på Hugos dator.
+    # Hugos beslut 2026-10-28, beslut 3: versionen i appen kontrolleras med /status i en Claude Code-session
+    # och ska vara 2.1.295 eller senare. Hugos beslut 2026-10-28, granskning 13, P3 b: Claude Code för
+    # Terminal ligger i ~/.local/bin, utanför PATH, så versionen där kontrolleras och uppdateras med hela
+    # sökvägen, aldrig med bara claude.
     text, rader = _installationskommandon()
     rubrik, forsta = _steg(text)[0]
+    forsta_rader = forsta
     forsta = _en_rad(forsta)
     assert "version" in rubrik.lower()
     assert "/status" in forsta and "2.1.295" in forsta
-    assert "Check for Updates" in forsta, "hur Hugo uppdaterar ska stå med"
-    assert "claude --version" not in rader
+    assert "Check for Updates" in forsta, "hur Hugo uppdaterar appen ska stå med"
+    for kommando in TERMINAL_VERSION:
+        assert f"```bash\n{kommando}\n```" in forsta_rader, kommando
+    assert rader.index(TERMINAL_VERSION[0]) < rader.index(TERMINAL_VERSION[1]) < _forsta_sudo(rader)
+    assert "claude --version" not in rader and "claude update" not in rader and "claude" not in rader
     assert "code.claude.com/docs/en/hooks" in text
 
 

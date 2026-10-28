@@ -28,7 +28,8 @@ Reglerna, i den ordning de prövas (planen i GRANSKNING.md, "Granskning 11 – p
    regel 5). Programmet som kommandot pekar på letas upp som skalet gör, i PATH från vaktens miljö, och
    filen och varje mapp ovanför den ska ägas av systemet (root) och inte gå att skriva i för gruppen
    eller andra. Det gäller både sökvägen som den står och dit länkarna leder (Hugos beslut 2026-10-28
-   om vakten, beslut 3). Samma krav gäller varje mapp i PATH före programmet, och en sådan mapp som
+   om vakten, beslut 3), och varje länk i kedjan däremellan, med mappen den ligger i (granskning 13, P2,
+   Hugos beslut 2026-10-28). Samma krav gäller varje mapp i PATH före programmet, och en sådan mapp som
    inte finns stoppar också (beslut 2). Kan vakten inte säkert avgöra vilken fil som körs, stoppas
    kommandot. Regeln prövas sist.
 
@@ -144,6 +145,9 @@ GIT_REGLER = {
 PATH_NAMN = ("PATH", "path")
 SATTER_VARIABLER = ("export", "env", "typeset", "declare", "readonly", "local", "unset")
 SKRIVBAR_FOR_GRUPP_ELLER_ANDRA = 0o022
+# Granskning 13, P2: så många länkar följs som mest i en kedja, som i macOS (MAXSYMLINKS). En längre kedja
+# stoppas.
+MAX_LANKAR = 32
 
 TILLATNA_KOMMANDON = (
     f"'{PYTHON}' (bara pytest), git, ls, cat, head, tail, grep, diff, find, wc, sort, mkdir, cp -R och tar"
@@ -432,9 +436,9 @@ def _mapparna_fore(namn, mappar):
     for mapp in mappar:
         if not _saker_plats(mapp):
             raise _Stopp(
-                f"mappen {mapp} står före programmet i PATH för '{namn}', och den mappen eller en mapp "
-                "ovanför den finns inte, ägs inte av systemet (root) eller går att skriva i för någon annan "
-                "än systemet. Ett program med samma namn kan läggas där utan administratörslösenord, så "
+                f"mappen {mapp} står före programmet i PATH för '{namn}', och den mappen, en länk på vägen "
+                "dit eller en mapp ovanför dem finns inte, ägs inte av systemet (root) eller går att skriva i "
+                "för någon annan än systemet. Ett program med samma namn kan läggas där utan administratörslösenord, så "
                 "kommandot stoppas (PATH-regeln, Hugos beslut 2026-10-28 om vakten, beslut 2)."
             )
 
@@ -455,7 +459,8 @@ def _sakert_agd(sokvag):
 
 def _saker_plats(fil):
     """Sant om filen (eller mappen) och varje mapp ovanför den ägs säkert av systemet, både för sökvägen
-    som den står och för sökvägen dit länkarna leder (Hugos beslut 2026-10-28 om vakten, beslut 3)."""
+    som den står och för sökvägen dit länkarna leder (Hugos beslut 2026-10-28 om vakten, beslut 3), och
+    för varje länk i kedjan däremellan (granskning 13, P2, Hugos beslut 2026-10-28)."""
     for sokvag in (os.path.normpath(fil), os.path.realpath(fil)):
         if not _sakert_agd(sokvag):
             return False
@@ -466,7 +471,46 @@ def _saker_plats(fil):
             if mapp == os.path.dirname(mapp):
                 break
             mapp = os.path.dirname(mapp)
-    return True
+    return _saker_kedja(fil)
+
+
+def _saker_kedja(fil):
+    """Sant om varje mapp som datorn går igenom för att nå filen ägs säkert av systemet, och filen själv.
+
+    Sökvägen följs en del i taget från /, som datorn själv gör. Varje länk på vägen (också en mapp som
+    är en länk) följs för sig, så att varje länk i en kedja prövas, också en länk i mitten (granskning 13,
+    P2, Hugos beslut 2026-10-28). En länk kan bara bytas ut av den som får skriva i mappen där länken
+    ligger, och den mappen prövas. En kedja med fler än MAX_LANKAR länkar stoppas, liksom en länk som
+    inte går att läsa."""
+    delar = [del_ for del_ in fil.split("/") if del_]
+    if not os.path.isabs(fil):
+        delar = [del_ for del_ in os.getcwd().split("/") if del_] + delar
+    mapp = "/"
+    lankar = 0
+    while delar:
+        if not _sakert_agd(mapp):
+            return False
+        del_ = delar.pop(0)
+        if del_ == ".":
+            continue
+        if del_ == "..":
+            mapp = os.path.dirname(mapp)
+            continue
+        nasta = os.path.join(mapp, del_)
+        if os.path.islink(nasta):
+            lankar += 1
+            if lankar > MAX_LANKAR:
+                return False
+            try:
+                mal = os.readlink(nasta)
+            except OSError:
+                return False
+            if os.path.isabs(mal):
+                mapp = "/"
+            delar[:0] = [d for d in mal.split("/") if d]
+            continue
+        mapp = nasta
+    return _sakert_agd(mapp)
 
 
 def _programmet(namn, lage, sokvag):
@@ -476,8 +520,8 @@ def _programmet(namn, lage, sokvag):
     verklig = os.path.realpath(fil)
     lank = f" (länken leder till {verklig})" if verklig != os.path.normpath(fil) else ""
     raise _Stopp(
-        f"programmet '{namn}' är {fil}{lank}, och filen eller en mapp ovanför den ägs inte av systemet "
-        "(root) eller går att skriva i för någon annan än systemet. Ett program där kan bytas ut utan "
+        f"programmet '{namn}' är {fil}{lank}, och filen, en länk på vägen dit eller en mapp ovanför dem ägs "
+        "inte av systemet (root) eller går att skriva i för någon annan än systemet. Ett program där kan bytas ut utan "
         "administratörslösenord, så kommandot stoppas (PATH-regeln, Hugos beslut 2026-10-28)."
     )
 

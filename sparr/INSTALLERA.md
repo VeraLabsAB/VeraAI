@@ -8,7 +8,12 @@ P7"). Ändrad igen samma dag efter Hugos beslut 2026-10-28 om vakten, beslut 1�
 nvm-mappen flyttas sist i `PATH` (steg 4). Ändrad igen samma dag efter Hugos svar 2026-10-28, punkt 1–3:
 också Cryptexes-mappen flyttas sist (steg 4), den gamla `.venv` tas bort efter installationen, raden Setting
 sources läses i Terminal och bara en annan låst källa underkänner installationen, och ett sista steg i
-skrivbordsappen visar att vakten stoppar ett kommando som inte står på listan.
+skrivbordsappen visar att vakten stoppar ett kommando som inte står på listan. Ändrad igen samma dag efter
+Hugos beslut 2026-10-28 om granskning 13 (`GRANSKNING.md`, "Granskning 11 – plan för Q1"): kontroll av alias
+och funktioner före och efter installationen (P1 a, steg 4 g och kontrollen efter installationen, steg 1),
+förbud för filerna som zsh läser vid start och de filer de läser in (P1 b), Claude Code för Terminal med
+hela sökvägen `~/.local/bin/claude` och en varning för installerarens förslag (P3 b, steg 1), och förbud för
+Claude Code för Terminal, skrivbordsappens Claude Code och appen (P4 a).
 
 Den här beskrivningen är till **Hugo** (och sedan **Casper**, på sin dator). Agenten kör inga av
 kommandona. Du kör dem själv i programmet **Terminal**, ett i taget, och skriver ditt
@@ -24,11 +29,19 @@ Agenten kan därför inte ändra filerna.
 | Fil i projektet | Kopieras till | Vad den gör |
 |---|---|---|
 | `sparr/kommandosparr.py` | `/Library/Application Support/ClaudeCode/vera/kommandosparr.py` | **Vakten.** Ett litet program som Claude Code kör före varje verktyg. Det stoppar allt som inte står på listan i SPEC 7.1. Det stoppar också ett kommando vars program ligger i en mapp som du kan ändra utan lösenord, och kommandon som ändrar `PATH` (PATH-regeln, se nedan). |
-| `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.295 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Läget "auto" går inte att använda, och skills kan inte köra skalkommandon. |
+| `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.295 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Inte heller i filerna som zsh läser när det startar och de filer som de läser in: nvm-mappen `~/.nvm`, `~/.zkbd`, `~/.zsh_sessions`, `~/.zlogout` och systemets zsh-filer i `/etc` (granskning 13, P1 b). Inte heller i Claude Code för Terminal (`~/.local/bin/claude` och `~/.local/share/claude`), i skrivbordsappens egen Claude Code (`~/Library/Application Support/Claude/claude-code`) eller i appen (`/Applications/Claude.app`) (granskning 13, P4 a). Läget "auto" går inte att använda, och skills kan inte köra skalkommandon. |
 | `requirements.txt` (listan över paket) | `/Library/Application Support/ClaudeCode/vera/venv` (skapas, kopieras inte) | **Projektets Python med pytest**, som testsviten körs med. Den låg förut i mappen `.venv` i projektet, som du äger, och då stoppade PATH-regeln testsviten. Nu ligger den där bara systemet kan ändra den (Hugos beslut 2026-10-28 om vakten, beslut 1). |
 
 Inställningarna börjar gälla så fort filen finns, i terminalen och i skrivbordsappen. Därför kopieras
 vakten först, sedan skapas projektets Python, och inställningarna kopieras sist.
+
+**Claude Code för Terminal omfattas av samma låsta inställningar som appen** (Hugos beslut 2026-10-28,
+granskning 13, fråga 2). Claude Code för Terminal, `~/.local/bin/claude`, behålls, men utanför `PATH` (steg
+1). Den läser samma fil som skrivbordsappen: dokumentationen säger att terminalen och skrivbordsappens flik
+Code läser samma källor (code.claude.com/docs/en/managed-settings, "Surfaces"). Vakten, förbuden och
+`"onFailure": "block"` gäller alltså där också, och agenten får inte skriva i den (förbudet i tabellen
+ovan). Att den faktiskt läser filen syns efter installationen: raden **Setting sources** i `/status` i
+Terminal ska visa `Enterprise managed settings (file)` ("Efteråt", punkt 2).
 
 **PATH-regeln** (Hugos beslut 2026-10-28, beslut 1). `PATH` är listan över mappar där datorn letar efter
 ett program när du skriver dess namn, till exempel `git`. Ligger ett program med samma namn i en mapp
@@ -62,8 +75,8 @@ kraschar. Kravet står i Claude Codes dokumentation på sidan **code.claude.com/
 tabellen över fälten för en vakt av typen `command` ("Requires Claude Code v2.1.295 or later") och i
 avsnittet "Block the action when a hook fails". Kontrollerat 2026-10-28.
 
-På din dator hittas kommandot `claude` inte i Terminal (2026-10-28), så Claude Code körs via
-**Claude-appen**. Versionen kontrolleras därför där, med `/status` (Hugos beslut 2026-10-28, beslut 3):
+Du har två Claude Code: den i **Claude-appen** och **Claude Code för Terminal**. Båda ska ha version
+2.1.295 eller senare. Först appen, med `/status` (Hugos beslut 2026-10-28, beslut 3):
 
 1. Öppna Claude-appen, gå till fliken **Code** och starta en ny session, till exempel i `~/VERA/agent`.
 2. Skriv `/status` i rutan där du skriver till Claude och tryck Retur. `/status` är ett kommando till
@@ -75,22 +88,63 @@ På din dator hittas kommandot `claude` inte i Terminal (2026-10-28), så Claude
 4. Raden **Setting sources** (var inställningarna kommer från) visas inte i skrivbordsappen. Den läses i
    Terminal, se nedan.
 
-**Raden Setting sources, i Terminal** (Hugos svar 2026-10-28, punkt 3). Öppna Terminal och kör ett kommando
-i taget:
+**Claude Code för Terminal, alltid med hela sökvägen** (Hugos beslut 2026-10-28, granskning 13, P3 b).
+Claude Code för Terminal är installerad med den officiella metoden, och programmet ligger i
+`~/.local/bin/claude` (version 2.1.312 enligt dig 2026-10-28). Mappen `~/.local/bin` står inte i `PATH`, och
+den ska inte läggas dit. Därför skriver du alltid hela sökvägen, `~/.local/bin/claude`, och aldrig bara
+`claude`. Skriver du bara `claude` säger Terminal `command not found: claude`. Det är väntat och inget fel.
+
+> **Varning: kör inte installerarens förslag.** När Claude Code installerades föreslog installeraren
+> raden `export PATH="$HOME/.local/bin:$PATH"`. **Kör den inte, och lägg inte in den i `~/.zshrc`,
+> `~/.zprofile` eller någon annan fil.** Skälen:
+>
+> - Raden lägger `~/.local/bin` **först** i `PATH`, före systemets mappar. Mappen ägs av dig, så vakten
+>   stoppar då **alla** kommandon, också `git status` (PATH-regeln, Hugos beslut 2026-10-28 om vakten,
+>   beslut 2).
+> - Ett program som läggs i den mappen med samma namn som ett program på listan, till exempel `git`, skulle
+>   köras i stället för systemets program. Det kräver inget lösenord. Det är just det PATH-regeln skyddar
+>   mot.
+> - Skrivbordsappen läser `PATH` från skalet när den startar, så raden skulle gälla agentens kommandon
+>   också, inte bara Terminal.
+>
+> Har raden redan kommit in i någon av filerna: stoppa och fråga. (Steg 4 e visar om `~/.local/bin` står i
+> `PATH`.)
+
+Kontrollera versionen i Terminal. Öppna Terminal och kör:
+
+```bash
+~/.local/bin/claude --version
+```
+
+- Visar versionen av Claude Code för Terminal, till exempel `2.1.312 (Claude Code)`, och ändrar ingenting.
+  Versionen ska vara 2.1.295 eller senare (jämför som i punkt 3 ovan).
+- Säger Terminal `no such file or directory`: Claude Code för Terminal ligger inte där. Stoppa och fråga.
+
+**Om versionen i Terminal är äldre än 2.1.295**, uppdatera:
+
+```bash
+~/.local/bin/claude update
+```
+
+- Hämtar och installerar den senaste versionen av Claude Code för Terminal (det kräver internet). Det ska
+  stå `Successfully updated from … to version …` eller `Claude Code is up to date (…)`. Kör sedan
+  `~/.local/bin/claude --version` igen. Är versionen fortfarande äldre än 2.1.295: stoppa och fråga.
+  (Kommandona står på code.claude.com/docs/en/setup, "Verify your installation" och "Update manually".)
+
+**Raden Setting sources, i Terminal** (Hugos svar 2026-10-28, punkt 3, och Hugos beslut 2026-10-28,
+granskning 13, P3 b, som ersätter `claude` med hela sökvägen). Kör ett kommando i taget:
 
 ```bash
 cd ~/VERA
 ```
 
 ```bash
-claude
+~/.local/bin/claude
 ```
 
-- `cd ~/VERA` gör `~/VERA` till mappen du står i. `claude` startar Claude Code i Terminal, i den mappen.
-  Frågar Claude Code om du litar på mappen: svara ja.
-- Säger Terminal `command not found: claude` är Claude Code inte installerat för Terminal (så var det på
-  din dator 2026-10-28). Stoppa och fråga. Claude Code för Terminal har ett eget versionsnummer, som också
-  ska vara 2.1.295 eller senare (rutan nedan).
+- `cd ~/VERA` gör `~/VERA` till mappen du står i. `~/.local/bin/claude` startar Claude Code för Terminal, i
+  den mappen. Frågar Claude Code om du litar på mappen: svara ja.
+- Säger Terminal `no such file or directory`: stoppa och fråga.
 
 Skriv sedan `/status` i Claude Code i Terminal och tryck Retur. Leta upp raden som börjar med
 **Setting sources**. Den räknar upp källorna efter kolon, åtskilda med kommatecken.
@@ -105,7 +159,7 @@ Skriv sedan `/status` i Claude Code i Terminal och tryck Retur. Leta upp raden s
 - Står det något annat på raden som inte är nämnt här: stoppa och fråga.
 - Avsluta Claude Code i Terminal med `/exit`.
 
-**Om versionen är äldre än 2.1.295: stoppa och uppdatera först.**
+**Om appens version är äldre än 2.1.295: stoppa och uppdatera först.**
 
 1. Klicka på **Claude** i menyraden överst på skärmen (när Claude-appen är aktiv) och välj **Check for
    Updates…**. Installera uppdateringen om det finns en.
@@ -116,8 +170,8 @@ Skriv sedan `/status` i Claude Code i Terminal och tryck Retur. Leta upp raden s
 
 Terminalen och skrivbordsappen har **var sin** Claude Code med var sitt versionsnummer, och att uppdatera
 den ena uppdaterar inte den andra (sidan **code.claude.com/docs/en/desktop**, avsnittet "Claude Code
-version in the Code tab"). Kontrollera därför versionen också i Claude Code i Terminal, på raden
-**Claude Code** (eller **Version**) i samma `/status` som ovan, innan du installerar vakten.
+version in the Code tab"). Kontrollera därför versionen i båda: i appen med `/status` och i Terminal med
+`~/.local/bin/claude --version` (ovan), innan du installerar vakten.
 
 De låsta inställningarna innehåller också `"requiredMinimumVersion": "2.1.295"`, så att en äldre Claude
 Code inte startar alls efter installationen (Hugos beslut 2026-10-28). Kontrollen här behövs ändå,
@@ -244,7 +298,7 @@ rmdir ~/vera-forprov
 
 **Stoppades `ls` inte i e: avbryt installationen.** Gå vidare till steg 4 bara om `ls` stoppades.
 
-## Steg 4: flytta nvm-mappen och Cryptexes-mappen sist i PATH (före installationen)
+## Steg 4: flytta nvm-mappen och Cryptexes-mappen sist i PATH, och kontrollera alias och funktioner (före installationen)
 
 Vakten kräver att varje mapp i `PATH` före programmet ägs av systemet och inte går att ändra för någon
 annan (Hugos beslut 2026-10-28 om vakten, beslut 2). På din dator står två mappar före `/usr/bin` och
@@ -346,11 +400,40 @@ echo $PATH
     Har nvm bytt version sedan dess kan siffrorna efter `node/v` vara andra.
 - Står nvm-mappen eller `/System/Cryptexes/App/usr/bin` före `/usr/bin`: stoppa och fråga. Då läggs de
   troligen in från en annan fil, till exempel `~/.zprofile` eller `~/.zlogin`, efter `~/.zshrc`.
+- `~/.local/bin` (på din dator `/Users/hugolindholmer/.local/bin`) ska **inte** stå någonstans i raden
+  (Hugos beslut 2026-10-28, granskning 13, P3 b). Står den där har installerarens förslag kommit in i en
+  fil (se varningen i steg 1): stoppa och fråga.
 
 **f. Starta om Claude-appen** helt (**Claude > Quit Claude**, eller Cmd+Q), och öppna den igen. Claude
 Code läser `PATH` när appen startar, så sessioner som redan är öppna har kvar den gamla ordningen. Att
 appen har fått den nya ordningen syns först efter installationen: i kontrollen efter installationen, steg
 3, ska `git status` gå igenom.
+
+**g. Kontrollera alias och funktioner** (Hugos beslut 2026-10-28, granskning 13, P1 a). Claude Code läser
+in `~/.zshrc` när en session startar, och tar med sig **alias** (ett kortnamn som skalet byter ut mot ett
+annat kommando) och **funktioner** (små program som skrivs direkt i skalet) till varje kommando som agenten
+kör. Vakten ser dem inte. Heter ett alias eller en funktion som ett kommando på listan, till exempel `git`,
+kör skalet aliaset eller funktionen i stället för programmet som vakten prövade. Gör det här i samma nya
+Terminal-fönster som i e, ett kommando i taget:
+
+```bash
+alias
+```
+
+```bash
+typeset -f +
+```
+
+- `alias` visar alla alias, ett per rad, som `namn=vad det byts ut mot`. `typeset -f +` visar namnen på
+  alla funktioner, ett per rad. Båda bara visar, och ändrar ingenting. Det är väntat att `alias` visar
+  `run-help=man` och `which-command=whence`, och att `typeset -f +` visar många namn som börjar med
+  `nvm` eller `shell_session`, och `update_terminal_cwd`.
+- **Leta efter namnen på kommandona i listan i SPEC 7.1:** `git`, `ls`, `cat`, `head`, `tail`, `grep`,
+  `diff`, `find`, `wc`, `sort`, `mkdir`, `cp` och `tar`. Hos `alias` är namnet det som står före `=`. Hos
+  `typeset -f +` är det hela raden. Leta också efter ett namn med ett snedstreck (`/`) i sig, till exempel
+  `/usr/bin/git`, eller ett namn som börjar med `'/Library`: zsh kan ha alias och funktioner med en hel
+  sökväg som namn, och då gäller de också när agenten skriver hela sökvägen.
+- **Finns något av dem där: stoppa och fråga.** Installera inte.
 
 Ångra steget: `cp ~/.zshrc.fore-vera ~/.zshrc`, och starta om Terminal och Claude-appen. Då stoppar vakten
 alla kommandon igen.
@@ -530,8 +613,9 @@ tio tecknen: installationen räknas som misslyckad. Stoppa och fråga.**
    redan är öppna kan ha läst inställningarna innan filen fanns.
 2. **Kontrollera att de låsta inställningarna gäller** (Hugos beslut 2026-10-28, beslut 3). Raden visas
    inte i skrivbordsappen, så den läses i Terminal (Hugos svar 2026-10-28, punkt 3): kör `cd ~/VERA` och
-   sedan `claude`, som i steg 1, skriv `/status` och leta upp raden **Setting sources**. Säger Terminal
-   `command not found: claude`: stoppa och fråga. Raden ska visa `Enterprise managed settings (file)`,
+   sedan `~/.local/bin/claude` (hela sökvägen, Hugos beslut 2026-10-28, granskning 13, P3 b), som i steg 1,
+   skriv `/status` och leta upp raden **Setting sources**. Säger Terminal `no such file or directory`:
+   stoppa och fråga. Raden ska visa `Enterprise managed settings (file)`,
    alltså inställningarna från filen du installerade (code.claude.com/docs/en/managed-settings). **Saknas
    raden eller den texten, gäller inte vakten, och installationen räknas som misslyckad.** Stoppa och
    fråga. `User settings`, `Project settings` och `Project local settings` är väntade och underkänner inte.
@@ -557,11 +641,25 @@ tio tecknen: installationen räknas som misslyckad. Stoppa och fråga.**
    testsviten går med Python på den nya platsen, inte före: dra mappen `.venv` i `~/VERA/agent` till
    papperskorgen i Finder (mappen är dold, tryck Cmd+Shift+. i Finder för att se den) och töm sedan
    papperskorgen. Därefter pekar listan i SPEC 7.1 bara på den nya platsen.
+10. **Om du senare lägger till en ny rad med `source` i `~/.zshrc`** (Hugos beslut 2026-10-28, granskning
+    13, P1 b). En rad som börjar med `source` eller med en punkt (`.`), eller har `&& \.` i sig som
+    nvm-raderna, läser in en annan fil varje gång skalet startar, och Claude Code tar med det som filen
+    gör till agentens kommandon. Program föreslår ofta en sådan rad när de installeras. De låsta
+    inställningarna förbjuder agenten att skriva i de filer som läses in i dag (`~/.nvm`, `~/.zkbd` och
+    `~/.zsh_sessions`), men inte i en ny fil. Gör så här:
+    - **Lägg inte till raden än.** Be om en ny version av inställningsfilen, med ett förbud för den nya
+      filen (och för mappen den ligger i, om den läser in fler filer därifrån). Den byggs med test,
+      granskas oberoende och installeras av dig, som en ny version av vakten.
+    - **Har ett program redan lagt in raden:** stoppa och fråga innan nästa session med agenten.
+    - Samma sak gäller `~/.zshenv`, `~/.zprofile` och `~/.zlogin`, och en rad som lägger till ett alias
+      eller en funktion. Gör efteråt kontrollen av alias och funktioner i steg 4 g igen.
 
 ## Caspers dator
 
-Samma steg, i samma ordning, och samma versionskontroll i steg 1 (med `/status`, minst 2.1.295, i
-skrivbordsappen och i terminalen om Claude Code finns där). Samma förprov i steg 3 och samma kontroll av
+Samma steg, i samma ordning, och samma versionskontroll i steg 1 (minst 2.1.295, med `/status` i
+skrivbordsappen och med `~/.local/bin/claude --version` i Terminal om Claude Code för Terminal finns där,
+med hela sökvägen och samma varning för installerarens förslag). Samma kontroll av alias och funktioner i
+steg 4 g och i kontrollen efter installationen, steg 1. Samma förprov i steg 3 och samma kontroll av
 mapparna i steg 2 och 13. Samma `managed-settings.json` fungerar: regeln som hindrar agenten att skriva i
 `.git` (`Edit(//**/.git/**)`) gäller varje `.git`-mapp på datorn och har inget användarnamn i sig.
 Skillnader:
@@ -588,8 +686,9 @@ uppgift 4, men ska vara gjort före läget "auto", före körningar utan att Hug
 körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28, 8).
 
 1. **De låsta inställningarna gäller.** Raden **Setting sources** visas inte i skrivbordsappen, så den läses
-   i Terminal (Hugos svar 2026-10-28, punkt 3): kör `cd ~/VERA` och sedan `claude`, som i installationens
-   steg 1, och skriv `/status`. Säger Terminal `command not found: claude`: stoppa och fråga. Raden ska
+   i Terminal (Hugos svar 2026-10-28, punkt 3): kör `cd ~/VERA` och sedan `~/.local/bin/claude` (hela
+   sökvägen, Hugos beslut 2026-10-28, granskning 13, P3 b), som i installationens steg 1, och skriv
+   `/status`. Säger Terminal `no such file or directory`: stoppa och fråga. Raden ska
    visa `Enterprise managed settings (file)`, alltså inställningarna från filen du installerade
    (code.claude.com/docs/en/managed-settings). `User settings`, `Project settings` och
    `Project local settings` är väntade och underkänner inte. Bara en annan låst källa underkänner
@@ -599,6 +698,21 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
    2.1.295 eller senare. Läget "auto" ska inte gå att välja: i terminalens Claude Code, tryck Shift+Tab
    några gånger, och "auto" ska inte komma upp (code.claude.com/docs/en/settings-reference,
    `disableAutoMode`).
+
+   **Alias och funktioner, igen efter installationen** (Hugos beslut 2026-10-28, granskning 13, P1 a).
+   Öppna ett nytt Terminal-fönster (Cmd+N) och kör, ett i taget:
+
+   ```bash
+   alias
+   ```
+
+   ```bash
+   typeset -f +
+   ```
+
+   Leta efter samma namn som i installationens steg 4 g: `git`, `ls`, `cat`, `head`, `tail`, `grep`,
+   `diff`, `find`, `wc`, `sort`, `mkdir`, `cp` och `tar`, och namn med ett snedstreck (`/`) i sig. **Finns
+   något av dem där: stoppa och fråga**, och kör inte uppgift 4.
 2. **Ihopkopplade kommandon stoppas.** Be agenten köra `ls; ls`. Det ska stoppas med ett fel som börjar
    "Stoppat av vakten" och säger att kommandon inte kopplas ihop.
 3. **Ett kommando på listan går igenom.** Be agenten köra `git status`. Claude Code frågar dig som vanligt
