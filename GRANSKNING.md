@@ -6606,3 +6606,14 @@ inget läst utanför projektet och scratchpad, inget pushat, ingen `git stash`.
    ägare och rättigheter) före installationen, eller prövas det i spärrtestet efter? Granskaren föreslår före, på
    båda datorerna, eftersom det är vakten själv.
 2. **J2 och J3:** rättas nu eller läggs under Öppet? J3 föreslås prövas i spärrtestet efter installationen.
+
+### Hugos beslut 2026-10-28 (efter granskning 19)
+
+Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28, i chatten.
+
+- **Meningen om I1 i SPEC 7.1 är godkänd.**
+- **Att I1-regeln gäller fler sökvägar i kommandon, även läsande, är godkänt.**
+- **J1 rättas före installationen:** vakten körs med `/Library/Developer/CommandLineTools/usr/bin/python3 -I`, och
+  stoppar allt om den inte kan köras.
+- **J2 läggs under Öppet.**
+- **J3 prövas i spärrtestet efter installationen.**
