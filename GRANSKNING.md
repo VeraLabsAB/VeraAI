@@ -3710,3 +3710,176 @@ Alla andra kommandon stod på listan och kördes ett i taget: `grep`, `git log`,
 
 Ändringarna i P2–P6 och beslut (b) ger en ny version av vakten eller inställningsfilen. Den behöver
 tester, en oberoende granskning och nya kontrollsummor innan den installeras.
+
+## Beslut 2026-10-28: PATH-regel, förprov för onFailure, P7
+
+Byggt på Hugos uppdrag i chatten 2026-10-28, i en ny byggsession. **Inget är installerat.** Inget i
+`/Library/Application Support/` är rört, och inga kommandon med `sudo` eller `su` är körda.
+
+### Bakgrund (Hugos dator, 2026-10-28, från uppdraget)
+
+`PATH` börjar med `/Users/hugolindholmer/.nvm/versions/node/v24.18.0/bin`, som ägs av Hugo. Övriga mappar
+ägs av root eller finns inte. `/Library/Application Support` är `root:admin` med 755. Mappen `ClaudeCode`
+finns inte än. Kommandot `claude` hittas inte i Terminal, så Claude Code körs troligen via Claude-appen.
+
+### Hugos beslut 2026-10-28
+
+1. **PATH-regel.** Vakten tillåter ett kommando bara om programmet det pekar på ligger i en mapp som ägs av
+   root och som varken gruppen eller andra kan skriva i. Samma krav gäller alla mappar ovanför. Gäller inte
+   det, eller kan vakten inte säkert avgöra vilken fil som körs, stoppas kommandot. Kommandon som ändrar
+   PATH (`PATH=...`, `export PATH`, `env PATH=...`) stoppas. Listan med tillåtna kommandon ändras inte.
+2. **Förprov för `onFailure`.** Vakten i installationsfilen startas med fullständig sökväg till både tolken
+   och skriptet och har `"onFailure": "block"`, med ett test som läser filen. Ett förprov i INSTALLERA.md
+   före installationen: i en tillfällig mapp utanför `~/VERA` skapas `.claude/settings.json` med en vakt
+   som pekar på ett skript som inte finns och har `"onFailure": "block"`, Hugo ber Claude köra `ls`, och
+   kommandot ska stoppas. Mappen raderas sedan. Stoppas kommandot inte, avbryts installationen.
+3. **P7 och versionen.** Versionen kontrolleras med `/status` och ska vara 2.1.295 eller senare, med en
+   beskrivning av hur Hugo uppdaterar. `ClaudeCode` får `root:wheel` och 755, filerna `root:wheel` och 644,
+   med förklaring av varför inte 600. `ls -ld` för `/`, `/Library`, `/Library/Application Support` och
+   `/Library/Application Support/ClaudeCode` före och efter installationen, och kan gruppen eller andra
+   skriva någonstans i kedjan avbryts installationen. Efter installationen ska `/status` visa
+   `Enterprise managed settings (file)` på raden Setting sources, annars räknas installationen som
+   misslyckad. Varje kommando förklaras på enkel svenska.
+
+### Vad som byggdes
+
+- **Vakten** (`sparr/kommandosparr.py`), regel 7, PATH-regeln:
+  - Kommandon som ändrar `PATH` stoppas före listan: ord först i kommandot av formen `NAMN=…` där namnet
+    är `PATH` eller zsh:s `path` (också `PATH+=…`), och `export`, `env`, `typeset`, `declare`, `readonly`,
+    `local` och `unset` med `PATH` någonstans. En sökning efter ordet (`grep -n PATH SPEC.md`) går igenom.
+  - Sist, när alla andra regler har godtagit kommandot, letas programmet upp som skalet gör: ett namn med
+    `/` i förhållande till projektmappen, annars första körbara filen med namnet i `PATH` från vaktens
+    miljö. Filen och varje mapp ovanför den ska ha ägaren root (uid 0), inget skrivtillstånd för gruppen
+    eller andra, och inte gå att skriva i för den som kör vakten (`os.access`, som också räknar med extra
+    rättigheter, ACL, för den användaren). Det prövas både för sökvägen som den står och för sökvägen dit
+    länkarna leder.
+  - Stopp med "kan inte säkert avgöra": `PATH` saknas eller är tom, en tom eller relativ mapp (till exempel
+    `.`, `bin` eller `~/bin`) står före träffen, eller programmet finns inte.
+  - **Strängare än beslutet:** beslutet nämner mappen och mapparna ovanför. Vakten kräver samma sak av
+    filen själv och av länkens mål. Skälet: en fil som Hugo äger i en rotmapp, eller en länk, kan annars
+    bytas ut. SPEC 7.1 säger att den strängaste gäller.
+- **Tester** (`scripts/tests/test_kommandosparr.py`): 463 tester för vakten (394 före). Nya:
+  - ett program med ett tillåtet namn i en mapp som användaren äger stoppas, för vart och ett av de 13
+    namnen på listan (`test_program_med_tillatet_namn_i_en_mapp_som_anvandaren_ager_stoppas`),
+  - ett program i en mapp som inte finns stoppas (`test_program_i_en_mapp_som_inte_finns_stoppas`,
+    `test_venv_som_inte_finns_stoppas`),
+  - `PATH=...` och 16 andra sätt att ändra `PATH` stoppas (`test_kommandon_som_andrar_path_stoppas`),
+  - ett program i en rotmapp går igenom, för alla 13 namnen (`test_program_i_en_rotmapp_gar_igenom`),
+  - länkar, första träffen i `PATH`, filer som inte är körbara, en `PATH` som inte går att lita på,
+    programmet med `PATH` från sin miljö, och de två pytest-formerna, som godtas av reglerna 1–6 men
+    stoppas av PATH-regeln,
+  - installationsfilen: varje vakt startas med hel sökväg till tolken och skriptet och har
+    `"onFailure": "block"`
+    (`test_installationsfilen_startar_vakten_med_hela_sokvagar_och_stoppar_om_den_fallerar`),
+  - INSTALLERA.md: versionen med `/status` först, förprovet före all `sudo` och städat efteråt, förprovets
+    vakt (ett skript som inte finns, hel sökväg, utan Python framför), `ls -ld` före och efter, ägare och
+    rättigheter, förklaringen av 644 och 600, och `/status` efter installationen.
+- **INSTALLERA.md** omskriven: steg 1 version med `/status` och uppdatering, steg 2 mapparna ovanför, steg
+  3 förprovet, steg 4 kontrollsummor, steg 5 skapa mapparna (`sudo mkdir`, `root:wheel`, 755), steg 6–9
+  kopiera och lås filerna (`root:wheel`, 644), steg 10 kontrollsummor, steg 11 `ls -ld` igen, och
+  `/status` i "Efteråt". `claude --version` är borttaget, eftersom `claude` inte finns i Terminal.
+- **SPEC 7.1**: PATH-regeln, förprovet, versionen och mapparna, och det PATH-regeln inte ser.
+
+Testsviten: **3 267 passed**, 0 misslyckade.
+
+### Varför förprovet inte använder Python
+
+Provet i kontrollen efter installationen (steg 8) flyttar undan vakten. Då startar `/usr/bin/python3`
+men hittar inte filen och avslutar med kod 2, och kod 2 stoppar oavsett `onFailure`. Förprovets vakt är
+i stället själva skriptet `/finns-inte/vera-forprov.sh`, utan tolk framför. Då går vakten inte att starta
+alls, och det är `onFailure` som avgör. Mappen `/finns-inte` kan inte skapas utan administratörslösenord.
+
+### Hugos dator: vilka kommandon på listan pekar utanför systemets mappar
+
+Prövat med en provfil i en kopia i scratchpad-mappen (SPEC 7.1, "Provfiler i kopian"), som körde vaktens
+egen uppslagning med `PATH` från Bash-verktygets miljö i den här sessionen. Provfilen läste bara ägare och
+rättigheter för mapparna i `PATH` och letade efter de 13 namnen på listan. Den ligger inte i projektet.
+
+| Kommando på listan | Fil på Hugos dator | Går igenom PATH-regeln? |
+|---|---|---|
+| `git` | `/usr/bin/git` | Ja |
+| `ls`, `cat`, `mkdir`, `cp` | `/bin/…` | Ja |
+| `head`, `tail`, `grep`, `diff`, `find`, `wc`, `sort` | `/usr/bin/…` | Ja |
+| `tar` | `/usr/bin/tar`, en länk till `/usr/bin/bsdtar` | Ja |
+| `.venv/bin/python` (båda pytest-kommandona) | `/Users/hugolindholmer/VERA/agent/.venv/bin/python`, länkar via `python3` till `/Library/Developer/CommandLineTools/…/python3.9` | **Nej.** Länkarna ligger i `.venv/bin` i projektet, som Hugo äger |
+
+- Första mappen i `PATH` är nvm-mappen, som ägs av Hugo (uid 501). Inget av de 13 namnen finns där, så
+  ingen av dem pekar dit i dag. `node`, `npm` och `npx` ligger där men står inte på listan.
+- Övriga mappar i `PATH` som finns (`/usr/local/bin`, `/System/Cryptexes/App/usr/bin`, `/usr/bin`, `/bin`,
+  `/usr/sbin`, `/sbin` och `/Library/Apple/usr/bin`) ägs av root och har `drwxr-xr-x`. Fyra mappar finns
+  inte (tre under `/var/run/com.apple.security.cryptexd/…` och `/pkg/env/global/bin`).
+- Om ett program med ett namn på listan senare hamnar i nvm-mappen (till exempel med `npm install -g`)
+  stoppar vakten det kommandot, eftersom mappen står först.
+
+### Mutationstester
+
+Gjorda i en kopia av `sparr/`, `scripts/` och `SPEC.md` i scratchpad-mappen, ändrad med fil-verktygen.
+Testfilen kördes mot kopian. Den oförändrade kopian gav 463 gröna. Kopian är återställd, och `diff -r`
+mot projektets `sparr/` visar inga skillnader.
+
+| Mutation | Röda tester |
+|---|---|
+| `"onFailure": "continue"` i installationsfilen | 2 (det nya testet och det gamla) |
+| Tolken `python3` i stället för `/usr/bin/python3` | 2 |
+| Skriptet `vera/kommandosparr.py` i stället för hela sökvägen | 2 |
+| Platsen för programmet godtas alltid | 23 |
+| Kommandon som ändrar `PATH` stoppas inte av PATH-regeln (de stoppas då av listan, med fel skäl) | 17 |
+
+Testet av installationsfilen var grönt redan innan något ändrades, eftersom filen redan hade hela sökvägar
+och `"onFailure": "block"`. Mutationerna visar att det blir rött om något av det ändras.
+
+### Det som inte är prövat eller bekräftat
+
+- **Vaktens `PATH` och skalets `PATH`.** Vakten prövar `PATH` i sin egen miljö, som Claude Code ger den.
+  Bash-verktygets skal läser in Hugos inställningar och kan få en annan `PATH`. Är de olika, kan vakten
+  pröva en annan fil än den som körs. **Inte bekräftat** vilken `PATH` vakten får. Kontrollen efter
+  installationen, steg 3, visar bara att `git status` går igenom.
+- **Länkens mål i en rotmapp.** Ett test kan inte skapa en mapp som ägs av root. Att länkens mål prövas
+  syns bara genom länkar i mappar som användaren äger, där den första kontrollen redan stoppar.
+  Mutationstestet "platsen godtas alltid" täcker hela kontrollen, inte bara länkens mål.
+- **Extra rättigheter (ACL).** `os.access` ser dem för den som kör vakten, men inte för andra användare.
+  `ls -ld` visar bara `+` eller `@` efter rättigheterna. INSTALLERA.md säger "stoppa och fråga" vid båda.
+- **`/usr/bin/git` och `/usr/bin/python3`** är små program från Apple som startar git och Python i
+  utvecklarverktygen. Vakten prövar bara det första programmet.
+- **Felet i förprovet.** Den exakta texten när en vakt inte går att starta är inte känd. INSTALLERA.md
+  beskriver den löst.
+- **"En annan källa" i `/status`.** Om raden Setting sources också visar till exempel användarens
+  inställningar bredvid `Enterprise managed settings (file)` är inte känt. INSTALLERA.md följer beslutet
+  ordagrant (annan källa = misslyckad), vilket är det strängaste.
+
+### Kontrollsummor
+
+Inte räknade (`shasum` står inte på listan i SPEC 7.1). Vakten och INSTALLERA.md är ändrade, så
+kontrollsummorna i granskning 12 gäller inte. Den nya versionen behöver nya summor från en ny oberoende
+granskning.
+
+### Kommandon i den här sessionen
+
+Avsteg från SPEC 7.1 och CLAUDE.md:
+- **De två första kommandona var ihopkopplade**: `cd … && git ls-files && wc -l …` och ett kommando med
+  `;` och `|` som listade `PROGRESS.md`-rader och `.venv/bin`. Båda läste bara.
+- Provfilen i kopian läste ägare och rättigheter för mapparna i `PATH` utanför projektet, och letade efter
+  de 13 namnen där. Det behövdes för uppdragets fråga om Hugos dator. Testerna i projektet läser ägare och
+  rättigheter för `/usr/bin` och `/bin`.
+
+Alla andra kommandon stod på listan och kördes ett i taget: `.venv/bin/python -B -m pytest
+-p no:cacheprovider` (mot `scripts/tests`, en testfil och kopian), `mkdir -p` och `cp -R` till
+scratchpad-mappen, `diff -r`, `git status`, `git diff`, `git add` och `git commit`.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **Testsviten efter installationen.** PATH-regeln stoppar båda pytest-kommandona, eftersom
+   `.venv/bin/python` ligger i projektet. Agenten kan då inte köra testsviten, och "Varje rättelse får ett
+   test" (CLAUDE.md) går inte att visa i sessionen. Vägar att välja mellan: (a) godta det, och Hugo kör
+   testsviten själv i Terminal; (b) ändra listan så att pytest körs med en Python i en rotmapp, till
+   exempel `/usr/bin/python3` med pytest installerat där, vilket kräver en ny version av vakten och kanske
+   installation med `sudo`; (c) flytta `.venv` till en mapp som root äger. Varje väg är en ny version av
+   vakten eller listan.
+2. **Vaktens `PATH` mot skalets.** Ska vakten dessutom kräva att **varje** mapp i `PATH` före träffen ägs
+   av root? Det stänger också fallet där skalet och vakten har olika `PATH`, men med nvm-mappen först i
+   Hugos `PATH` skulle då alla kommandon stoppas, tills nvm-mappen flyttas efter systemets mappar.
+3. **Filen själv och länkens mål.** Vakten kräver mer än beslutet (se "Vad som byggdes"). OK?
+4. **"En annan källa" i `/status`.** Gäller "annan källa" bara låsta källor (till exempel från claude.ai),
+   eller varje annan källa på raden?
+5. **En ny oberoende granskning** av den nya versionen, med punkt 3 från granskning 12 (omvägarna) och
+   PATH-regeln, och nya kontrollsummor, före installationen.

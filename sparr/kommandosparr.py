@@ -24,6 +24,11 @@ Reglerna, i den ordning de prövas (planen i GRANSKNING.md, "Granskning 11 – p
 6. Reglerna under listan: mål bara i den tillfälliga mappen, find bara för att söka, pytest bara i de
    två formerna, inga git-tillägg som skriver filer eller kör program, och läsande kommandon bara i
    projektet och i den tillfälliga mappen.
+7. PATH-regeln (Hugos beslut 2026-10-28, beslut 1). Kommandon som ändrar PATH stoppas (prövas före
+   regel 5). Programmet som kommandot pekar på letas upp som skalet gör, i PATH från vaktens miljö, och
+   filen och varje mapp ovanför den ska ägas av systemet (root) och inte gå att skriva i för gruppen
+   eller andra. Det gäller både sökvägen som den står och dit länkarna leder. Kan vakten inte säkert
+   avgöra vilken fil som körs, stoppas kommandot. Regeln prövas sist.
 
 Allt som vakten inte känner igen stoppas. Om vakten själv kraschar stoppas kommandot också, både här
 (kod 2) och av Claude Code (inställningen "onFailure": "block").
@@ -132,6 +137,11 @@ GIT_REGLER = {
     "show": ("cO", (), "SGOUnLl", ()),
 }
 
+# Regel 7: PATH heter också path i zsh. Kommandon i skalet som sätter eller tar bort en variabel.
+PATH_NAMN = ("PATH", "path")
+SATTER_VARIABLER = ("export", "env", "typeset", "declare", "readonly", "local", "unset")
+SKRIVBAR_FOR_GRUPP_ELLER_ANDRA = 0o022
+
 TILLATNA_KOMMANDON = (
     ".venv/bin/python (bara pytest), git, ls, cat, head, tail, grep, diff, find, wc, sort, mkdir, "
     "cp -R och tar"
@@ -148,16 +158,19 @@ class _Lage:
         self.tillfallig = tillfallig
 
 
-def bedom(indata, projektmapp, hemmapp):
-    """Bedömer ett verktyg. Returnerar None om vakten inte invänder, annars felet på svenska."""
+def bedom(indata, projektmapp, hemmapp, sokvag):
+    """Bedömer ett verktyg. Returnerar None om vakten inte invänder, annars felet på svenska.
+
+    sokvag är PATH, som avgör vilket program ett kommando utan / pekar på (regel 7).
+    """
     try:
-        _bedom(indata, projektmapp, hemmapp)
+        _bedom(indata, projektmapp, hemmapp, sokvag)
     except _Stopp as stopp:
         return FORSTA + str(stopp)
     return None
 
 
-def _bedom(indata, projektmapp, hemmapp):
+def _bedom(indata, projektmapp, hemmapp, sokvag):
     if not isinstance(indata, dict):
         _indatafel("det är inte ett JSON-objekt")
     verktyg = indata.get("tool_name")
@@ -209,6 +222,9 @@ def _bedom(indata, projektmapp, hemmapp):
     ordlista = _dela_upp(kommando)
     _sudo_och_su(ordlista[0])
 
+    # Regel 7, första delen: kommandon som ändrar PATH.
+    _andrar_path(ordlista)
+
     # Regel 5 och 6.
     forsta = ordlista[0]
     if forsta == PYTHON:
@@ -227,6 +243,9 @@ def _bedom(indata, projektmapp, hemmapp):
         raise _Stopp(
             f"'{forsta}' står inte på listan i SPEC 7.1. Tillåtna kommandon: {TILLATNA_KOMMANDON}."
         )
+
+    # Regel 7, andra delen: var programmet ligger. Prövas sist.
+    _programmet(forsta, lage, sokvag)
 
 
 def _indatafel(detalj):
@@ -342,6 +361,106 @@ def _mal(sokvag, etikett, lage):
     raise _Stopp(
         f"{etikett}: får bara ha mål i en tillfällig mapp ({lage.tillfallig}), aldrig i projektet "
         f"(SPEC 7.1). '{sokvag}' ligger inte där."
+    )
+
+
+# ---------------------------------------------------------------------------------------------
+# Regel 7: PATH-regeln (Hugos beslut 2026-10-28, beslut 1)
+
+def _path_namn(ord_):
+    """Namnet på variabeln i PATH=..., PATH+=... eller PATH, annars None."""
+    namn = ord_.split("=", 1)[0]
+    if namn.endswith("+"):
+        namn = namn[:-1]
+    return namn if namn.isidentifier() else None
+
+
+def _andrar_path(ordlista):
+    andrar = False
+    # Ord först i kommandot som ser ut som NAMN=värde sätter en variabel för kommandot.
+    for ord_ in ordlista:
+        if "=" not in ord_ or _path_namn(ord_) is None:
+            break
+        if _path_namn(ord_) in PATH_NAMN:
+            andrar = True
+    if ordlista[0] in SATTER_VARIABLER and any(_path_namn(o) in PATH_NAMN for o in ordlista[1:]):
+        andrar = True
+    if andrar:
+        raise _Stopp(
+            "kommandon som ändrar PATH stoppas, eftersom PATH avgör vilket program ett kommando kör "
+            "(PATH-regeln, Hugos beslut 2026-10-28)."
+        )
+
+
+def _osaker(namn, detalj):
+    raise _Stopp(
+        f"vakten kan inte säkert avgöra vilken fil som körs för '{namn}' ({detalj}). Kommandot stoppas för "
+        "säkerhets skull (PATH-regeln, Hugos beslut 2026-10-28)."
+    )
+
+
+def _kan_koras(fil):
+    return os.path.isfile(fil) and os.access(fil, os.X_OK)
+
+
+def _hitta_programmet(namn, lage, sokvag):
+    """Filen som skalet kör för namn: som det står om namnet har ett /, annars första träffen i PATH."""
+    if "/" in namn:
+        fil = namn if os.path.isabs(namn) else os.path.join(lage.projekt, namn)
+        if not _kan_koras(fil):
+            _osaker(namn, f"{fil} finns inte eller går inte att köra")
+        return fil
+    if not isinstance(sokvag, str) or not sokvag:
+        _osaker(namn, "PATH saknas")
+    for mapp in sokvag.split(":"):
+        if not os.path.isabs(mapp):
+            _osaker(namn, f"PATH har en mapp som inte är en hel sökväg, '{mapp}', före programmet")
+        fil = os.path.join(mapp, namn)
+        if _kan_koras(fil):
+            return fil
+    _osaker(namn, "programmet finns inte i någon mapp i PATH")
+
+
+def _sakert_agd(sokvag):
+    """Sant om sökvägen ägs av systemet (root) och varken gruppen, andra eller den som kör vakten kan
+    skriva i den. os.access räknar också med extra rättigheter (ACL) för den som kör vakten."""
+    try:
+        info = os.stat(sokvag)
+    except OSError:
+        return False
+    return (
+        info.st_uid == 0
+        and not info.st_mode & SKRIVBAR_FOR_GRUPP_ELLER_ANDRA
+        and not os.access(sokvag, os.W_OK)
+    )
+
+
+def _saker_plats(fil):
+    """Sant om filen och varje mapp ovanför den ägs säkert av systemet, både för sökvägen som den står
+    och för sökvägen dit länkarna leder."""
+    for sokvag in (os.path.normpath(fil), os.path.realpath(fil)):
+        if not _sakert_agd(sokvag):
+            return False
+        mapp = os.path.dirname(sokvag)
+        while True:
+            if not _sakert_agd(mapp):
+                return False
+            if mapp == os.path.dirname(mapp):
+                break
+            mapp = os.path.dirname(mapp)
+    return True
+
+
+def _programmet(namn, lage, sokvag):
+    fil = _hitta_programmet(namn, lage, sokvag)
+    if _saker_plats(fil):
+        return
+    verklig = os.path.realpath(fil)
+    lank = f" (länken leder till {verklig})" if verklig != os.path.normpath(fil) else ""
+    raise _Stopp(
+        f"programmet '{namn}' är {fil}{lank}, och filen eller en mapp ovanför den ägs inte av systemet "
+        "(root) eller går att skriva i för någon annan än systemet. Ett program där kan bytas ut utan "
+        "administratörslösenord, så kommandot stoppas (PATH-regeln, Hugos beslut 2026-10-28)."
     )
 
 
@@ -676,7 +795,12 @@ def main():
         )
     else:
         try:
-            fel = bedom(indata, os.environ.get("CLAUDE_PROJECT_DIR"), pwd.getpwuid(os.getuid()).pw_dir)
+            fel = bedom(
+                indata,
+                os.environ.get("CLAUDE_PROJECT_DIR"),
+                pwd.getpwuid(os.getuid()).pw_dir,
+                os.environ.get("PATH"),
+            )
         except Exception as undantag:
             fel = FORSTA + (
                 f"vakten råkade ut för ett oväntat fel ({type(undantag).__name__}). Kommandot stoppas för "

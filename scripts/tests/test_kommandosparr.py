@@ -42,6 +42,10 @@ INSTALLERADE_INSTALLNINGAR = "/Library/Application Support/ClaudeCode/managed-se
 
 PYTEST = ".venv/bin/python -B -m pytest -p no:cacheprovider"
 
+# PATH-regeln (Hugos beslut 2026-10-28, beslut 1): vakten letar upp programmet i PATH och kontrollerar
+# var det ligger. Testerna använder datorns egna mappar för program, som ägs av systemet (root).
+SYSTEMETS_SOKVAG = "/usr/bin:/bin"
+
 
 @pytest.fixture(scope="module")
 def vakt():
@@ -77,15 +81,17 @@ def _indata(mappar, kommando, verktyg="Bash"):
     }
 
 
-def _bedom(vakt, mappar, kommando, verktyg="Bash"):
-    return vakt.bedom(_indata(mappar, kommando, verktyg), mappar["projekt"], mappar["hem"])
+def _bedom(vakt, mappar, kommando, verktyg="Bash", sokvag=SYSTEMETS_SOKVAG):
+    return vakt.bedom(_indata(mappar, kommando, verktyg), mappar["projekt"], mappar["hem"], sokvag)
 
 
 # ---------------------------------------------------------------------------------------------
 # Det som SPEC 7.1 tillåter går igenom. En rad per rad i tabellen i 7.1, och de regler under den
 # som tillåter något (läsa i kopior, provfiler i kopian, tillägg till pytest).
 
-TILLATNA = [
+# Rad 1 och 2: testsviten i projektet och mot en kopia. Reglerna 1–6 godtar formerna, men PATH-regeln
+# stoppar dem (se test_pytest_formerna_godtas_men_venv_stoppas_av_path_regeln).
+TILLATNA_PYTEST = [
     # Rad 1: testsviten i projektet.
     ("pytest-projektet", f"{PYTEST} -q scripts/tests"),
     # Rad 2: testsviten mot en kopia, hela mappen eller en testfil i kopian.
@@ -95,6 +101,9 @@ TILLATNA = [
     ("pytest-tillagg", f"{PYTEST} -qq --tb=short -rA -p no:randomly -k regelbok scripts/tests"),
     ("pytest-tillagg-separata", f"{PYTEST} -q --tb line -r fE -k 'not langsam' scripts/tests"),
     ("pytest-k-hopskrivet", f"{PYTEST} -kbelopp <T>/kopia/scripts/tests"),
+]
+
+TILLATNA = [
     # git status, log, diff, add, commit, show och archive.
     ("git-status", "git status"),
     ("git-log", "git log"),
@@ -140,6 +149,17 @@ TILLATNA = [
 @pytest.mark.parametrize("kommando", [k for _, k in TILLATNA], ids=[i for i, _ in TILLATNA])
 def test_kommandon_pa_listan_gar_igenom(vakt, mappar, kommando):
     assert _bedom(vakt, mappar, kommando) is None
+
+
+@pytest.mark.parametrize("kommando", [k for _, k in TILLATNA_PYTEST], ids=[i for i, _ in TILLATNA_PYTEST])
+def test_pytest_formerna_godtas_men_venv_stoppas_av_path_regeln(vakt, mappar, kommando):
+    # PATH-regeln prövas sist. Att felet kommer från den visar att reglerna 1–6 godtar formen. Programmet
+    # .venv/bin/python ligger i projektet, som användaren äger, och stoppas därför (Hugos beslut
+    # 2026-10-28, beslut 1). Det gäller också på Hugos dator, där .venv/bin/python är en länk till
+    # systemets Python: länken ligger i en mapp som Hugo kan ändra.
+    _lagg_program(os.path.join(mappar["projekt"], ".venv", "bin"), "python")
+    fel = _bedom(vakt, mappar, kommando)
+    assert fel is not None and PLATS in fel and ".venv/bin/python" in fel, fel
 
 
 # Granskning 12, P4 (Hugos beslut 2026-10-28): vakten släpper bara igenom verktyg som står på en
@@ -217,7 +237,7 @@ def test_vanliga_filverktyg_slapps_igenom(vakt, mappar, verktyg):
     # SPEC 7.1 gäller bara kommandon (planen, regel 2). Fil-verktygen släpps igenom.
     indata = _indata(mappar, "", verktyg)
     indata["tool_input"] = {"file_path": mappar["projekt"] + "/SPEC.md"}
-    assert vakt.bedom(indata, mappar["projekt"], mappar["hem"]) is None
+    assert vakt.bedom(indata, mappar["projekt"], mappar["hem"], SYSTEMETS_SOKVAG) is None
 
 
 def test_agenten_kan_fraga_och_skriva_filer_i_vera(vakt, mappar):
@@ -225,10 +245,10 @@ def test_agenten_kan_fraga_och_skriva_filer_i_vera(vakt, mappar):
     # skriva filer i ~/VERA. Vakten ska alltså släppa igenom båda, också utanför projektmappen.
     fraga = _indata(mappar, "", "AskUserQuestion")
     fraga["tool_input"] = {"questions": [{"question": "Prov?", "header": "Prov", "options": []}]}
-    assert vakt.bedom(fraga, mappar["projekt"], mappar["hem"]) is None
+    assert vakt.bedom(fraga, mappar["projekt"], mappar["hem"], SYSTEMETS_SOKVAG) is None
     skriv = _indata(mappar, "", "Write")
     skriv["tool_input"] = {"file_path": os.path.join(mappar["hem"], "VERA", "prov.txt"), "content": "x"}
-    assert vakt.bedom(skriv, mappar["projekt"], mappar["hem"]) is None
+    assert vakt.bedom(skriv, mappar["projekt"], mappar["hem"], SYSTEMETS_SOKVAG) is None
 
 
 KONTROLL_RUBRIK = "## Kontroll efter installationen"
@@ -386,6 +406,9 @@ PYTEST_FORM = "pytest"
 TILLAGG = "tillägget"
 TAR = "tar"
 VERKTYG = "står inte på listan över tillåtna verktyg"
+PLATS = "ägs inte av systemet (root) eller går att skriva i"
+OSAKER = "kan inte säkert avgöra vilken fil"
+ANDRAR_PATH = "ändrar PATH"
 
 STOPPAS = [
     # Regel 1: sudo och su stoppas alltid (Hugos beslut 5 och 7).
@@ -674,19 +697,19 @@ def test_symbolisk_lank_ut_ur_projektet_stoppas(vakt, mappar):
 def test_kommando_i_annan_mapp_an_projektet_stoppas(vakt, mappar):
     indata = _indata(mappar, "git status")
     indata["cwd"] = mappar["projekt"] + "/scripts"
-    fel = vakt.bedom(indata, mappar["projekt"], mappar["hem"])
+    fel = vakt.bedom(indata, mappar["projekt"], mappar["hem"], SYSTEMETS_SOKVAG)
     assert fel is not None and "annan mapp" in fel
 
 
 def test_kommando_utan_mapp_stoppas(vakt, mappar):
     indata = _indata(mappar, "git status")
     del indata["cwd"]
-    fel = vakt.bedom(indata, mappar["projekt"], mappar["hem"])
+    fel = vakt.bedom(indata, mappar["projekt"], mappar["hem"], SYSTEMETS_SOKVAG)
     assert fel is not None and "indata" in fel
 
 
 def test_utan_projektmapp_stoppas_allt(vakt, mappar):
-    fel = vakt.bedom(_indata(mappar, "git status"), None, mappar["hem"])
+    fel = vakt.bedom(_indata(mappar, "git status"), None, mappar["hem"], SYSTEMETS_SOKVAG)
     assert fel is not None and "CLAUDE_PROJECT_DIR" in fel
 
 
@@ -696,7 +719,7 @@ def test_session_i_hemmappen_eller_ovanfor_stoppas(vakt, mappar, vilken):
     mapp = mappar["hem"] if vilken == "hem" else os.path.dirname(mappar["hem"])
     indata = _indata(mappar, "ls")
     indata["cwd"] = mapp
-    fel = vakt.bedom(indata, mapp, mappar["hem"])
+    fel = vakt.bedom(indata, mapp, mappar["hem"], SYSTEMETS_SOKVAG)
     assert fel is not None and "hemmappen" in fel
 
 
@@ -710,18 +733,18 @@ def test_samma_regler_i_en_annan_mapp(vakt, mappar, kommando, nyckel):
     os.mkdir(annan)
     indata = _indata(mappar, kommando)
     indata["cwd"] = annan
-    fel = vakt.bedom(indata, annan, mappar["hem"])
+    fel = vakt.bedom(indata, annan, mappar["hem"], SYSTEMETS_SOKVAG)
     assert fel is not None and nyckel in fel
 
 
 def test_utan_tillfallig_mapp_stoppas_mkdir_men_inte_cat(vakt, mappar):
     indata = _indata(mappar, "mkdir <T>/kopia")
     del indata["scratchpad_dir"]
-    fel = vakt.bedom(indata, mappar["projekt"], mappar["hem"])
+    fel = vakt.bedom(indata, mappar["projekt"], mappar["hem"], SYSTEMETS_SOKVAG)
     assert fel is not None and TILLFALLIG in fel
     indata = _indata(mappar, "cat SPEC.md")
     del indata["scratchpad_dir"]
-    assert vakt.bedom(indata, mappar["projekt"], mappar["hem"]) is None
+    assert vakt.bedom(indata, mappar["projekt"], mappar["hem"], SYSTEMETS_SOKVAG) is None
 
 
 @pytest.mark.parametrize("vilken", ["i-projektet", "hemmappen", "roten"])
@@ -734,7 +757,7 @@ def test_tillfallig_mapp_som_inte_ar_tillfallig_godtas_inte(vakt, mappar, vilken
     }[vilken]
     indata = _indata(mappar, "mkdir " + os.path.join(mapp, "x"))
     indata["scratchpad_dir"] = mapp
-    fel = vakt.bedom(indata, mappar["projekt"], mappar["hem"])
+    fel = vakt.bedom(indata, mappar["projekt"], mappar["hem"], SYSTEMETS_SOKVAG)
     assert fel is not None and TILLFALLIG in fel
 
 
@@ -751,15 +774,174 @@ TRASIG_INDATA = [
 
 @pytest.mark.parametrize("indata", [i for _, i in TRASIG_INDATA], ids=[n for n, _ in TRASIG_INDATA])
 def test_trasig_indata_stoppas(vakt, mappar, indata):
-    fel = vakt.bedom(indata, mappar["projekt"], mappar["hem"])
+    fel = vakt.bedom(indata, mappar["projekt"], mappar["hem"], SYSTEMETS_SOKVAG)
     assert fel is not None and "indata" in fel
+
+
+# ---------------------------------------------------------------------------------------------
+# PATH-regeln (Hugos beslut 2026-10-28, beslut 1). Vakten tillåter ett kommando bara om programmet det
+# pekar på ligger i en mapp som ägs av systemet (root) och som varken gruppen eller andra kan skriva i.
+# Samma krav gäller alla mappar ovanför, och filen själv. Kan vakten inte säkert avgöra vilken fil som
+# körs, stoppas kommandot. Kommandon som ändrar PATH stoppas.
+
+def _lagg_program(mapp, namn):
+    """Lägger ett litet program med namnet namn i mappen, som användaren (inte systemet) äger."""
+    os.makedirs(mapp, exist_ok=True)
+    fil = os.path.join(mapp, namn)
+    with open(fil, "w", encoding="utf-8") as ut:
+        ut.write("#!/bin/sh\nexit 0\n")
+    os.chmod(fil, 0o755)
+    return fil
+
+
+# Ett kommando per namn på listan i SPEC 7.1 (utom .venv/bin/python, som har en egen sökväg).
+LISTANS_PROGRAM = [
+    ("git", "git status"),
+    ("ls", "ls"),
+    ("cat", "cat SPEC.md"),
+    ("head", "head SPEC.md"),
+    ("tail", "tail SPEC.md"),
+    ("grep", "grep -n x SPEC.md"),
+    ("diff", "diff SPEC.md SPEC.md"),
+    ("find", "find scripts -type f"),
+    ("wc", "wc -l SPEC.md"),
+    ("sort", "sort SPEC.md"),
+    ("mkdir", "mkdir <T>/kopia"),
+    ("cp", "cp -R scripts <T>/kopia"),
+    ("tar", "tar -tf <T>/paket.tar"),
+]
+
+
+def test_systemets_program_ags_av_systemet():
+    # Förutsättning för testerna nedan: programmen i SYSTEMETS_SOKVAG ägs av root och går inte att
+    # skriva i för gruppen eller andra.
+    for namn, _ in LISTANS_PROGRAM:
+        fil = next(os.path.join(m, namn) for m in SYSTEMETS_SOKVAG.split(":") if os.path.isfile(os.path.join(m, namn)))
+        info = os.stat(fil)
+        assert info.st_uid == 0 and not info.st_mode & 0o022, fil
+
+
+@pytest.mark.parametrize("kommando", [k for _, k in LISTANS_PROGRAM], ids=[n for n, _ in LISTANS_PROGRAM])
+def test_program_i_en_rotmapp_gar_igenom(vakt, mappar, kommando):
+    assert _bedom(vakt, mappar, kommando, sokvag=SYSTEMETS_SOKVAG) is None
+
+
+@pytest.mark.parametrize("namn,kommando", LISTANS_PROGRAM, ids=[n for n, _ in LISTANS_PROGRAM])
+def test_program_med_tillatet_namn_i_en_mapp_som_anvandaren_ager_stoppas(vakt, mappar, tmp_path, namn, kommando):
+    # Som node, npm och npx i Hugos nvm-mapp: mappen står först i PATH och ägs av Hugo.
+    egen = str(tmp_path / "egen-bin")
+    fil = _lagg_program(egen, namn)
+    fel = _bedom(vakt, mappar, kommando, sokvag=f"{egen}:{SYSTEMETS_SOKVAG}")
+    assert fel is not None and PLATS in fel and fil in fel, fel
+
+
+def test_lank_i_en_mapp_som_anvandaren_ager_stoppas_aven_om_den_leder_till_systemet(vakt, mappar, tmp_path):
+    # Länken pekar på systemets git, men själva länken kan bytas ut av användaren.
+    egen = tmp_path / "egen-bin"
+    egen.mkdir()
+    os.symlink("/usr/bin/git", egen / "git")
+    fel = _bedom(vakt, mappar, "git status", sokvag=f"{egen}:{SYSTEMETS_SOKVAG}")
+    assert fel is not None and PLATS in fel, fel
+
+
+def test_lank_i_en_rotmapp_till_en_mapp_som_anvandaren_ager_stoppas(vakt, mappar, tmp_path):
+    # Dit länken leder prövas också. Ingen rotmapp kan skapas i ett test, så länken prövas genom
+    # .venv/bin/python i projektet, som leder till ett program i en mapp som användaren äger.
+    egen = _lagg_program(str(tmp_path / "egen-bin"), "python3")
+    bin_ = os.path.join(mappar["projekt"], ".venv", "bin")
+    os.makedirs(bin_)
+    os.symlink(egen, os.path.join(bin_, "python"))
+    fel = _bedom(vakt, mappar, f"{PYTEST} -q scripts/tests")
+    assert fel is not None and PLATS in fel, fel
+
+
+def test_forsta_traffen_i_path_avgor(vakt, mappar, tmp_path):
+    # Skalet kör det första programmet med namnet i PATH. Ligger systemets git först går det igenom,
+    # ligger användarens git först stoppas det.
+    egen = str(tmp_path / "egen-bin")
+    _lagg_program(egen, "git")
+    assert _bedom(vakt, mappar, "git status", sokvag=f"{SYSTEMETS_SOKVAG}:{egen}") is None
+    fel = _bedom(vakt, mappar, "git status", sokvag=f"{egen}:{SYSTEMETS_SOKVAG}")
+    assert fel is not None and PLATS in fel
+
+
+def test_fil_som_inte_far_koras_hoppas_over_som_skalet_gor(vakt, mappar, tmp_path):
+    # En fil med namnet som inte är körbar hoppar skalet över, och letar vidare i PATH.
+    egen = tmp_path / "egen-bin"
+    egen.mkdir()
+    (egen / "git").write_text("inte ett program\n", encoding="utf-8")
+    os.chmod(egen / "git", 0o644)
+    assert _bedom(vakt, mappar, "git status", sokvag=f"{egen}:{SYSTEMETS_SOKVAG}") is None
+
+
+@pytest.mark.parametrize(
+    "sokvag",
+    ["/finns-inte/bin", "/finns-inte/bin:/finns-inte/heller"],
+    ids=["en-mapp", "tva-mappar"],
+)
+def test_program_i_en_mapp_som_inte_finns_stoppas(vakt, mappar, sokvag):
+    fel = _bedom(vakt, mappar, "git status", sokvag=sokvag)
+    assert fel is not None and OSAKER in fel, fel
+
+
+def test_venv_som_inte_finns_stoppas(vakt, mappar):
+    # .venv/bin/python pekar på en mapp som inte finns i projektet.
+    fel = _bedom(vakt, mappar, f"{PYTEST} -q scripts/tests")
+    assert fel is not None and OSAKER in fel, fel
+
+
+@pytest.mark.parametrize(
+    "sokvag",
+    [None, "", ":/usr/bin:/bin", ".:/usr/bin:/bin", "bin:/usr/bin:/bin", "~/bin:/usr/bin:/bin"],
+    ids=["saknas", "tom", "tom-mapp-forst", "punkt", "relativ", "tilde"],
+)
+def test_path_som_inte_gar_att_lita_pa_stoppas(vakt, mappar, sokvag):
+    # En tom eller relativ mapp i PATH före programmet betyder arbetsmappen eller en mapp i förhållande
+    # till den. Då kan vakten inte säkert avgöra vilken fil som körs.
+    fel = _bedom(vakt, mappar, "git status", sokvag=sokvag)
+    assert fel is not None and OSAKER in fel, fel
+
+
+ANDRAR_PATH_KOMMANDON = [
+    ("tilldelning", "PATH=/tmp git status"),
+    ("tilldelning-citat", "PATH='/tmp' git status"),
+    ("tilldelning-tom", "PATH= git status"),
+    ("tilldelning-ensam", "PATH=/tmp"),
+    ("tilldelning-lagg-till", "PATH+=/tmp git status"),
+    ("tilldelning-zsh-path", "path=/tmp git status"),
+    ("tilldelning-efter-annan", "X=1 PATH=/tmp git status"),
+    ("export", "export PATH=/tmp"),
+    ("export-namn", "export PATH"),
+    ("export-citat", "export 'PATH=/tmp'"),
+    ("env", "env PATH=/tmp git status"),
+    ("env-i", "env -i PATH=/tmp git status"),
+    ("typeset", "typeset PATH=/tmp"),
+    ("declare", "declare -x PATH=/tmp"),
+    ("readonly", "readonly PATH"),
+    ("local", "local PATH=/tmp"),
+    ("unset", "unset PATH"),
+]
+
+
+@pytest.mark.parametrize(
+    "kommando", [k for _, k in ANDRAR_PATH_KOMMANDON], ids=[i for i, _ in ANDRAR_PATH_KOMMANDON]
+)
+def test_kommandon_som_andrar_path_stoppas(vakt, mappar, kommando):
+    fel = _bedom(vakt, mappar, kommando)
+    assert fel is not None and ANDRAR_PATH in fel, fel
+
+
+@pytest.mark.parametrize("kommando", ["grep -n PATH SPEC.md", "grep -n 'PATH=' SPEC.md", "git log --grep=PATH"])
+def test_att_soka_efter_ordet_path_gar_igenom(vakt, mappar, kommando):
+    # Bara kommandon som ändrar PATH stoppas, inte en sökning efter ordet.
+    assert _bedom(vakt, mappar, kommando) is None
 
 
 # ---------------------------------------------------------------------------------------------
 # Programmet: så som Claude Code kör det, med datorns egen Python och -I.
 
-def _kor_programmet(mappar, indata, fil=VAKTEN, projektmapp=True, cwd=None):
-    miljo = {"PATH": "/usr/bin:/bin"}
+def _kor_programmet(mappar, indata, fil=VAKTEN, projektmapp=True, cwd=None, sokvag=SYSTEMETS_SOKVAG):
+    miljo = {} if sokvag is None else {"PATH": sokvag}
     if projektmapp:
         miljo["CLAUDE_PROJECT_DIR"] = mappar["projekt"]
     if not isinstance(indata, bytes):
@@ -825,6 +1007,19 @@ def test_programmet_stoppar_nar_vakten_kraschar_vid_inlasningen(mappar):
     assert svar.returncode == 2
 
 
+def test_programmet_tar_path_fran_sin_miljo(mappar, tmp_path):
+    # Claude Code ger vakten sin PATH i miljön. Ett git i en mapp som användaren äger stoppas.
+    egen = str(tmp_path / "egen-bin")
+    _lagg_program(egen, "git")
+    svar = _kor_programmet(mappar, _indata(mappar, "git status"), sokvag=f"{egen}:{SYSTEMETS_SOKVAG}")
+    assert svar.returncode == 2 and PLATS in svar.stderr.decode("utf-8")
+
+
+def test_programmet_stoppar_utan_path(mappar):
+    svar = _kor_programmet(mappar, _indata(mappar, "git status"), sokvag=None)
+    assert svar.returncode == 2 and OSAKER in svar.stderr.decode("utf-8")
+
+
 def test_programmet_stoppar_utan_projektmapp(mappar):
     svar = _kor_programmet(mappar, _indata(mappar, "git status"), projektmapp=False)
     assert svar.returncode == 2 and "CLAUDE_PROJECT_DIR" in svar.stderr.decode("utf-8")
@@ -882,6 +1077,26 @@ def test_installningarna_kor_vakten_fore_varje_verktyg_och_stoppar_om_den_faller
             "onFailure": "block",
         }
     ]
+
+
+def test_installationsfilen_startar_vakten_med_hela_sokvagar_och_stoppar_om_den_fallerar():
+    # Hugos beslut 2026-10-28, beslut 2: varje vakt i installationsfilen startas med fullständig sökväg
+    # till både tolken (Python) och skriptet, och har "onFailure": "block". Testet läser filen och
+    # prövar alla vakter i den, inte bara den första.
+    alla = [
+        vakt_
+        for grupper in _installningar()["hooks"].values()
+        for grupp in grupper
+        for vakt_ in grupp["hooks"]
+    ]
+    assert alla, "installationsfilen har ingen vakt"
+    for vakt_ in alla:
+        assert vakt_["onFailure"] == "block", vakt_
+        tolken = vakt_["command"]
+        assert os.path.isabs(tolken) and " " not in tolken and tolken == SYSTEMETS_PYTHON, tolken
+        skript = [a for a in vakt_["args"] if not a.startswith("-")]
+        assert skript == [INSTALLERAD_VAKT] and os.path.isabs(skript[0]), vakt_["args"]
+        assert skript[0].startswith("/Library/Application Support/ClaudeCode/")
 
 
 def test_installningarna_nekar_sudo_su_och_att_skriva_i_git():
@@ -993,28 +1208,131 @@ def _installationskommandon():
     return text, [rad.strip() for b in block for rad in b.splitlines() if rad.strip()]
 
 
+FORPROV_MAPP = "~/vera-forprov"
+FORPROV_FIL = f"{FORPROV_MAPP}/.claude/settings.json"
+FORPROV_KOMMANDON = (
+    f"ls -ld {FORPROV_MAPP}",
+    f"mkdir -p {FORPROV_MAPP}/.claude",
+    "echo '",
+    f"cat {FORPROV_FIL}",
+    f"rm {FORPROV_FIL}",
+    f"rmdir {FORPROV_MAPP}/.claude",
+    f"rmdir {FORPROV_MAPP}",
+)
+KEDJAN = 'ls -ld / /Library "/Library/Application Support" "/Library/Application Support/ClaudeCode"'
+
+
 def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
+    # Utöver kopieringen: förprovet i en egen mapp, och ls -ld för att läsa ägare och rättigheter.
     _, rader = _installationskommandon()
     tillatna = (
-        "claude --version",
         "shasum -a 256 ",
+        "sudo mkdir ",
         "sudo ditto ",
         "sudo cp -i ",
         "sudo chown ",
         "sudo chmod ",
+        'ls -ld "/Library/Application Support/ClaudeCode',
+        KEDJAN,
         FLYTTA_UNDAN,
         FLYTTA_TILLBAKA,
-    )
+    ) + FORPROV_KOMMANDON
     assert rader
     for rad in rader:
         assert rad.startswith(tillatna), rad
 
 
+def _steg(text):
+    """Avsnitten i INSTALLERA.md med rubriken "## Steg ...", i ordning, som (rubrik, text)."""
+    delar = re.split(r"\n(## .*)\n", "\n" + text.split(KONTROLL_RUBRIK, 1)[0])
+    return [(delar[i], delar[i + 1]) for i in range(1, len(delar), 2) if delar[i].startswith("## Steg")]
+
+
 def test_installationen_kontrollerar_versionen_forst():
+    # Hugos beslut 2026-10-28, beslut 3: versionen kontrolleras med /status i en Claude Code-session och
+    # ska vara 2.1.295 eller senare. Kommandot claude finns inte i Terminal på Hugos dator.
     text, rader = _installationskommandon()
-    assert rader[0] == "claude --version"
-    assert "2.1.295" in text and "/status" in text
+    rubrik, forsta = _steg(text)[0]
+    forsta = _en_rad(forsta)
+    assert "version" in rubrik.lower()
+    assert "/status" in forsta and "2.1.295" in forsta
+    assert "Check for Updates" in forsta, "hur Hugo uppdaterar ska stå med"
+    assert "claude --version" not in rader
     assert "code.claude.com/docs/en/hooks" in text
+
+
+def _forsta_sudo(rader):
+    return min(i for i, r in enumerate(rader) if r.startswith("sudo "))
+
+
+def test_forprovet_gors_fore_installationen_och_stadas_bort():
+    # Hugos beslut 2026-10-28, beslut 2: förprovet görs före installationen, och den tillfälliga mappen
+    # raderas efteråt. Mappen ligger utanför ~/VERA.
+    text, rader = _installationskommandon()
+    # Hela kommandon jämförs exakt, så att "rmdir ~/vera-forprov" inte räknas som ".../.claude".
+    plats = {
+        k: next(i for i, r in enumerate(rader) if (r.startswith(k) if k == "echo '" else r == k))
+        for k in FORPROV_KOMMANDON
+    }
+    assert max(plats.values()) < _forsta_sudo(rader)
+    assert plats[f"ls -ld {FORPROV_MAPP}"] < plats[f"mkdir -p {FORPROV_MAPP}/.claude"] < plats["echo '"]
+    assert plats["echo '"] < plats[f"rm {FORPROV_FIL}"] < plats[f"rmdir {FORPROV_MAPP}/.claude"]
+    assert plats[f"rmdir {FORPROV_MAPP}/.claude"] < plats[f"rmdir {FORPROV_MAPP}"]
+    assert not FORPROV_MAPP.lower().startswith("~/vera/")
+    (forprovet,) = [_en_rad(t) for r, t in _steg(text) if "förprov" in r.lower()]
+    assert "`ls`" in forprovet and "avbryt installationen" in forprovet
+
+
+def test_forprovets_vakt_pekar_pa_ett_skript_som_inte_finns_och_har_onfailure_block():
+    _, rader = _installationskommandon()
+    rad = next(r for r in rader if r.startswith("echo '"))
+    innehall, _, mal = rad[len("echo '"):].rpartition("' > ")
+    assert mal == FORPROV_FIL
+    installningar = json.loads(innehall)
+    assert list(installningar) == ["hooks"] and list(installningar["hooks"]) == ["PreToolUse"]
+    (grupp,) = installningar["hooks"]["PreToolUse"]
+    assert grupp["matcher"] == "*"
+    (vakt_,) = grupp["hooks"]
+    assert vakt_["type"] == "command" and vakt_["onFailure"] == "block"
+    # Ett skript som inte finns, med hel sökväg och utan tolk framför: då går vakten inte att starta, och
+    # det är onFailure som avgör (inte kod 2 från en Python som inte hittar sin fil).
+    assert os.path.isabs(vakt_["command"]) and not os.path.exists(vakt_["command"])
+    assert " " not in vakt_["command"] and "python" not in vakt_["command"]
+
+
+def test_agare_och_rattigheter_kontrolleras_fore_och_efter_installationen():
+    # Hugos beslut 2026-10-28, beslut 3 (P7): ls -ld för hela kedjan före och efter installationen.
+    _, rader = _installationskommandon()
+    kedjan = [i for i, r in enumerate(rader) if r == KEDJAN]
+    sista_chmod = max(i for i, r in enumerate(rader) if r.startswith("sudo chmod"))
+    assert any(i < _forsta_sudo(rader) for i in kedjan)
+    assert any(i > sista_chmod for i in kedjan)
+
+
+def test_mappen_och_filerna_far_ratt_agare_och_rattigheter():
+    # Mappen ClaudeCode (och vera) root:wheel och 755, filerna root:wheel och 644.
+    _, rader = _installationskommandon()
+    mapp = '"/Library/Application Support/ClaudeCode"'
+    assert f"sudo mkdir {mapp}" in rader
+    assert any(r.startswith("sudo chown root:wheel ") and mapp in r for r in rader)
+    assert any(r.startswith("sudo chmod 755 ") and mapp in r for r in rader)
+    for fil in (INSTALLERAD_VAKT, INSTALLERADE_INSTALLNINGAR):
+        assert any(r.startswith("sudo chown root:wheel ") and f'"{fil}"' in r for r in rader), fil
+        assert any(r.startswith("sudo chmod 644 ") and f'"{fil}"' in r for r in rader), fil
+    assert not any(r.startswith("sudo chmod 600") for r in rader)
+
+
+def test_installera_forklarar_varfor_644_och_inte_600():
+    text = _en_rad(INSTALLERA.read_text(encoding="utf-8"))
+    assert "600" in text and "hoppas över utan varning" in text
+
+
+def test_status_efter_installationen_avgor_om_den_lyckades():
+    # Beslut 3: /status ska visa "Enterprise managed settings (file)" på raden Setting sources. Annars
+    # gäller inte vakten, och installationen räknas som misslyckad.
+    efterat = _en_rad(INSTALLERA.read_text(encoding="utf-8").split("## Efteråt", 1)[1].split("\n## ", 1)[0])
+    assert "Setting sources" in efterat and "Enterprise managed settings (file)" in efterat
+    assert "misslyckad" in efterat
 
 
 def test_installationen_kopierar_vakten_fore_installningarna():
@@ -1025,7 +1343,9 @@ def test_installationen_kopierar_vakten_fore_installningarna():
     installningarna = next(
         i for i, r in enumerate(rader) if r.startswith("sudo cp -i") and INSTALLERADE_INSTALLNINGAR in r
     )
-    agare = [i for i, r in enumerate(rader[:installningarna]) if r.startswith("sudo chown")]
+    agare = [
+        i for i, r in enumerate(rader[:installningarna]) if r.startswith("sudo chown") and INSTALLERAD_VAKT in r
+    ]
     rattigheter = [
         i for i, r in enumerate(rader[:installningarna]) if r.startswith("sudo chmod") and INSTALLERAD_VAKT in r
     ]

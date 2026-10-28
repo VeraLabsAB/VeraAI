@@ -62,10 +62,12 @@ vakten efter granskning 12).
    Övriga fynd: P2 (provet där vakten fallerar togs bort ur kontrollen efter installationen), P3 (skills
    som kör skalkommandon), P4 (kommandoverktyg känns igen på namnet), P5 (`.git` som fil), P6 (läget
    "auto") och P7 (rättigheterna på `/Library/Application Support`). **P2–P6 och beslut (a) och (b) är
-   byggda** efter Hugos beslut 2026-10-28 (5cb9080, 08a3370, c066188). Kvar: P1 (omvägarna), P7 (inget
-   beslut), vilka mappar i Hugos `PATH` som ska förbjudas (förbuden mot `~/bin`, `~/.local/bin` och
-   `/opt/homebrew` är granskarens förslag, inte kontrollerade mot Hugos `PATH`), och att lägsta version
-   för `disableSkillShellExecution` och `disableAutoMode` inte är bekräftad i dokumentationen.
+   byggda** efter Hugos beslut 2026-10-28 (5cb9080, 08a3370, c066188). **PATH-regeln, förprovet för
+   `onFailure` och P7 är byggda** efter Hugos beslut 2026-10-28 (`GRANSKNING.md`, "Beslut 2026-10-28:
+   PATH-regel, förprov för onFailure, P7"). Kvar: P1 (omvägarna), att lägsta version för
+   `disableSkillShellExecution` och `disableAutoMode` inte är bekräftad i dokumentationen, och **beslutet om
+   testsviten**: PATH-regeln stoppar båda pytest-kommandona efter installationen, eftersom
+   `.venv/bin/python` ligger i projektet.
    Kontrollsummorna i granskning 12 gäller inte längre, eftersom vakten och inställningarna är ändrade.
    Provet med en vakt som fallerar visar att en **saknad** vakt stoppar (Python ger kod 2), men prövar inte
    `onFailure` i sig (INSTALLERA.md, steg 8).
@@ -133,6 +135,13 @@ avsnitt 8, med namn och datum.
   kräver en oberoende granskning, men inte provet med en vakt som fallerar. Provet krävs före läget
   "auto", före körningar utan att Hugo tittar, före första hela körningen på riktiga underlag och före
   första kund. Står i SPEC 7.1 och INSTALLERA.md, med test.
+- **Hugos beslut 2026-10-28 (PATH-regel, förprov för onFailure, P7):** vakten släpper bara igenom ett
+  kommando vars program, och varje mapp ovanför det, ägs av root och inte går att skriva i för gruppen
+  eller andra, och kommandon som ändrar `PATH` stoppas. Listan ändras inte. Ett förprov i INSTALLERA.md
+  visar att Claude Code stoppar ett kommando när en vakt inte går att starta, före installationen.
+  Versionen kontrolleras med `/status`, `ClaudeCode` får `root:wheel` och 755 och filerna 644, mapparna
+  kontrolleras med `ls -ld` före och efter, och `/status` ska visa `Enterprise managed settings (file)`
+  efteråt. Byggt, inte installerat. Detaljer: `GRANSKNING.md`.
 - **Hugos beslut i chatten 2026-10-27:** listan över ägare och närstående ligger kvar i
   `foretag/<namn>/regelbok.json` tills spärrsteget, eftersom SPEC inte säger var den skyddade mappen ska
   ligga. Testet att listan ligger utanför alla mappar agenten får skriva i skrivs då.

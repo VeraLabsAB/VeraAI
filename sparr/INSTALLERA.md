@@ -1,11 +1,14 @@
 # Installera vakten för kommandolistan
 
 Skriven 2026-10-28 i byggsessionen för granskning 11, Q1. Planen och Hugos beslut står i `GRANSKNING.md`
-under "Granskning 11 – plan för Q1".
+under "Granskning 11 – plan för Q1". Ändrad samma dag efter Hugos beslut 2026-10-28 om PATH-regeln,
+förprovet för `onFailure` och P7 (`GRANSKNING.md`, "Beslut 2026-10-28: PATH-regel, förprov för onFailure,
+P7").
 
 Den här beskrivningen är till **Hugo** (och sedan **Casper**, på sin dator). Agenten kör inga av
 kommandona. Du kör dem själv i programmet **Terminal**, ett i taget, och skriver ditt
-administratörslösenord när datorn frågar efter det.
+administratörslösenord när datorn frågar efter det. Kopiera ett kommando i taget från en grå ruta,
+klistra in det i Terminal och tryck Retur.
 
 ## Vad som installeras
 
@@ -15,18 +18,26 @@ filerna.
 
 | Fil i projektet | Kopieras till | Vad den gör |
 |---|---|---|
-| `sparr/kommandosparr.py` | `/Library/Application Support/ClaudeCode/vera/kommandosparr.py` | **Vakten.** Ett litet program som Claude Code kör före varje verktyg. Det stoppar allt som inte står på listan i SPEC 7.1. |
+| `sparr/kommandosparr.py` | `/Library/Application Support/ClaudeCode/vera/kommandosparr.py` | **Vakten.** Ett litet program som Claude Code kör före varje verktyg. Det stoppar allt som inte står på listan i SPEC 7.1. Det stoppar också ett kommando vars program ligger i en mapp som du kan ändra utan lösenord, och kommandon som ändrar `PATH` (PATH-regeln, se nedan). |
 | `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.295 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Läget "auto" går inte att använda, och skills kan inte köra skalkommandon. |
 
 Inställningarna börjar gälla så fort filen finns, i terminalen och i skrivbordsappen. Därför kopieras
 vakten först och inställningarna sist.
+
+**PATH-regeln** (Hugos beslut 2026-10-28, beslut 1). `PATH` är listan över mappar där datorn letar efter
+ett program när du skriver dess namn, till exempel `git`. Ligger ett program med samma namn i en mapp
+som du själv kan ändra, kan det bytas ut utan lösenord. Vakten släpper därför bara igenom ett kommando om
+programmet, och varje mapp ovanför det, ägs av systemet (`root`) och inte går att ändra för någon annan.
+**Följd:** pytest-kommandona i SPEC 7.1 körs med `.venv/bin/python`, som ligger i projektet, och projektet
+ägs av dig. De stoppas alltså efter installationen, och agenten kan då inte köra testsviten. Det är ett
+beslut som behövs (se `GRANSKNING.md`).
 
 ## Innan du börjar
 
 1. **Den oberoende granskningen ska vara klar** (planens steg 2), och du ska kopiera filerna från den
    commit som granskades. Ändras filerna i projektet efter granskningen, kopiera inte. Fråga först.
    Provet med en vakt som fallerar (steg 8 i kontrollen efter installationen) behövs inte före
-   installationen (Hugos beslut 2026-10-28, 8).
+   installationen (Hugos beslut 2026-10-28, 8). Förprovet i steg 3 nedan behövs däremot.
 2. **Titta efter om mappen redan finns.** Öppna Finder, välj **Gå > Gå till mapp…** och skriv
    `/Library/Application Support/ClaudeCode`. Om Finder säger att mappen inte finns: bra, gå vidare.
    Om mappen finns och har filer i sig: **stoppa och fråga**, så att inget som redan ligger där skrivs
@@ -40,24 +51,33 @@ kraschar. Kravet står i Claude Codes dokumentation på sidan **code.claude.com/
 tabellen över fälten för en vakt av typen `command` ("Requires Claude Code v2.1.295 or later") och i
 avsnittet "Block the action when a hook fails". Kontrollerat 2026-10-28.
 
-Terminalen och skrivbordsappen har **var sin** Claude Code med var sitt versionsnummer, och att
-uppdatera den ena uppdaterar inte den andra (sidan **code.claude.com/docs/en/desktop**, avsnittet
-"Claude Code version in the Code tab"). Båda ska därför kontrolleras.
+På din dator hittas kommandot `claude` inte i Terminal (2026-10-28), så Claude Code körs via
+**Claude-appen**. Versionen kontrolleras därför där, med `/status` (Hugos beslut 2026-10-28, beslut 3):
 
-**I Terminal:** kör
+1. Öppna Claude-appen, gå till fliken **Code** och starta en ny session, till exempel i `~/VERA/agent`.
+2. Skriv `/status` i rutan där du skriver till Claude och tryck Retur. `/status` är ett kommando till
+   Claude Code, inte till Terminal. Det visar bland annat versionen och var inställningarna kommer ifrån,
+   och ändrar ingenting.
+3. Läs raden **Claude Code**. Den visar versionen, till exempel `2.1.300`. Jämför siffergrupperna mellan
+   punkterna en i taget, från vänster: `2.1.300` och `2.2.0` är senare än `2.1.295`, men `2.1.29` är
+   äldre (29 är mindre än 295).
+4. Läs i samma ruta raden **Setting sources** (var inställningarna kommer från). Om den nämner
+   inställningar från claude.ai (server-managed settings) går de före filen som installeras här, och då
+   används inte filen. Stoppa i så fall och fråga.
 
-```bash
-claude --version
-```
+**Om versionen är äldre än 2.1.295: stoppa och uppdatera först.**
 
-Det visar Claude Codes version, till exempel `2.1.300`. Det läser bara, och ändrar ingenting.
+1. Klicka på **Claude** i menyraden överst på skärmen (när Claude-appen är aktiv) och välj **Check for
+   Updates…**. Installera uppdateringen om det finns en.
+2. Avsluta appen helt (**Claude > Quit Claude**, eller Cmd+Q) och öppna den igen.
+3. Starta en ny session och gör `/status` igen.
+4. Gå vidare först när versionen är minst 2.1.295. Säger appen att den redan är senaste versionen, men
+   versionen fortfarande är äldre än 2.1.295: stoppa och fråga.
 
-**I skrivbordsappen:** öppna en ny session i fliken **Code** på den här datorn, skriv `/status` i
-rutan där du skriver till Claude, och läs raden **Claude Code**. Den visar versionen.
-
-Läs i samma ruta raden **Setting sources** (var inställningarna kommer från). Om den nämner inställningar
-från claude.ai (server-managed settings) går de före filen som installeras här, och då används inte
-filen. Stoppa i så fall och fråga.
+Terminalen och skrivbordsappen har **var sin** Claude Code med var sitt versionsnummer, och att uppdatera
+den ena uppdaterar inte den andra (sidan **code.claude.com/docs/en/desktop**, avsnittet "Claude Code
+version in the Code tab"). Om du senare installerar Claude Code för Terminal, så att `claude` hittas där:
+kontrollera den också, med `/status` i en session i Terminal, innan du installerar vakten.
 
 De låsta inställningarna innehåller också `"requiredMinimumVersion": "2.1.295"`, så att en äldre Claude
 Code inte startar alls efter installationen (Hugos beslut 2026-10-28). Kontrollen här behövs ändå,
@@ -69,11 +89,122 @@ inga skalkommandon) och `disableAutoMode` (läget "auto" går inte att använda)
 dem, kontrollerat 2026-10-28. Lägsta version är alltså **inte bekräftat** (Hugos beslut 2026-10-28: byggs
 in ändå). Kontrollen efter installationen, steg 1, visar att läget "auto" saknas.
 
-**Båda versionerna ska vara 2.1.295 eller senare.** Om någon är äldre: **stoppa**, uppdatera den först
-(skrivbordsappen med **Claude > Check for Updates…**, och terminalens Claude Code enligt
-dokumentationen), kontrollera igen, och gå vidare först när båda är minst 2.1.295.
+## Steg 2: kontrollera mapparna ovanför (före installationen)
 
-## Steg 2: kontrollera att filerna är de som granskades
+Vakten och inställningarna skyddas av att bara systemet kan ändra mappen `ClaudeCode`. Det skyddet gäller
+bara om ingen annan heller kan ändra mapparna ovanför, eftersom den som kan ändra en mapp kan flytta undan
+allt som ligger i den (granskning 12, P7, Hugos beslut 2026-10-28, beslut 3).
+
+```bash
+ls -ld / /Library "/Library/Application Support" "/Library/Application Support/ClaudeCode"
+```
+
+- `ls -ld` visar en rad per mapp: vem som äger mappen och vem som får ändra i den. Det bara läser, och
+  ändrar ingenting. Citattecknen behövs, eftersom "Application Support" har ett mellanslag.
+- En rad ser ut ungefär så här: `drwxr-xr-x  67 root  wheel  2144 Oct 28 10:00 /Library`. Så läser du den:
+  - Det första tecknet, `d`, betyder att det är en mapp.
+  - Sedan kommer tre grupper om tre tecken: vad **ägaren** får (`rwx`), vad **gruppen** får (`r-x`) och
+    vad **alla andra** får (`r-x`). `r` betyder läsa, `w` betyder skriva (ändra), `x` betyder öppna
+    mappen, och `-` betyder att det inte är tillåtet.
+  - Efter siffran kommer **ägaren** (`root`, systemets administratör) och sedan **gruppen** (till
+    exempel `wheel` eller `admin`).
+- **Så ska de tre första raderna** (`/`, `/Library` och `/Library/Application Support`) se ut:
+  - ägaren är `root`, och
+  - det står **inget `w`** på plats 6 (gruppen) eller plats 9 (alla andra), räknat från vänster.
+    Rätt: `drwxr-xr-x`. Fel: till exempel `drwxrwxr-x` (gruppen får ändra) eller `drwxr-xrwx` (alla får
+    ändra).
+  - `/Library/Application Support` har gruppen `admin` på din dator. Det är bra så länge det inte står
+    `w` på plats 6.
+- **Den fjärde raden** ska säga `No such file or directory`, eftersom mappen `ClaudeCode` inte finns än.
+- Står det `+` eller `@` direkt efter de tio tecknen (till exempel `drwxr-xr-x+`), har mappen extra
+  uppgifter som raden inte visar, och de kan ge fler rättigheter. Stoppa och fråga.
+
+**Kan gruppen eller andra skriva någonstans i kedjan, är ägaren inte `root`, eller finns `ClaudeCode`
+redan: avbryt installationen och fråga.**
+
+## Steg 3: förprov – stoppar Claude Code ett kommando när en vakt fallerar?
+
+`"onFailure": "block"` ska göra att ett kommando stoppas när vakten inte går att köra. Förprovet visar att
+din Claude Code faktiskt gör så, **innan** något installeras (Hugos beslut 2026-10-28, beslut 2). Det görs
+i en tillfällig mapp, `~/vera-forprov`, utanför `~/VERA`, med en vakt som pekar på ett skript som inte
+finns. Ingenting i `~/VERA` eller i `/Library` ändras, och inget kräver lösenord.
+
+**a. Kontrollera att mappen inte finns:**
+
+```bash
+ls -ld ~/vera-forprov
+```
+
+- Visar mappen `vera-forprov` i din hemmapp (`~` betyder din hemmapp), om den finns. Det ska stå
+  `No such file or directory`. Finns mappen redan: stoppa och fråga.
+
+**b. Skapa mappen:**
+
+```bash
+mkdir -p ~/vera-forprov/.claude
+```
+
+- `mkdir` skapar en mapp. `-p` gör att mappen ovanför, `vera-forprov`, skapas i samma steg. `.claude` är
+  mappen där Claude Code läser inställningar för en mapp.
+
+**c. Skriv inställningsfilen** (kommandot är en enda lång rad, kopiera hela):
+
+```bash
+echo '{"hooks":{"PreToolUse":[{"matcher":"*","hooks":[{"type":"command","command":"/finns-inte/vera-forprov.sh","onFailure":"block"}]}]}}' > ~/vera-forprov/.claude/settings.json
+```
+
+- `echo '…'` skriver ut texten mellan de enkla citattecknen, och `>` gör att texten hamnar i filen
+  `settings.json` i stället för på skärmen. Kommandot skapar bara den filen.
+- Texten är inställningar för Claude Code: före varje verktyg (`PreToolUse`, och `"matcher": "*"` betyder
+  alla verktyg) ska programmet `/finns-inte/vera-forprov.sh` köras. Det programmet finns inte, och mappen
+  `/finns-inte` kan inte skapas utan administratörslösenord. Claude Code kan alltså inte starta vakten.
+  `"onFailure": "block"` säger: går vakten inte att köra, stoppa kommandot.
+
+**d. Kontrollera filen:**
+
+```bash
+cat ~/vera-forprov/.claude/settings.json
+```
+
+- `cat` visar vad som står i filen, och ändrar ingenting. Det ska vara exakt texten mellan citattecknen i
+  c.
+
+**e. Pröva.** Öppna Claude-appen, gå till fliken **Code** och starta en ny session i mappen
+`vera-forprov` i din hemmapp. Frågar appen om du litar på mappen: svara ja (den har bara filen ovan). Be
+Claude: "Kör kommandot `ls`."
+
+- **Förväntat: kommandot stoppas.** Claude Code säger att en vakt (en hook, `PreToolUse`) inte gick att
+  köra, eller att verktyget stoppades. Eftersom vakten gäller alla verktyg kan Claude inte heller läsa
+  filer i den sessionen. Det är rätt.
+- **Om `ls` körs och visar filerna i mappen: förprovet har misslyckats.** Det betyder att Claude Code inte
+  stoppar ett kommando när en vakt fallerar, och då skyddar vakten inte. Gör f, avbryt installationen och
+  fråga.
+- Avsluta sessionen när du har sett resultatet (arkivera den i appen).
+
+**f. Radera den tillfälliga mappen** (i båda fallen). Ett kommando i taget:
+
+```bash
+rm ~/vera-forprov/.claude/settings.json
+```
+
+```bash
+rmdir ~/vera-forprov/.claude
+```
+
+```bash
+rmdir ~/vera-forprov
+```
+
+- `rm` raderar en fil, här bara inställningsfilen från c.
+- `rmdir` raderar en mapp, men bara om den är tom, så inget annat kan försvinna av misstag. Först
+  `.claude`, sedan `vera-forprov`.
+- Säger `rmdir` `Directory not empty` har något mer hamnat i mappen. Radera inte på något annat sätt:
+  stoppa och fråga.
+- Kör sedan `ls -ld ~/vera-forprov` från a igen. Det ska stå `No such file or directory`.
+
+**Stoppades `ls` inte i e: avbryt installationen.** Gå vidare till steg 4 bara om `ls` stoppades.
+
+## Steg 4: kontrollera att filerna är de som granskades
 
 ```bash
 shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-settings.json
@@ -84,32 +215,27 @@ shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-set
 - Jämför de två summorna, tecken för tecken, med dem som den oberoende granskningen har skrivit upp
   (Hugos beslut 2026-10-28). **Är någon summa olika: stoppa och fråga.** Kopiera ingenting.
 
-## Steg 3: kopiera vakten
+## Steg 5: skapa mapparna och låt systemet äga dem
 
 ```bash
-sudo ditto ~/VERA/agent/sparr/kommandosparr.py "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+sudo mkdir "/Library/Application Support/ClaudeCode"
+```
+
+```bash
+sudo mkdir "/Library/Application Support/ClaudeCode/vera"
 ```
 
 - `sudo` gör att kommandot körs som administratör. Datorn frågar efter ditt lösenord. Det syns inte
   när du skriver, det är normalt.
-- `ditto` kopierar en fil. Om mapparna `ClaudeCode` och `vera` inte finns, skapar `ditto` dem som en
-  del av kopieringen.
-- `~/VERA/agent/sparr/kommandosparr.py` är vakten i projektet (`~` betyder din hemmapp).
-- Den sista sökvägen är dit vakten kopieras. Citattecknen behövs, eftersom "Application Support"
-  har ett mellanslag.
-
-## Steg 4: låt systemet äga mappen och vakten
+- `mkdir` skapar en mapp: först `ClaudeCode`, sedan `vera` inuti den, där vakten ska ligga. Säger
+  kommandot `File exists` finns mappen redan: stoppa och fråga.
 
 ```bash
-sudo chown -R root:wheel "/Library/Application Support/ClaudeCode"
+sudo chown root:wheel "/Library/Application Support/ClaudeCode" "/Library/Application Support/ClaudeCode/vera"
 ```
 
-- `chown` byter ägare. `root:wheel` är systemets administratör och dess grupp.
-- `-R` gör att det gäller mappen och allt i den, alltså också `vera` och vakten.
-- Efter det kan bara en administratör ändra i mappen, och agenten, som arbetar som ditt vanliga
-  konto, kan inte göra det.
-
-## Steg 5: sätt rättigheterna på mapparna och vakten
+- `chown` byter ägare. `root:wheel` är systemets administratör och dess grupp. En ny mapp får annars
+  gruppen från mappen ovanför (`admin`), och därför sätts gruppen uttryckligen här.
 
 ```bash
 sudo chmod 755 "/Library/Application Support/ClaudeCode" "/Library/Application Support/ClaudeCode/vera"
@@ -118,14 +244,35 @@ sudo chmod 755 "/Library/Application Support/ClaudeCode" "/Library/Application S
 - `chmod` sätter vem som får läsa, skriva och öppna. `755` på en mapp betyder: ägaren (systemet) får
   ändra, alla andra får bara titta in. Claude Code behöver kunna titta in för att hitta filerna.
 
+## Steg 6: kopiera vakten
+
+```bash
+sudo ditto ~/VERA/agent/sparr/kommandosparr.py "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+- `ditto` kopierar en fil. `~/VERA/agent/sparr/kommandosparr.py` är vakten i projektet, och den sista
+  sökvägen är dit den kopieras.
+
+## Steg 7: låt systemet äga vakten och sätt rättigheterna
+
+```bash
+sudo chown root:wheel "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
 ```bash
 sudo chmod 644 "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
 ```
 
-- `644` på en fil betyder: ägaren (systemet) får ändra, alla andra får bara läsa. Claude Code behöver
-  kunna läsa vakten för att köra den med `/usr/bin/python3`.
+- Systemet blir ägare av vakten. `644` på en fil betyder: ägaren (systemet) får ändra, alla andra får
+  bara läsa. Claude Code behöver kunna läsa vakten för att köra den med `/usr/bin/python3`.
+- **Varför 644 och inte 600?** `600` betyder att bara ägaren, systemet, får läsa filen. Claude Code körs
+  som ditt vanliga konto, inte som systemet, och skulle då inte kunna läsa filerna. En inställningsfil som
+  Claude Code inte får läsa **hoppas över utan varning**: sessionen startar som om filen inte fanns, och
+  då gäller ingen vakt alls (code.claude.com/docs/en/managed-settings, granskning 12). Det är farligare än
+  att alla kan läsa filerna, eftersom de inte innehåller några hemligheter. Det viktiga är att ingen utom
+  systemet kan **ändra** dem.
 
-## Steg 6: kopiera de låsta inställningarna (sist, nu börjar de gälla)
+## Steg 8: kopiera de låsta inställningarna (sist, nu börjar de gälla)
 
 ```bash
 sudo cp -i ~/VERA/agent/sparr/managed-settings.json "/Library/Application Support/ClaudeCode/managed-settings.json"
@@ -134,7 +281,7 @@ sudo cp -i ~/VERA/agent/sparr/managed-settings.json "/Library/Application Suppor
 - `cp` kopierar en fil. `-i` gör att datorn frågar innan den skriver över en fil som redan finns. Om
   den frågar: svara `n` (nej) och stoppa, eftersom filen då inte borde finnas (se "Innan du börjar").
 
-## Steg 7: låt systemet äga inställningarna och sätt rättigheterna
+## Steg 9: låt systemet äga inställningarna och sätt rättigheterna
 
 ```bash
 sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.json"
@@ -144,44 +291,73 @@ sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.
 sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
 ```
 
-- Samma som i steg 4 och 5, för inställningsfilen: systemet äger den, alla får läsa den, bara en
+- Samma som i steg 7, för inställningsfilen: systemet äger den, alla får läsa den, bara en
   administratör får ändra den.
 
-## Steg 8: kontrollera att det är samma filer som ligger på plats
+## Steg 10: kontrollera att det är samma filer som ligger på plats
 
 ```bash
 shasum -a 256 "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/managed-settings.json"
 ```
 
-- Samma kontroll som i steg 2, nu för filerna där de installerades. Summorna ska vara exakt samma som
-  i steg 2. **Är någon olika: stoppa och fråga.**
+- Samma kontroll som i steg 4, nu för filerna där de installerades. Summorna ska vara exakt samma som
+  i steg 4. **Är någon olika: stoppa och fråga.**
+
+## Steg 11: kontrollera ägare och rättigheter igen (efter installationen)
+
+```bash
+ls -ld / /Library "/Library/Application Support" "/Library/Application Support/ClaudeCode"
+```
+
+- Samma kommando som i steg 2, och de tre första raderna ska se ut som där. Nu ska också den fjärde raden
+  finnas: `drwxr-xr-x`, ägaren `root` och gruppen `wheel`, för `/Library/Application Support/ClaudeCode`.
+
+```bash
+ls -ld "/Library/Application Support/ClaudeCode/vera" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+- Visar mappen `vera` och de två filerna. `vera` ska vara `drwxr-xr-x`. Filerna ska vara `-rw-r--r--`
+  (det första tecknet, `-`, betyder att det är en fil, och `644` skrivs så). Ägaren ska vara `root` och
+  gruppen `wheel` på alla tre.
+
+**Kan gruppen eller andra skriva någonstans (ett `w` på plats 6 eller 9), är ägaren inte `root`, är
+gruppen inte `wheel` för `ClaudeCode`, `vera` och filerna, eller står det `+` eller `@` efter de tio
+tecknen: installationen räknas som misslyckad. Stoppa och fråga.**
 
 ## Efteråt
 
-1. **Starta nya sessioner** i terminalen och i skrivbordsappen. Sessioner som redan är öppna kan ha
-   läst inställningarna innan filen fanns.
-2. **Gör kontrollen efter installationen** (sist i den här filen) i en ny session.
-3. **Agenten kan inte längre skriva i `~/.claude`** (Hugos beslut 2026-10-28, punkt 5). Där ligger
+1. **Starta nya sessioner** i skrivbordsappen (och i terminalen, om du har Claude Code där). Sessioner som
+   redan är öppna kan ha läst inställningarna innan filen fanns.
+2. **Kontrollera att de låsta inställningarna gäller** (Hugos beslut 2026-10-28, beslut 3). Skriv `/status`
+   i en ny session och läs raden **Setting sources**. Den ska visa `Enterprise managed settings (file)`,
+   alltså inställningarna från filen du installerade (code.claude.com/docs/en/managed-settings). **Saknas
+   raden, saknas den texten, eller visas en annan källa, gäller inte vakten, och installationen räknas
+   som misslyckad.** Stoppa och fråga.
+3. **Gör kontrollen efter installationen** (sist i den här filen) i en ny session.
+4. **Agenten kan inte längre skriva i `~/.claude`** (Hugos beslut 2026-10-28, punkt 5). Där ligger
    bland annat Claudes minne mellan sessionerna (`~/.claude/projects/…/memory`). Det slutar gå att
    spara nytt där. Claude Code själv skriver fortfarande sina egna filer.
-4. **Vakterna i tillägget superpowers slutar fungera** (Hugos beslut 2026-10-28, 2), eftersom bara
+5. **Vakterna i tillägget superpowers slutar fungera** (Hugos beslut 2026-10-28, 2), eftersom bara
    vakter från de låsta inställningarna får köras.
-5. **Bara verktygen på listan i SPEC 7.1 fungerar** (granskning 12, P4, Hugos beslut 2026-10-28). Andra
+6. **Bara verktygen på listan i SPEC 7.1 fungerar** (granskning 12, P4, Hugos beslut 2026-10-28). Andra
    verktyg, till exempel webbsökning, appens webbläsare och kopplingar till andra tjänster, stoppas av
    vakten. Behövs ett verktyg till blir det en ny version av vakten.
-6. **Läget "auto" går inte att välja** (granskning 12, P6). Claude Code frågar dig före varje kommando
+7. **Läget "auto" går inte att välja** (granskning 12, P6). Claude Code frågar dig före varje kommando
    som inte är förgodkänt.
-7. **Agenten kan inte skriva i projektets mapp `.claude`, i `.mcp.json` eller i `.venv`** (Hugos beslut
+8. **Agenten kan inte skriva i projektets mapp `.claude`, i `.mcp.json` eller i `.venv`** (Hugos beslut
    2026-10-28, 5). Inställningar och kopplingar för projektet skriver du eller Casper själva.
+9. **Agenten kan inte köra testsviten** (PATH-regeln, Hugos beslut 2026-10-28, beslut 1), eftersom
+   `.venv/bin/python` ligger i projektet, som du äger. Det gäller tills ett beslut om det är fattat.
 
 ## Caspers dator
 
-Samma steg, i samma ordning, och samma versionskontroll i steg 1 (både terminalen och
-skrivbordsappen, minst 2.1.295). Samma `managed-settings.json` fungerar: regeln som hindrar agenten att
-skriva i `.git` (`Edit(//**/.git/**)`) gäller varje `.git`-mapp på datorn och har inget användarnamn i
-sig. En skillnad:
+Samma steg, i samma ordning, och samma versionskontroll i steg 1 (med `/status`, minst 2.1.295, i
+skrivbordsappen och i terminalen om Claude Code finns där). Samma förprov i steg 3 och samma kontroll av
+mapparna i steg 2 och 11. Samma `managed-settings.json` fungerar: regeln som hindrar agenten att skriva i
+`.git` (`Edit(//**/.git/**)`) gäller varje `.git`-mapp på datorn och har inget användarnamn i sig. En
+skillnad:
 
-- Sökvägen till projektet kan vara en annan. Byt `~/VERA/agent` i steg 2, 3 och 6 mot där projektet
+- Sökvägen till projektet kan vara en annan. Byt `~/VERA/agent` i steg 4, 6 och 8 mot där projektet
   ligger på Caspers dator.
 
 Kontrollen nedan görs också på Caspers dator.
@@ -206,7 +382,9 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
 2. **Ihopkopplade kommandon stoppas.** Be agenten köra `ls; ls`. Det ska stoppas med ett fel som börjar
    "Stoppat av vakten" och säger att kommandon inte kopplas ihop.
 3. **Ett kommando på listan går igenom.** Be agenten köra `git status`. Claude Code frågar dig som vanligt
-   om det får köras. Säg ja. Kommandot ska köras och visa läget i projektet.
+   om det får köras. Säg ja. Kommandot ska köras och visa läget i projektet. (`git` ligger i
+   `/usr/bin`, som ägs av systemet, så PATH-regeln släpper igenom det. Stoppas det med "PATH-regeln":
+   skriv upp felet och fråga.)
 4. **sudo stoppas.** Be agenten köra `sudo ls`. Det ska stoppas, antingen av vakten ("sudo och su stoppas
    alltid") eller av förbudsregeln i inställningarna. Datorn ska **inte** fråga efter ditt lösenord. Gör
    den det: skriv inte lösenordet, avbryt med Ctrl+C, och stoppa.
@@ -261,7 +439,7 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
    ```
 
    Du ser två rader, var och en med en summa på 64 tecken och sökvägen till filen. Summorna ska vara
-   **exakt samma** som i steg 8 i installationen (och som de som granskningen skrev upp). Är någon olika:
+   **exakt samma** som i steg 10 i installationen (och som de som granskningen skrev upp). Är någon olika:
    stoppa och fråga.
 
    **e. Starta en ny session** och gör steg 2 och 3 igen: `ls; ls` ska stoppas med "Stoppat av vakten",
@@ -271,4 +449,5 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
    och kod 2 betyder för Claude Code "stoppa". Provet visar alltså att en **saknad** vakt stoppar allt.
    Det prövar inte inställningen `onFailure: "block"` i sig, som gäller när vakten fallerar på andra sätt
    (en annan kod än 0 och 2, tidsgränsen, eller att programmet inte går att starta). Att Python ger kod 2
-   visas av testet `test_systemets_python_stoppar_med_kod_2_nar_vakten_saknas`.
+   visas av testet `test_systemets_python_stoppar_med_kod_2_nar_vakten_saknas`. Det är förprovet i steg 3
+   i installationen som prövar `onFailure: "block"`: där går vakten inte att starta alls.
