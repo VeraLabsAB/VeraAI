@@ -104,8 +104,10 @@ LASANDE_FORBJUDNA_LANGA = {
 # grep (granskning 15, S1, Hugos beslut 2026-10-28): i agentens skal är grep Claude Codes ugrep, som har
 # tillägg som kör program och skriver filer. Bara tillägg som söker släpps igenom, och namnen jämförs exakt.
 # Korta tillägg utan värde, korta tillägg som tar ett värde, långa tillägg utan värde, långa tillägg som tar
-# ett tal efter =, och långa tillägg som tar ett filmönster efter = (prövas som en sökväg).
-GREP_KORTA = "nirRlLcvwxEFHhosqI"
+# ett tal efter =, och långa tillägg som tar ett filmönster efter = (prövas som en sökväg). -R står inte med
+# (granskning 16, G3, Hugos beslut 2026-10-28): i ugrep följer det alla länkar inne i mappar, också ut ur
+# projektet. Den långa formen (--dereference-recursive) står inte heller med.
+GREP_KORTA = "nirlLcvwxEFHhosqI"
 GREP_KORTA_VARDE = "eABCm"
 GREP_KORTA_TAL = "ABCm"
 GREP_LANGA = (
@@ -130,7 +132,7 @@ GREP_LANGA = (
 GREP_LANGA_TAL = ("after-context", "before-context", "context", "max-count")
 GREP_LANGA_MONSTER = ("include", "exclude", "exclude-dir")
 GREP_TILLATNA = (
-    "-n, -i, -r, -R, -l, -L, -c, -v, -w, -x, -E, -F, -H, -h, -o, -s, -q, -I, -e med ett mönster, -A, -B, -C "
+    "-n, -i, -r, -l, -L, -c, -v, -w, -x, -E, -F, -H, -h, -o, -s, -q, -I, -e med ett mönster, -A, -B, -C "
     "och -m med ett tal, motsvarande långa namn, och --include=, --exclude= och --exclude-dir="
 )
 

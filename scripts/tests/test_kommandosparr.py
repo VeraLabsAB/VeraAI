@@ -143,7 +143,6 @@ TILLATNA = [
     ("grep-hopskrivet", "grep -rnwiE x scripts"),
     ("grep-l-L-c", "grep -lLc x SPEC.md"),
     ("grep-v-x-F-H-h-o-s-q-I", "grep -vxFHhosqI x SPEC.md"),
-    ("grep-R", "grep -R x scripts"),
     ("grep-e", "grep -e x -e y SPEC.md"),
     ("grep-e-hopskrivet", "grep -nex SPEC.md"),
     ("grep-sammanhang", "grep -A 3 -B2 -C 1 -m 5 x SPEC.md"),
