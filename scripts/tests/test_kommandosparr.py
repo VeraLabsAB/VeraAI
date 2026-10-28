@@ -804,6 +804,52 @@ def test_installningarna_nekar_sudo_su_och_att_skriva_i_git():
         assert regel in neka
 
 
+def test_installningarna_nekar_bade_mappen_git_och_filen_git():
+    # Granskning 12, P5 (Hugos beslut 2026-10-28): i en worktree är .git en fil, inte en mapp. Båda ska
+    # vara förbjudna, på varje djup. //**/.git utan /** på slutet gäller en fil med det namnet var den än
+    # ligger, som Read(//**/.env) i code.claude.com/docs/en/permissions ("How deep a pattern matches").
+    neka = _installningar()["permissions"]["deny"]
+    assert "Edit(//**/.git/**)" in neka
+    assert "Edit(//**/.git)" in neka
+
+
+def test_installningarna_stanger_av_skalkommandon_i_skills():
+    # Granskning 12, P3 (Hugos beslut 2026-10-28, 1). Nyckeln ligger överst i filen och tar true
+    # (code.claude.com/docs/en/settings-reference, "disableSkillShellExecution").
+    assert _installningar()["disableSkillShellExecution"] is True
+
+
+def test_installningarna_stanger_av_laget_auto():
+    # Granskning 12, P6 (Hugos beslut 2026-10-28, 4). Under permissions, värdet "disable"
+    # (code.claude.com/docs/en/settings-reference, "disableAutoMode / permissions.disableAutoMode").
+    assert _installningar()["permissions"]["disableAutoMode"] == "disable"
+
+
+# Hugos beslut 2026-10-28, 5 (granskning 12, beslut b). Mapparna i PATH är granskarens förslag för de
+# mappar Hugo äger. Vilka som faktiskt finns i Hugos PATH är inte kontrollerat (öppen fråga).
+NYA_FORBUD = [
+    "Edit(~/.ssh/**)",
+    "Edit(//**/.mcp.json)",
+    "Edit(//**/.claude/**)",
+    "Edit(~/.claude.json)",
+    "Edit(~/bin/**)",
+    "Edit(~/.local/bin/**)",
+    "Edit(//opt/homebrew/**)",
+    "Edit(//**/.venv/**)",
+]
+
+
+@pytest.mark.parametrize("regel", NYA_FORBUD)
+def test_installningarna_nekar_hugos_nya_forbud(regel):
+    assert regel in _installningar()["permissions"]["deny"]
+
+
+def test_claude_md_ar_inte_forbjuden():
+    # Hugos beslut 2026-10-28, 5: inget förbud för CLAUDE.md. Hugo och Casper ber ibland agenten ändra den.
+    for regel in _installningar()["permissions"]["deny"]:
+        assert "CLAUDE.md" not in regel, regel
+
+
 def test_git_regeln_galler_varje_git_mapp_pa_datorn():
     # Regeln ska gälla .git var den än ligger, så att samma fil fungerar på Caspers dator. I Claude Codes
     # regler betyder // datorns rot och ** valfritt antal mappar (code.claude.com/docs/en/permissions,

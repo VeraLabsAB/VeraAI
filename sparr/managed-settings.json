@@ -2,13 +2,16 @@
   "requiredMinimumVersion": "2.1.295",
   "allowManagedHooksOnly": true,
   "allowManagedPermissionRulesOnly": true,
+  "disableSkillShellExecution": true,
   "permissions": {
     "disableBypassPermissionsMode": "disable",
+    "disableAutoMode": "disable",
     "deny": [
       "Bash(sudo *)",
       "Bash(su *)",
       "Bash(su)",
       "Edit(//**/.git/**)",
+      "Edit(//**/.git)",
       "Edit(~/.zshrc)",
       "Edit(~/.zshenv)",
       "Edit(~/.zprofile)",
@@ -19,7 +22,15 @@
       "Edit(~/.gitconfig)",
       "Edit(~/.config/git/**)",
       "Edit(~/.claude/**)",
-      "Edit(~/Library/LaunchAgents/**)"
+      "Edit(~/Library/LaunchAgents/**)",
+      "Edit(~/.ssh/**)",
+      "Edit(//**/.mcp.json)",
+      "Edit(//**/.claude/**)",
+      "Edit(~/.claude.json)",
+      "Edit(~/bin/**)",
+      "Edit(~/.local/bin/**)",
+      "Edit(//opt/homebrew/**)",
+      "Edit(//**/.venv/**)"
     ]
   },
   "hooks": {
