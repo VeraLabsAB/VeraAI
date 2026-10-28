@@ -24,6 +24,8 @@
 # - fpath: bara zsh:s egna mappar, som ägs av root utan skrivrätt för gruppen eller andra (granskning 14, R1).
 # - startfiler: bara nvm:s två rader läser in andra filer, ingen kompilerad startfil (.zwc) och ingen ZDOTDIR
 #   (granskning 14, R2, och granskning 15, S2).
+# - ägare och rättigheter (ls -le@): inga extra rättigheter (+), och ingen extra uppgift (@) utom exakt en, som
+#   heter exakt com.apple.provenance (Hugos beslut 2026-10-28 efter granskning 17, H1).
 
 () {
   emulate -L zsh
@@ -35,21 +37,32 @@
   local -a avvikelser match mbegin mend
   local namn varde fil rad text mapp
 
-  # Ägs av någon i agare, ingen skrivrätt för gruppen eller andra, inga extra rättigheter (+) eller
-  # uppgifter (@), och ingen länk. Skriver felet, eller ingenting om allt är rätt.
+  # Ägs av någon i agare, ingen skrivrätt för gruppen eller andra, inga extra rättigheter (+), och ingen länk.
+  # Den enda extra uppgiften (@) som godtas är exakt com.apple.provenance, som macOS själv sätter, och då bara om
+  # den är ensam (Hugos beslut 2026-10-28 efter granskning 17, H1). ls -le@ skriver varje uppgift och varje extra
+  # rättighet på en egen rad efter den första, och ls visar bara @ när filen har både uppgifter och extra
+  # rättigheter. Skriver felet, eller ingenting om allt är rätt.
   _vera_kontrollera_agare() {
-    local sokvag=$1 rad
-    local -a ord
-    rad=$(/bin/ls -ld -- $sokvag 2>/dev/null)
+    local sokvag=$1 rad tecken
+    local -a rader ord
+    rad=$(/bin/ls -lde@ -- $sokvag 2>/dev/null)
     if [[ -z $rad ]]; then
       builtin print -r -- "$sokvag finns inte"
       return
     fi
-    ord=(${=rad})
-    if [[ ${ord[1]} == l* ]]; then
-      builtin print -r -- "$sokvag är en länk: $rad"
-    elif (( ${#ord[1]} != 10 )); then
-      builtin print -r -- "$sokvag har extra rättigheter eller uppgifter (+ eller @): $rad"
+    rader=("${(@f)rad}")
+    ord=(${=rader[1]})
+    tecken=${ord[1]}
+    if [[ $tecken == ?(#c10)@ && ${#rader} == 2 &&
+          ${rader[2]} == $'\t'com.apple.provenance$'\t'[[:space:]]#[0-9]##[[:space:]]# ]]; then
+      tecken=${tecken[1,10]}
+    elif (( ${#rader} != 1 )); then
+      tecken+=-
+    fi
+    if [[ $tecken == l* ]]; then
+      builtin print -r -- "$sokvag är en länk: ${(j: | :)rader}"
+    elif (( ${#tecken} != 10 )); then
+      builtin print -r -- "$sokvag har extra rättigheter eller uppgifter (+ eller @): ${(j: | :)rader}"
     elif [[ ${ord[1][6]} == w || ${ord[1][9]} == w ]]; then
       builtin print -r -- "gruppen eller andra kan skriva i $sokvag: $rad"
     elif (( ! ${agare[(Ie)${ord[3]}]} )); then

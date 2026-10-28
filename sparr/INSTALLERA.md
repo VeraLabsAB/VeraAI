@@ -429,7 +429,10 @@ att `/etc/zshrc` och `/etc/zshrc_Apple_Terminal` ägs av `root` och att varken g
 skriva i dem. Terminals fil läser också in zsh:s egen funktion `add-zsh-hook`. Den godtas bara om `whence -v`
 visar att den kommer från zsh:s egen mapp, `/usr/share/zsh/<version>/functions/add-zsh-hook`, och filen ägs av
 `root` utan skrivrätt för gruppen eller andra (Hugos beslut 2026-10-28 efter granskning 16, G4). Allt annat
-avviker.
+avviker. Varje fil och mapp som skriptet prövar med `ls` får inte ha extra rättigheter (`+`). Den får ha en
+enda extra uppgift (`@`), och bara om den heter exakt `com.apple.provenance`. Den uppgiften sätter macOS själv,
+till exempel när någon gör ett andra namn på filen (Hugos beslut 2026-10-28 efter granskning 17, H1). Alla
+andra uppgifter, och flera uppgifter samtidigt, avviker.
 
 Gör det här i samma nya Terminal-fönster som i e, ett kommando i taget. Kontrollera först skriptets
 kontrollsumma:

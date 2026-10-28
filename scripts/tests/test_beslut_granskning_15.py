@@ -60,10 +60,9 @@ PROGRESS = PROJEKTET / "PROGRESS.md"
 TERMINALFIL_RAD = "local terminalfil=/etc/zshrc_Apple_Terminal"
 ETCFILER_RAD = "local -a etcfiler=(/etc/zshrc /etc/zshrc_Apple_Terminal)"
 AGARE_RAD = "local -a agare=(root)"
-# macOS lägger extra uppgifter (syns som @ i ls -l) på filer som skapas i testets tillfälliga mapp. Kopian godtar
-# därför ett @ sist. Att det riktiga skriptet stoppar för det visar test_skriptet_stoppar_for_extra_uppgifter.
-TECKEN_RAD = "elif (( ${#ord[1]} != 10 )); then"
-TECKEN_KOPIA = "elif (( ${#${ord[1]%@}} != 10 )); then"
+# macOS sätter uppgiften com.apple.provenance (syns som @ i ls -l) på filer som skapas i testets tillfälliga mapp.
+# Skriptet godtar den, och bara den (Hugos beslut 2026-10-28 efter granskning 17, H1), så kopian har kvar
+# skriptets egen kontroll. Den prövas i test_beslut_granskning_17.py.
 
 NVM_RADER = (
     'export NVM_DIR="$HOME/.nvm"\n'
@@ -94,17 +93,15 @@ def _anvandaren():
     return pwd.getpwuid(os.getuid()).pw_name
 
 
-def _kopia(tmp_path, root_bara=False, etcfiler=None, snabel_a=True):
+def _kopia(tmp_path, root_bara=False, etcfiler=None):
     """En kopia av skriptet där Terminals fil och /etc-filerna är provfiler, och returnerar (kopia, terminalfil)."""
     terminal = tmp_path / "zshrc_Apple_Terminal"
     terminal.write_text(TERMINAL_INNEHALL, encoding="utf-8")
     etc = tmp_path / "zshrc"
     etc.write_text("# provfil\n", encoding="utf-8")
     text = SKRIPTET.read_text(encoding="utf-8")
-    for rad in (TERMINALFIL_RAD, ETCFILER_RAD, AGARE_RAD, TECKEN_RAD):
+    for rad in (TERMINALFIL_RAD, ETCFILER_RAD, AGARE_RAD):
         assert text.count(rad) == 1, rad
-    if snabel_a:
-        text = text.replace(TECKEN_RAD, TECKEN_KOPIA)
     text = text.replace(TERMINALFIL_RAD, f"local terminalfil={terminal}")
     filer = " ".join(str(f) for f in (etcfiler if etcfiler is not None else [etc, terminal]))
     text = text.replace(ETCFILER_RAD, f"local -a etcfiler=({filer})")
@@ -122,9 +119,8 @@ def _hem(tmp_path, zshrc=NVM_RADER + STEG_4_RADER):
     return hem
 
 
-def _kor(tmp_path, fore="", efter="", root_bara=False, etcfiler=None, hem=None, compinit=True, snabel_a=True,
-         **extra):
-    kopia, terminal = _kopia(tmp_path, root_bara, etcfiler, snabel_a)
+def _kor(tmp_path, fore="", efter="", root_bara=False, etcfiler=None, hem=None, compinit=True, **extra):
+    kopia, terminal = _kopia(tmp_path, root_bara, etcfiler)
     hem = hem or _hem(tmp_path)
     start = (NVM_COMPINIT if compinit else "") + NVM_FUNKTIONER + f"source {terminal}\n"
     return _zsh(hem, start + fore + f"\nsource {kopia}\n" + efter, **extra)
@@ -521,13 +517,12 @@ def test_8d_etcfiler_som_gruppen_eller_andra_kan_skriva_i_avviker(tmp_path, ratt
 
 @inget_zsh
 def test_skriptet_stoppar_for_extra_uppgifter(tmp_path):
-    # Det riktiga skriptet godtar inget + eller @ efter de tio tecknen, som steg 2 i INSTALLERA.md.
+    # Det riktiga skriptet godtar inget + och ingen annan uppgift än exakt com.apple.provenance (granskning 17, H1).
+    # Fler fall står i test_beslut_granskning_17.py.
     fil = tmp_path / "med_uppgifter"
     fil.write_text("x\n", encoding="utf-8")
-    ls = subprocess.run(["/bin/ls", "-ld", str(fil)], capture_output=True, text=True, timeout=30).stdout
-    if not ls.split()[0].endswith(("@", "+")):
-        pytest.skip("filer i den tillfälliga mappen har inga extra uppgifter på den här datorn")
-    resultat = _kor(tmp_path, etcfiler=[fil], snabel_a=False)
+    subprocess.run(["/usr/bin/xattr", "-w", "com.apple.quarantine", "prov", str(fil)], check=True, timeout=30)
+    resultat = _kor(tmp_path, etcfiler=[fil])
     (rad,) = _avvikelser(resultat)
     assert "extra rättigheter eller uppgifter (+ eller @)" in rad, resultat
 
