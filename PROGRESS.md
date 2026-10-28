@@ -6,8 +6,8 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **3 987 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
-rättelsen av I1 efter granskning 18).
+Testsviten: **4 076 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
+rättelsen av J1 efter granskning 19).
 
 **Regler tills vakten är installerad** (Hugos beslut 2026-10-28 efter granskning 15, ändrade 2026-10-28 kväll):
 
@@ -19,6 +19,29 @@ rättelsen av I1 efter granskning 18).
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-10-28, efter rättelsen av J1 (granskning 19)
+
+**Rättat, inte granskat, inte installerat.** Besluten står i `GRANSKNING.md`, "Hugos beslut 2026-10-28 (efter
+granskning 19)": meningen om I1 i SPEC 7.1 är godkänd, att I1 gäller fler sökvägar i kommandon är godkänt, J1
+rättas före installationen, J2 under Öppet (punkt 12) och J3 prövas i spärrtestet efter installationen.
+Sessionen kördes i läget auto (tillåtet enligt Hugos beslut 2026-10-28 kväll), och började och slutade med
+`git status`. Inga sudo-kommandon körda, inget i `/etc` eller `/Library` ändrat, inget pushat, inga `git stash`.
+
+- **J1** (ab305c7, 4bcbabe, ad85b8e): vakten startas med `/Library/Developer/CommandLineTools/usr/bin/python3`
+  (Python 3.9.6 på Hugos dator), `-I` och `"onFailure": "block"`, i formen med `args`. Vakten fungerar med 3.9
+  utan kodändring. Rökprovet (`test_beslut_granskning_19.py`) kör vakten med den Pythonen och hoppar över sig
+  självt om den saknas. INSTALLERA.md har ett nytt steg 2 b där Hugo ser versionen och ägare och rättigheter för
+  Pythonen, filen den leder till och alla mappar ovanför. Ingen rad med `sudo` är ändrad (21 rader).
+- **Kontrollsummor (sha256)**, räknade med Pythons `hashlib` i en provfil i scratchpad:
+  `sparr/kommandosparr.py` `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d` (ny),
+  `sparr/managed-settings.json` `ab34081665b9052c1ff7c35a1b3a983107fc6a763f1f1aab6476523109cb80b0` (ny),
+  `sparr/kontrollera-skalet.zsh` `10388d474a555e6d337a9468c5a1f5e2fd0ca04608e36024f73011dc5186d51f` och
+  `requirements.txt` `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a` (oförändrade).
+- **Testsviten:** 4 076 passed (före: 3 987 passed).
+- **Nästa steg:** (1) **oberoende granskning 20** i en ny session, som bara gäller J1-ändringen (b9b49cc till och
+  med den här commiten), med kontrollsummor, (2) en session provkör steg 4 h med Hugos OK (G1), (3) Hugo
+  installerar enligt `sparr/INSTALLERA.md`.
 
 ## Läge 2026-10-28, efter rättelsen av I1 (granskning 18)
 
@@ -495,14 +518,21 @@ fattade och byggda, se avsnittet ovan.)
     - **I6:** INSTALLERA.md steg 2 säger "den fjärde raden" om `No such file or directory`, men `ls` skriver den raden först.
     - **I7:** INSTALLERA.md steg 13: `ditto` och `cp` tar med alla uppgifter, inte bara `com.apple.provenance`, så installationen kan stoppa i onödan.
     - **I8:** regeln om prov och test: SPEC 7.1 har ett undantag som CLAUDE.md saknar, och "läsa riktiga systemfiler" är otydligt.
+12. **J2, gits egna sökvägar** (Hugos beslut 2026-10-28 efter granskning 19: under Öppet). SPEC 7.1 säger att I1
+    gäller sökvägar i kommandon, men sökvägar som git själv tar emot (efter `--` eller sist, till exempel
+    `git log -- /.vol/…`) prövas inte av vakten. git vägrar troligen sökvägar utanför projektet, men det är inte
+    prövat. Förslag: SPEC säger exakt vilka kommandon I1 gäller, eller vakten prövar också gits sökvägar.
+13. **Steg 9 använder /usr/bin/python3 med sudo. Kan bytas till den fasta sökvägen senare** (Hugos beslut
+    2026-10-28 efter granskning 19). INSTALLERA.md steg 9 skapar projektets Python med
+    `sudo /usr/bin/python3 -m venv`, och lämnas som det är.
 
 ## Nästa steg i byggordningen
 
 1. **Vakten för kommandolistan (granskning 11, Q1).** Byggsessionen är klar (f21a3a1, 773e919 och
    6686166), och fynden i granskning 12 är byggda (5cb9080, 08a3370, c066188). Rättelserna efter granskning
-   16 är gjorda (1dbedb1 till 58daf69), efter granskning 17 (653f0a4 till 235eab6) och I1 efter granskning 18
-   (0c7cdcb och 43e2371). Kvar: **oberoende granskning 19 i en ny session, som bara gäller I1-ändringen**, med
-   kontrollsummor, sedan provkörs steg 4 h i en session med Hugos OK (G1), sedan kontrollerar
+   16 är gjorda (1dbedb1 till 58daf69), efter granskning 17 (653f0a4 till 235eab6), I1 efter granskning 18
+   (0c7cdcb och 43e2371) och J1 efter granskning 19 (ab305c7, 4bcbabe och ad85b8e). Kvar: **oberoende
+   granskning 20 i en ny session, som bara gäller J1-ändringen**, med kontrollsummor, sedan provkörs steg 4 h i en session med Hugos OK (G1), sedan kontrollerar
    Hugo versionen och installerar enligt `sparr/INSTALLERA.md`, och
    därefter kontrollen efter installationen i en ny session (sist i `sparr/INSTALLERA.md`). Caspers dator
    får samma installation och samma kontroll. Före

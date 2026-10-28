@@ -491,7 +491,7 @@ shasum -a 256 ~/VERA/agent/sparr/kontrollera-skalet.zsh
 ```
 
 - Summan ska vara exakt (Hugos beslut 2026-10-28 efter granskning 15, ny summa efter Hugos beslut 2026-10-28
-  efter granskning 17, H1, oförändrad efter granskning 18, I1):
+  efter granskning 17, H1, oförändrad efter granskning 18, I1, och granskning 19, J1):
   `10388d474a555e6d337a9468c5a1f5e2fd0ca04608e36024f73011dc5186d51f`
   Den oberoende granskningen bekräftar samma summa. **Är summan en annan: stoppa och fråga.** Kör inte
   skriptet.
