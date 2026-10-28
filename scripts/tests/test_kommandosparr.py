@@ -142,6 +142,76 @@ def test_kommandon_pa_listan_gar_igenom(vakt, mappar, kommando):
     assert _bedom(vakt, mappar, kommando) is None
 
 
+# Granskning 12, P4 (Hugos beslut 2026-10-28): vakten släpper bara igenom verktyg som står på en
+# uttrycklig lista, och listan står i SPEC 7.1 ("Tillåtna verktyg"). Hugo valde i chatten 2026-10-28
+# grunden (Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion och WebFetch) och dessutom ToolSearch,
+# appens planlista och slutruta, Skill och Agent.
+VERKTYGSLISTAN = [
+    "Bash",
+    "Read",
+    "Write",
+    "Edit",
+    "Glob",
+    "Grep",
+    "AskUserQuestion",
+    "WebFetch",
+    "ToolSearch",
+    "Skill",
+    "Agent",
+    "mcp__ccd_turn__update_plan",
+    "mcp__ccd_turn__wrap_up",
+]
+SPEC = PROJEKTET / "SPEC.md"
+SPEC_VERKTYG_RUBRIK = "**Tillåtna verktyg**"
+
+
+def _verktygen_i_spec():
+    rader = [r for r in SPEC.read_text(encoding="utf-8").splitlines() if SPEC_VERKTYG_RUBRIK in r]
+    assert len(rader) == 1, f"SPEC 7.1 ska ha exakt en rad med {SPEC_VERKTYG_RUBRIK}"
+    return re.findall(r"`([^`]+)`", rader[0])
+
+
+def test_verktygslistan_i_spec_ar_hugos_beslut():
+    assert _verktygen_i_spec() == VERKTYGSLISTAN
+
+
+def test_vakten_har_samma_verktygslista_som_spec(vakt):
+    # Säger texten och vakten olika gäller den strängaste, och skillnaden rättas (SPEC 7.1). Testet
+    # gör att de inte kan bli olika utan att någon märker det.
+    assert list(vakt.TILLATNA_VERKTYG) == _verktygen_i_spec()
+
+
+@pytest.mark.parametrize("verktyg", VERKTYGSLISTAN)
+def test_alla_verktyg_pa_listan_slapps_igenom(vakt, mappar, verktyg):
+    # Bash prövas mot kommandolistan, så det får ett kommando som står där.
+    assert _bedom(vakt, mappar, "git status", verktyg) is None
+
+
+OKANDA_VERKTYG = [
+    "mcp__x__nytt_verktyg",  # granskarens förslag: ett påhittat namn
+    "NotebookEdit",
+    "WebSearch",
+    "CronCreate",
+    "RemoteTrigger",
+    "EnterWorktree",
+    "mcp__Claude_Code_iOS_Simulator__control",
+    "mcp__ccd_session_mgmt__set_session_permission_mode",
+    "mcp__scheduled-tasks__create_scheduled_task",
+    "mcp__abc__COMPOSIO_REMOTE_WORKBENCH",
+    "mcp__ccd_turn__update_plan_x",
+    "bash",
+    "read",
+    "Read ",
+    "",
+]
+
+
+@pytest.mark.parametrize("verktyg", OKANDA_VERKTYG)
+def test_verktyg_som_inte_star_pa_listan_stoppas(vakt, mappar, verktyg):
+    fel = _bedom(vakt, mappar, "git status", verktyg)
+    assert fel is not None and VERKTYG in fel, fel
+
+
 @pytest.mark.parametrize("verktyg", ["Read", "Write", "Edit", "Glob", "Grep", "WebFetch"])
 def test_vanliga_filverktyg_slapps_igenom(vakt, mappar, verktyg):
     # SPEC 7.1 gäller bara kommandon (planen, regel 2). Fil-verktygen släpps igenom.
@@ -229,7 +299,7 @@ FIND = "find får bara söka"
 PYTEST_FORM = "pytest"
 TILLAGG = "tillägget"
 TAR = "tar"
-VERKTYG = "kör kommandon"
+VERKTYG = "står inte på listan över tillåtna verktyg"
 
 STOPPAS = [
     # Regel 1: sudo och su stoppas alltid (Hugos beslut 5 och 7).
@@ -786,13 +856,21 @@ def test_installningarna_kraver_lagst_den_version_som_kan_stoppa_vid_krasch():
 
 def _installationskommandon():
     text = INSTALLERA.read_text(encoding="utf-8")
+    # Kodblocken i kontrollen efter installationen är indragna under sin listpunkt.
     block = re.findall(r"```bash\n(.*?)```", text, flags=re.S)
-    return text, [rad for b in block for rad in b.splitlines() if rad.strip()]
+    return text, [rad.strip() for b in block for rad in b.splitlines() if rad.strip()]
 
 
 def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
     _, rader = _installationskommandon()
-    tillatna = ("claude --version", "shasum -a 256 ", "sudo ditto ", "sudo cp -i ", "sudo chown ", "sudo chmod ")
+    tillatna = (
+        "claude --version",
+        "shasum -a 256 ",
+        "sudo ditto ",
+        "sudo cp -i ",
+        "sudo chown ",
+        "sudo chmod ",
+    )
     assert rader
     for rad in rader:
         assert rad.startswith(tillatna), rad

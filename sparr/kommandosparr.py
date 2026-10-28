@@ -12,8 +12,9 @@ Vakten godkänner aldrig något själv. Den kan bara stoppa.
 Reglerna, i den ordning de prövas (planen i GRANSKNING.md, "Granskning 11 – plan för Q1"):
 
 1. sudo och su stoppas alltid (Hugos beslut 2026-10-28, 5 och 7).
-2. Andra verktyg som kör kommandon än Bash stoppas helt. Fil-verktygen (läsa, skriva, redigera)
-   släpps igenom, eftersom 7.1 bara gäller kommandon.
+2. Bara verktygen på listan i SPEC 7.1 ("Tillåtna verktyg") släpps igenom. Allt annat stoppas, också
+   verktyg som vakten inte känner till (granskning 12, P4, Hugos beslut 2026-10-28). Bash prövas
+   vidare mot reglerna nedan. De andra verktygen på listan kör inga kommandon.
 3. Ingen mapp undantas (Hugos beslut 8). Kommandot ska köras i mappen där sessionen startade
    (CLAUDE_PROJECT_DIR), och den mappen får inte vara hemmappen eller en mapp ovanför den.
 4. Inga ihopkopplade kommandon: inget ;, &, |, <, >, $, bakåtfnutt, omvänt snedstreck eller
@@ -43,18 +44,21 @@ FORSTA = "Stoppat av vakten: "
 
 SUDO_OCH_SU = ("sudo", "su")
 
-# Regel 2: verktyg som kör kommandon. Bash prövas mot listan. Övriga stoppas helt.
-KOMMANDOVERKTYG = ("PowerShell", "Monitor")
-KOMMANDOORD = (
-    "bash",
-    "shell",
-    "terminal",
-    "command",
-    "exec",
-    "run_",
-    "preview_start",
-    "simulator__build",
-    "sync_with_base_branch",
+# Regel 2: listan i SPEC 7.1, "Tillåtna verktyg", i samma ordning. Namnen jämförs exakt.
+TILLATNA_VERKTYG = (
+    "Bash",
+    "Read",
+    "Write",
+    "Edit",
+    "Glob",
+    "Grep",
+    "AskUserQuestion",
+    "WebFetch",
+    "ToolSearch",
+    "Skill",
+    "Agent",
+    "mcp__ccd_turn__update_plan",
+    "mcp__ccd_turn__wrap_up",
 )
 
 # Regel 4: tecken som kopplar ihop kommandon eller styr om utskriften, var de än står.
@@ -165,13 +169,13 @@ def _bedom(indata, projektmapp, hemmapp):
     if isinstance(verktygsdata, dict) and isinstance(verktygsdata.get("command"), str):
         _sudo_och_su(verktygsdata["command"])
 
+    # Regel 2.
+    if verktyg not in TILLATNA_VERKTYG:
+        raise _Stopp(
+            f"verktyget '{verktyg}' står inte på listan över tillåtna verktyg i SPEC 7.1 och är stoppat. "
+            "Bara Bash får köra kommandon, och bara de som står i SPEC 7.1."
+        )
     if verktyg != "Bash":
-        # Regel 2.
-        if verktyg in KOMMANDOVERKTYG or any(ord_ in verktyg.lower() for ord_ in KOMMANDOORD):
-            raise _Stopp(
-                f"verktyget {verktyg} kör kommandon och är stoppat. Bara Bash får köra kommandon, och "
-                "bara de som står i SPEC 7.1."
-            )
         return
 
     if not isinstance(verktygsdata, dict):
