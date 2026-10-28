@@ -4874,3 +4874,258 @@ raderna saknas, och en funktion som heter `print` döljer inget. Två tester i R
 **Kommandon i byggsessionen:** bara från listan, ett i taget (`.venv/bin/python -B -m pytest
 -p no:cacheprovider`, `grep`, `git status`, `git diff`, `git add` och `git commit`), och WebFetch för Apples
 källkod. Inga avsteg.
+
+## Granskning 15 – R1–R5, kroklistorna och skalet som agenten kör i (2026-10-28)
+
+Oberoende granskning, gjord på uppdrag i chatten 2026-10-28, i en ny session som inte har sett bygget.
+Granskat läge: commit `5143262`. `git status` var ren när granskningen började (inget som inte var
+committat). Vakten, inställningsfilen, INSTALLERA.md, SPEC.md och de andra testerna är **inte ändrade**.
+Skrivet: det här avsnittet och en ny testfil, `scripts/tests/test_granskning_15.py`.
+
+### Viktigt först
+
+- **S1, HÖG: `find` kan radera filer, och vakten släpper igenom det.** I skalet där agenten kör sina
+  kommandon (skrivbordsappen) är `find` inte systemets `/usr/bin/find`, utan en funktion som Claude Code
+  själv lägger in och som kör Claude Codes inbyggda `bfs`. `bfs` raderar med `-rm` (samma som `-delete`).
+  Vakten stoppar bara `-delete` och de andra tilläggen i systemets `find`. Prövat: `find <mapp> -name
+  offer.txt -rm` raderade en provfil i scratchpad-mappen, och vakten släpper igenom `find <P> -rm`.
+- **Kontrollsummorna är därför inte framtagna** (uppdragets punkt 7). Rättelsen ändrar vakten.
+- **S3: kontrollen i steg 4 g görs i Terminal, men agentens skal är ett annat.** I agentens skal finns inte
+  Terminals två namn (punkt 8), men där finns fyra funktioner från Claude Code själv: `find`, `grep`, `rg`
+  och `pkill`. Två av dem är kommandon på listan. Kontrollen i Terminal kan inte se dem.
+- R1–R5 och Hugos svar är i övrigt byggda som de står. Hugo stoppar i steg 4 g, som texten säger att han ska.
+
+### Fynd
+
+| Nr | Nivå | Kort |
+|---|---|---|
+| S1 | HÖG, BÖR RÄTTAS FÖRE INSTALLATIONEN | `find` i agentens skal är `bfs`, som raderar med `-rm`. Vakten släpper igenom det |
+| S2 | MEDEL | Kompilerade startfiler (`~/.zshrc.zwc` med flera) läses in i stället för filen, och har inget förbud |
+| S3 | MEDEL | Steg 4 g prövar Terminals skal, inte agentens. Claude Codes egna funktioner `grep` och `find` syns inte |
+| S4 | LÅG | Den vända kontrollen missar fällor satta med `trap`, skalets tabell över program (`hash`), och en funktion `builtin` som härmar svaret |
+| S5 | LÅG | SPEC 7.1 säger att vakten prövar programmet. För `grep` och `find` kör skalet ett annat program |
+| S6 | LÅG | INSTALLERA.md steg 5 och 12 kontrollerar inte `requirements.txt`. Texten är lång |
+
+**S1 – `find` i agentens skal raderar med `-rm`. HÖG.**
+- Vad: Claude Codes dokumentation säger: "In Claude's shell those two commands run embedded versions of
+  `bfs` and `ugrep`" ([tools-reference, "Glob tool behavior"](https://code.claude.com/docs/en/tools-reference),
+  läst 2026-10-28). I den här sessionen (skrivbordsappen, Claude Code 2.1.309 enligt sökvägen nedan) visar
+  `typeset -f find` att funktionen kör `$CLAUDE_CODE_EXECPATH` med namnet `bfs`, och
+  `${functions_source[find]}` att den kommer från Claude Codes fil i `~/.claude/shell-snapshots/`.
+  `CLAUDE_CODE_EXECPATH` är `~/Library/Application Support/Claude/claude-code/2.1.309/…/claude`.
+- Prövat:
+  - `find <scratchpad>/bfsprov -name offer.txt -rm` raderade provfilen (bara i scratchpad-mappen).
+  - Systemets `/usr/bin/find` godtar inte `-rm`, och filen finns kvar
+    (`test_systemets_find_godtar_inte_rm`). Vaktens regel för `find` bygger alltså på fel program.
+  - `test_find_med_rm_stoppas`, markerat `xfail(strict=True)`: vakten släpper igenom `find <P> -name
+    prov.txt -rm` och `find <P> -rm`. Med `<P>/.git` som mapp skulle gits historik kunna raderas.
+- **Inte bekräftat:** om Claude Code frågar Hugo före `find … -rm`. Claude Code godkänner en del läsande
+  kommandon utan att fråga, och den här sessionen körs i läget "auto", så det syntes inte här.
+- **Inte bekräftat:** alla tillägg som `bfs` har. Bara `-rm` är prövat.
+- Förslag (beslut för Hugo eller Casper, ny version av vakten): vänd regeln för `find`, som kontrollen i
+  steg 4 g: bara en kort lista över tillägg som bara söker (till exempel `-name`, `-iname`, `-path`,
+  `-type`, `-maxdepth`, `-mindepth`, `-print`) släpps igenom, och allt annat stoppas. Det minsta är `rm` i
+  `FIND_FORBJUDNA`. Testet blir då grönt, och då stoppar pytest tills markeringen tas bort.
+- `grep` är på samma sätt Claude Codes `ugrep`. Funktionen skickar de tillägg jag känner till som kör
+  program eller skriver filer (`--filter`, `--pager`, `--view`, `--config`, `---`, `--save-config`) till
+  systemets `grep`, som inte känner dem och stoppar. `ugrep` godtar inte förkortningar (prövat:
+  `--filte=` gav "invalid option"). **Inte granskat** i sin helhet.
+
+**S2 – kompilerade startfiler. MEDEL.**
+- Vad: zsh-manualen, "Startup/Shutdown Files": "If a compiled file exists (named for the original file plus
+  the `.zwc` extension) and it is newer than the original file, the compiled file will be used instead"
+  ([zsh.sourceforge.io/Doc/Release/Files.html](https://zsh.sourceforge.io/Doc/Release/Files.html), läst
+  2026-10-28). Samma gäller `source`. Förbudet för `~/.zshrc` gäller inte `~/.zshrc.zwc`.
+- Prövat (`zsh -f` och `zsh -d`, tillfällig hemmapp): en `.zshrc.zwc` med `alias git=true` används av
+  `source ~/.zshrc`, och en `.zshenv.zwc` används när zsh startar. Fem tester för förbuden, markerade
+  `xfail(strict=True)`.
+- Därför MEDEL och inte HÖG: en `.zwc` är inte text (provfilen hade byte 0x84 på plats 5 och 166 nollbyte),
+  så agentens Write-verktyg kan troligen inte skriva den. **Inte bekräftat.** Andra program kan.
+  `~/.nvm/**` och `~/.zcompdump*` täcker redan sina `.zwc`. Mapparna i `fpath` kan också ha en `.zwc`
+  bredvid sig (manualen, "Autoloading Functions"). Den ligger i mappen ovanför, som steg 4 i kontrollerar.
+- Förslag: `Edit(~/.zshrc.zwc)`, `Edit(~/.zshenv.zwc)`, `Edit(~/.zprofile.zwc)`, `Edit(~/.zlogin.zwc)` och
+  `Edit(~/.zlogout.zwc)`. Enklare: `Edit(~/.z*)` och `Edit(~/.z*/**)`, som täcker alla zsh:s filer i
+  hemmappen på en gång (också `.zkbd`, `.zsh_sessions` och `.zcompdump*`). Och i steg 4: `ls -d ~/.*.zwc`,
+  väntat `zsh: no matches found`.
+
+**S3 – steg 4 g prövar Terminals skal. MEDEL.**
+- Claude Code läser in `~/.zshrc` när en session startar och "captures the resulting aliases, functions, and
+  shell options" (tools-reference). Det sparas i en fil i `~/.claude/shell-snapshots/`, som läses före
+  varje kommando (syns i `functions_source`). Den filen har förbud (`Edit(~/.claude/**)`).
+- Läst i den här sessionens skal (bara läsning, se "Kommandon"): `TERM_PROGRAM` är tomt, alla sex
+  kroklistor är tomma, `ZDOTDIR`, `CLAUDE_ENV_FILE`, `CLAUDE_CODE_SHELL` och `CLAUDE_CODE_SHELL_PREFIX` är
+  tomma, `alias` visar bara `run-help=man` och `which-command=whence`, `alias -s` ingenting. Funktioner som
+  inte börjar med `_`: de nio från `compinit`, nvm:s, och **`find`, `grep`, `rg` och `pkill`** från Claude
+  Code. `update_terminal_cwd` och `shell_session…` finns inte.
+- Följd: kontrollen i Terminal visar Terminals tillägg, som agenten inte har, och visar inte Claude Codes
+  tillägg, som agenten har. Den kontrollerar fortfarande det viktigaste, det som `~/.zshrc` lägger in, och
+  den skyddar Terminal-skalet där Hugo skriver sitt lösenord i steg 6–11.
+- Förslag: se punkt 8, d.
+
+**S4 – det som den vända kontrollen inte ser. LÅG.** Prövat i `zsh -f`, alla fyra kontrollerna ger det
+väntade svaret:
+- `trap '…' DEBUG` (fällor satta med kommandot `trap`, inte som funktion) körs före varje kommando, men
+  skapar ingen funktion `TRAPDEBUG`. Kommandot `trap` utan något efter visar dem (väntat: ingenting).
+- `hash git=<fil>` gör att `git` kör en annan fil, oavsett `PATH`. `whence -v git` visar det.
+- En funktion som heter `builtin` kan skriva de väntade raderna själv, också `SLUT`. Texten i steg 4 g
+  ("Saknas `SLUT` … till exempel en funktion som heter `builtin`") gäller en funktion som döljer, inte en
+  som härmar. Det stämmer med det byggsessionen redan skrev: kontrollen kan luras av den som vet hur den ser
+  ut.
+- Alla tre kräver en rad i en startfil, och de har förbud. Därför LÅG. Förslag: lägg till `trap` och
+  `whence -v git ls cat head tail grep diff find wc sort mkdir cp tar` i steg 4 g (väntat för varje namn:
+  `… is /usr/bin/…` eller `… is /bin/…`), och skriv i texten att `SLUT` fångar en funktion som döljer, inte
+  en som härmar.
+- `zsh_directory_name_functions` (en sjunde kroklista) saknas i kontrollen. Den körs bara för `~[…]`, och
+  vakten stoppar `~` och `[` utanför citattecken. Ingen åtgärd behövs.
+- Prövat och i ordning: en funktion med ett väntat namn (`_vera_ond`) i en kroklista syns i kroklistan.
+  Globala alias syns i `alias` och alias för filändelser i `alias -s` (byggsessionens tester).
+
+**S5 – SPEC 7.1 och `grep`/`find`. LÅG.** Se punkt 5.
+
+**S6 – INSTALLERA.md. LÅG.** Steg 5 och 12 räknar kontrollsummor bara för vakten och inställningsfilen.
+`requirements.txt`, som steg 9 installerar paketen från, kontrolleras inte (granskning 14 sa att den
+behöver en summa). Se också punkt 4.
+
+### Punkt 1: R1–R5 och Hugos svar
+
+| Beslut | Byggt som det står? | Var |
+|---|---|---|
+| R1: förbud för `~/.zcompdump` | **Ja**: `Edit(~/.zcompdump)` och `Edit(~/.zcompdump*)`. Enligt dokumentationen matchar `*` inom en del av sökvägen, så `.zcompdump.zwc` och `.zcompdump-<dator>-<version>` täcks (test). `ZDOTDIR` är tomt i agentens skal, så filen ligger i hemmappen. Se S2 för de andra `.zwc` | `sparr/managed-settings.json` |
+| R1: `fpath` i steg 4 i | **Ja**: `print -rl -- $fpath` med väntade mappar, `ls -ld $fpath` och mapparna ovanför `/usr/local/share/zsh/site-functions`. Det täcker också en `site-functions.zwc` bredvid mappen | INSTALLERA.md steg 4 i |
+| R2: steg 4 h, båda datorerna | **Ja** | INSTALLERA.md steg 4 h, "Caspers dator" |
+| R3: vänd kontroll | **Ja**, med luckorna i S3 och S4 | INSTALLERA.md steg 4 g, kontrollen efter, steg 1 |
+| Svar, punkt 1: kroklistor och särskilda funktioner | **Ja**: sex kroklistor, `preexec`, `precmd`, `chpwd`, `periodic`, `zshexit`, `command_not_found_handler` och `TRAP*`, sju väntade rader, när Hugo ska stoppa, före och efter installationen | INSTALLERA.md steg 4 g, kontrollen efter, steg 1 |
+| `SLUT` | **Ja**, och det fungerar mot en funktion som döljer. Inte mot en som härmar (S4) | samma |
+| R4: SPEC 7.1 om länken | **Ja**: texten säger nu det som `_saker_kedja` gör (mappen där varje länk ligger, inte länkfilen) | SPEC 7.1, PATH-regeln |
+| R5 | **Ja** | INSTALLERA.md, "Innan du börjar" punkt 3, steg 4 a, 4 d, 4 e, 6–11 |
+
+### Punkt 2: den vända kontrollen
+
+Se S4 (det som går igenom) och S3 (fel skal). Prövat i `zsh -f` med tillfällig hemmapp, med kommandotexterna
+ur INSTALLERA.md: en funktion med väntat namn i en kroklista (syns), `trap` (syns inte), `hash` (syns inte),
+en funktion `builtin` som härmar (syns inte). Globala alias, alias för filändelser och en funktion som döljer
+utskriften är prövade i byggsessionens tester och syns.
+
+### Punkt 3: fler filer och mekanismer som zsh och Claude Code läser
+
+| Vad | Läses som kod? | Förbud? | Källa |
+|---|---|---|---|
+| `~/.zshrc.zwc`, `~/.zshenv.zwc`, `~/.zprofile.zwc`, `~/.zlogin.zwc`, `~/.zlogout.zwc` | Ja, i stället för filen | **Nej** (S2) | zsh-manualen, "Startup/Shutdown Files"; prövat |
+| `.zwc` bredvid en mapp i `fpath` | Ja | Skyddas av att systemet äger mappen ovanför (steg 4 i) | zsh-manualen, "Autoloading Functions" |
+| Claude Codes fil i `~/.claude/shell-snapshots/` | Ja, före varje kommando | Ja, `Edit(~/.claude/**)` | tools-reference; `functions_source` i agentens skal |
+| `CLAUDE_ENV_FILE` (en fil som körs före varje kommando) | Ja, om variabeln är satt | Variabeln kan bara sättas i inställningarnas `env` (förbud) eller av vakter (bara de låsta) eller i appens startmiljö (startfilerna, förbud). Tom i agentens skal | [env-vars](https://code.claude.com/docs/en/env-vars) |
+| `CLAUDE_CODE_SHELL_PREFIX` (ett program som kör varje kommando) | Ja, om satt | Samma som ovan. Tom | env-vars |
+| Claude Codes funktioner `grep`, `find`, `rg`, `pkill` | Ja | Programmet de kör har förbud (`~/Library/Application Support/Claude/**`, `~/.local/bin/claude`) | tools-reference; `typeset -f` i agentens skal |
+| `/etc/zshrc_Apple_Terminal` och `~/.zsh_sessions/*` | Ja, bara i Terminal | Ja, `//etc/zshrc_*` och `~/.zsh_sessions/**` | punkt 8 |
+
+Inte granskat: Terminals egna inställningar (en profil i Terminal kan köra ett kommando när ett fönster
+öppnas). Det rör bara Terminal, inte agentens skal.
+
+### Punkt 4: INSTALLERA.md
+
+- **Omfång:** 13 steg, och steg 4 har nio delsteg (a–i). 51 grå rutor med kommandon: 44 i installationen
+  och 7 i kontrollen efter. 16 av dem börjar med `sudo` (14 i steg 6–11, 2 i kontrollen efter). Omkring 9 000 ord. "Efteråt" har 10 punkter och
+  kontrollen efter 9.
+- **Vad Hugo ska se och när han ska stoppa:** står efter varje kommando i steg 4–13, och den allmänna regeln
+  står i "Innan du börjar", punkt 3. Undantag: steg 5 och 12 saknar `requirements.txt` (S6).
+- **Går den att följa utan programmeringsvana?** Ja, men den är tung. Svårast är steg 4 g: fyra långa
+  kommandon, och att jämföra sju rader exakt.
+- **Förslag som inte gör skyddet svagare:**
+  1. Flytta historiken i början ("Ändrad igen samma dag …", 20 rader) till GRANSKNING.md. Hugo behöver den
+     inte för att installera.
+  2. Lägg kontrollerna i steg 4 g (och S4:s `trap` och `whence -v`) i **en fil** i `sparr/`, som Hugo kör
+     med ett enda kommando, och som har en kontrollsumma i steg 5. Utskriften jämförs med ett väntat svar
+     som står i INSTALLERA.md. Samma fil används i kontrollen efter installationen. Det blir ett kommando i
+     stället för sex, och Hugo behöver inte kopiera långa rader.
+  3. Steg 4 g står två gånger (före och efter). Med förslag 2 räcker en hänvisning.
+
+### Punkt 5: SPEC 7.1
+
+- R4-texten stämmer med koden: `_saker_plats` prövar sökvägen och målet med `os.stat` (följer länken), och
+  `_saker_kedja` mappen där varje länk ligger. Länkfilen själv prövas inte.
+- **Stämmer inte för `grep` och `find` (S5):** PATH-regeln säger att vakten bara släpper igenom ett kommando
+  vars program ägs av systemet. Vakten prövar `/usr/bin/grep` och `/usr/bin/find`, men i agentens skal kör
+  de Claude Codes program, som Hugo äger. Skyddet för det programmet är förbuden, inte att root äger det.
+  Meningen "Om de ändå skiljer sig, eller skalet har alias eller funktioner, kan skalet köra en annan fil"
+  är inte längre en möjlighet utan bekräftad för två kommandon. Och "find bara för att söka" håller inte
+  (S1). Förslag: en mening om det i "Det PATH-regeln inte ser".
+
+### Punkt 6: testsviten
+
+`.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests` (övergången i SPEC 7.1):
+- före granskningen: 3 456 passed (enligt byggsessionen, och 3 469 − 13 nya stämmer),
+- efter den nya testfilen: **3 469 passed, 7 xfailed** (de väntat röda för S1 och S2), 0 misslyckade.
+
+### Punkt 7: kontrollsummor
+
+**Inte framtagna.** Uppdraget säger att de bara tas fram om granskningen inte hittar något allvarligt. S1 är
+allvarlig, och rättelsen ändrar `sparr/kommandosparr.py` (och S2 `sparr/managed-settings.json`).
+
+### Punkt 8: Hugos kroklistor i Terminal
+
+- **a. Stoppar Hugo i steg 4 g? Ja, och det är rätt.** `precmd_functions=(update_terminal_cwd)` och
+  `zshexit_functions=(shell_session_update)` är inte de väntade tomma raderna, och texten säger: "Står ett
+  sådant namn mellan parenteserna: stoppa och fråga ändå. Då behövs ett beslut om det namnet."
+- **b. Varifrån, och vem äger filerna?** På macOS läser `/etc/zshrc` in Terminals egen fil
+  `/etc/zshrc_Apple_Terminal` (förbudet `//etc/zshrc_*` finns för den). Den ska lägga in
+  `update_terminal_cwd` (talar om för Terminal vilken mapp skalet står i) och `shell_session_…` (sparar och
+  återställer fönster, i `~/.zsh_sessions`). **Inte bekräftat:** granskaren läser inte filer utanför
+  projektet, och filen finns inte i Apples öppna källkod (byggsessionen). Hugo kan se det själv, bara läsning,
+  i Terminal:
+  - `whence -v update_terminal_cwd shell_session_update`: väntat "… is a shell function from
+    /etc/zshrc_Apple_Terminal" för båda (formen prövad i `test_functions_source_visar_filen_dar_en_funktion_skrevs`).
+  - `ls -l /etc/zshrc /etc/zshrc_Apple_Terminal`: väntat ägaren `root`, inget `w` på plats 6 eller 9.
+- **c. Finns de i agentens skal? Nej.** Läst i den här sessionens skal i skrivbordsappen: `TERM_PROGRAM` är
+  tomt, alla kroklistor är tomma, och funktionerna finns inte. De finns bara i Terminal. I stället har
+  agentens skal Claude Codes `find`, `grep`, `rg` och `pkill` (S3).
+- **d. Vad är säkrast?** (Uppdraget slutar mitt i meningen efter "eller", så det andra alternativet är
+  okänt.) Granskarens förslag:
+  1. **I Terminal: en exakt lista med ursprung.** Väntat `precmd_functions=(update_terminal_cwd)` och
+     `zshexit_functions=(shell_session_update)`, de andra fyra tomma, och `whence -v` som visar
+     `/etc/zshrc_Apple_Terminal` för båda och för varje `shell_session…`-funktion, och `ls -l` som visar att
+     filen ägs av root. Det är bättre än att godkänna namnen utan ursprung: en funktion med samma namn som
+     skrivs om senare, i en annan fil, syns i `whence -v` (prövat). Visar filtret för funktioner också
+     `add-zsh-hook` (om Apples fil använder den), behövs samma kontroll för den (väntat en fil i
+     `/usr/share/zsh/`).
+  2. **Och samma kontroll i agentens skal**, i skrivbordsappen, före installationen: be agenten köra
+     kontrollen och läs den råa utskriften i verktygsrutan (inte agentens sammanfattning). Där är väntat:
+     alla kroklistor tomma, och bara Claude Codes fyra funktioner utöver de väntade. Efter installationen
+     stoppar vakten de kommandona, så det går bara före.
+  - Att i stället starta ett skal utan Terminals tillägg (till exempel med `TERM_PROGRAM` borttaget) gör
+    listan enklare, men då prövas inte skalet där Hugo skriver sitt lösenord, och det bygger på en rad i
+    `/etc/zshrc` som inte är läst. Granskaren rekommenderar det inte.
+
+### Kommandon i den här granskningen
+
+Vakten är inte installerad, så inget stoppades av den. Avsteg från SPEC 7.1 och CLAUDE.md:
+- **Ihopkopplade kommandon med `cd`, `&&`, `;`, `|` och `echo`** för att läsa i projektet (git status, logg,
+  rubriker, delar av filer, `git diff`), och ett Python-skript med `/usr/bin/python3 -I -c` som räknade
+  rutorna i INSTALLERA.md.
+- **Läsning av agentens eget skal** (bara läsning): `echo` av variabler, `typeset -f +`, `typeset -f grep
+  find rg pkill`, `alias`, `alias -s` och `functions_source`. Ett första försök med `print` stoppades av en
+  inbyggd kontroll i Claude Code och kördes inte.
+- **`find … -rm` i scratchpad-mappen**, som raderade granskarens egen provfil, och `grep --filte=…` på en
+  provfil där. Provfilerna skrevs med Write.
+- **`/bin/zsh -f -c zcompile`, `printf … >` och Python** i scratchpad-mappen för att se om en `.zwc` är text.
+- **Läsning utanför projektet:** Claude Code sparade två sidor ur dokumentationen och en verktygsutskrift i
+  `~/.claude/projects/…/tool-results/`. Granskaren läste i dem med `grep`, `sed` och Read. Inget skrevs där.
+- WebFetch: code.claude.com (tools-reference, env-vars) och zsh.sourceforge.io (Files, Functions).
+- Testerna startar `/bin/zsh -f` och `/bin/zsh -d` med en tillfällig hemmapp, och `/usr/bin/find` i en
+  tillfällig mapp. `zsh -d` läser `/etc/zshenv` om den finns.
+
+Allt annat: `.venv/bin/python -B -m pytest -p no:cacheprovider` (mot `scripts/tests` och den nya filen),
+`git status`, `git add` och `git commit`.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **S1:** ny version av vakten där `find` bara får ha tillägg som söker (eller minst `-rm` stoppat)?
+2. **S2:** förbud för zsh:s kompilerade startfiler, som fem regler eller som `Edit(~/.z*)` och
+   `Edit(~/.z*/**)`, och `ls -d ~/.*.zwc` i steg 4?
+3. **Punkt 8 d och S3:** exakt lista med ursprung för Terminals två namn, och samma kontroll i agentens skal
+   före installationen?
+4. **S4:** `trap` och `whence -v` i steg 4 g, och rättad text om `SLUT`?
+5. **S5:** en mening i SPEC 7.1 om att `grep` och `find` kör Claude Codes program i agentens skal?
+6. **S6 och punkt 4:** `requirements.txt` i steg 5 och 12, historiken ut ur INSTALLERA.md, och kontrollerna i
+   en fil med kontrollsumma?
+
+Därefter: en ny oberoende granskning av den nya versionen, med kontrollsummor, före installationen.
