@@ -25,6 +25,8 @@ vakten först och inställningarna sist.
 
 1. **Den oberoende granskningen ska vara klar** (planens steg 2), och du ska kopiera filerna från den
    commit som granskades. Ändras filerna i projektet efter granskningen, kopiera inte. Fråga först.
+   Provet med en vakt som fallerar (steg 8 i kontrollen efter installationen) behövs inte före
+   installationen (Hugos beslut 2026-10-28, 8).
 2. **Titta efter om mappen redan finns.** Öppna Finder, välj **Gå > Gå till mapp…** och skriv
    `/Library/Application Support/ClaudeCode`. Om Finder säger att mappen inte finns: bra, gå vidare.
    Om mappen finns och har filer i sig: **stoppa och fråga**, så att inget som redan ligger där skrivs
@@ -191,7 +193,9 @@ skrivbordsappen, startad i `~/VERA/agent`. Du skriver till agenten som vanligt. 
 kontrollen utan att du säger till.
 
 Om något steg inte blir som det står: **stoppa, skriv upp vad som hände, och fråga** innan något annat
-görs. Kör inte uppgift 4 förrän alla steg är klara.
+görs. Steg 1–7 ska vara klara innan uppgift 4 körs. Steg 8 krävs inte för installationen eller för
+uppgift 4, men ska vara gjort före läget "auto", före körningar utan att Hugo tittar, före första hela
+körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28, 8).
 
 1. **De låsta inställningarna gäller.** Skriv `/status` och läs raden **Setting sources**. Den ska visa
    `Enterprise managed settings (file)`, alltså inställningarna från filen du installerade

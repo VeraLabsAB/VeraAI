@@ -300,6 +300,45 @@ def test_bara_kontrollen_flyttar_vakten_och_bara_fram_och_tillbaka():
     assert "sudo mv" not in installationen
 
 
+# Hugos beslut 2026-10-28, 8 (texten godkänd av Hugo i chatten samma dag): installationen kräver en
+# oberoende granskning men inte provet gjort av en människa (steg 8). Provet krävs före de fyra
+# tillfällena nedan, och det ska stå både i SPEC 7.1 och i INSTALLERA.md.
+FORE_PROVET = [
+    'före läget "auto"',
+    "före körningar utan att Hugo tittar",
+    "före första hela körningen på riktiga underlag",
+    "före första kund",
+]
+
+
+def _en_rad(text):
+    # Radbrytningarna i Markdown-filerna räknas som mellanslag, så att en mening kan brytas var som helst.
+    return " ".join(text.split())
+
+
+def _spec_7_1():
+    text = SPEC.read_text(encoding="utf-8")
+    return _en_rad(text.split("### 7.1 Fast kommandolista", 1)[1].split("\n## ", 1)[0])
+
+
+@pytest.mark.parametrize("tillfalle", FORE_PROVET)
+def test_provet_kravs_fore_auto_obevakat_riktiga_underlag_och_kund(tillfalle):
+    assert tillfalle in _spec_7_1()
+    assert tillfalle in _en_rad(_kontrollen())
+
+
+def test_installationen_kraver_granskning_men_inte_provet():
+    spec = _spec_7_1()
+    assert "Hugos beslut 2026-10-28, 8" in spec
+    assert "installeras först när en oberoende granskning är klar" in spec
+    assert "krävs inte för installationen" in spec
+    fore = INSTALLERA.read_text(encoding="utf-8").split("## Innan du börjar", 1)[1].split("\n## ", 1)[0]
+    assert "behövs inte före installationen" in _en_rad(fore)
+    kontrollen = _en_rad(_kontrollen())
+    assert "Steg 1–7 ska vara klara innan uppgift 4 körs" in kontrollen
+    assert "Kör inte uppgift 4 förrän alla steg är klara" not in kontrollen
+
+
 def test_systemets_python_stoppar_med_kod_2_nar_vakten_saknas(tmp_path):
     # Det är därför provet stoppar: när vakten är bortflyttad kan /usr/bin/python3 inte öppna filen och
     # avslutar med kod 2, som Claude Code läser som "stoppa". Provet visar alltså att en saknad vakt

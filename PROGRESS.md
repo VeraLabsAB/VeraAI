@@ -6,7 +6,7 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **3 193 passed**, 0 misslyckade (körd 2026-10-28 i projektet, i byggsessionen som härdade
+Testsviten: **3 198 passed**, 0 misslyckade (körd 2026-10-28 i projektet, i byggsessionen som härdade
 vakten efter granskning 12).
 
 ## Klart
@@ -129,6 +129,10 @@ avsnitt 8, med namn och datum.
   Provet med en vakt som fallerar i kontrollen efter installationen, gjort av Hugo i Terminal. Lägsta
   version för P3 och P6 är inte bekräftad, och Hugo beslöt i chatten att de byggs in ändå. Byggt i
   5cb9080, 08a3370 och c066188.
+- **Hugos beslut 2026-10-28 (8), texten godkänd av Hugo i chatten samma dag:** installationen av vakten
+  kräver en oberoende granskning, men inte provet med en vakt som fallerar. Provet krävs före läget
+  "auto", före körningar utan att Hugo tittar, före första hela körningen på riktiga underlag och före
+  första kund. Står i SPEC 7.1 och INSTALLERA.md, med test.
 - **Hugos beslut i chatten 2026-10-27:** listan över ägare och närstående ligger kvar i
   `foretag/<namn>/regelbok.json` tills spärrsteget, eftersom SPEC inte säger var den skyddade mappen ska
   ligga. Testet att listan ligger utanför alla mappar agenten får skriva i skrivs då.
