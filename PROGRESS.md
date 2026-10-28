@@ -6,10 +6,39 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **3 304 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, i
-byggsessionen efter Hugos beslut 1–4 om vakten).
+Testsviten: **3 312 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, i
+byggsessionen efter Hugos svar 1–3).
+
+## Läge 2026-10-28, efter Hugos svar 1–3
+
+**Byggt** (inte installerat, inga `sudo`-kommandon körda, inget i `/Library` rört, `~/.zshrc` inte rörd).
+Besluten och detaljerna står i `GRANSKNING.md`, "Granskning 11 – plan för Q1", "Hugos svar 2026-10-28 på de
+öppna frågorna 1–3".
+
+- **Svar 1, Cryptexes-mappen:** INSTALLERA.md steg 4 har raden som Hugo själv lägger sist i `~/.zshrc`, på
+  sin och Caspers dator, och hur han kontrollerar `PATH` efteråt. Inget undantag i vakten. Nytt test: med
+  Cryptexes-mappen först stoppas `git status`, med den sist går det igenom (både med en kopia av
+  uppbyggnaden och med den riktiga mappen på den här datorn).
+- **Svar 2, gamla `.venv`:** testsviten körs med `.venv/bin/python` tills den nya platsen finns. Efter
+  installationen tas den gamla `.venv` bort (INSTALLERA.md, "Efteråt"), och listan i SPEC 7.1 pekar bara på
+  den nya platsen.
+- **Svar 3, Setting sources:** bara en annan låst källa underkänner installationen. `User settings`,
+  `Project settings` och `Project local settings` är väntade. Raden läses i Terminal (`cd ~/VERA`, `claude`,
+  `/status`). Nytt sista steg i kontrollen efter installationen: agenten ombeds köra `date` i
+  skrivbordsappen, och vakten ska stoppa det. Ersätter beslut 4 om vakten.
+- **OVERLAMNING.md** nämner inte längre den gamla `.venv`.
+- **Tester:** 8 nya, 508 för vakten. Hela testsviten: **3 312 passed**, 0 misslyckade.
+
+**Att veta före installationen:** kommandot `claude` hittades inte i Terminal på Hugos dator 2026-10-28.
+Svar 3 kräver det. Säger Terminal `command not found: claude`, stoppar Hugo och frågar (INSTALLERA.md steg
+1). Claude Code för Terminal har ett eget versionsnummer, som också ska vara minst 2.1.295.
+
+**Beslut som behövs:** en ny oberoende granskning av den nya versionen, med omvägarna (P1 från granskning
+12) och PATH-regeln, och nya kontrollsummor. Därefter installerar Hugo enligt `sparr/INSTALLERA.md`.
 
 ## Läge 2026-10-28, efter Hugos beslut 1–4 om vakten
+
+(Beslut som behövs 1–3 nedan är besvarade, se avsnittet ovan.)
 
 **Byggt** (inte installerat, inga `sudo`-kommandon körda, inget i `/Library` rört). Besluten och detaljerna
 står i `GRANSKNING.md`, "Granskning 11 – plan för Q1", "Hugos beslut 2026-10-28 om vakten, beslut 1–4".
@@ -230,6 +259,11 @@ avsnitt 8, med namn och datum.
   pytest-kommandona pekar dit, (2) varje mapp i `PATH` före programmet ska ägas av root, (3) också filen själv
   och länkens mål ska ägas av root, (4) varje annan källa i `/status` stoppar installationen. Byggt, inte
   installerat. Detaljer: `GRANSKNING.md`, "Granskning 11 – plan för Q1".
+- **Hugos svar 2026-10-28, punkt 1–3:** (1) Cryptexes-mappen flyttas sist i `PATH` med en rad i `~/.zshrc`
+  som Hugo lägger in själv, inget undantag i vakten, (2) testsviten körs med den gamla `.venv` tills den nya
+  platsen finns, och den gamla tas bort efter installationen, (3) bara en annan låst källa på raden Setting
+  sources underkänner installationen (ersätter beslut 4 ovan), raden läses i Terminal, och ett sista steg i
+  skrivbordsappen visar att vakten stoppar `date`. Byggt, inte installerat.
 - **Hugos beslut i chatten 2026-10-27:** listan över ägare och närstående ligger kvar i
   `foretag/<namn>/regelbok.json` tills spärrsteget, eftersom SPEC inte säger var den skyddade mappen ska
   ligga. Testet att listan ligger utanför alla mappar agenten får skriva i skrivs då.

@@ -935,14 +935,24 @@ def test_att_soka_efter_ordet_path_gar_igenom(vakt, mappar, kommando):
 # Hugos beslut 2026-10-28 om vakten, beslut 1–4 (GRANSKNING.md, "Granskning 11 – plan för Q1").
 #
 # Ett test kan inte skapa en mapp eller fil som ägs av root. Fixturen rotagd låtsas därför att de
-# sökvägar som testet anger ägs säkert av root, genom att byta ut vaktens _sakert_agd. Allt annat prövas
-# som vanligt, så en fil eller mapp som testet inte anger är fortfarande användarens.
+# sökvägar som testet anger ägs av root, genom att byta ut vaktens _sakert_agd. Rättigheterna prövas
+# ändå på riktigt: en sådan sökväg som gruppen eller andra får skriva i (till exempel 777) godtas inte.
+# Allt annat prövas som vanligt, så en fil eller mapp som testet inte anger är fortfarande användarens.
 
 @pytest.fixture
 def rotagd(vakt, monkeypatch):
     sakra = set()
     vanlig = vakt._sakert_agd
-    monkeypatch.setattr(vakt, "_sakert_agd", lambda sokvag: sokvag in sakra or vanlig(sokvag))
+
+    def sakert_agd(sokvag):
+        if sokvag not in sakra:
+            return vanlig(sokvag)
+        try:
+            return not os.stat(sokvag).st_mode & 0o022
+        except OSError:
+            return False
+
+    monkeypatch.setattr(vakt, "_sakert_agd", sakert_agd)
 
     def lagg_till(sokvag, mapparna_ovanfor=True):
         for form in {os.path.normpath(str(sokvag)), os.path.realpath(str(sokvag))}:
@@ -970,6 +980,10 @@ def test_rotagd_galler_bara_det_testet_anger(vakt, tmp_path, rotagd):
     rotagd(mapp)
     assert vakt._saker_plats(str(mapp))
     assert not vakt._saker_plats(str(_lagg_program(str(mapp), "git")))
+    # Rättigheterna prövas på riktigt också för det som testet anger.
+    os.chmod(mapp, 0o777)
+    assert not vakt._saker_plats(str(mapp))
+    os.chmod(mapp, 0o755)
 
 
 # Beslut 1 (alternativ c): .venv flyttas till en mapp som root äger. Pytest-kommandona i listan pekar dit.
@@ -1153,24 +1167,141 @@ def test_beslut_3_lank_i_en_rotmapp_till_systemets_program_gar_igenom(vakt, mapp
     assert _bedom(vakt, mappar, "git status", sokvag=f"{rot}:{SYSTEMETS_SOKVAG}") is None
 
 
-# Beslut 4: den strängaste tolkningen. Varje källa på raden Setting sources i /status som inte är den
-# låsta filen stoppar installationen.
+# Hugos svar 2026-10-28, punkt 1: Cryptexes-mappen flyttas sist i PATH, inget undantag i vakten. På Hugos
+# dator står /System/Cryptexes/App/usr/bin före /usr/bin. Mappen ägs av root, men leder (via en länk) till
+# /System/Volumes/Preboot/Cryptexes, som har rättigheterna 777.
 
-ANNAN_KALLA = "Varje annan källa på raden stoppar installationen"
+KRYPTEX = "/System/Cryptexes/App/usr/bin"
 
 
-def test_beslut_4_varje_annan_kalla_i_status_stoppar_installationen():
+def _kryptex_i_testet(tmp_path, rotagd):
+    """Samma uppbyggnad som på Hugos dator, i en mapp i testet: System/Cryptexes/App är en länk till
+    Preboot/Cryptexes/App, och Preboot/Cryptexes har 777. Allt låtsas ägas av root (rotagd)."""
+    preboot = tmp_path / "Preboot" / "Cryptexes"
+    bin_ = preboot / "App" / "usr" / "bin"
+    _lagg_program(str(bin_), "safaridriver")
+    os.chmod(preboot, 0o777)
+    system = tmp_path / "System" / "Cryptexes"
+    system.mkdir(parents=True)
+    os.symlink(preboot / "App", system / "App")
+    kryptex = system / "App" / "usr" / "bin"
+    rotagd(kryptex)
+    return str(kryptex)
+
+
+def test_cryptexes_mappen_forst_stoppas_och_sist_slapps_igenom(vakt, mappar, tmp_path, rotagd):
+    kryptex = _kryptex_i_testet(tmp_path, rotagd)
+    fel = _bedom(vakt, mappar, "git status", sokvag=f"{kryptex}:{SYSTEMETS_SOKVAG}")
+    assert fel is not None and FORE_PROGRAMMET in fel and kryptex in fel, fel
+    assert _bedom(vakt, mappar, "git status", sokvag=f"{SYSTEMETS_SOKVAG}:{kryptex}") is None
+
+
+@pytest.mark.skipif(not os.path.isdir(KRYPTEX), reason=f"{KRYPTEX} finns inte på den här datorn")
+def test_cryptexes_mappen_pa_den_har_datorn_forst_stoppas_och_sist_slapps_igenom(vakt, mappar):
+    # Samma sak med den riktiga mappen, på en dator där den finns (som Hugos).
+    if vakt._saker_plats(KRYPTEX):
+        pytest.skip(f"{KRYPTEX} och mapparna ovanför går inte att skriva i för andra på den här datorn")
+    fel = _bedom(vakt, mappar, "git status", sokvag=f"{KRYPTEX}:{SYSTEMETS_SOKVAG}")
+    assert fel is not None and FORE_PROGRAMMET in fel and KRYPTEX in fel, fel
+    assert _bedom(vakt, mappar, "git status", sokvag=f"{SYSTEMETS_SOKVAG}:{KRYPTEX}") is None
+
+
+def test_vakten_har_inget_undantag_for_cryptexes_mappen():
+    # Hugos svar 2026-10-28, punkt 1: inget undantag i vakten.
+    assert "Cryptexes" not in VAKTEN.read_text(encoding="utf-8")
+
+
+KRYPTEX_RAD = f"path=( ${{path:#{KRYPTEX}}} {KRYPTEX} )"
+KRYPTEX_LAGG_TILL = f"echo '{KRYPTEX_RAD}' >> ~/.zshrc"
+
+
+def test_installera_har_raden_som_lagger_cryptexes_mappen_sist():
+    text, rader = _installationskommandon()
+    plats = {k: rader.index(k) for k in NVM_KOMMANDON}
+    kryptex = rader.index(KRYPTEX_LAGG_TILL)
+    # Efter säkerhetskopian och nvm-raden, före kontrollen och före installationen. Raden läggs efter
+    # nvm-raden, så att nvm-mappen och sedan Cryptexes-mappen står sist.
+    assert plats[NVM_KOPIA] < plats[NVM_LAGG_TILL] < kryptex < plats["tail -n 3 ~/.zshrc"] < plats["echo $PATH"]
+    assert kryptex < _forsta_sudo(rader)
+    (steget,) = [_en_rad(t) for r, t in _steg(text) if "nvm" in r.lower()]
+    # Hur Hugo kontrollerar att det fungerade, och vad han ska se.
+    assert "Cryptexes" in steget and "safaridriver" in steget
+    assert f"{KRYPTEX}` ska stå sist" in steget
+    assert "Öppen fråga, installera inte än" not in steget
+    caspers = _en_rad(text.split("## Caspers dator", 1)[1].split("\n## ", 1)[0])
+    assert "Cryptexes" in caspers
+
+
+# Hugos svar 2026-10-28, punkt 2: den gamla .venv används tills den nya platsen finns, och tas bort efter
+# installationen. Efter installationen pekar listan i SPEC 7.1 bara på den nya platsen.
+
+def test_gamla_venv_tas_bort_efter_installationen_och_listan_pekar_bara_pa_den_nya_platsen():
+    efterat = _en_rad(INSTALLERA.read_text(encoding="utf-8").split("## Efteråt", 1)[1].split("\n## ", 1)[0])
+    assert "Den gamla mappen `.venv` i projektet ska tas bort efter installationen" in efterat
+    spec = _spec_7_1()
+    assert "Hugos svar 2026-10-28, punkt 2" in spec
+    assert "Efter installationen pekar listan bara på den nya platsen" in spec
+    assert "väntar på bekräftelse" not in spec
+
+
+# Hugos svar 2026-10-28, punkt 3: bara en annan låst källa på raden Setting sources underkänner
+# installationen. User settings, Project settings och Project local settings är väntade. Raden visas inte
+# i skrivbordsappen, så den läses i Terminal: cd ~/VERA, claude och /status.
+
+VANTADE_KALLOR = ("User settings", "Project settings", "Project local settings")
+
+
+def _setting_sources_stallen():
     text = INSTALLERA.read_text(encoding="utf-8")
     forsta_steget = _en_rad(_steg(text)[0][1])
     efterat = _en_rad(text.split("## Efteråt", 1)[1].split("\n## ", 1)[0])
     kontroll_1 = _en_rad(_kontrollen().split("\n2. ", 1)[0])
-    for stalle in (forsta_steget, efterat, kontroll_1, _spec_7_1()):
+    return forsta_steget, efterat, kontroll_1
+
+
+def test_bara_en_annan_last_kalla_underkanner_installationen():
+    for stalle in _setting_sources_stallen() + (_spec_7_1(),):
         assert "Enterprise managed settings (file)" in stalle
-        assert ANNAN_KALLA in stalle
-        assert "Hugos beslut 2026-10-28 om vakten, beslut 4" in stalle
-    # Också Hugos och projektets egna inställningar räknas, inte bara låsta källor från claude.ai.
-    for stalle in (efterat, kontroll_1):
-        assert "User settings" in stalle and "Project settings" in stalle
+        assert "Bara en annan låst källa underkänner installationen" in stalle
+        assert "Hugos svar 2026-10-28, punkt 3" in stalle
+        for kalla in VANTADE_KALLOR:
+            assert f"`{kalla}`" in stalle, (kalla, stalle[:200])
+        assert "Varje annan källa på raden stoppar installationen" not in stalle
+
+
+def test_setting_sources_lases_i_terminal():
+    _, rader = _installationskommandon()
+    assert rader.index("cd ~/VERA") + 1 == rader.index("claude")
+    for stalle in _setting_sources_stallen():
+        assert "Terminal" in stalle and "`cd ~/VERA`" in stalle and "`claude`" in stalle and "`/status`" in stalle
+        assert "command not found" in stalle
+
+
+# Hugos svar 2026-10-28, punkt 3: ett sista steg i skrivbordsappen visar att vakten stoppar ett kommando som
+# inte står på listan. Kommandot ska vara ofarligt om vakten saknas, och steget använder inte sudo.
+
+APPKONTROLL_KOMMANDO = "date"
+
+
+def _sista_steget():
+    kontrollen = _kontrollen()
+    nummer = re.findall(r"\n(\d+)\. \*\*", kontrollen)
+    sista = nummer[-1]
+    return int(sista), kontrollen.split(f"\n{sista}. **", 1)[1]
+
+
+def test_sista_steget_ar_en_kontroll_i_skrivbordsappen_med_ett_ofarligt_kommando():
+    nummer, steget = _sista_steget()
+    assert nummer == 9
+    steget_en_rad = _en_rad(steget)
+    assert "skrivbordsappen" in steget_en_rad and f"`{APPKONTROLL_KOMMANDO}`" in steget_en_rad
+    assert "står inte på listan" in steget_en_rad and "Stoppat av vakten" in steget_en_rad
+    assert "sudo" not in steget and "```" not in steget
+
+
+def test_vakten_stoppar_kommandot_i_appkontrollen(vakt, mappar):
+    fel = _bedom(vakt, mappar, APPKONTROLL_KOMMANDO)
+    assert fel is not None and LISTAN in fel and fel.startswith("Stoppat av vakten"), fel
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1464,6 +1595,8 @@ NVM_KOPIA = "cp -i ~/.zshrc ~/.zshrc.fore-vera"
 NVM_RAD = '[ -n "$NVM_BIN" ] && path=( ${path:#$NVM_BIN} $NVM_BIN )'
 NVM_LAGG_TILL = f"echo '{NVM_RAD}' >> ~/.zshrc"
 NVM_KOMMANDON = (NVM_KOPIA, NVM_LAGG_TILL, "tail -n 3 ~/.zshrc", "echo $PATH")
+# Hugos svar 2026-10-28, punkt 3: raden Setting sources läses i Terminal.
+TERMINAL_KOMMANDON = ("cd ~/VERA", "claude")
 
 
 def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
@@ -1486,7 +1619,7 @@ def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
     ) + FORPROV_KOMMANDON
     assert rader
     for rad in rader:
-        assert rad.startswith(tillatna) or rad in NVM_KOMMANDON, rad
+        assert rad.startswith(tillatna) or rad in NVM_KOMMANDON + TERMINAL_KOMMANDON + (KRYPTEX_LAGG_TILL,), rad
 
 
 def test_beslut_2_installera_beskriver_hur_nvm_mappen_flyttas_sist_i_path():

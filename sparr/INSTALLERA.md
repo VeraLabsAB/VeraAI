@@ -4,8 +4,11 @@ Skriven 2026-10-28 i byggsessionen för granskning 11, Q1. Planen och Hugos besl
 under "Granskning 11 – plan för Q1". Ändrad samma dag efter Hugos beslut 2026-10-28 om PATH-regeln,
 förprovet för `onFailure` och P7 (`GRANSKNING.md`, "Beslut 2026-10-28: PATH-regel, förprov för onFailure,
 P7"). Ändrad igen samma dag efter Hugos beslut 2026-10-28 om vakten, beslut 1–4 (`GRANSKNING.md`,
-"Granskning 11 – plan för Q1"): projektets Python flyttas till en mapp som systemet äger (steg 9),
-nvm-mappen flyttas sist i `PATH` (steg 4), och varje annan källa i `/status` stoppar installationen.
+"Granskning 11 – plan för Q1"): projektets Python flyttas till en mapp som systemet äger (steg 9), och
+nvm-mappen flyttas sist i `PATH` (steg 4). Ändrad igen samma dag efter Hugos svar 2026-10-28, punkt 1–3:
+också Cryptexes-mappen flyttas sist (steg 4), den gamla `.venv` tas bort efter installationen, raden Setting
+sources läses i Terminal och bara en annan låst källa underkänner installationen, och ett sista steg i
+skrivbordsappen visar att vakten stoppar ett kommando som inte står på listan.
 
 Den här beskrivningen är till **Hugo** (och sedan **Casper**, på sin dator). Agenten kör inga av
 kommandona. Du kör dem själv i programmet **Terminal**, ett i taget, och skriver ditt
@@ -69,15 +72,38 @@ På din dator hittas kommandot `claude` inte i Terminal (2026-10-28), så Claude
 3. Läs raden **Claude Code**. Den visar versionen, till exempel `2.1.300`. Jämför siffergrupperna mellan
    punkterna en i taget, från vänster: `2.1.300` och `2.2.0` är senare än `2.1.295`, men `2.1.29` är
    äldre (29 är mindre än 295).
-4. Läs i samma ruta raden **Setting sources** (var inställningarna kommer från). Om den nämner
-   inställningar från claude.ai (server-managed settings) går de före filen som installeras här, och då
-   används inte filen. Stoppa i så fall och fråga.
-5. Skriv upp vad som står på raden **Setting sources** nu. Efter installationen ska raden bara visa
-   `Enterprise managed settings (file)`. Varje annan källa på raden stoppar installationen, också dina
-   egna inställningar och projektets (Hugos beslut 2026-10-28 om vakten, beslut 4, se "Efteråt"). Står
-   det redan nu något på raden, till exempel `User settings` eller `Project settings`, kommer den källan
-   troligen att stå kvar efter installationen. Stoppa i så fall och fråga redan nu, innan något
-   installeras.
+4. Raden **Setting sources** (var inställningarna kommer från) visas inte i skrivbordsappen. Den läses i
+   Terminal, se nedan.
+
+**Raden Setting sources, i Terminal** (Hugos svar 2026-10-28, punkt 3). Öppna Terminal och kör ett kommando
+i taget:
+
+```bash
+cd ~/VERA
+```
+
+```bash
+claude
+```
+
+- `cd ~/VERA` gör `~/VERA` till mappen du står i. `claude` startar Claude Code i Terminal, i den mappen.
+  Frågar Claude Code om du litar på mappen: svara ja.
+- Säger Terminal `command not found: claude` är Claude Code inte installerat för Terminal (så var det på
+  din dator 2026-10-28). Stoppa och fråga. Claude Code för Terminal har ett eget versionsnummer, som också
+  ska vara 2.1.295 eller senare (rutan nedan).
+
+Skriv sedan `/status` i Claude Code i Terminal och tryck Retur. Leta upp raden som börjar med
+**Setting sources**. Den räknar upp källorna efter kolon, åtskilda med kommatecken.
+
+- **Väntade källor**, som inte underkänner något: `User settings` (dina egna inställningar),
+  `Project settings` (projektets) och `Project local settings` (projektets, bara på din dator).
+- **Före installationen** ska raden inte nämna någon låst källa, till exempel inställningar som styrs från
+  claude.ai (orden `managed`, `policy` eller `claude.ai`). En sådan går före filen som installeras här, och
+  då används inte filen. Stoppa i så fall och fråga.
+- **Efter installationen** ska raden också visa `Enterprise managed settings (file)`, alltså filen du
+  installerade. Bara en annan låst källa underkänner installationen (Hugos svar 2026-10-28, punkt 3).
+- Står det något annat på raden som inte är nämnt här: stoppa och fråga.
+- Avsluta Claude Code i Terminal med `/exit`.
 
 **Om versionen är äldre än 2.1.295: stoppa och uppdatera först.**
 
@@ -90,8 +116,8 @@ På din dator hittas kommandot `claude` inte i Terminal (2026-10-28), så Claude
 
 Terminalen och skrivbordsappen har **var sin** Claude Code med var sitt versionsnummer, och att uppdatera
 den ena uppdaterar inte den andra (sidan **code.claude.com/docs/en/desktop**, avsnittet "Claude Code
-version in the Code tab"). Om du senare installerar Claude Code för Terminal, så att `claude` hittas där:
-kontrollera den också, med `/status` i en session i Terminal, innan du installerar vakten.
+version in the Code tab"). Kontrollera därför versionen också i Claude Code i Terminal, på raden
+**Claude Code** (eller **Version**) i samma `/status` som ovan, innan du installerar vakten.
 
 De låsta inställningarna innehåller också `"requiredMinimumVersion": "2.1.295"`, så att en äldre Claude
 Code inte startar alls efter installationen (Hugos beslut 2026-10-28). Kontrollen här behövs ändå,
@@ -218,27 +244,31 @@ rmdir ~/vera-forprov
 
 **Stoppades `ls` inte i e: avbryt installationen.** Gå vidare till steg 4 bara om `ls` stoppades.
 
-## Steg 4: flytta nvm-mappen sist i PATH (före installationen)
+## Steg 4: flytta nvm-mappen och Cryptexes-mappen sist i PATH (före installationen)
 
-**Öppen fråga, installera inte än** (byggsessionen 2026-10-28). Också systemets mapp
-`/System/Cryptexes/App/usr/bin` står före `/usr/bin` i din `PATH`. Den ägs av systemet, men leder till
-`/System/Volumes/Preboot/Cryptexes`, som har rättigheterna 777 (alla får ändra, enligt mappens egna
-uppgifter). Vakten stoppar därför alla kommandon också när nvm-mappen är flyttad. Mappen innehåller bara
-programmet `safaridriver`. Hugo eller Casper bestämmer hur det löses (`GRANSKNING.md`, "Granskning 11 –
-plan för Q1", beslut 2). Gör inte det här steget, och installera inte, förrän frågan är besvarad.
+Vakten kräver att varje mapp i `PATH` före programmet ägs av systemet och inte går att ändra för någon
+annan (Hugos beslut 2026-10-28 om vakten, beslut 2). På din dator står två mappar före `/usr/bin` och
+`/bin`, där programmen på listan ligger, som inte klarar det:
 
-Vakten kräver att varje mapp i `PATH` före programmet ägs av systemet (Hugos beslut 2026-10-28 om vakten,
-beslut 2). På din dator står nvm-mappen först i `PATH`:
-`/Users/hugolindholmer/.nvm/versions/node/v24.18.0/bin`. **nvm** (Node Version Manager) är ett program som
-installerar Node, och mappen ägs av dig. Den står först både i den `PATH` som Claude Code själv har (och
-som vakten får) och i den `PATH` som agentens kommandon körs med (kontrollerat 2026-10-28, se
-`PROGRESS.md`). Utan det här steget stoppar vakten **alla** kommandon, också `git status`.
+- **nvm-mappen**, `/Users/hugolindholmer/.nvm/versions/node/v24.18.0/bin`, står först. **nvm** (Node Version
+  Manager) är ett program som installerar Node, och mappen ägs av dig.
+- **Cryptexes-mappen**, `/System/Cryptexes/App/usr/bin`. Den ägs av systemet, men leder till
+  `/System/Volumes/Preboot/Cryptexes`, som har rättigheterna 777 (alla får ändra, enligt mappens egna
+  uppgifter). Mappen innehåller bara programmet `safaridriver` (för att styra Safari från program), som
+  inte står på listan.
 
-nvm lägger in mappen från filen `~/.zshrc`, som skalet zsh (programmet som tolkar kommandona i Terminal)
-läser varje gång det startar. Här lägger du till en rad sist i den filen, som flyttar nvm-mappen sist i
-`PATH`. Agenten ändrar inte dina skalfiler, du gör det själv (Hugos beslut 2026-10-28 om vakten, beslut 2,
-och de låsta inställningarna förbjuder agenten att skriva i `~/.zshrc`). `node`, `npm` och `npx` fungerar
-som förut.
+Båda står så både i den `PATH` som Claude Code själv har (och som vakten får) och i den `PATH` som
+agentens kommandon körs med (kontrollerat 2026-10-28, se `PROGRESS.md`). Utan det här steget stoppar vakten
+**alla** kommandon, också `git status`. Med båda mapparna sist går alla 13 program på listan igenom
+(prövat med vakten mot din `PATH` 2026-10-28). Vakten har inget undantag för någon av mapparna (Hugos svar
+2026-10-28, punkt 1).
+
+nvm lägger in sin mapp från filen `~/.zshrc`, som skalet zsh (programmet som tolkar kommandona i Terminal)
+läser varje gång det startar. Här lägger du till två rader sist i den filen: en som flyttar nvm-mappen sist
+i `PATH`, och en som sedan flyttar Cryptexes-mappen sist. Agenten ändrar inte dina skalfiler, du gör det
+själv, på din och på Caspers dator (Hugos beslut 2026-10-28 om vakten, beslut 2, och Hugos svar
+2026-10-28, punkt 1; de låsta inställningarna förbjuder också agenten att skriva i `~/.zshrc`). `node`,
+`npm`, `npx` och `safaridriver` fungerar som förut.
 
 **a. Gör en säkerhetskopia av filen:**
 
@@ -251,7 +281,7 @@ cp -i ~/.zshrc ~/.zshrc.fore-vera
 - Säger kommandot `No such file or directory` finns ingen `~/.zshrc`, och då läggs nvm in från en annan
   fil. Stoppa och fråga.
 
-**b. Lägg till raden sist i filen** (kommandot är en enda rad, kopiera hela):
+**b. Lägg till raden för nvm-mappen sist i filen** (kommandot är en enda rad, kopiera hela):
 
 ```bash
 echo '[ -n "$NVM_BIN" ] && path=( ${path:#$NVM_BIN} $NVM_BIN )' >> ~/.zshrc
@@ -264,29 +294,63 @@ echo '[ -n "$NVM_BIN" ] && path=( ${path:#$NVM_BIN} $NVM_BIN )' >> ~/.zshrc
   lista. `${path:#$NVM_BIN}` är listan utan nvm-mappen, och nvm-mappen läggs sedan sist. `[ -n "$NVM_BIN" ]
   &&` betyder "bara om nvm har angett sin mapp", så att ingen tom mapp läggs till.
 
-**c. Kontrollera filen:**
+**c. Lägg till raden för Cryptexes-mappen sist i filen**, efter raden från b (en enda rad, kopiera hela):
+
+```bash
+echo 'path=( ${path:#/System/Cryptexes/App/usr/bin} /System/Cryptexes/App/usr/bin )' >> ~/.zshrc
+```
+
+- Samma sätt som i b, med `>>`. Raden som hamnar i filen är:
+  `path=( ${path:#/System/Cryptexes/App/usr/bin} /System/Cryptexes/App/usr/bin )`. Den tar bort
+  `/System/Cryptexes/App/usr/bin` ur listan och lägger den sist, efter nvm-mappen.
+- Fanns mappen inte i `PATH` förut (till exempel på en dator med en äldre macOS), läggs den till sist. Det
+  är ofarligt: vakten prövar bara mapparna före programmet.
+
+**d. Kontrollera filen:**
 
 ```bash
 tail -n 3 ~/.zshrc
 ```
 
-- `tail -n 3` visar de tre sista raderna i filen, och ändrar ingenting. Den sista raden ska vara exakt
-  raden mellan citattecknen i b.
+- `tail -n 3` visar de tre sista raderna i filen, och ändrar ingenting. De **två sista** raderna ska vara
+  exakt de två raderna från b och c, i den ordningen:
+  - `[ -n "$NVM_BIN" ] && path=( ${path:#$NVM_BIN} $NVM_BIN )`
+  - `path=( ${path:#/System/Cryptexes/App/usr/bin} /System/Cryptexes/App/usr/bin )`
+- Står något annat där, eller står en rad två gånger: hämta tillbaka säkerhetskopian med
+  `cp ~/.zshrc.fore-vera ~/.zshrc`, och fråga.
 
-**d. Kontrollera `PATH`.** Öppna ett **nytt** Terminal-fönster (Cmd+N), så att skalet läser filen på
+**e. Kontrollera `PATH`.** Öppna ett **nytt** Terminal-fönster (Cmd+N), så att skalet läser filen på
 nytt, och kör:
 
 ```bash
 echo $PATH
 ```
 
-- Visar `PATH`: mapparna i ordning, åtskilda med `:`. nvm-mappen (den med `.nvm` i namnet) ska nu stå
-  **sist**, och den första mappen ska vara en av systemets, till exempel `/usr/local/bin`.
-- Står nvm-mappen fortfarande först: stoppa och fråga. Då läggs nvm troligen in från en annan fil, till
-  exempel `~/.zprofile` eller `~/.zlogin`.
+- Visar `PATH`: mapparna i ordning, åtskilda med `:`, på en enda lång rad. Så ska den se ut:
+  - Den **första** mappen ska vara en av systemets, till exempel `/usr/local/bin`, och `/usr/bin` och `/bin`
+    ska komma tidigt.
+  - nvm-mappen (den med `.nvm` i namnet) ska stå **näst sist**.
+  - `/System/Cryptexes/App/usr/bin` ska stå sist, efter nvm-mappen. Raden slutar alltså med
+    `:/Users/hugolindholmer/.nvm/versions/node/v24.18.0/bin:/System/Cryptexes/App/usr/bin`.
+  - På din dator 2026-10-28 ska hela raden bli (radbruten här, i Terminal en rad):
 
-**e. Starta om Claude-appen** helt (**Claude > Quit Claude**, eller Cmd+Q), och öppna den igen. Claude
-Code läser `PATH` när appen startar, så sessioner som redan är öppna har kvar den gamla ordningen.
+    ```
+    /usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:
+    /var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:
+    /var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:
+    /var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:
+    /pkg/env/global/bin:/Library/Apple/usr/bin:/Users/hugolindholmer/.nvm/versions/node/v24.18.0/bin:
+    /System/Cryptexes/App/usr/bin
+    ```
+
+    Har nvm bytt version sedan dess kan siffrorna efter `node/v` vara andra.
+- Står nvm-mappen eller `/System/Cryptexes/App/usr/bin` före `/usr/bin`: stoppa och fråga. Då läggs de
+  troligen in från en annan fil, till exempel `~/.zprofile` eller `~/.zlogin`, efter `~/.zshrc`.
+
+**f. Starta om Claude-appen** helt (**Claude > Quit Claude**, eller Cmd+Q), och öppna den igen. Claude
+Code läser `PATH` när appen startar, så sessioner som redan är öppna har kvar den gamla ordningen. Att
+appen har fått den nya ordningen syns först efter installationen: i kontrollen efter installationen, steg
+3, ska `git status` gå igenom.
 
 Ångra steget: `cp ~/.zshrc.fore-vera ~/.zshrc`, och starta om Terminal och Claude-appen. Då stoppar vakten
 alla kommandon igen.
@@ -464,14 +528,16 @@ tio tecknen: installationen räknas som misslyckad. Stoppa och fråga.**
 
 1. **Starta nya sessioner** i skrivbordsappen (och i terminalen, om du har Claude Code där). Sessioner som
    redan är öppna kan ha läst inställningarna innan filen fanns.
-2. **Kontrollera att de låsta inställningarna gäller** (Hugos beslut 2026-10-28, beslut 3). Skriv `/status`
-   i en ny session och läs raden **Setting sources**. Den ska visa `Enterprise managed settings (file)`,
+2. **Kontrollera att de låsta inställningarna gäller** (Hugos beslut 2026-10-28, beslut 3). Raden visas
+   inte i skrivbordsappen, så den läses i Terminal (Hugos svar 2026-10-28, punkt 3): kör `cd ~/VERA` och
+   sedan `claude`, som i steg 1, skriv `/status` och leta upp raden **Setting sources**. Säger Terminal
+   `command not found: claude`: stoppa och fråga. Raden ska visa `Enterprise managed settings (file)`,
    alltså inställningarna från filen du installerade (code.claude.com/docs/en/managed-settings). **Saknas
-   raden, saknas den texten, eller visas en annan källa, gäller inte vakten, och installationen räknas
-   som misslyckad.** Stoppa och fråga. Varje annan källa på raden stoppar installationen, också dina
-   egna inställningar (till exempel `User settings`) och projektets (till exempel `Project settings` eller
-   `Local settings`), inte bara inställningar från claude.ai (Hugos beslut 2026-10-28 om vakten, beslut 4,
-   den strängaste tolkningen).
+   raden eller den texten, gäller inte vakten, och installationen räknas som misslyckad.** Stoppa och
+   fråga. `User settings`, `Project settings` och `Project local settings` är väntade och underkänner inte.
+   Bara en annan låst källa underkänner installationen, till exempel inställningar som styrs från
+   claude.ai (Hugos svar 2026-10-28, punkt 3). Står något annat på raden: stoppa och fråga. Avsluta med
+   `/exit`.
 3. **Gör kontrollen efter installationen** (sist i den här filen) i en ny session.
 4. **Agenten kan inte längre skriva i `~/.claude`** (Hugos beslut 2026-10-28, punkt 5). Där ligger
    bland annat Claudes minne mellan sessionerna (`~/.claude/projects/…/memory`). Det slutar gå att
@@ -486,10 +552,11 @@ tio tecknen: installationen räknas som misslyckad. Stoppa och fråga.**
 8. **Agenten kan inte skriva i projektets mapp `.claude`, i `.mcp.json` eller i `.venv`** (Hugos beslut
    2026-10-28, 5). Inställningar och kopplingar för projektet skriver du eller Casper själva.
 9. **Agenten kör testsviten med Python på den nya platsen** (Hugos beslut 2026-10-28 om vakten, beslut
-   1), med kommandona i SPEC 7.1. Den gamla mappen `.venv` i projektet används inte längre. När kontrollen
-   efter installationen, steg 3, visar att testsviten går, kan du ta bort den: dra mappen `.venv` i
-   `~/VERA/agent` till papperskorgen i Finder (mappen är dold, tryck Cmd+Shift+. för att se den). Gör det
-   inte före kontrollen.
+   1), med kommandona i SPEC 7.1. Den gamla mappen `.venv` i projektet ska tas bort efter installationen
+   (Hugos svar 2026-10-28, punkt 2). Gör det när kontrollen efter installationen, steg 3, visar att
+   testsviten går med Python på den nya platsen, inte före: dra mappen `.venv` i `~/VERA/agent` till
+   papperskorgen i Finder (mappen är dold, tryck Cmd+Shift+. i Finder för att se den) och töm sedan
+   papperskorgen. Därefter pekar listan i SPEC 7.1 bara på den nya platsen.
 
 ## Caspers dator
 
@@ -501,9 +568,10 @@ Skillnader:
 
 - Sökvägen till projektet kan vara en annan. Byt `~/VERA/agent` i steg 5, 7, 9 och 10 mot där projektet
   ligger på Caspers dator.
-- Steg 4 (nvm-mappen) gäller bara om en mapp som Casper äger står före systemets mappar i `PATH`. Kör
-  `echo $PATH` från steg 4 d först. Står någon annan mapp än systemets först, till exempel nvm eller
-  Homebrew (`/opt/homebrew/bin`): stoppa och fråga, eftersom vakten då stoppar alla kommandon.
+- Steg 4: kör `echo $PATH` från steg 4 e först. Raden för Cryptexes-mappen (steg 4 c) läggs in också
+  på Caspers dator (Hugos svar 2026-10-28, punkt 1). Raden för nvm-mappen (steg 4 b) behövs bara om nvm
+  finns där. Står någon annan mapp än systemets före `/usr/bin`, till exempel Homebrew
+  (`/opt/homebrew/bin`): stoppa och fråga, eftersom vakten då stoppar alla kommandon.
 
 Kontrollen nedan görs också på Caspers dator.
 
@@ -514,15 +582,19 @@ skrivbordsappen, startad i `~/VERA/agent`. Du skriver till agenten som vanligt. 
 kontrollen utan att du säger till.
 
 Om något steg inte blir som det står: **stoppa, skriv upp vad som hände, och fråga** innan något annat
-görs. Steg 1–7 ska vara klara innan uppgift 4 körs. Steg 8 krävs inte för installationen eller för
+görs. Steg 1–7 ska vara klara innan uppgift 4 körs. Steg 9 görs direkt efter steg 7 och ska också vara
+klart innan uppgift 4 körs (Hugos svar 2026-10-28, punkt 3). Steg 8 krävs inte för installationen eller för
 uppgift 4, men ska vara gjort före läget "auto", före körningar utan att Hugo tittar, före första hela
 körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28, 8).
 
-1. **De låsta inställningarna gäller.** Skriv `/status` och läs raden **Setting sources**. Den ska visa
-   `Enterprise managed settings (file)`, alltså inställningarna från filen du installerade
-   (code.claude.com/docs/en/managed-settings). Varje annan källa på raden stoppar installationen, också
-   dina egna inställningar (till exempel `User settings`) och projektets (till exempel `Project settings`
-   eller `Local settings`): stoppa och fråga (Hugos beslut 2026-10-28 om vakten, beslut 4). Läs också
+1. **De låsta inställningarna gäller.** Raden **Setting sources** visas inte i skrivbordsappen, så den läses
+   i Terminal (Hugos svar 2026-10-28, punkt 3): kör `cd ~/VERA` och sedan `claude`, som i installationens
+   steg 1, och skriv `/status`. Säger Terminal `command not found: claude`: stoppa och fråga. Raden ska
+   visa `Enterprise managed settings (file)`, alltså inställningarna från filen du installerade
+   (code.claude.com/docs/en/managed-settings). `User settings`, `Project settings` och
+   `Project local settings` är väntade och underkänner inte. Bara en annan låst källa underkänner
+   installationen, till exempel inställningar som styrs från claude.ai: stoppa och fråga (Hugos svar
+   2026-10-28, punkt 3). Avsluta med `/exit`. Läs också i skrivbordsappens `/status`
    raden **Claude Code**: versionen ska vara
    2.1.295 eller senare. Läget "auto" ska inte gå att välja: i terminalens Claude Code, tryck Shift+Tab
    några gånger, och "auto" ska inte komma upp (code.claude.com/docs/en/settings-reference,
@@ -532,7 +604,8 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
 3. **Ett kommando på listan går igenom.** Be agenten köra `git status`. Claude Code frågar dig som vanligt
    om det får köras. Säg ja. Kommandot ska köras och visa läget i projektet. (`git` ligger i
    `/usr/bin`, som ägs av systemet, så PATH-regeln släpper igenom det. Stoppas det med "PATH-regeln":
-   skriv upp felet och fråga. Nämner felet en mapp med `.nvm` i namnet, har steg 4 inte fått effekt.)
+   skriv upp felet och fråga. Nämner felet en mapp med `.nvm` i namnet eller
+   `/System/Cryptexes/App/usr/bin`, har installationens steg 4 inte fått effekt i appen.)
    Be sedan agenten köra testsviten med kommandot i SPEC 7.1,
    `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`
    (Hugos beslut 2026-10-28 om vakten, beslut 1). Det ska gå igenom, och sista raden ska säga hur många
@@ -557,7 +630,7 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
    worktree-sessionen: stoppa och fråga.
 8. **Provet med en vakt som fallerar:** ett vanligt kommando ska stoppas när vakten inte går att köra
    (Hugos beslut 2026-10-28, 7, granskning 12 P2). Det här
-   steget gör du **själv i Terminal**, inte agenten. Gör det sist, när steg 1–7 är klara. Vakten flyttas
+   steget gör du **själv i Terminal**, inte agenten. Gör det när steg 1–7 och 9 är klara. Vakten flyttas
    undan en kort stund, och flyttas sedan tillbaka. Inställningsfilen ändras inte.
 
    **a. Flytta undan vakten.** Kommandot byter bara namn på filen, i samma mapp (`.av` på slutet):
@@ -603,3 +676,16 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
    (en annan kod än 0 och 2, tidsgränsen, eller att programmet inte går att starta). Att Python ger kod 2
    visas av testet `test_systemets_python_stoppar_med_kod_2_nar_vakten_saknas`. Det är förprovet i steg 3
    i installationen som prövar `onFailure: "block"`: där går vakten inte att starta alls.
+
+   Gör steg 9 igen efter e.
+9. **Sista kontrollen, i skrivbordsappen: vakten stoppar ett kommando som inte står på listan** (Hugos svar
+   2026-10-28, punkt 3). Görs direkt efter steg 7, och igen efter steg 8 om du gör det. Starta en ny session
+   i fliken **Code** i skrivbordsappen, startad i `~/VERA/agent`, och be agenten: "Kör kommandot `date`."
+   - `date` visar bara dagens datum och klockslag. Det läser och ändrar ingenting, så det är ofarligt även
+     om vakten skulle saknas. Det står inte på listan i SPEC 7.1.
+   - **Förväntat:** kommandot stoppas innan Claude Code frågar dig om lov, med ett fel som börjar
+     "Stoppat av vakten" och säger att `'date' står inte på listan i SPEC 7.1`. Inget datum visas.
+   - **Om Claude Code frågar om lov att köra `date`:** svara nej. Vakten har då inte stoppat kommandot.
+     Stoppa och fråga.
+   - **Om datumet visas:** kommandot kördes utan att vakten stoppade det. Det är ofarligt, men vakten
+     fungerar inte. Stoppa och fråga, och kör inte uppgift 4.

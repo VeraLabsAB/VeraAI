@@ -3346,6 +3346,51 @@ eftersom vakten redan gjorde så.
    med tillägg), visar `/status` troligen `User settings` på raden, och då räknas installationen som
    misslyckad tills de är borttagna. Inte kontrollerat, eftersom byggsessionen inte läser utanför projektet.
 
+### Hugos svar 2026-10-28 på de öppna frågorna 1–3
+
+Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28:
+
+1. **Cryptexes: flytta den sist. Inget undantag i vakten.** INSTALLERA.md får den exakta raden till
+   `~/.zshrc` som lägger `/System/Cryptexes/App/usr/bin` sist i `PATH`. Hugo lägger in raden själv, på sin
+   och Caspers dator. Byggsessionen ändrar inte `~/.zshrc`. Efter raden står hur Hugo kontrollerar att det
+   fungerade och vad han ska se. Test: med Cryptexes-mappen sist i `PATH` släpps ett tillåtet kommando
+   igenom, med den först stoppas det.
+2. **Gamla `.venv`: OK** att testsviten körs med `.venv/bin/python` tills den nya platsen finns.
+   INSTALLERA.md ska säga att den gamla `.venv` tas bort efter installationen. Listan i SPEC 7.1 ska efter
+   installationen bara peka på den nya platsen.
+3. **Setting sources: bara en annan låst källa** (till exempel inställningar som styrs från claude.ai)
+   underkänner installationen. `User settings`, `Project settings` och `Project local settings` är väntade
+   och underkänner inte. **Detta ersätter beslut 4 om vakten** (den strängaste tolkningen). I skrivbordsappen
+   visar `/status` ingen rad Setting sources, så raden läses i Terminal: `cd ~/VERA`, sedan `claude`, sedan
+   `/status`. Ett sista steg i INSTALLERA.md: en kontroll i skrivbordsappen som visar att vakten stoppar ett
+   kommando som inte står på listan, som inte kör något farligt om vakten saknas och inte använder `sudo`.
+
+Hugo bad också att OVERLAMNING.md rättas så att den inte längre nämner den gamla `.venv`-platsen.
+
+**Byggt 2026-10-28** (inte installerat, inga `sudo`-kommandon körda, inget i `/Library` rört, `~/.zshrc`
+inte rörd):
+
+- **Svar 1.** INSTALLERA.md steg 4 c: `echo 'path=( ${path:#/System/Cryptexes/App/usr/bin}
+  /System/Cryptexes/App/usr/bin )' >> ~/.zshrc`, efter nvm-raden. Steg 4 d och e: de två sista raderna i
+  filen och hur `PATH` ska se ut (nvm-mappen näst sist, Cryptexes-mappen sist, hela den väntade raden för
+  Hugos dator). Caspers dator får samma rad. Vakten är inte ändrad och har inget undantag (med test).
+  Tester: `test_cryptexes_mappen_forst_stoppas_och_sist_slapps_igenom` (samma uppbyggnad som på Hugos dator,
+  i en mapp i testet: en länk till en mapp med 777) och
+  `test_cryptexes_mappen_pa_den_har_datorn_forst_stoppas_och_sist_slapps_igenom` (den riktiga mappen, körs
+  där den finns och är skrivbar för andra, som på Hugos dator). Fixturen `rotagd` prövar nu också
+  rättigheterna på riktigt för de sökvägar den låtsas att root äger, så att 777 stoppar också i testerna.
+- **Svar 2.** SPEC 7.1: övergången är Hugos beslut, och efter installationen pekar listan bara på den nya
+  platsen. INSTALLERA.md "Efteråt", punkt 9: den gamla `.venv` ska tas bort efter installationen (i Finder,
+  när kontrollen efter installationen, steg 3, visar att testsviten går med den nya platsen).
+- **Svar 3.** INSTALLERA.md steg 1, "Efteråt" punkt 2 och kontrollen efter installationen, steg 1: raden
+  läses i Terminal med `cd ~/VERA`, `claude` och `/status`, med vad Hugo ska leta efter. Bara en annan låst
+  källa underkänner. Säger Terminal `command not found: claude` stoppar Hugo och frågar, eftersom `claude`
+  inte hittades i Terminal på Hugos dator 2026-10-28. Nytt sista steg 9 i kontrollen: i skrivbordsappen ber
+  Hugo agenten köra `date`, som bara visar datum och klockslag och inte står på listan. Det ska stoppas med
+  "Stoppat av vakten" och "står inte på listan". Inget `sudo` (med test, och ett test att vakten stoppar
+  `date`).
+- OVERLAMNING.md nämner inte längre `.venv`: den nya platsen och INSTALLERA.md i stället.
+
 ## Bygget av vakten för Q1 (2026-10-28)
 
 Planens steg 1 (byggsessionen), gjord på Hugos uppdrag i chatten 2026-10-28. **Inget är installerat.**

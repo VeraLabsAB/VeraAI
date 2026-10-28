@@ -118,7 +118,11 @@ och `origin/main` på samma commit, `3f0e2da`.
 | `requirements.txt` | Vilka Python-paket som behövs (bara pytest 8.4.2) | Ja |
 | `.gitignore` | Listan över filer som git aldrig ska ta med (avsnitt 11) | Ja |
 | `inkorg/`, `arkiv/`, `forslag/`, `godkant/`, `arenden/`, `rapporter/`, `logg/` | Arbetsmappar där Vera ska ta emot underlag och skriva förslag, ärenden, rapporter och logg. Tomma i dag | **Nej**, aldrig |
-| `.venv/` | Projektets egen Python med pytest. Byggs på varje dator | Nej |
+| `sparr/` | Vakten för kommandolistan, de låsta inställningarna och `INSTALLERA.md` | Ja |
+
+Projektets egen Python med pytest ligger **inte** i projektet, utan i
+`/Library/Application Support/ClaudeCode/vera/venv`, där bara systemet kan ändra den. Den skapas på varje
+dator enligt `sparr/INSTALLERA.md`, steg 9 (Hugos beslut 2026-10-28 om vakten, beslut 1).
 
 ### Kärnan, fil för fil
 
@@ -281,8 +285,9 @@ De filerna är inte omskrivna, så att historiken visar vem som bestämde vad f�
 Det här gör du själv i terminalen, inte Claude:
 
 1. Hämta repot med ditt eget GitHub-konto (avsnitt 3).
-2. Skapa projektets Python i mappen `.venv` och installera pytest från `requirements.txt`. Hugos `.venv`
-   använder Python 3.9.6 och pytest 8.4.2.
+2. Installera vakten och projektets Python enligt `sparr/INSTALLERA.md`. Projektets Python skapas där i
+   `/Library/Application Support/ClaudeCode/vera/venv` (steg 9), med Python 3.9.6 från datorns
+   utvecklarverktyg och pytest 8.4.2 från `requirements.txt`.
 3. Öppna mappen `agent/` i Claude Code. CLAUDE.md läses då in automatiskt.
 4. Be Claude köra testsviten och kontrollera att alla tester är gröna innan du börjar.
 
@@ -291,7 +296,7 @@ Det här gör du själv i terminalen, inte Claude:
 Claude får bara köra de kommandon som står i **SPEC.md avsnitt 7.1**. Listan gäller byggarbetet,
 granskningar inräknade. I korthet:
 
-- Testsviten: `.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests`
+- Testsviten: `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`
 - Testsviten mot en kopia utanför projektet, med kopians sökväg i stället för `scripts/tests`.
 - Git: `git status`, `git log`, `git diff`, `git add`, `git commit`, `git show`, `git archive`.
 - Läsa och söka: `ls`, `cat`, `head`, `tail`, `grep`, `diff`, `find` (bara för att söka), `wc`, `sort`.
@@ -378,7 +383,7 @@ Två sorters frågor:
   exporterad bokföring (SIE-filer).
 - **Arbetsmapparna** `inkorg/`, `arkiv/`, `forslag/`, `godkant/`, `arenden/`, `rapporter/` och `logg/`. Där
   kan riktiga kunduppgifter hamna när Vera används på riktigt.
-- **Datorns egna filer:** `.venv/`, Python-cache, Claude Codes lokala inställningar och macOS-filer.
+- **Datorns egna filer:** Python-cache, Claude Codes lokala inställningar och macOS-filer.
 
 `.gitignore` stoppar det mesta av detta automatiskt, med mönster för hemligheter, underlag och
 arbetsmappar. Men den är **ingen garanti**: en fil med ett oväntat namn kommer igenom. Därför gäller:
