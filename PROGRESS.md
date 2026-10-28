@@ -495,7 +495,9 @@ fattade och byggda, se avsnittet ovan.)
    gröna redan före abd0745. G6: Claude Codes `grep` hoppar över filer i `.gitignore` och binära filer, vilket
    inte står i SPEC 7.1. G7: inget förbud för `.ugrep`, och skyddet bygger på hur Claude Codes funktion ser ut
    i dag. **Hugos beslut 2026-10-28: G2, G3, G4, G6 och G7 är rättade** (se "Läge 2026-10-28, efter rättelserna
-   efter granskning 16"). **Kvar:** G1 (en session provkör steg 4 h med Hugos OK, före installationen), G5
+   efter granskning 16"). **Kvar:** G1 (en session provkör steg 4 h med Hugos OK, före installationen; provkörd 2026-10-28 i läget
+   auto: Claude Codes inbyggda kontroll stoppade kommandot innan det kördes, se `GRANSKNING.md`, "Provkörning av
+   steg 4 h 2026-10-28"; inte prövat i läget Manual), G5
    (bara en anmärkning om gamla tester), och tre saker från rättelserna: (a) om Claude Codes förbud
    `Edit(//**/.ugrep)` också gäller `.UGREP` (stora bokstäver) är inte bekräftat, och samma fråga gäller de andra
    förbuden, (b) vakten ser bara namnen i kommandot, inte innehållet i en mapp som kopieras eller ett arkiv som

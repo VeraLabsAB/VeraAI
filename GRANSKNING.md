@@ -6839,3 +6839,29 @@ Skrivna av Hugo i uppdraget till sessionen 2026-10-28, i chatten.
 - **K2, K3 och K5 läggs under Öppet.** K3 rättas i nästa version av vakten.
 - **K4: beslutet om steg 9 är bekräftat.** Steg 9 lämnas som det är (`sudo /usr/bin/python3 -m venv`, PROGRESS.md,
   Öppet punkt 13).
+
+## Provkörning av steg 4 h 2026-10-28
+
+Gjord på Hugos uppdrag i chatten 2026-10-28 (G1 från granskning 16), i skrivbordsappens Code-flik, i
+`~/VERA/agent`, i läget **auto** (tillåtet enligt uppdraget; steget säger Manual). Hugo skrev "OK, kör" i chatten
+innan kommandot skickades. Vakten är inte installerad.
+
+**Resultat: RÖTT. Kommandot kördes inte.** Kommandot skickades till Bash-verktyget en gång, tecken för tecken som
+det står i `sparr/INSTALLERA.md` steg 4 h. Claude Code stoppade det själv innan det kördes, med beskedet att en
+inbyggd säkerhetskontroll (inte användaren) nekade det: kommandot "could not be checked for dangerous rm
+operations: the shell may read it differently than it was parsed. This requires explicit approval." Kontrollen
+letar efter `rm` som kan radera för mycket, och kan inte läsa kommandot säkert (troligen `${(ko)functions:#(…)}`
+och `${…[*]}`, som zsh läser på sitt eget sätt). Ingen fråga visades, så ingen människa kunde godkänna det.
+
+| Rad | Väntat | Svar | Stämmer |
+|---|---|---|---|
+| 1–11 | `preexec_functions=()` … `SLUT` (de elva raderna i steg 4 h) | Inget svar: kommandot kördes inte | Stämmer inte |
+
+- **Det är fallet som steg 4 h punkt 5 räknar upp:** "om Claude Code vägrar köra kommandot" → stoppa och fråga,
+  installera inte. Steget säger också "Inte bekräftat: att Claude Code släpper igenom kommandot (granskning 15 såg
+  att en inbyggd kontroll i Claude Code stoppade ett annat `print`-kommando)". Det är nu sett: i läget auto
+  stoppas det.
+- **Inte prövat:** om samma kommando går igenom i läget **Manual**, som steget föreskriver, där Claude Code kan
+  visa en fråga som Hugo godkänner. Agenten försökte inte köra kommandot på något annat sätt (delat, i ett skript
+  eller med ett annat verktyg), eftersom beskedet förbjuder det och uppdraget säger stoppa.
+- **G1 är alltså inte stängd.** Kroklistorna och funktionerna i agentens skal är fortfarande inte kontrollerade.
