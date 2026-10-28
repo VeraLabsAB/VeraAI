@@ -3999,3 +3999,295 @@ scratchpad-mappen, `diff -r`, `git status`, `git diff`, `git add` och `git commi
    eller varje annan källa på raden?
 5. **En ny oberoende granskning** av den nya versionen, med punkt 3 från granskning 12 (omvägarna) och
    PATH-regeln, och nya kontrollsummor, före installationen.
+
+## Granskning 13 – vakten efter Hugos svar 1–3 (2026-10-28)
+
+Oberoende granskning, gjord på Hugos uppdrag i chatten 2026-10-28, i en ny session som inte har sett bygget.
+Granskat läge: commit `c88ad30` (`git status` ren när granskningen började). Vakten, inställningsfilen,
+INSTALLERA.md och de andra testerna är **inte ändrade**. Skrivet: det här avsnittet och en ny testfil,
+`scripts/tests/test_granskning_13.py`.
+
+### Viktigt först
+
+- **Svaret stoppades en gång av ett säkerhetsfilter i Claude Code**, efter att testsviten hade körts, när
+  granskaren gick vidare mot uppdragets punkt 3 (omvägarna). Det som filtret stoppade görs inte om i samma
+  session. Punkt 3 är därför bara gjord genom att läsa koden och de befintliga testerna (se "Punkt 2 och 3"
+  nedan), inte genom nya prov med kommandotexter utöver de två testerna i den nya testfilen. Det är samma sak
+  som hände i granskning 12.
+- **Punkt 4 håller inte** (P1): en ändring i `~/.zshrc` kan ge **färre** stopp, eftersom Claude Code läser in
+  alias och funktioner därifrån till varje kommando, och vakten ser dem inte.
+- **INSTALLERA.md utgår inte från det nya läget** med Claude Code i `~/.local/bin` (P3, Hugos punkt 9). Med
+  filen som den är stannar Hugo redan i steg 1 (`command not found: claude`).
+- **Kontrollsummorna är inte framtagna**, eftersom granskningen hittade allvarliga fynd (P1 och P3) och
+  förslagen till rättelse ändrar `sparr/managed-settings.json` och kanske `sparr/kommandosparr.py` (punkt 8 i
+  uppdraget). Se "Kontrollsummor".
+
+### Fynd
+
+| Nr | Nivå | Kort |
+|---|---|---|
+| P1 | HÖG, BÖR RÄTTAS FÖRE UPPGIFT 4 | Alias och funktioner från `~/.zshrc` (och filer den läser in) gäller i Bash-verktyget. Vakten ser dem inte |
+| P2 | MEDEL | En länk i mitten av en kedja av länkar prövas inte (beslut 3) |
+| P3 | HÖG, STOPPAR INSTALLATIONEN | INSTALLERA.md utgår inte från Claude Code i `~/.local/bin` (Hugos punkt 9) |
+| P4 | MEDEL | Agenten kan skriva över Claude Code för Terminal i `~/.local/share/claude`, som kontrollen av Setting sources litar på |
+| P5 | NOTERING | Punkt 3 (omvägarna) är bara granskad genom att läsa koden och testerna |
+
+**P1 – Alias och funktioner från `~/.zshrc` gäller i Bash-verktyget, och vakten ser dem inte. HÖG.**
+- Vad: dokumentationen säger: "At session start, Claude Code sources `~/.zshrc`, `~/.bashrc`, or `~/.profile`
+  depending on your shell, captures the resulting aliases, functions, and shell options, and applies them to
+  every Bash command" (code.claude.com/docs/en/tools-reference, "Bash tool behavior"). Vakten prövar
+  kommandotexten och filen som `PATH` pekar på, till exempel `/usr/bin/git`. Finns ett alias eller en funktion
+  som heter `git` (eller `ls`, `cat` …), kör skalet den i stället, och vakten har släppt igenom kommandot.
+  En ändring i `~/.zshrc` kan alltså ge **färre** stopp, inte bara fler. Svar på punkt 4: **nej**.
+- Kan agenten själv ändra det? Inte `~/.zshrc` med fil-verktygen: `Edit(~/.zshrc)` är förbjudet, och
+  skalkommandon på listan kan inte skriva där. Men:
+  - **Filer som `~/.zshrc` läser in** är inte förbjudna. nvm läser normalt in `~/.nvm/nvm.sh` från
+    `~/.zshrc` (INSTALLERA.md steg 4 säger att nvm lägger in sin mapp därifrån). Vilka filer Hugos
+    `~/.zshrc` läser in är **inte kontrollerat**, eftersom granskaren inte läser utanför projektet.
+  - **Den kända luckan**: en egen testfil i en kopia kan skriva var som helst, också i `~/.zshrc` (SPEC 7.1,
+    "Det vakten inte stoppar"). Sandlådan stänger den, före uppgift 5.
+  - Ändringen gäller från nästa session, eftersom inläsningen görs när sessionen startar.
+- Det som gör det svårare i dag: fil-verktygen frågar Hugo före en ändring utanför projektet (läget "auto"
+  är avstängt), och `~/.zshrc`, `~/.zshenv`, `~/.zprofile` och `~/.zlogin` är förbjudna.
+- SPEC 7.1 nämner redan risken ("om … skalet har alias eller funktioner, kan skalet köra en annan fil än den
+  vakten prövade"), men inte att filer som `~/.zshrc` läser in är öppna för fil-verktygen.
+- Förslag (beslut för Hugo eller Casper, varje punkt är en ny version av inställningsfilen eller
+  INSTALLERA.md):
+  1. Hugo kontrollerar i Terminal, före installationen och i kontrollen efter, att inget alias eller ingen
+     funktion har ett namn på listan: `alias` visar alla alias, `typeset -f +` visar namnen på alla
+     funktioner. Står `git`, `ls`, `cat`, `head`, `tail`, `grep`, `diff`, `find`, `wc`, `sort`, `mkdir`, `cp`
+     eller `tar` där: stoppa och fråga.
+  2. Hugo tar reda på vilka filer `~/.zshrc` läser in (rader med `source` eller som börjar med `. `), och
+     varje sådan fil får ett förbud i `sparr/managed-settings.json`, till exempel `Edit(~/.nvm/**)`, med test.
+  3. Om det finns en inställning som stänger av inläsningen av `~/.zshrc` i Bash-verktyget är **inte
+     bekräftat** (sidan nämner ingen). Gissas inte.
+  4. Sandlådan (redan beslutad före uppgift 5) stänger den kända luckan.
+- Test: inget. Vakten kan inte se alias, så det finns inget i vakten att testa. Kontrollen är förslag 1.
+
+**P2 – En länk i mitten av en kedja av länkar prövas inte. MEDEL.**
+- Vad: beslut 3 säger att målet för en länk ska ägas av root. `_saker_plats` prövar sökvägen som den står
+  (`os.path.normpath`) och slutmålet (`os.path.realpath`), men inte en länk i mitten. Exempel:
+  `rot/bin/git` → `mitten/git` → `mal/bin/git`, där `rot` och `mal` ägs av root men `mitten` av Hugo. Vakten
+  släpper igenom, men Hugo (eller den kända luckan) kan byta `mitten/git` mot en länk till ett annat
+  program, mellan vaktens prov och körningen eller före nästa kommando.
+- Var: `sparr/kommandosparr.py`, `_saker_plats` (rad 456–469).
+- I dag: inget av programmen på listan på Hugos dator har en sådan kedja (`/usr/bin/tar` → `bsdtar` i samma
+  mapp, granskningen 2026-10-28 ovan). Python i `vera/venv` är en länk till Python i utvecklarverktygen, som
+  ägs av root. Därför MEDEL och inte HÖG.
+- Förslag: pröva varje steg i kedjan (följ länkarna ett i taget med `os.readlink`, och kräv `_sakert_agd`
+  för varje länk och varje mapp ovanför den), med en gräns för hur många steg.
+- Test: `test_lank_via_en_lank_i_en_mapp_som_anvandaren_ager_stoppas` i den nya testfilen, markerat
+  `xfail(strict=True, raises=AssertionError)`: väntat rött i dag. När vakten rättas blir det grönt, och då
+  stoppar pytest testsviten tills markeringen tas bort.
+
+**P3 – INSTALLERA.md utgår inte från Claude Code i `~/.local/bin`. HÖG, STOPPAR INSTALLATIONEN.**
+Läget enligt Hugo 2026-10-28 (uppdragets punkt 9): Claude Code för Terminal är installerad med den
+officiella metoden, version 2.1.312, startfilen `~/.local/bin/claude`. `PATH` och `~/.zshrc` är inte ändrade.
+Installerarens förslag `export PATH="$HOME/.local/bin:$PATH"` är **inte** kört.
+
+| Krav i punkt 9 | INSTALLERA.md i `c88ad30` |
+|---|---|
+| Utgår från det här läget | **Nej.** Steg 1 säger att `claude` inte finns i Terminal och att Hugo stoppar vid `command not found`. Eftersom `~/.local/bin` inte står i `PATH` säger Terminal fortfarande `command not found: claude`, så Hugo stannar i steg 1 |
+| Ger raden som lägger `~/.local/bin` sist, i rätt ordning med Cryptexes-raden | **Nej**, ingen sådan rad |
+| Varnar för installerarens förslag | **Nej** |
+| Visar `claude --version`, och vad Hugo gör om versionen är för gammal | **Nej.** Testet `test_installationen_kontrollerar_versionen_forst` kräver tvärtom att `claude --version` **inte** står bland kommandona (Hugos beslut 3: versionen med `/status`, eftersom `claude` inte fanns i Terminal). Uppdatering för Terminal (`claude update`) saknas helt |
+
+Granskaren har **inte** ändrat INSTALLERA.md. Skäl: rättelsen kräver att fyra befintliga tester ändras
+(`test_installationen_kontrollerar_versionen_forst`, `test_installationen_bara_kopierar_och_satter_agare_och_rattigheter`,
+`test_installera_har_raden_som_lagger_cryptexes_mappen_sist` och `test_setting_sources_lases_i_terminal`), och
+granskaren får bara lägga till tester. SPEC 7.1 säger dessutom "Hittas inte `claude` (`command not found`)
+stoppas installationen tills Claude Code finns för Terminal", som behöver nya ord med Hugos eller Caspers OK.
+Det hör till en byggsession. Förslaget, ordagrant:
+
+1. **Steg 1, i Terminal** (före steg 4 står `~/.local/bin` inte i `PATH`, så hela sökvägen används):
+
+   ```bash
+   ~/.local/bin/claude --version
+   ```
+
+   Ska visa en rad som `2.1.312 (Claude Code)`. Versionen ska vara 2.1.295 eller senare (jämför som i
+   steg 1, punkt 3). Är den äldre:
+
+   ```bash
+   ~/.local/bin/claude update
+   ```
+
+   Det hämtar och installerar den senaste versionen. Det ska stå `Successfully updated from … to version …`
+   eller `Claude Code is up to date (…)`. Kör `~/.local/bin/claude --version` igen. Är versionen fortfarande
+   äldre än 2.1.295: stoppa och fråga. (Kommandona står på code.claude.com/docs/en/setup, "Verify your
+   installation" och "Update manually".) Raden Setting sources läses på samma sätt: `cd ~/VERA`, sedan
+   `~/.local/bin/claude`, sedan `/status`.
+2. **Steg 4, ny rad mellan nvm-raden (b) och Cryptexes-raden (c)**, en enda rad:
+
+   ```bash
+   echo 'path=( ${path:#$HOME/.local/bin} $HOME/.local/bin )' >> ~/.zshrc
+   ```
+
+   Raden som hamnar i filen tar bort `~/.local/bin` ur `PATH` (om den finns där) och lägger den sist. Den
+   läggs **efter** nvm-raden och **före** Cryptexes-raden, så att Cryptexes-mappen fortfarande står allra
+   sist. Mappen ägs av Hugo, så om den stod före `/usr/bin` skulle vakten stoppa alla kommandon (beslut 2).
+3. **Varning, i steg 4 och steg 1:** "Installeraren föreslog raden `export PATH="$HOME/.local/bin:$PATH"`.
+   **Kör den inte.** Den lägger `~/.local/bin` **först** i `PATH`, och då stoppar vakten alla kommandon. Har
+   den redan kommit in i `~/.zshrc` eller `~/.zprofile`: stoppa och fråga." (Står den i `~/.zshrc` före de
+   nya raderna, flyttar raden i punkt 2 ändå mappen sist. Står den i `~/.zprofile` eller `~/.zlogin`, som
+   läses i en annan ordning, gör den inte säkert det.)
+4. **Steg 4 d:** `tail -n 3 ~/.zshrc` ska visa exakt tre rader, i ordning: nvm-raden, raden i punkt 2 och
+   Cryptexes-raden.
+5. **Steg 4 e:** raden slutar med
+   `:/Users/hugolindholmer/.nvm/versions/node/v24.18.0/bin:/Users/hugolindholmer/.local/bin:/System/Cryptexes/App/usr/bin`.
+   I det nya Terminal-fönstret ska `claude --version` nu fungera utan hela sökvägen och visa samma version.
+6. **Caspers dator:** samma rad om Claude Code där finns i `~/.local/bin`.
+
+Prövat i den nya testfilen:
+- `test_lokala_bin_mappen_forst_stoppar_allt_och_sist_slapps_igenom`: med `~/.local/bin` (en mapp som
+  användaren äger, med `claude`) först stoppas `git status` med "före programmet i PATH", med den sist går
+  det igenom.
+- `test_hugos_path_efter_de_tre_raderna_slapps_igenom`: systemets mappar, nvm, `~/.local/bin` och sist en
+  kopia av Cryptexes-uppbyggnaden går igenom. Installerarens ordning stoppas.
+- `test_raderna_i_zshrc_ger_den_vantade_ordningen` (två fall): de tre raderna körs med `/bin/zsh -f` (som inte
+  läser Hugos filer) och ger nvm-mappen, `~/.local/bin` och Cryptexes-mappen sist, i den ordningen, och bara
+  `/usr/bin` och `/bin` före. Det gäller både när installerarens rad redan har körts och när `~/.local/bin`
+  inte finns i `PATH` alls. Ingen mapp står två gånger.
+- `test_claude_i_lokala_bin_star_inte_pa_listan`: agenten kan inte starta `claude`, inte heller med hela
+  sökvägen.
+- `test_installerarens_forslag_lagger_mappen_forst`: skälet till varningen.
+
+**P4 – Claude Code för Terminal går att skriva över med fil-verktygen. MEDEL.**
+- Vad: startfilen `~/.local/bin/claude` är en länk till `~/.local/share/claude/versions/<version>`
+  (code.claude.com/docs/en/setup, "Auto-updates"). `Edit(~/.local/bin/**)` skyddar länken, och en
+  förbudsregel gäller också när sökvägen leder via en länk (code.claude.com/docs/en/permissions). Men
+  `~/.local/share/claude/**` har inget förbud, så Write kan skriva över själva programmet. Kontrollen efter
+  installationen litar på `/status` i Claude Code för Terminal (raden Setting sources). Ett utbytt program kan
+  visa vad som helst där.
+- Det kräver att Hugo godkänner en skrivning utanför projektet (eller den kända luckan).
+- Förslag: `"Edit(~/.local/share/claude/**)"` i `sparr/managed-settings.json`, med test i
+  `test_installningarna_nekar_hugos_nya_forbud`. Var skrivbordsappens egen Claude Code ligger, och om den
+  behöver samma förbud, är **inte kontrollerat**.
+
+**P5 – Punkt 3 är bara granskad genom att läsa koden och testerna. NOTERING.** Se "Punkt 2 och 3" nedan.
+
+### Punkt 1: besluten
+
+| Beslut | I koden | Test |
+|---|---|---|
+| Vakten gäller strikt överallt, inget undantag (beslut 8) | Ja. Ingen regel för undantag. Mappen ska vara `CLAUDE_PROJECT_DIR`, inte hemmappen eller ovanför (`_sessionen`) | `test_samma_regler_i_en_annan_mapp`, `test_session_i_hemmappen_eller_ovanfor_stoppas` |
+| `sudo` och `su` stoppas alltid (5 och 7) | Ja. Prövas före listan över verktyg, för varje verktyg som har ett `command` (rad 184–185). Förbudsregler i inställningarna också | `STOPPAS` (sudo- och su-raderna), `test_sudo_stoppas_ocksa_i_andra_verktyg` |
+| Root ska äga mappen, filen och varje mapp ovanför (beslut 1 och 3) | Ja (`_saker_plats`, både `normpath` och `realpath`, varje mapp upp till `/`) | `test_beslut_3_*`, `test_program_*` |
+| Målet för en länk (beslut 3) | Slutmålet ja, **en länk i mitten nej** | P2 |
+| Varje mapp i `PATH` före programmet (beslut 2) | Ja (`_mapparna_fore`). En mapp som inte finns stoppar. Tom eller relativ mapp stoppar | `test_beslut_2_*`, `test_path_som_inte_gar_att_lita_pa_stoppas` |
+
+### Punkt 2 och 3: omvägarna
+
+P1 i granskning 12 bad om prov av omvägar. Granskaren läste `sparr/kommandosparr.py` rad för rad och
+jämförde med testerna i `scripts/tests/test_kommandosparr.py`. Varje grupp i uppdraget har tester där i dag:
+
+| Grupp i uppdraget | Hur vakten stoppar | Befintliga tester (id i `STOPPAS` om inget annat står) |
+|---|---|---|
+| Kedjade kommandon (`;`, `&&`, `\|\|`, `\|`) | Tecknen stoppas var de än står, också inom citattecken | `semikolon`, `och-och`, `eller-eller`, `ror`, `bakgrund`, `semikolon-i-citat` |
+| `$( )` och bakåtfnuttar | `$` och bakåtfnutt stoppas var de än står | `kommando-i-kommando`, `bakatfnuttar`, `variabel`, `kommando-i-meddelande` |
+| Miljövariabler före kommandot | Ett ord med `=` först stoppas (citattecken), eller första ordet står inte på listan; `PATH=` och `path=` stoppas med eget skäl | `variabel-fore`, `test_kommandon_som_andrar_path_stoppas` |
+| Alias och funktioner | **Syns inte för vakten** | Inget, se P1 |
+| Relativa sökvägar och länkar | Sökvägar följs med `realpath` och prövas mot projektet och den tillfälliga mappen | `cat-ovanfor`, `ls-ovanfor`, `find-ovanfor`, `test_symbolisk_lank_ut_ur_projektet_stoppas`, P2 |
+| Mellanslag och citattecken i sökvägar | Egen uppdelning i ord; citattecken tas bort innan första ordet jämförs; tabb och hårt mellanslag stoppas | `sudo-citat`, `su-citat`, `citat-ej-stangt`, `tabb`, `hart-mellanslag` |
+| Program som startar andra program (`env`, `xargs`, `find -exec`, `python -c`) | `env` och `xargs` står inte på listan; `find -exec` m.fl. stoppas; Python bara i pytest-formen | `env`, `xargs`, `find-exec`, `find-execdir`, `python-c`, `python-skript` |
+
+Granskaren prövade inte nya omvägar med kommandotexter utöver dem i den nya testfilen, eftersom svaret
+stoppades av säkerhetsfiltret (se "Viktigt först"). Det som inte kan uteslutas utan ett sådant prov är
+framför allt sätt som zsh läser ett ord på som skiljer sig från vaktens uppdelning. Förslag: låt nästa
+granskning göra det provet i en kopia, om Hugo vill.
+
+### Punkt 4: Cryptexes och `~/.zshrc`
+
+- **`PATH` i sig: bara fler stopp.** Vakten prövar varje `PATH` den får med samma krav. En ändring som lägger
+  en mapp som Hugo äger före `/usr/bin` stoppar allt. En ändring som tar bort Cryptexes-raden stoppar allt igen
+  (`test_cryptexes_mappen_forst_stoppas_och_sist_slapps_igenom`). Det stämmer.
+- **Men `PATH` hos vakten och hos skalet kan skilja sig** om `~/.zshrc` ändras medan appen är igång:
+  skrivbordsappen läser `PATH` "When Desktop starts … and it keeps those values until you quit"
+  (code.claude.com/docs/en/desktop), medan Bash-verktyget läser in `~/.zshrc` vid varje ny session. Om
+  Bash-verktyget också tar `PATH` därifrån är **inte bekräftat** (sidan nämner bara alias, funktioner och
+  skalets inställningar). Beslut 2 begränsar det, eftersom vaktens egen `PATH` bara får ha rotmappar före
+  programmet, men det säger inget om skalets.
+- **Alias och funktioner: färre stopp är möjligt** (P1). Punkt 4 håller därför inte.
+- **Agenten själv:** kan inte skriva `~/.zshrc` med fil-verktygen eller med skalkommandon på listan. Kan
+  skriva filer som `~/.zshrc` läser in (P1), och kan via den kända luckan (en egen testfil) skriva överallt.
+
+### Punkt 5: dokumentationen
+
+Läst 2026-10-28. Citaten står på engelska som på sidan.
+
+| Fråga | Svar | Källa |
+|---|---|---|
+| a. Gäller de låsta inställningarna i skrivbordsappen? | **Bekräftat**: "the terminal, the VS Code and JetBrains extensions, the desktop app's Code tab, and Agent SDK sessions read all of these sources". Och: Claude Desktops egna inställningar ("parent settings") ignoreras "whenever an admin source is present" | code.claude.com/docs/en/managed-settings ("Surfaces", "Let an embedding host add policy") |
+| b. Vakter från User, Project, Local eller tillägg | **Bekräftat att de inte körs** med `allowManagedHooksOnly`: "Your user, project, local, and plugin hooks are blocked. Hooks from plugins force-enabled in managed settings `enabledPlugins` are exempt" (inga sådana i filen) | code.claude.com/docs/en/hooks |
+| b. Kan de stänga av vakten? | **Bekräftat nej**: "`disableAllHooks` set in user, project, or local settings can't disable those managed hooks". Inget i egna filer eller `--settings` går före en låst nyckel | code.claude.com/docs/en/hooks, code.claude.com/docs/en/settings ("Settings precedence") |
+| b. Tillåtande regler från andra källor | **Bekräftat**: med `allowManagedPermissionRulesOnly` ignoreras `allow`, `ask` och `deny` i user, project, local och `--settings`. En vakt som stoppar går före reglerna (granskning 12) | code.claude.com/docs/en/settings-reference |
+| b. Undantagen från de låsta inställningarna | Bara nycklar som gör något strängare (tabellen "Exceptions to managed settings precedence"). Ingen av dem gäller vakter | code.claude.com/docs/en/settings |
+| b. Tillägg som lägger till skills, agenter eller kopplingar | **Inte stoppat av inställningarna**: `strictPluginOnlyCustomization` är inte satt. Kopplingarnas verktyg stoppas av vaktens lista, skills kan inte köra skalkommandon (`disableSkillShellExecution`). Att en koppling startar ett program syns inte för vakten (granskning 12) | code.claude.com/docs/en/managed-settings |
+| b. Kringgå vakten via skalets filer | **Ja**, via alias och funktioner (P1) | code.claude.com/docs/en/tools-reference |
+| c. "Minst 2.1.295" för raden Setting sources | **Inte bekräftat.** 2.1.295 är kravet för `onFailure` ("Requires Claude Code v2.1.295 or later"), inte för raden. För raden Setting sources anger sidan ingen version. Bara tilläggen `(… , merged)` och raden `Skipped sources` kräver "v2.1.242 or later". Eftersom 2.1.295 är senare än 2.1.242 räcker kravet ändå | code.claude.com/docs/en/hooks, code.claude.com/docs/en/managed-settings ("Read the source in /status") |
+| `claude --version`, `claude update`, `~/.local/bin/claude` | **Bekräftat**: "A working installation prints a version number such as `2.1.211 (Claude Code)`", `claude update` ger "Successfully updated from …" eller "Claude Code is up to date (…)", och startfilen är en länk till `~/.local/share/claude/versions/` | code.claude.com/docs/en/setup |
+| Skrivbordsappens `/status` visar inte Setting sources | **Inte bekräftat** (sidan säger inget om det; Hugos iakttagelse) | code.claude.com/docs/en/desktop |
+
+### Punkt 6: INSTALLERA.md
+
+- **Kan någon utan programmeringsvana följa stegen?** Ja, i stort. Varje kommando står i en egen grå ruta
+  och förklaras, rättigheterna förklaras tecken för tecken, och det står vad som ska synas. Svårast: steg 4
+  (rader i `~/.zshrc` med `>>`), men där finns säkerhetskopia och hur man ångrar.
+- **Står det efter varje steg vad Hugo ska se och när han ska stoppa?** Ja för steg 1–13 och kontrollen
+  efter installationen, med ett undantag: steg 4 f säger att effekten syns först i kontrollen, steg 3. Det är
+  ärligt beskrivet. Kontrollen steg 9 nämner inte fallet där Claude Code själv stoppar allt (vakten saknas och
+  `onFailure` stoppar), men den allmänna regeln "Om något steg inte blir som det står: stoppa" täcker det.
+- **Kontrolleras och uppdateras versionen både i appen och i Terminal före installationen?** Appen: ja
+  (`/status`, "Check for Updates…"). Terminal: kontrollen nämns men **utgår från att `claude` inte finns**, och
+  hur Terminal-versionen uppdateras saknas. Se P3.
+- **Fungerar appkontrollen även om vakten saknas, utan att något farligt körs?** Ja. `date` bara visar datum
+  och klockslag och står inte på listan. Saknas vakten och `onFailure` stoppar, stoppas allt (säkert). Saknas
+  hela inställningsfilen frågar Claude Code om lov, och steget säger "svara nej". Testet
+  `test_vakten_stoppar_kommandot_i_appkontrollen` visar vaktens svar.
+
+### Testsviten (punkt 7)
+
+`.venv/bin/python -B -m pytest -p no:cacheprovider -q scripts/tests`:
+- före granskningen: **3312 passed**,
+- efter den nya testfilen: **3318 passed, 1 xfailed** (det väntade röda testet för P2), 0 misslyckade.
+
+### Tester som lades till
+
+`scripts/tests/test_granskning_13.py`, 7 tester (6 gröna och 1 väntat rött): de fem under P3 (varav ett i två
+fall) och `test_lank_via_en_lank_i_en_mapp_som_anvandaren_ager_stoppas` (P2). Fixturerna och hjälpfunktionerna
+tas från `test_kommandosparr.py`, så proven görs på samma sätt som de andra testerna.
+
+### Kontrollsummor (punkt 8)
+
+**Inte framtagna.** Uppdraget säger att de bara tas fram om granskningen inte hittar något allvarligt. P1 och
+P3 är allvarliga. Förslagen till rättelse ändrar `sparr/managed-settings.json` (nya förbud, P1 och P4) och
+kanske `sparr/kommandosparr.py` (P2). Summor för den nuvarande versionen skulle då inte gälla den som
+installeras. Den nya versionen behöver summor från nästa oberoende granskning.
+
+### Kommandon i den här granskningen
+
+Avsteg från SPEC 7.1 och CLAUDE.md:
+- **Det första kommandot var ihopkopplat** (`cd … && git ls-files && wc -l …`). Det läste bara filnamn och
+  antal rader.
+- Två sidor ur dokumentationen sparades av Claude Code i filer i hemmappen (`~/.claude/projects/…/tool-results/`),
+  eftersom de var för långa. **Granskaren läste i dem** med `grep` och fil-verktyget Read. Det är läsning utanför
+  projektmappen. Inget skrevs där.
+- Dokumentationen hämtades med verktyget WebFetch.
+- Testet `test_raderna_i_zshrc_ger_den_vantade_ordningen` startar `/bin/zsh -f` från Python, med en egen `PATH`
+  och en tillfällig hemmapp. Det läser inga av Hugos filer och ändrar inget.
+
+Alla andra kommandon stod på listan och kördes ett i taget: `grep`, `ls -a`, `wc -l`,
+`.venv/bin/python -B -m pytest -p no:cacheprovider` (mot `scripts/tests` och den nya testfilen), `git status`,
+`git add` och `git commit`.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **P3:** en byggsession som skriver om INSTALLERA.md enligt förslaget ovan, ändrar de fyra testerna och
+   föreslår ny text i SPEC 7.1 (`claude` finns nu i `~/.local/bin`). Ersätter det beslut 3 (versionen bara med
+   `/status`) för Terminal?
+2. **P1:** vilka av förslagen 1–2 (kontroll av alias och funktioner, förbud för filer som `~/.zshrc` läser in)?
+3. **P4:** förbud mot `~/.local/share/claude/**`?
+4. **P2:** ska vakten pröva varje länk i en kedja?
+5. **P5:** ska en ny granskning pröva omvägarna med kommandotexter i en kopia?
+
+Därefter: nästa oberoende granskning av den nya versionen, med kontrollsummor, före installationen.
