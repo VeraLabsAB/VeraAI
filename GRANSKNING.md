@@ -6398,3 +6398,211 @@ Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28, i chatten.
 - **I2–I8 läggs under Öppet**, så att vakten kan installeras snart (PROGRESS.md, Öppet).
 - **I3, den riktiga historiken:** den slutliga H6-versionen bygger på den undanlagda versionen, och gjordes alltså
   inte om från början. Den andra stash-posten (`stash@{0}`, kl. 20.18) har inget nedskrivet OK.
+
+## Granskning 19 (av f363b92 till 3abadaa, bara I1) (2026-10-28)
+
+Oberoende granskning av I1-ändringen, commits `f363b92`, `0c7cdcb`, `43e2371` och `3abadaa`, gjord på Hugos uppdrag
+i chatten 2026-10-28, i en ny session som inte har sett bygget. Granskat läge: commit `3abadaa` på grenen main
+(`git status` ren när granskningen började). Ingen kod, inga tester och inget i INSTALLERA.md är ändrat. Skrivet i
+projektet: bara det här avsnittet. Granskarens prov ligger i rena kopior i scratchpad-mappen (`scratchpad/g19/ny`
+av `3abadaa` och `scratchpad/g19/gammal` av `8cabddc`) och i pytests tillfälliga mappar.
+
+**Läget:** sessionen stod i läget **auto** från början till slut (det säger Claude Codes egna besked i sessionen).
+Det är tillåtet enligt Hugos beslut. Granskaren har inte bytt läge.
+
+### Viktigt först
+
+- **I1 håller.** Inget av granskarens 61 försök att smita förbi (punkt 2) gick igenom, varken med skrivverktygen
+  eller i kommandon. Vakten blev inte mindre sträng någonstans, och vanliga arbetsflöden går igenom.
+- **Inga fynd på nivån medel eller allvarligt.** Tre låga fynd, J1–J3. Enligt stoppregeln hindrar de inte
+  installationen. **J1 bör ändå Hugo titta på före installationen:** INSTALLERA.md kontrollerar inte vilken Python
+  vakten själv körs med.
+- **Kontrollsummorna stämmer**, alla fyra, med uppdraget och med INSTALLERA.md steg 4 g och 5.
+- **sudo-raderna är oförändrade** sedan `8cabddc`.
+- **Röda före rättelsen:** 64 av de 93 nya testen är röda mot `8cabddc`, som commit-meddelandet säger.
+- **Testsviten:** 3 987 tester, alla gröna.
+
+### Fynd
+
+| Nr | Nivå | Kort |
+|---|---|---|
+| J1 | LÅG | INSTALLERA.md kontrollerar inte vilken Python vakten körs med (`/usr/bin/python3`), dess version eller att agenten inte kan ändra den |
+| J2 | LÅG | SPEC 7.1 säger att I1 gäller "sökvägar i kommandon", men sökvägar till git (`git log -- /.vol/…`) prövas inte |
+| J3 | LÅG (inte prövat) | Skrivverktygen: `$HOME/…` och `~användarnamn/…` räknas som vanlig text. Byter Claude Code ut dem, kommer de förbi både I1 och H6 |
+
+**J1 – vaktens egen Python. LÅG (inte prövat på datorn).**
+- **Vad det är:** de låsta inställningarna startar vakten med `/usr/bin/python3 -I`. `/usr/bin/python3` är ett
+  litet program från Apple som startar Python i **utvecklarverktygen** (Apples paket med program för den som
+  programmerar). Vilka utvecklarverktyg det blir avgörs av inställningen `xcode-select`, eller av en
+  miljövariabel (`DEVELOPER_DIR`). På Hugos dator pekar projektets gamla `.venv` på
+  `/Library/Developer/CommandLineTools/usr/bin/python3` (sett med `ls -l .venv/bin/python3`), och testsviten körs
+  med Python 3.9 (Unicode-tabellen 13.0.0, sett i granskarens prov). Det är troligen samma Python som vakten får.
+- **Vad INSTALLERA.md täcker:** inget av det. Ingen rad kontrollerar att `/usr/bin/python3` finns och startar
+  Python, vilken version det är, vilka utvecklarverktyg som är valda, eller att mapparna med Python ägs av root
+  och inte går att ändra utan lösenord. Steg 13 kontrollerar projektets nya Python (`venv/bin/python`), men bara
+  att den är en länk "`-> python3` eller liknande", inte vart den leder.
+- **Kan agenten ändra den?** Om utvecklarverktygen ligger i `/Library/Developer/CommandLineTools`, som root äger
+  vid en vanlig installation: nej, inte utan lösenord (`xcode-select -s` kräver `sudo`). Men om de valda
+  utvecklarverktygen ligger i ett `Xcode.app` som användaren äger (till exempel om Xcode har dragits in i
+  Program för hand), kan fil-verktygen skriva i Pythons egna filer där. Inget förbud i de låsta inställningarna
+  gäller `/Applications/Xcode.app`. Då kan agenten ändra vakten utan att vakten ser det, och också testsvitens
+  Python. Agenten kan inte sätta `DEVELOPER_DIR` för Claude Code med verktygen på listan (förbuden för `.claude`
+  och skalets startfiler). Inget av det är prövat på datorn: det kräver läsning utanför projektet.
+- **Om Python saknas:** då kan `/usr/bin/python3` inte starta vakten, och `onFailure: block` stoppar allt. Säker
+  riktning.
+- **Varför låg:** på Hugos dator talar allt för CommandLineTools, som root äger. Men det är inte kontrollerat, och
+  Caspers dator är okänd.
+- **Bör göras (Hugo avgör):** ett steg i INSTALLERA.md före installationen, på båda datorerna, som visar
+  `xcode-select -p` (väntat `/Library/Developer/CommandLineTools`), `/usr/bin/python3 --version` (väntat 3.9) och
+  ägare och rättigheter för mapparna dit (`ls -lde@`, som i steg 2). Visar det något annat: stoppa och fråga.
+  Eller ett beslut om att det prövas i spärrtestet efter installationen.
+
+**J2 – sökvägar till git. LÅG.**
+- SPEC 7.1 säger nu att I1 gäller "både för fil-verktygen och för sökvägar i kommandon". Vakten prövar sökvägarna i
+  `git commit -F` och `git archive -o`, men inte de sökvägar som git själv tar emot efter `--` eller sist i
+  kommandot. Med vaktens `bedom` släpps `git log -- /.vol/1/2/x`, `git diff HEAD -- /.vol/1/2/x`,
+  `git add /.vol/1/2/x`, `git show HEAD -- /.nofollow<P>/SPEC.md` och `git status /.vol/1/2` igenom (PATH-regeln
+  avstängd i provet). Det var likadant före I1, och gäller alla sökvägar, inte bara `/.`.
+- git vägrar sökvägar utanför projektet ("outside repository"). git letar upp länkar själv, och `/.vol/…` är ingen
+  länk, så git bör vägra också där. Inte prövat på riktigt: det skulle läsa i `/.vol`.
+- **Bör göras:** SPEC-texten säger exakt vilka kommandon I1 gäller, eller vakten prövar också gits sökvägar med
+  I1. Kan ligga under Öppet.
+
+**J3 – `$HOME` och `~användarnamn` i skrivverktygen. LÅG (inte prövat).**
+- Vakten räknar bara `~` och `~/` som hemmappen. `$HOME/../../.vol/1/2/x`, `${HOME}/…`, `~hem/.zshrc` och
+  `~hem/../../.vol/…` (med hemmappen `hem` i provet) räknas som vanlig text i projektet, och släpps igenom av
+  både I1 och H6. Om Claude Code själv byter ut `$HOME` eller `~användarnamn` innan filen skrivs, skulle Write
+  kunna skriva i `~/.zshrc` eller via `/.vol`. Granskning 18 nämnde `$HOME` på samma sätt.
+- I kommandon är det stängt: `$` stoppas alltid, och `~` får bara stå inom citattecken, där skalet inte byter ut
+  det.
+- Inte prövat på riktigt: provet skulle kunna skriva utanför projektet och scratchpad.
+- **Bör göras:** prövas i spärrtestet efter installationen (Write till en sökväg som börjar med `$HOME/` och med
+  `~hugolindholmer/`, inom projektet). Byter Claude Code ut dem: vakten stoppar skrivverktyg vars sökväg börjar
+  med `$` eller med `~` följt av något annat än `/`.
+
+### Punkt 1: varje commit
+
+| Commit | Säger | Gör det, och inget mer? |
+|---|---|---|
+| `f363b92` | Hugos beslut efter granskning 18 | Ja: bara GRANSKNING.md, 10 rader. Att Hugo skrev just de orden i byggsessionens chatt kan granskaren inte se |
+| `0c7cdcb` | I1 | Ja: vakten (en ny funktion, en konstant, fyra anrop, en uppdelning av `_forbud_for` utan ändrad logik), en mening i SPEC 7.1, en ny testfil med 93 tester. Commit-meddelandet säger öppet att `test_steg_5_har_filernas_kontrollsummor` är rött till nästa commit |
+| `43e2371` | Kontrollsummor | Ja: en ny summa för vakten i steg 5, och text om oförändrade summor i steg 4 g och 5 |
+| `3abadaa` | PROGRESS.md | Ja: bara PROGRESS.md. Siffrorna (93 tester, 64 röda, 3 987 gröna, summorna) stämmer med granskningen |
+
+`git diff --stat f363b92~1 3abadaa`: GRANSKNING.md, PROGRESS.md, SPEC.md, `test_beslut_granskning_18.py`,
+INSTALLERA.md och `kommandosparr.py`. Inga andra filer.
+
+### Punkt 2: försök att smita förbi I1
+
+Prövat med vaktens `bedom` i provfilen `scratchpad/g19/ny/scripts/tests/test_granskare_19.py`, med låtsat projekt,
+låtsad hemmapp och låtsad tillfällig mapp i testets tillfälliga mapp. PATH-regeln är avstängd i provet, så att ett
+svar utan fel betyder att vakten släpper igenom helt. Hela sökvägar utanför testets mapp räknas bara som text.
+
+- **Skrivverktygen (Write och Edit), 25 sökvägar, stoppas alla av I1:** `/./.vol/…`, `/././.vol/…`,
+  `/tmp/../.vol/…`, `/private/tmp/../../.vol/…`, `////.vol/…`, `/.Vol`, `/.vOL`, `/.NOFOLLOW<H>/.zshrc`,
+  `/.NoFollow<P>/…`, `/.vol/1/2/./x`, `/.vol`, `/.vol/`, `/.file`, `/.resolve/…`, `../` från den tillfälliga mappen,
+  från projektet (också `scripts/../`) och från `~` (också `~/./` och `~//`), `/System/Volumes/Data/./.vol/…` och
+  samma med små och blandade bokstäver, och `/.vól` (accent i namnet).
+- **Kommandon, 36 försök, stoppas alla av I1:** `ls`, `cat`, `head -n`, `tail`, `wc`, `sort`, `diff`, `grep -rn`,
+  `grep -e` med `/./`, `/tmp/../`, `////`, stora bokstäver, `../` från projektet och `'~/…'` och `'~'/…` inom
+  citattecken; `git commit -F` (också `-F/.vol…` ihopskrivet, `--file=`, `--file` och efter `-m`); `mkdir -p`,
+  `cp -R` (mål och källa), `tar -c` och `tar -x` (`-C`, `-f` och filer), `git archive -o` och `--output`, och
+  pytest-målet. `$HOME`, `${HOME}` och bakåtfnutt stoppas av regeln om `$` och `` ` ``.
+- **Länk i scratchpad till `/.vol` och `/.nofollow`:** uppdraget bad om en länk i scratchpad som pekar dit, men
+  CLAUDE.md säger att prov aldrig får göra länkar till något utanför scratchpad och testets mapp. Granskaren följde
+  CLAUDE.md och låtsade länkarna som de nya testen gör: `os.path.realpath` säger att `<T>/lank`, `<T>/lank2` och
+  `<P>/lank3` leder till `/.nofollow<P>`, `/.vol/1/2` och `/.NOFOLLOW<H>`. Write och Edit (fem sökvägar, också
+  `lank2/../x`) och tolv kommandon via länkarna stoppas alla av I1. Hur Claude Code och macOS hanterar en riktig
+  sådan länk är inte prövat.
+- **Unicode:** inget tecken blir en punkt när macOS jämför namn (NFD och små bokstäver, prövat för alla tecken).
+  Sju tecken blir en punkt med den lösare jämförelsen NFKD, till exempel `．` (U+FF0E) och `․` (U+2024). Vakten
+  släpper igenom `/．vol/…`, men macOS räknar det som ett annat namn än `/.vol`, och bara root kan skapa något
+  direkt under roten. Ofarligt.
+- **Kommer förbi:** inget i I1:s område. Utanför: gits egna sökvägar (J2) och `$HOME` och `~användarnamn` i
+  skrivverktygen (J3).
+
+### Punkt 3: stoppar regeln något som ska gå igenom?
+
+Nej. Med samma prov går 10 skrivningar (Write och Edit, till exempel `GRANSKNING.md`, en ny testfil, `.gitignore`,
+`<T>/meddelande.txt`, `<T>/.vol/x` och `<P>/scripts/.nofollow/x`) och 26 kommandon igenom helt: `git status`,
+`git log --stat`, `git diff --stat`, `git show`, `git add`, `git commit -F <T>/meddelande.txt` (också `--file=` och
+`-F<T>/…`), `git commit -F GRANSKNING.md`, pytest mot `scripts/tests` (med `-q`, `-qq`, `--tb`, `-rfE`) och mot en
+kopia och en testfil i scratchpad, `ls`, `ls -R`, `cat`, `grep -n`, `grep -rn`, `wc -l`, `diff` mot en kopia,
+`mkdir -p`, `git archive -o`, `tar -x -C` och `cp -R` till scratchpad. En mapp som börjar med punkt längre ner
+(`<T>/.vol`) stoppas inte, som det ska.
+
+### Punkt 4: blev vakten mindre sträng?
+
+Nej. Diffen i `kommandosparr.py` lägger bara till: `_forbud_for` delas i `_former` och `_forbud_for` med exakt samma
+logik, och `_punkt_under_roten` anropas efter de gamla kontrollerna (Write och Edit, mål för kommandon) eller före
+dem (`_las` och pytest-målet). Ingen rad som stoppar något är borttagen. Hela testsviten, också de gamla testen, är
+grön.
+
+### Punkt 5: röda före rättelsen
+
+`test_beslut_granskning_18.py` från `3abadaa`, kopierad med `cp -R` till den rena kopian av `8cabddc` och körd där:
+**64 röda, 29 gröna**, som commit-meddelandet säger. Röda är bland annat:
+- `test_i1_skrivverktyg_under_punkt_vid_roten_stoppas[Write-/.vol/16777220/12345/pre-commit]`
+- `test_i1_skrivverktyg_under_punkt_vid_roten_stoppas[Write-/.nofollow<H>/.zshrc]`
+- `test_i1_skrivverktyg_under_punkt_vid_roten_stoppas[Write-//.vol/16777220/12345/pre-commit]`
+- `test_i1_skrivverktyg_via_en_lank_till_punkt_vid_roten_stoppas[Write-<P>/lank/pre-commit]`
+- `test_i1_kommandon_under_punkt_vid_roten_stoppas[cat /.vol/16777220/12345/x]`
+- `test_i1_star_i_spec`
+
+Granskarens egna försök mot `8cabddc`: alla 50 med Write och Edit och alla 10 via låtsade länkar släpptes igenom
+(röda), de 12 kommandona via länkar stoppades men utan I1-skälet (röda), och de 46 vanliga går igenom (gröna).
+Kommandona stoppades alltså redan före I1, av regeln att läsa och skriva bara i projektet och scratchpad. Hålet var
+skrivverktygen, som granskning 18 sa.
+
+### Punkt 6: kontrollsummor (sha256)
+
+Räknade med Pythons `hashlib` i provfilen, i den rena kopian av `3abadaa` (`git archive`, `tar -x`):
+
+| Fil | sha256 | Uppdraget | INSTALLERA.md |
+|---|---|---|---|
+| `sparr/kommandosparr.py` | `4b271e0aeb1a662133603f3c674ff98d37367ea6ea5786add9937e73e48a62cf` | **Stämmer** | **Stämmer** (steg 5) |
+| `sparr/managed-settings.json` | `e1222e168de38f819ebf861319e9a9b2fc134ce52b3729ec23ceacb57682d463` | **Stämmer** | **Stämmer** (steg 5) |
+| `sparr/kontrollera-skalet.zsh` | `10388d474a555e6d337a9468c5a1f5e2fd0ca04608e36024f73011dc5186d51f` | **Stämmer** | **Stämmer** (steg 4 g) |
+| `requirements.txt` | `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a` | **Stämmer** | **Stämmer** (steg 5) |
+
+Den gamla summan för vakten (`273e37f0…`) finns inte kvar i INSTALLERA.md.
+
+### Punkt 7: Python för vakten
+
+Se J1. Kort: vakten körs med `/usr/bin/python3 -I`, alltså Python i de valda utvecklarverktygen, på Hugos dator
+troligen `/Library/Developer/CommandLineTools` (Python 3.9). INSTALLERA.md kontrollerar inte att den finns, vilken
+version det är eller att agenten inte kan ändra den. Rapporterat, inte rättat.
+
+### Punkt 8: sudo-raderna
+
+`git diff -Gsudo 8cabddc 3abadaa -- sparr/INSTALLERA.md` visar ingenting: ingen rad med `sudo` är tillagd,
+borttagen eller ändrad. 21 rader med `sudo` före och efter (`grep -c` i de två kopiorna).
+
+### Punkt 9: bokföring utan godkännande
+
+Nej. Ändringarna gäller bara vakten, SPEC 7.1, INSTALLERA.md, PROGRESS.md, GRANSKNING.md och en testfil. Ingen kod i
+`scripts/` utanför testerna är ändrad, och inget i projektet kan bokföra något.
+
+### Punkt 10: testsviten
+
+`.venv/bin/python -B -m pytest -p no:cacheprovider -q --tb=line -rfE scripts/tests` (övergången i SPEC 7.1, eftersom
+vakten och Python på den nya platsen inte är installerade): **3 987 passed**, inga röda. Samma antal som PROGRESS.md.
+
+### Kommandon i den här granskningen
+
+Från listan, ett i taget: `git status` (först och sist), `git log --stat`, `git show`, `git diff --stat`,
+`git diff -Gsudo`, `grep -n`, `grep -c`, `cat`, `ls -l` (på `.venv/bin` i projektet), `mkdir -p`,
+`git archive --format=tar -o` och `tar -x -f … -C` till scratchpad, `cp -R` av två testfiler från kopian av
+`3abadaa` till kopian av `8cabddc`, och `.venv/bin/python -B -m pytest -p no:cacheprovider` mot `scripts/tests` och
+mot filer i kopiorna (med `-q`, `-qq`, `--tb`, `-r` och `-k`). Egen provfil skriven med Write och Edit i kopian. Den
+skrev utfallsfiler i `scratchpad/g19/utfall/` och gjorde allt annat i pytests tillfälliga mappar. Inga länkar.
+
+**Avsteg:** inga. Inga `cd`, `&&`, `|` eller `sed`, inga `sudo`-kommandon, inget i `/etc` eller `/Library` rört,
+inget läst utanför projektet och scratchpad, inget pushat, ingen `git stash`.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **J1:** ska INSTALLERA.md få en kontroll av vaktens Python (`xcode-select -p`, `/usr/bin/python3 --version`,
+   ägare och rättigheter) före installationen, eller prövas det i spärrtestet efter? Granskaren föreslår före, på
+   båda datorerna, eftersom det är vakten själv.
+2. **J2 och J3:** rättas nu eller läggs under Öppet? J3 föreslås prövas i spärrtestet efter installationen.
