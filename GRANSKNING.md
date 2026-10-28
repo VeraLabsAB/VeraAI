@@ -5295,3 +5295,332 @@ Flyttad hit från början av `sparr/INSTALLERA.md` (Hugos beslut 2026-10-28 efte
 g–i i `sparr/kontrollera-skalet.zsh` (steg 4 g), kontrollen av agentens skal (S3, steg 4 h), Terminals två
 namn med ursprung och ägare (8 d), `requirements.txt` i steg 5 och 12 (S6), förbuden för `.zwc` (S2) och
 `cd ~/VERA/agent`.
+
+## Granskning 16 (av abd0745) (2026-10-28)
+
+Oberoende granskning, gjord på Hugos uppdrag i chatten 2026-10-28, i en ny session som inte har sett bygget.
+Granskat läge: commit `abd0745` på grenen main. `git status` var ren när granskningen började. **Läget:**
+appens uppgifter om sessionen visade `permissionMode: default`, alltså att Claude Code frågar före varje
+verktyg (Manual), inte auto. Ingen kod, inga tester och ingen inställningsfil är ändrade. Skrivet: det här
+avsnittet och PROGRESS.md. Granskarens egna prov ligger bara i kopior i scratchpad-mappen.
+
+### Viktigt först
+
+- **Inget allvarligt fynd och inget fynd på nivån medel.** Sju låga fynd (G1–G7). Enligt stoppregeln i
+  PROGRESS.md (Hugos beslut 2026-10-28 efter granskning 15) går de till "Öppet", och vakten kan installeras.
+- **`grep` i agentens skal är bekräftat:** en funktion från Claude Code (från filen i
+  `~/.claude/shell-snapshots/`) som kör Claude Codes eget program med namnet `ugrep`, inte `ug`. Därför läser
+  den ingen inställningsfil `.ugrep` av sig själv. Vakten släpper bara igenom tillägg som söker, i både
+  `ugrep` och systemets `grep`, och jag hittade inget sätt att ta sig förbi listan.
+- **Två saker kan stoppa installationen, i den säkra riktningen** (G1 och G4): de elva raderna i steg 4 h är
+  aldrig provkörda i agentens riktiga skal, och kontrollskriptet skriver aldrig OK om en fil eller mapp det
+  prövar har tecknet `@` eller `+`. Hugo kan själv se det senare i förväg (punkt 2 nedan).
+- **Kontrollsummorna** står i punkt 5. Kontrollskriptets summa stämmer med INSTALLERA.md.
+
+### Hugos beslut 2026-10-28 (efter granskning 15, skrivna av Hugo i uppdraget till den här granskningen)
+
+- **B1 (Hugos beslut 2026-10-28):** `grep` står kvar, men vakten släpper bara igenom en kort lista med
+  tillägg som söker. `find` är borttaget. Godkänt.
+- **B2 (Hugos beslut 2026-10-28):** kontrollskriptet får vara strängare än 8 d: gruppen och andra får inte
+  kunna skriva i `/etc/zshrc` och `/etc/zshrc_Apple_Terminal`, och tomma kroklistor i Terminal avviker.
+  Godkänt.
+- **B3 (Hugos beslut 2026-10-28):** en kompilerad startfil (`.zwc`) eller en satt `ZDOTDIR` räknas som
+  avvikelse. Godkänt.
+- **Regel (Hugos beslut 2026-10-28):** skriver skriptet `AVVIKER` vid installationen, stoppar Hugo och
+  frågar. Kontrollen lättas aldrig på plats.
+
+### Fynd
+
+| Nr | Nivå | Kort |
+|---|---|---|
+| G1 | LITET (säker riktning) | De elva raderna i steg 4 h är aldrig provkörda i agentens riktiga skal |
+| G2 | LITET | Steg 4 h säger inte uttryckligen "inte exakt de elva raderna: stoppa och fråga" |
+| G3 | LITET | `-R` får `ugrep` att följa länkar inne i mappar, också länkar som leder ut ur projektet |
+| G4 | LITET (säker riktning) | Det riktiga skriptet skriver aldrig OK om en prövad fil eller mapp har `@` eller `+`. Testet för OK prövar en ändrad kopia |
+| G5 | LITET | Minst 40 av de nya och ändrade testerna är gröna redan före abd0745 |
+| G6 | LITET (dokumentation) | Claude Codes `grep` lägger till egna tillägg: hoppar över filer i `.gitignore` och binära filer |
+| G7 | LITET | Inget förbud för `.ugrep`, och skyddet bygger på hur Claude Codes funktion ser ut i dag |
+
+**G1 – de elva raderna är aldrig provkörda. LITET (säker riktning).** `sparr/INSTALLERA.md:466` (kommandot)
+och `:474–486` (de elva raderna).
+- Kommandot i steg 4 h har bara körts i `zsh -f` med påhittade funktioner
+  (`test_s3_i_ett_skal_som_agentens_visas_de_elva_raderna`, `scripts/tests/test_beslut_granskning_15.py:268`).
+  Det testet prövar kommandotexten i `test_kommandosparr.py`, inte INSTALLERA.md eller agentens skal, och det
+  är grönt redan före abd0745 (punkt 3). Byggsessionen körde det inte, och inte heller den här granskningen
+  (det står inte på listan i SPEC 7.1, och Hugos OK gällde bara `whence -v grep` och `typeset -f grep`).
+- Följd: visar verktygsrutan något annat, stoppar Hugo. Inget kan slinka igenom, men installationen kan
+  stoppas och kräva en ny omgång. Tre saker som kan ge något annat än de elva raderna: Claude Codes inbyggda
+  kontroll av kommandon (granskning 15 såg den stoppa ett `print`-kommando), agenten själv (CLAUDE.md säger att
+  den aldrig kör kommandon utanför listan, så den kan vägra eller fråga först), och skalinställningar som
+  `SH_GLOB` från `~/.zshrc`, som gör att parenteserna i kommandot inte fungerar.
+- Bekräftat i den här sessionen: `grep` är en funktion från Claude Codes fil i `~/.claude/shell-snapshots/`
+  (`whence -v grep`). Det stämmer med att `grep` står bland de fyra väntade namnen.
+- Förslag: låt en session köra kommandot i steg 4 h före installationsdagen, med Hugos OK i chatten, och
+  jämför utskriften med de elva raderna. Då är steget provat innan det räknas.
+
+**G2 – steg 4 h saknar en mening för allt annat. LITET.** `sparr/INSTALLERA.md:471–495`.
+- Punkt 4 säger "Väntat: exakt de här elva raderna, i den här ordningen". Punkt 5 räknar upp när Hugo ska
+  stoppa: något mellan parenteserna, ett annat namn, ett namn som saknas, `SLUT` saknas, Claude Code vägrar,
+  eller ett fel. Det som inte står i steget: raderna i en annan ordning, en rad för mycket (till exempel samma
+  namn två gånger), en kroklista med ett annat namn, eller att verktygsrutan bara visar en del av utskriften.
+  Den allmänna regeln i "Innan du börjar", punkt 3, täcker det ("Visar ett kommando något annat än det som
+  står vid steget: stoppa och fråga"), men den står inte vid steget.
+- Förslag: först i punkt 5: "Visar verktygsrutan något annat än exakt de elva raderna, i den ordningen:
+  stoppa och fråga, och installera inte." Ser verktygsrutan ut att vara avkortad, öppna hela utskriften.
+
+**G3 – `-R` följer länkar ut ur projektet. LITET.** `sparr/kommandosparr.py:108` (`GREP_KORTA` har `R`).
+- `ugrep -R` följer alla länkar, också inne i mappar ("following symbolic links to files and directories,
+  unlike -r", ugreps manual). `-r` följer bara länkar som står i kommandot, och dem prövar vakten redan
+  (`_las` följer länken med `os.path.realpath`). Systemets `grep` följer inga länkar med `-r` eller `-R`
+  (FreeBSD:s manual).
+- Prövat i en kopia: vakten släpper igenom `grep -R x <tillfällig mapp>`. I projektet finns tre länkar, alla i
+  `.venv/bin`, och `.venv/bin/python3` leder till `/Library/Developer/CommandLineTools/usr/bin/python3`.
+  `grep -R x .venv` läser alltså en fil utanför projektet. Claude Codes funktion lägger till `-I`, så en binär
+  fil ger ingen träff, men den öppnas.
+- Bara läsning, inget körs eller skrivs. Agenten kan inte göra en länk med kommandona på listan. En länk kan
+  komma från en egen testfil (det vakten inte stoppar, SPEC 7.1) eller en länk som redan finns. Därför LITET.
+- Förslag: ta bort `-R` ur listan (och ur SPEC 7.1). `-r` räcker för att söka i mappar.
+
+**G4 – tecknet `@` i det rena fallet. LITET (säker riktning).** `sparr/kontrollera-skalet.zsh:48`, och kopian
+i `scripts/tests/test_beslut_granskning_15.py:63–66` och `:104–107`.
+- Skriptet godtar bara exakt tio tecken i rättighetsfältet från `ls -ld`. Ett `@` (extra uppgifter, till
+  exempel `com.apple.provenance`) eller ett `+` (extra rättigheter) sist ger `AVVIKER`, och då skrivs aldrig
+  OK. Det gäller `/etc/zshrc`, `/etc/zshrc_Apple_Terminal`, varje mapp i `fpath`, och `/usr/local`,
+  `/usr/local/share`, `/usr/local/share/zsh` och `/usr/local/share/zsh/site-functions` (de fyra sista bara om
+  de finns).
+- **Testet för det rena fallet prövar en ändrad kopia**, där raden `elif (( ${#ord[1]} != 10 )); then` är
+  utbytt mot en som godtar ett `@` sist. Skälet står i testfilen: macOS lägger extra uppgifter på filer som
+  skapas i testets tillfälliga mapp. På den här datorn är det så: `test_skriptet_stoppar_for_extra_uppgifter`
+  hoppas över om filerna inte har `@` eller `+`, och det kördes och var grönt. **Att det riktiga skriptet
+  skriver OK är alltså aldrig visat**, bara att det stoppar för `@`.
+- **Kan det riktiga skriptet skriva OK på en vanlig Mac?** Ja, om ingen av filerna och mapparna ovan har `@`
+  eller `+`. Filerna i `/etc` och zsh:s mappar i `/usr/share/zsh` kommer från macOS själv och har troligen inga
+  extra uppgifter, men **det är inte bekräftat**: granskaren läser inte filer utanför projektet. Mappar under
+  `/usr/local` som ett annat installationsprogram har skapat kan ha det. Har någon av dem det, skriver
+  skriptet `AVVIKER`, Hugo stoppar (regeln ovan), och då behövs ett beslut innan installationen kan fortsätta.
+- Ett `@` ger i sig inga rättigheter. Ett `+` kan göra det. Skriptet skiljer inte på dem.
+- Förslag: Hugo kör kommandona i punkt 2 före installationsdagen, så att ett eventuellt beslut kan tas i lugn
+  och ro, utan att kontrollen lättas på plats.
+
+**G5 – tester som är gröna redan före rättelsen. LITET.** Se punkt 3 för listan. De bevisar inget om
+rättelsen. De flesta av dem är väntade (de prövar att något tillåtet går igenom, eller något som aldrig stod på
+listan), men det står inte i byggsessionens rapport, som säger att "de nya testerna är inte körda mot en kopia
+av `f400bb7`". Två tester (`grep-f` och `grep-file` i `test_kommandosparr.py`) är röda före rättelsen bara
+för att felets text har ändrats: kommandona stoppades redan förut.
+
+**G6 – Claude Codes `grep` lägger till egna tillägg. LITET (dokumentation).** Funktionen (läst med
+`typeset -f grep`, se punkt 1) startar `ugrep` med `-G --ignore-files --hidden -I` och
+`--exclude-dir=.git` (och fem andra versionsmappar) före agentens egna tillägg. Följder: filer som står i en
+`.gitignore` hoppas över (till exempel `.venv`), binära filer ger ingen träff, och mönstret är som standard
+ett enkelt reguljärt uttryck (`-G`) tills `-E` anges. En sökning med `grep` i en granskning kan därför missa
+filer som systemets `grep` skulle hitta. Det står inte i SPEC 7.1. Förslag: en mening i SPEC 7.1 under "`grep`
+får bara söka".
+
+**G7 – inget förbud för `.ugrep`, och funktionen kan ändras. LITET.**
+- I dag läser `ugrep` ingen inställningsfil av sig själv: funktionen sätter namnet till `ugrep`
+  (`ARGV0=ugrep`), och ugreps manual säger att bara `ug` läser `.ugrep` av sig själv, i arbetsmappen och sedan i
+  hemmappen. En sådan fil kan sätta `pager=`, `view=` och `filter=`, som kör andra program, och vakten ser den
+  inte.
+- Funktionen kommer från Claude Code och kan ändras när Claude Code uppdateras. Börjar en senare version
+  starta `ug`, eller ändras listan i funktionen, gäller skyddet inte längre som det står i SPEC 7.1, och
+  agenten får i dag skriva `.ugrep` både i projektet och i hemmappen.
+- Förslag: förbud för `Edit(//**/.ugrep)` och `Edit(~/.ugrep)` i `sparr/managed-settings.json` (en ny
+  version av vakten och inställningarna), och `typeset -f grep` i steg 4 h, där Hugo ser att raden med
+  `ARGV0=ugrep` finns.
+
+### Punkt 1: grep och ugrep
+
+**Vilket program `grep` är** (Hugos OK i chatten 2026-10-28 till `whence -v grep` och `typeset -f grep`):
+
+- `whence -v grep`: "grep is a shell function from
+  /Users/hugolindholmer/.claude/shell-snapshots/snapshot-zsh-….sh". Filen har förbudet `Edit(~/.claude/**)`.
+- `typeset -f grep`, i korthet:
+  1. Står något av `--filter`, `--pager`, `--view`, `--format-open`, `--config`, `---`, `-@`,
+     `--save-config`, `-Z`/`-z` (också hopskrivet) eller `--null`/`--null-data` bland orden, körs systemets
+     `grep` (`command grep`) i stället.
+  2. Annars körs `$CLAUDE_CODE_EXECPATH` (skrivbordsappens Claude Code), eller `~/.local/bin/claude` om den
+     inte finns, med namnet `ugrep` och tilläggen i G6 först.
+  3. Finns ingen av dem, körs systemets `grep`.
+- Alla tre platserna har förbud i de låsta inställningarna (`~/Library/Application Support/Claude/**`,
+  `~/.local/bin/claude`) eller ägs av root (`/usr/bin/grep`). Det stämmer med SPEC 7.1.
+
+**Varje tillägg som vakten släpper igenom.** Källor: ugreps manual
+(github.com/Genivia/ugrep, `man/ugrep.1`, läst 2026-10-28) och FreeBSD:s manual för `grep`, som systemets
+`grep` på macOS bygger på (man.freebsd.org, läst 2026-10-28).
+
+| Tillägg | ugrep | Systemets grep | Kör program, visare, inställningsfil eller skriver? |
+|---|---|---|---|
+| `-n`, `-i`, `-l`, `-L`, `-c`, `-v`, `-w`, `-x`, `-E`, `-F`, `-H`, `-h`, `-o`, `-s`, `-q`, `-I` (och de långa namnen) | Söker och visar | Söker och visar | Nej i båda |
+| `-r`, `--recursive` | Söker i mappar, följer bara länkar i kommandot | Söker i mappar, följer inga länkar | Nej |
+| `-R` | Söker i mappar och **följer alla länkar** | Som `-r` | Nej, men läser utanför projektet via en länk (G3) |
+| `-e` med ett mönster, `--regexp=` | Mönster | Mönster | Nej |
+| `-A`, `-B`, `-C` med ett tal, och de långa namnen | Rader före och efter | Samma | Nej |
+| `-m` med ett tal, `--max-count=` | Högsta antal träffar (ugrep godtar också `MIN,MAX`, vakten bara ett tal) | Samma | Nej |
+| `--include=`, `--exclude=`, `--exclude-dir=` | Filmönster | Filmönster | Nej |
+
+Det som kör program, öppnar en visare, läser eller sparar en inställningsfil i `ugrep` är `--filter`,
+`--pager`, `--view`, `--config`/`---` och `--save-config` (och `ug` utan något, G7). Systemets `grep` har
+inget tillägg som kör ett program eller skriver en fil. Det läser `GREP_OPTIONS` från miljön, men den kan
+agenten inte sätta (se nedan), och inget tillägg där kör program.
+
+**Hur vakten hanterar olika former** (prövat med en egen provfil i en kopia av abd0745, `vakt.bedom` med 49
+kommandon):
+
+| Form | Exempel | Vakten | Bedömning |
+|---|---|---|---|
+| Sammanslagna korta | `-rn` | går igenom | rätt |
+| | `-rnf`, `-frn`, `-nQ`, `-rz`, `-iP` | stoppas | rätt: varje bokstav prövas |
+| | `-ie x` (värdet i nästa ord), `-m1`, `-e--pager` | går igenom | rätt: värdet är ett mönster, och `--pager` blir ett mönster även i ugrep |
+| | `-A1nr`, `-5`, `-V` | stoppas | rätt |
+| Förkortade långa | `--line`, `--max=3`, `--incl=…`, `--rec`, `--files-with`, `--pag`, `--fil=sh` | stoppas | rätt: exakta namn |
+| `--namn=värde` | `--include='*.py'` | går igenom | rätt |
+| | `--include=/etc/x` | stoppas | rätt |
+| | `--line-number=1`, `--context=-1`, `--context=`, `--pager=less`, `--filter='sh'` | stoppas | rätt |
+| | `--config`, `--regexp` utan `=` | stoppas | rätt (strängare än grep) |
+| | `--regexp=` (tomt) | går igenom | ofarligt: tomt mönster |
+| Efter `--` | `-- --pager`, `-n -- -f`, `x -- --filter=sh` | går igenom | rätt: efter `--` är allt mönster eller filnamn i båda programmen |
+| | `x -- /etc/passwd` | stoppas | rätt |
+| Ser ut som mönster eller filväg | `x SPEC.md --pager` | stoppas | rätt: grep läser tillägg också efter filnamnen |
+| | `'-Q'`, `"--pager"`, `''-Q` | stoppas | rätt: citattecknen tas bort först |
+| | `-e -Q` | går igenom | rätt: `-Q` är mönstret |
+| | `'/etc'`, `'..'` som mönster | stoppas | strängare än nödvändigt, säkert |
+| | `x -` | går igenom | ofarligt: läser standard in |
+| Annat | `GREP_OPTIONS='--pager' grep …`, `/usr/bin/grep …`, `command grep …`, `builtin grep …` | stoppas | rätt: första ordet står inte på listan |
+
+**Inget sätt att ta sig förbi listan hittades.** `$`, omvänt snedstreck och bakåtfnutt stoppas överallt,
+också inom citattecken, så zsh kan inte bygga ett tillägg av en variabel eller en kod som `$'\x2d'`.
+
+### Punkt 2: tecknet `@` i det rena fallet
+
+Se G4. **Kommandon som Hugo kör själv i ett nytt Terminal-fönster**, ett i taget, utan `sudo`. De bara
+visar, och ändrar ingenting. Granskaren har inte kört dem.
+
+```bash
+ls -ld@e /etc/zshrc /etc/zshrc_Apple_Terminal
+```
+
+```bash
+print -rl -- $fpath
+```
+
+```bash
+ls -ld@e $fpath
+```
+
+```bash
+ls -ld@e /usr/local /usr/local/share /usr/local/share/zsh /usr/local/share/zsh/site-functions
+```
+
+- `-@` visar namnen på extra uppgifter, och `-e` visar extra rättigheter. `print -rl -- $fpath` visar zsh:s
+  mappar för funktioner, en per rad (samma mappar som skriptet prövar).
+- **Så ska det se ut:** rättighetsfältet först på raden är exakt tio tecken, till exempel `-r--r--r--` eller
+  `drwxr-xr-x`, utan något direkt efter, och det står inga extra rader under.
+- **`@` direkt efter de tio tecknen:** filen eller mappen har extra uppgifter. Namnen står på raderna under,
+  till exempel `com.apple.provenance`. Då skriver skriptet `AVVIKER` för den.
+- **`+` direkt efter de tio tecknen:** extra rättigheter, som står på raderna under (till exempel
+  `0: group:everyone deny delete`). Då skriver skriptet också `AVVIKER`.
+- `No such file or directory` för en mapp under `/usr/local` är väntat om mappen inte finns: skriptet hoppar
+  över den. För de två filerna i `/etc` är det inte väntat.
+- Visar något `@` eller `+`: skicka raderna och fråga, före installationsdagen.
+
+### Punkt 3: röda före rättelsen
+
+Sätt: `git archive` av `f400bb7` (versionen före abd0745) till en kopia i scratchpad-mappen, `tar -x`, och de
+fem nya eller ändrade testfilerna från abd0745 kopierade dit med `cp -R`. Sedan pytest mot varje fil i
+kopian (kommandona på listan i SPEC 7.1).
+
+| Testfil | Röda före | Gröna redan före |
+|---|---|---|
+| `test_beslut_granskning_15.py` (ny) | 139 | 18 |
+| `test_kommandosparr.py` (ändrad) | 37 | 507, av dem 22 nya eller ändrade (nedan) |
+| `test_granskning_15.py` (`xfail` borttaget) | 7 | 13 (oändrade) |
+| `test_beslut_granskning_13.py` (ändrad) | 2 | 30 |
+| `test_beslut_granskning_14.py` (ändrad) | 4 | 74 |
+
+**Gröna redan före, och därför utan bevis för rättelsen:**
+
+- `test_beslut_granskning_15.py`: `test_s1_rg_stoppas` (3 fall: `rg` har aldrig stått på listan), och alla
+  15 prov av kommandot i steg 4 h i `zsh -f` (`test_s3_i_ett_skal_som_agentens_visas_de_elva_raderna`,
+  `test_s3_en_annan_funktion_syns` i 6 fall, `test_s3_en_kroklista_som_inte_ar_tom_syns` i 6 fall,
+  `test_s3_saknas_en_av_claude_codes_funktioner_syns_det` och
+  `test_s3_en_funktion_som_heter_builtin_syns_pa_att_slut_saknas`). De prövar kommandotexten i testfilen, inte
+  INSTALLERA.md (G1).
+- `test_kommandosparr.py`: de 15 nya raderna i `TILLATNA` (`ls-R` och 14 för `grep`) prövar att något tillåtet
+  går igenom, och den gamla vakten släppte igenom allt utom `-f`. I `STOPPAS`: `find-hel-sokvag`, `rg`,
+  `rg-hel-sokvag`, `grep-e-utanfor`, `grep-regexp-utanfor` och `grep-exclude-dir-utanfor` stoppades redan av
+  den gamla vakten. Och det ändrade `test_installationen_jamfor_kontrollsummor_fore_och_efter_kopieringen`.
+- `test_beslut_granskning_13.py` och `test_beslut_granskning_14.py`: bara de 6 som står i tabellen är röda före.
+  Granskaren har inte räknat vilka av de andra som abd0745 ändrade.
+- Röda före bara för att felets text ändrats: `grep-f` och `grep-file` (G5).
+
+Granskarens väntat röda tester från granskning 15 (S1 och S2, 7 st) är röda före och gröna efter. Det bekräftar
+byggsessionens rapport.
+
+### Punkt 4: steg 4 h
+
+`sparr/INSTALLERA.md:456–498`. Steget säger att Hugo startar en ny session i läget Manual, jämför kommandot i
+frågan om lov tecken för tecken, läser verktygsrutan och inte agentens sammanfattning, och att "exakt de här
+elva raderna, i den här ordningen" är väntat. Det säger "Stoppa och fråga, och installera inte" för sex
+uppräknade fall, men inte uttryckligen för allt annat (G2). Raderna är aldrig provkörda (G1).
+
+### Punkt 5: kontrollsummor (sha256)
+
+Räknade på filerna i projektet i commit abd0745 (`git status` ren), med Pythons `hashlib` i en provfil i
+kopian (`shasum` står inte på listan i SPEC 7.1). Hugo jämför med `shasum -a 256` i steg 4 g och steg 5.
+
+| Fil | sha256 | I INSTALLERA.md |
+|---|---|---|
+| `sparr/kommandosparr.py` | `3d65477403d324c692d54fd676460ac506382173f430d190a6b5a24197cca5e3` | Ska jämföras med granskningens summa (steg 5) |
+| `sparr/managed-settings.json` | `7d44e7c3123f4a2cdc95459c810e07149ddc492cc5b689053a5851ee4b15ac9c` | Samma (steg 5) |
+| `requirements.txt` | `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a` | Samma (steg 5) |
+| `sparr/kontrollera-skalet.zsh` | `4038b5eb32fadc7621ce69aa0fa5f4a511c0bc0ff70f5ee3f25a2260b016eb3d` | **Stämmer** med steg 4 g (`INSTALLERA.md:439`) |
+
+`requirements.txt` har en rad: `pytest==8.4.2`.
+
+### Punkt 6: övrigt i abd0745
+
+- **Vakten** (`sparr/kommandosparr.py`): `find` är borta ur `LASANDE`, och `_grep` prövar varje ord. Inga
+  andra regler är ändrade. Ett mönster eller värde prövas som en sökväg, som förut.
+- **De låsta inställningarna:** bara elva nya förbud för `.zwc`. Inget är borttaget.
+- **INSTALLERA.md:** inga `sudo`-rader är ändrade (`git diff -Gsudo` visar inget), och testet räknar 16 som
+  förut. Historiken är flyttad hit.
+- **Kontrollskriptet** (`sparr/kontrollera-skalet.zsh`): kör bara `/bin/ls` och `/usr/bin/grep` och zsh:s
+  egna kommandon, skriver inga filer, och allt är lokalt i en funktion utan namn. Det letar inte efter rader
+  som sätter `GREP_OPTIONS` (som bara systemets `grep` läser, och där inget tillägg kör program). Startfilerna
+  har förbud. Inget fynd.
+- **SPEC 7.1, OVERLAMNING.md och PROGRESS.md** stämmer med vakten, utom det som står i G6.
+- Inget i abd0745 rör bokföringen eller godkännandet. Inget kan bokföra något.
+
+### Testsviten
+
+`.venv/bin/python -B -m pytest -p no:cacheprovider -qq --tb=short scripts/tests` (övergången i SPEC 7.1):
+**3 669 passed**, 0 misslyckade.
+
+### Kommandon i den här granskningen
+
+Från listan, ett i taget, utan `cd` och utan `&&`: `grep -n` i GRANSKNING.md och INSTALLERA.md, `git show
+--stat`, `git diff` (också `-Gsudo`), `wc -l`, `mkdir -p`, `git archive -o` och `tar -x -C` till
+scratchpad-mappen, `cp -R` av testfiler till kopian, och `.venv/bin/python -B -m pytest -p no:cacheprovider`
+mot `scripts/tests` och mot filer i kopiorna (med `-q`, `-qq`, `--tb` och `-r`). En egen provfil skrevs i
+kopian med Write (`test_granskare_16.py`).
+
+**Avsteg, med Hugos OK i chatten 2026-10-28:** `whence -v grep` och `typeset -f grep` (zsh:s egna, bara
+läsning).
+
+**Avsteg utan OK:** ett `grep` med `--include=*.py` utan citattecken, mot citatregeln i SPEC 7.1. zsh stoppade
+det själv ("no matches found"), och `grep` kördes inte. Kördes sedan om utan tillägget.
+
+**Andra verktyg:** Read, Write och Edit (bara GRANSKNING.md och PROGRESS.md i projektet), WebFetch (ugreps
+manual på github.com, FreeBSD:s manual för `grep`, och code.claude.com tools-reference, vars svar Claude Code
+sparade i hemmappen och som inte lästes), ToolSearch, AskUserQuestion och appens verktyg för planen och
+slutrutan. **Utanför listan över tillåtna verktyg i SPEC 7.1:** appens verktyg som visar sessionens uppgifter
+(`mcp__ccd_session_mgmt__get_session`), använt en gång för att se läget. Inga `sudo`-kommandon, inget i
+`/Library` rört, inga filer i hemmappen ändrade, inget pushat.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **Installera nu**, med G1–G7 under "Öppet" (stoppregeln), eller rätta något av dem först?
+2. **G1 och G4:** ska en session köra kommandot i steg 4 h före installationsdagen (med ditt OK i chatten), och
+   kör du kommandona i punkt 2 före installationsdagen?
+3. **G3 och G7** (en ny version av vakten och inställningarna): ta bort `-R`, och förbjud `.ugrep`?
+4. **G2 och G6** (bara text): en mening i steg 4 h och en i SPEC 7.1?

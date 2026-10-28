@@ -17,6 +17,28 @@ Hugos beslut om granskning 15).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
 
+## Läge 2026-10-28, efter granskning 16 (av abd0745)
+
+**Granskat, inte installerat.** Oberoende granskning 16 står sist i `GRANSKNING.md`, gjord i läget Manual.
+Inga sudo-kommandon körda, inget i `/Library` rört, inga filer i hemmappen ändrade.
+
+- **Hugos beslut 2026-10-28 (B1–B3):** `grep` med bara sökande tillägg och `find` borttaget (B1), skriptet
+  strängare än 8 d (B2), och `.zwc` eller satt `ZDOTDIR` avviker (B3) är godkända. Regel: skriver skriptet
+  `AVVIKER` vid installationen, stoppar Hugo och frågar. Kontrollen lättas aldrig på plats.
+- **Fynd:** inget allvarligt och inget på nivån medel. Sju låga (G1–G7), under "Öppet", punkt 9. Enligt
+  stoppregeln kan vakten installeras.
+- **`grep` i agentens skal** är bekräftat: Claude Codes funktion, som kör Claude Codes program med namnet
+  `ugrep` (läser ingen `.ugrep` av sig själv). Inget sätt att ta sig förbi vaktens lista hittades.
+- **Kontrollsummor (sha256)** för installationen, steg 5: `sparr/kommandosparr.py`
+  `3d65477403d324c692d54fd676460ac506382173f430d190a6b5a24197cca5e3`, `sparr/managed-settings.json`
+  `7d44e7c3123f4a2cdc95459c810e07149ddc492cc5b689053a5851ee4b15ac9c`, `requirements.txt`
+  `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a`. Kontrollskriptet
+  `4038b5eb32fadc7621ce69aa0fa5f4a511c0bc0ff70f5ee3f25a2260b016eb3d` stämmer med steg 4 g.
+- **Före installationsdagen** (förslag i granskningen): Hugo kör fyra läsande kommandon i Terminal för att se
+  om filerna som skriptet prövar har `@` eller `+` (G4, `GRANSKNING.md`, granskning 16, punkt 2), och en
+  session provkör kommandot i steg 4 h med Hugos OK (G1).
+- **Testsviten:** 3 669 passed, 0 misslyckade (körd i granskning 16 med `.venv/bin/python`).
+
 ## Läge 2026-10-28, efter Hugos beslut om granskning 15
 
 **Byggt** (inte installerat, inte granskat, inga `sudo`-kommandon körda, inget i `/Library` rört, inga filer
@@ -354,6 +376,14 @@ fattade och byggda, se avsnittet ovan.)
    program (`hash`, till exempel `hash git=…`, som får `git` att köra en annan fil oavsett `PATH`), och en funktion som heter
    `builtin` och härmar kontrollens svar. Alla tre kräver en rad i en startfil, som har förbud. De ska täckas
    av **sandlådan** (punkt 4). **Öppen, inte byggd.**
+9. **De låga fynden i granskning 16** (av abd0745, `GRANSKNING.md`). Stoppregeln: de stoppar inte
+   installationen. G1: de elva raderna i INSTALLERA.md steg 4 h är aldrig provkörda i agentens riktiga skal.
+   G2: steg 4 h saknar meningen "inte exakt de elva raderna: stoppa och fråga". G3: `grep -R` följer länkar ut
+   ur projektet (förslag: ta bort `-R`). G4: kontrollskriptet skriver aldrig OK om en prövad fil eller mapp har
+   `@` eller `+`, och testet för OK prövar en ändrad kopia. G5: minst 40 av de nya och ändrade testerna är
+   gröna redan före abd0745. G6: Claude Codes `grep` hoppar över filer i `.gitignore` och binära filer, vilket
+   inte står i SPEC 7.1. G7: inget förbud för `.ugrep`, och skyddet bygger på hur Claude Codes funktion ser ut
+   i dag. **Öppna, väntar på beslut från Hugo eller Casper.**
 
 ## Nästa steg i byggordningen
 
