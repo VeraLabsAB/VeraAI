@@ -37,8 +37,8 @@ ren kopia av commiten tagen med `git archive`).
    2026-10-28), P2 i texten i SPEC avsnitt 11 och P5–P6 i dokumentationen. Kvar från granskningen: P3
    (en ägarrad med ett skiljetecken intill namnet matchas aldrig mot sitt underlag, säker riktning) och P4
    (nivåsteget ska använda märkningen, uppgift 6). Listan över ägare och närstående ligger där agenten kan
-   skriva, till spärrsteget (Hugos beslut i chatten 2026-10-27). dd0e1cf tillsammans med 16000a8 är inte
-   oberoende granskade efter rättelsen.
+   skriva, till spärrsteget (Hugos beslut i chatten 2026-10-27). 16000a8 och 10bfe0f är oberoende granskade
+   i granskning 11 (P1 stängd, fynd Q1–Q8). Öppna därifrån: Q2–Q4 och Q7.
 2. **N2, vilka tecken ett namn i regelboken får ha.** I dag får ett namn bara ha a–z med eller utan accent,
    0–9, mellanslag, bindestreck, understreck och punkt. Öppen fråga till Hugo eller Casper: ska fler tecken
    få finnas, till exempel `&` (som i "Café Ölund & Söner AB"), `/`, `,`, `'` och parenteser, och bokstäver
@@ -47,10 +47,19 @@ ren kopia av commiten tagen med `git archive`).
    granskning 8:s punkt 6): regelbokens namn bara latinska, regel-id bara a–z, siffror och bindestreck, en
    roll per konto, och ägarens bankrader som hela ord. Valen gjordes i en byggsession, inte av en människa.
    BESLUTSFATTARE SAKNAS.
+4. **Sandlådan (granskning 11, Q1).** Kommandolistan i SPEC 7.1 ska spärras av en vakt i Claude Codes låsta
+   inställningar (planen står i `GRANSKNING.md` under "Granskning 11 – plan för Q1"). Vakten kan inte stoppa
+   en egen testfil som körs med pytest och raderar eller skriver i projektet. Det stoppas av en **sandlåda**
+   (ett skydd i macOS som gör att kommandon bara kan skriva i vissa mappar). Hugos beslut 2026-10-28:
+   sandlådan byggs i spärrsteget, men ska vara klar före steg 5 (torrkörningen). **Öppen fråga:** vilket steg
+   är "steg 5 (torrkörningen)"? Projektets filer har inget steg med det namnet. Uppgift 5 i byggordningen är
+   flöde c och d. Tills det är klart gäller kravet före uppgift 5, eller före en torrkörning om den kommer först.
 
 ## Nästa steg i byggordningen
 
-1. En oberoende granskning av dd0e1cf och rättelsen 16000a8 i en ny session.
+1. **Vakten för kommandolistan (granskning 11, Q1)**, enligt planen i `GRANSKNING.md` under "Granskning 11 –
+   plan för Q1": byggsession, oberoende granskning, Hugo kontrollerar versionen och installerar. Före uppgift 4
+   (Hugos beslut 2026-10-28). Byggsessionen startas när Hugo eller Casper säger till.
 2. **Uppgift 4**: flöde a, b och e (leverantörsfakturor, kvitton och bankavgifter) med K5 och K8.
 3. Uppgift 5: Z-rapporter, kortinlösen, Swish och kontantinsättningar (och M9 från granskning 7).
 4. Uppgift 6: nivåerna A–D och K9, med nivå D för ägarens bankrader. Därefter en oberoende granskning.
@@ -80,6 +89,11 @@ avsnitt 8, med namn och datum.
   står och hur det rättas, i en mening. De tre andra stoppen där felet inte säger "Hela körningen stoppas"
   rättas bara i texten i SPEC avsnitt 11, inte i koden. Dokumentationen (`DESIGN-regelbok.md`,
   `foretag/README.md` och PROGRESS.md) rättas i en egen commit.
+- **Hugos beslut 2026-10-28 (granskning 11, Q1):** kommandolistan i SPEC 7.1 spärras tekniskt nu, före
+  uppgift 4, i en fil utanför projektet. Vakten gäller strikt överallt utom i mappar Hugo uttryckligen
+  undantar (ingen än), `sudo` stoppas alltid, Claude Code uppdateras först till en version som kan stoppa
+  kommandot när vakten fallerar, Hugo godtar att superpowers vakter slutar fungera, och sandlådan byggs i
+  spärrsteget före steg 5. Hela planen och besluten: `GRANSKNING.md`, "Granskning 11 – plan för Q1".
 - **Hugos beslut i chatten 2026-10-27:** listan över ägare och närstående ligger kvar i
   `foretag/<namn>/regelbok.json` tills spärrsteget, eftersom SPEC inte säger var den skyddade mappen ska
   ligga. Testet att listan ligger utanför alla mappar agenten får skriva i skrivs då.

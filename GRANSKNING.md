@@ -3064,3 +3064,206 @@ BESLUT SOM BEHÖVS: Q1 (spärr för kommandolistan och var den ligger), Q2 (äga
   las_regelbok.py) och Q7 (push med d8efa3a), se ovan.
 NÄSTA STEG: Besluta Q1 och Q2. Låt sedan en byggsession göra Q3 och Q4,
   därefter uppgift 4.
+
+## Granskning 11 – plan för Q1 (2026-10-28)
+
+Skriven av granskaren i samma session som Granskning 11, på Hugos uppdrag. Det här är en **plan**, inget är
+byggt. Byggsessionen läser den här texten. Den startas först när Hugo eller Casper säger till i chatten.
+
+### Vad Q1 gäller
+
+Listan över kommandon i SPEC 7.1 hålls i dag bara av att agenten följer texten. Projektet har inga
+behörighetsinställningar för Claude Code, och ihopkopplade kommandon kördes i granskning 11 utan att något
+stoppade dem. Hugos beslut 2026-10-28 (Q1): **kommandolistan ska spärras tekniskt nu, före uppgift 4, i en
+fil utanför projektet.**
+
+### Hugos beslut 2026-10-28 om planen
+
+Skrivna i chatten av Hugo 2026-10-28, i hans ordning:
+
+1. **Vakten gäller strikt överallt**, utom i mappar som Hugo uttryckligen undantar. Granskaren ska skriva ner
+   vilka mappar som finns under `~/VERA` och föreslå vilka som ska undantas, men ingen mapp undantas utan
+   Hugos OK. Sessioner som startar i `~/VERA` ska vara skyddade.
+2. **Hugo godtar att vakterna i tillägget superpowers slutar fungera** (följden av att bara vakter från de
+   låsta inställningarna får köras).
+3. **Claude Codes version ska kontrolleras och uppdateras före installationen.** Granskaren ska kontrollera i
+   dokumentationen att inställningen för att stoppa kommandot när vakten fallerar finns, vad den heter och
+   vilken version den kräver (se nästa avsnitt).
+4. **Sandlådan väntar till spärrsteget, men ska vara klar före steg 5 (torrkörningen).** Skrivs in som öppen
+   fråga i PROGRESS.md.
+5. **`sudo` ska alltid stoppas**, också i en mapp som har undantagits.
+
+### Vad dokumentationen säger (kontrollerat 2026-10-28)
+
+Läst på code.claude.com/docs/en/hooks, /permissions, /settings och /managed-settings. Citaten är översatta.
+
+- **Inställningen finns och heter `onFailure`.** Den sätts på själva vakten (en hook av typen `command` eller
+  `http`) och har värdena `"continue"` och `"block"`. **`"continue"` är standard**: om vakten fallerar körs
+  kommandot ändå. Dokumentationen säger själv att en vakt med fel sökväg eller ett skript som kraschar då
+  "släpper igenom allt". Med `"block"` stoppas kommandot. **Kräver Claude Code version 2.1.295 eller senare.**
+- Det som räknas som att vakten fallerar: den går inte att starta (till exempel fel sökväg), den avslutas med
+  en annan kod än 0 eller 2, den når sin tidsgräns, eller dess svar är ogiltigt.
+- **En vakt som stoppar ett kommando kan inte hävas** av någon annan inställningsfil eller regel. Regler som
+  nekar ("deny") gäller också för varje del av ett ihopkopplat kommando, även inne i `$(...)`.
+- **Ett tillägg av typen "mod" kan släppa igenom något som vakten har stoppat**, men bara om det inte finns
+  några låsta inställningar och sessionen inte är inloggad i ett Team- eller Enterprise-konto. Med låsta
+  inställningar på datorn gäller vaktens stopp.
+- **De låsta inställningarna** ligger på macOS i `/Library/Application Support/ClaudeCode/managed-settings.json`
+  (och i en mapp `managed-settings.d/` bredvid). De går före allt annat: projektets filer, användarens fil och
+  tillägg på kommandoraden. Terminalen och skrivbordsappen läser samma filer. **Om organisationen skickar
+  inställningar från claude.ai går de före filen**, och då används inte filen. Det syns under Status
+  ("Setting sources").
+- Låsta inställningar som behövs: `allowManagedHooksOnly` (bara vakter från de låsta inställningarna körs),
+  `allowManagedPermissionRulesOnly` (bara regler från de låsta inställningarna gäller) och
+  `permissions.disableBypassPermissionsMode` (läget "hoppa över alla behörigheter" går inte att slå på).
+- Vakten får kommandot som text (`tool_input.command`), verktygets namn, och `cwd`: mappen där agenten
+  arbetar, som **följer med när agenten byter mapp**. Mappen där sessionen startade finns i
+  `CLAUDE_PROJECT_DIR`.
+- Vakten kan anges som ett program med en lista av argument ("exec form"), så att mellanslaget i
+  "Application Support" inte ställer till det.
+
+### Förslaget
+
+**Skydd 1: vakten (byggs nu).** Ett litet Python-program som Claude Code kör före varje verktyg som agenten
+använder. Det släpper bara igenom det som SPEC 7.1 tillåter, och svarar annars med ett stopp och ett fel på
+svenska som säger vad som stoppades och varför. Reglerna, i den ordning de prövas:
+
+1. **`sudo` stoppas alltid**, oavsett mapp (Hugos beslut 5). Förslag som kräver OK: samma för `su`.
+2. **Andra verktyg som kör kommandon än Bash stoppas helt**, till exempel terminalverktyget i appen,
+   fjärrkommandon via kopplingar och övervakning som kör ett kommando. Vanliga fil-verktyg (läsa, skriva,
+   redigera) släpps igenom, eftersom 7.1 bara gäller kommandon.
+3. **Undantagna mappar** (listan är tom tills Hugo säger annat): bara om både startmappen
+   (`CLAUDE_PROJECT_DIR`) och arbetsmappen (`cwd`) ligger i en undantagen mapp släpps kommandot igenom utan
+   listan, och inte heller då om det nämner en sökväg i `~/VERA`.
+4. **Inga ihopkopplade kommandon.** Stopp vid `;`, `&`, `|`, `<`, `>`, `$`, bakåtfnuttar, radbrytning och
+   omvänt snedstreck någonstans i kommandot (SPEC 7.1: ett kommando i taget, ingen omdirigering, inget
+   `$(...)`). Det stoppar också uttryck i `-k` för pytest som använder parenteser eller `|`, vilket är godtagbart.
+5. **Första ordet ska stå på listan**: `.venv/bin/python` (bara de två pytest-formerna), `git` med
+   `status`, `log`, `diff`, `add`, `commit`, `show` eller `archive` som andra ord, `ls`, `cat`, `head`,
+   `tail`, `grep`, `diff`, `find`, `wc`, `sort`, `mkdir`, `cp` (bara med `-R`) och `tar`. Allt annat stoppas,
+   till exempel `cd`, `sed`, `echo`, `rm`, `for`, `env`, `bash`, `python3` och `git -C`.
+6. **Reglerna under listan i 7.1:**
+   - `mkdir`, `cp -R`, `tar` och `git archive` bara med mål i en tillfällig mapp utanför projektet.
+   - `find` utan `-delete`, `-exec`, `-execdir`, `-ok`, `-okdir` och `-fprint`/`-fprintf`/`-fls`, som raderar,
+     kör andra kommandon eller skriver filer.
+   - pytest bara i de två formerna i 7.1, med kopians sökväg, och bara de tillägg som 7.1 tillåter (`--tb`,
+     `-q`, `-qq`, `-r`, `-k` och `-p no:randomly`).
+   - `git`-tillägg som skriver filer eller kör program stoppas, till exempel `--output`, `-c`, `--exec-path`,
+     `--ext-diff` och `--textconv`.
+   - Läsande kommandon bara på sökvägar i projektet eller i en tillfällig mapp (CLAUDE.md: bara den här
+     mappen, och kopior enligt 7.1).
+
+Vakten skrivs med bara Pythons egna delar och körs med datorns egen Python, `/usr/bin/python3 -I`, inte med
+projektets `.venv`, som agenten kan skriva i. `-I` gör att Python inte läser in filer från den mapp den körs
+i eller från inställningar i miljön.
+
+**Skydd 2: de låsta inställningarna (byggs nu).** En skiss av `managed-settings.json`. Byggsessionen
+kontrollerar varje nyckel mot dokumentationen igen innan filen lämnas till Hugo:
+
+```json
+{
+  "allowManagedHooksOnly": true,
+  "allowManagedPermissionRulesOnly": true,
+  "permissions": {
+    "disableBypassPermissionsMode": "disable",
+    "deny": [
+      "Bash(sudo *)",
+      "Edit(//Users/hugolindholmer/VERA/agent/.git/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3",
+            "args": ["-I", "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"],
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+- Vakten och inställningsfilen ligger i `/Library/Application Support/ClaudeCode/`, som ägs av systemet.
+  Det krävs ett administratörslösenord för att ändra där, så agenten kan inte ändra dem.
+- Regeln mot att skriva i `.git` stänger ett hål: annars kan agenten lägga ett eget program i `.git/hooks`
+  eller ändra `.git/config`, och git kör det vid nästa `git commit` eller `git diff`, förbi vakten.
+- Listan med undantagna mappar ligger också i den skyddade mappen, inte i projektet. Den är tom från början.
+
+**Skydd 3: sandlådan (spärrsteget, före steg 5).** Ett skydd i macOS som gör att kommandon och allt de
+startar bara kan skriva i vissa mappar. Det behövs för hålet nedan. Hugos beslut 4: den väntar till
+spärrsteget, men ska vara klar före steg 5 (torrkörningen).
+
+### Det vakten inte stoppar
+
+- **En egen testfil.** SPEC 7.1 tillåter att agenten skriver en testfil i en kopia och kör den med pytest. En
+  testfil är vanlig Python och kan göra vad som helst, till exempel radera filer i projektet. Vakten stoppar
+  misstag och ihopkopplade kommandon, men inte en avsiktlig omväg via en testfil. Det stoppas först av
+  sandlådan (skydd 3) och av att de filer som spärrarna läser ägs av någon annan än agenten (spärrsteget).
+- **Fil-verktygen** (Write och Edit) kan skriva överallt där Hugo själv får skriva, utom i de skyddade
+  mapparna och i `.git`. Det gäller inte kommandolistan, men hör till spärrsteget.
+- **Andra datorer.** Inställningarna gäller bara den dator där de installeras. Caspers dator behöver samma
+  installation.
+
+### Mappar under `~/VERA`, och förslag till undantag
+
+Läst med `ls` på `/Users/hugolindholmer/VERA` i den här sessionen (bara översta nivån):
+
+| Namn | Vad det är (av namnet att döma) | Förslag |
+|---|---|---|
+| `agent` | Veras bokföringsagent, det här projektet | **Undantas aldrig** |
+| `varumarke` | Varumärket | Undantas inte. Om arbetet där behöver andra kommandon läggs de till på en egen lista, efter OK |
+| `veralabs-hemsida` | Hemsidan för Vera Labs | Undantas inte nu, se frågan nedan |
+| `.obsidian` | Inställningar för programmet Obsidian (`~/VERA` används som Obsidian-valv) | Ingen arbetsmapp, inget undantag |
+| `.DS_Store`, `.cmp-test.html` | Filer, inte mappar | Inget undantag |
+
+**Granskarens rekommendation: undanta ingen mapp nu.** Skälen:
+- Hugos beslut säger att sessioner som startar i `~/VERA` ska vara skyddade, och alla mappar ovan ligger där.
+- En session i en undantagen mapp kan nå `~/VERA/agent` med hela sökvägar. Vakten stoppar kommandon som
+  nämner `~/VERA`, men en undantagen mapp skulle ändå ha mycket friare kommandon.
+- Hemsidan behöver troligen andra kommandon (till exempel för att bygga och visa sidan). Två vägar, som Hugo
+  väljer mellan när det behövs: flytta hemsidan till en mapp utanför `~/VERA` och undanta den, eller ge den en
+  egen kort lista i vakten.
+
+Följd av beslut 1: också sessioner i Hugos andra mappar utanför `~/VERA` får bara Veras lista, tills en mapp
+undantas.
+
+### Arbetsgång
+
+1. **Byggsession** (ny session, startas bara när Hugo eller Casper säger till):
+   - skriver vakten i projektet, förslagsvis `sparr/kommandosparr.py`, och tester i `scripts/tests`,
+   - testerna ska visa att varje kommando i SPEC 7.1 går igenom och att varje omväg ovan stoppas, till
+     exempel `ls; rm x`, `ls && rm x`, `ls | head`, `cat $(x)`, kommandon på två rader, `cd`, `sed`, `sudo`,
+     `git -C`, `git diff --output=x`, `find -exec`, `mkdir` i projektet, `cp -R` och `tar` in i projektet,
+     `git archive -o` i projektet, pytest med andra tillägg, en vakt som får trasig indata, och andra verktyg
+     som kör kommandon,
+   - skriver `managed-settings.json` och en kort installationsbeskrivning för Hugo, med de exakta kommandona,
+   - föreslår en ny text för SPEC 7.1 (listan spärras av vakten, och en ändrad lista blir en ny version som
+     Hugo installerar). SPEC ändras bara efter Hugos eller Caspers OK.
+2. **Oberoende granskning** av vakten i en ny session.
+3. **Hugo kontrollerar Claude Codes version** och uppdaterar till minst 2.1.295 (Hugos beslut 3).
+4. **Hugo installerar** själv, i Terminal med sitt administratörslösenord: vakten och
+   `managed-settings.json` till `/Library/Application Support/ClaudeCode/`. Agenten gör det inte.
+5. **Kontroll efter installationen**, i en ny session:
+   - under Status ska de låsta inställningarna synas som källa (inte inställningar från claude.ai),
+   - `git status` går igenom, medan `ls; ls`, `cd ..`, `sudo ls` och `echo x` stoppas,
+   - en vakt som fallerar stoppar kommandot (prövas genom att Hugo tillfälligt pekar inställningen mot en fil
+     som inte finns, och sedan återställer).
+6. **Caspers dator** får samma installation.
+7. Därefter uppgift 4.
+
+### Öppna frågor till Hugo eller Casper
+
+1. **Undantag:** ska någon mapp undantas? Rekommendation: ingen nu (se ovan).
+2. **`su`:** ska också `su` alltid stoppas, som `sudo`? Rekommendation: ja.
+3. **"Steg 5 (torrkörningen)":** projektets filer har inget steg som heter torrkörning. Uppgift 5 i
+   byggordningen (DESIGN-regelbok.md avsnitt 7) är flöde c och d (Z-rapporter, kortinlösen, Swish och
+   kontantinsättningar), och SPEC 9 har faserna 0–4. Vilket steg menas? Tills det är klart räknas sandlådan
+   som ett krav före uppgift 5, eller före en torrkörning om den kommer först.
+4. **SPEC 7.1:** byggsessionen föreslår texten, och den ändras först efter OK.
