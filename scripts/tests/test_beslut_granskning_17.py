@@ -185,3 +185,45 @@ def test_h1_skriptet_och_steg_4_g_namner_com_apple_provenance():
     (steget,) = [t for r, t in _steg(INSTALLERA.read_text(encoding="utf-8")) if r.startswith("## Steg 4:")]
     g = _en_rad(steget.split("**g. ", 1)[1].split("**h. ", 1)[0])
     assert f"`{PROVENANCE}`" in g and "granskning 17, H1" in g and "`+`" in g
+
+
+# ---------------------------------------------------------------------------------------------
+# Steg 2 och 13 i INSTALLERA.md: samma regel som H1 (Hugos beslut 2026-10-28 kväll). Stegen läses av Hugo, inte av
+# skriptet, så texten ska säga regeln i enkla ord, och ls ska visa namnet på varje uppgift.
+
+
+def _steget(nummer):
+    (steget,) = [
+        t for r, t in _steg(INSTALLERA.read_text(encoding="utf-8")) if r.startswith(f"## Steg {nummer}:")
+    ]
+    return steget
+
+
+@pytest.mark.parametrize("nummer", [2, 13])
+def test_steg_2_och_13_visar_namnet_pa_varje_uppgift(nummer):
+    ls_rader = [r for r in _steget(nummer).splitlines() if r.startswith("ls ")]
+    assert ls_rader and all(r.startswith("ls -lde@ ") for r in ls_rader), ls_rader
+
+
+def test_steg_2_sager_regeln_i_enkla_ord():
+    text = _en_rad(_steget(2))
+    assert "(Hugos beslut 2026-10-28 kväll, samma regel som H1)" in text
+    assert f"**exakt en** indragen rad som börjar med `{PROVENANCE}`" in text
+    assert "`+` efter de tio tecknen" in text and "alltid" in text
+    assert "`com.apple.quarantine`" in text and "`com.apple.provenance2`" in text
+    assert "mer än en indragen rad" in text and "**Allt annat: stoppa och fråga.**" in text
+    # Det gamla, att varje @ stoppar, står inte kvar.
+    assert "Står det `+` eller `@` direkt efter de tio tecknen" not in text
+
+
+def test_steg_13_hanvisar_till_regeln_i_steg_2():
+    text = _en_rad(_steget(13))
+    assert "eller står det `+` eller `@` efter de tio tecknen" not in text
+    assert f"`{PROVENANCE}`" in text and "regeln i steg 2" in text and "`+` stoppar alltid" in text
+    assert "installationen räknas som misslyckad. Stoppa och fråga." in text
+
+
+def test_steg_2_och_13_har_samma_regel_som_skriptet():
+    # Skriptet godtar samma sak som stegen: exakt en uppgift, com.apple.provenance, och aldrig +.
+    skriptet = SKRIPTET.read_text(encoding="utf-8")
+    assert f"$'\\t'{PROVENANCE}$'\\t'" in skriptet and "${#rader} == 2" in skriptet

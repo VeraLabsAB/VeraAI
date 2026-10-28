@@ -183,10 +183,11 @@ bara om ingen annan heller kan ändra mapparna ovanför, eftersom den som kan ä
 allt som ligger i den (granskning 12, P7, Hugos beslut 2026-10-28, beslut 3).
 
 ```bash
-ls -ld / /Library "/Library/Application Support" "/Library/Application Support/ClaudeCode"
+ls -lde@ / /Library "/Library/Application Support" "/Library/Application Support/ClaudeCode"
 ```
 
-- `ls -ld` visar en rad per mapp: vem som äger mappen och vem som får ändra i den. Det bara läser, och
+- `ls -lde@` visar en rad per mapp: vem som äger mappen och vem som får ändra i den. `e@` gör att varje
+  extra uppgift och varje extra rättighet visas på en egen, indragen rad direkt under. Det bara läser, och
   ändrar ingenting. Citattecknen behövs, eftersom "Application Support" har ett mellanslag.
 - En rad ser ut ungefär så här: `drwxr-xr-x  67 root  wheel  2144 Oct 28 10:00 /Library`. Så läser du den:
   - Det första tecknet, `d`, betyder att det är en mapp.
@@ -203,8 +204,16 @@ ls -ld / /Library "/Library/Application Support" "/Library/Application Support/C
   - `/Library/Application Support` har gruppen `admin` på din dator. Det är bra så länge det inte står
     `w` på plats 6.
 - **Den fjärde raden** ska säga `No such file or directory`, eftersom mappen `ClaudeCode` inte finns än.
-- Står det `+` eller `@` direkt efter de tio tecknen (till exempel `drwxr-xr-x+`), har mappen extra
-  uppgifter som raden inte visar, och de kan ge fler rättigheter. Stoppa och fråga.
+- **Extra uppgifter och rättigheter** (Hugos beslut 2026-10-28 kväll, samma regel som H1). Titta på tecknet
+  direkt efter de tio tecknen, och på de indragna raderna under:
+  - Står det **inget** där, och ingen indragen rad under: rätt.
+  - Står det `@` (till exempel `drwxr-xr-x@`), och under står **exakt en** indragen rad som börjar med
+    `com.apple.provenance` och sedan bara en siffra (till exempel `com.apple.provenance   11`): rätt. Den
+    uppgiften sätter macOS själv, och den ger inga rättigheter.
+  - **Allt annat: stoppa och fråga.** Till exempel `+` efter de tio tecknen (det betyder alltid extra
+    rättigheter), ett annat namn på den indragna raden (till exempel `com.apple.quarantine` eller
+    `com.apple.provenance2`), mer än en indragen rad, eller en indragen rad som börjar med en siffra och kolon
+    (till exempel `0: group:everyone deny delete`, som är en extra rättighet).
 
 **Kan gruppen eller andra skriva någonstans i kedjan, är ägaren inte `root`, eller finns `ClaudeCode`
 redan: avbryt installationen och fråga.**
@@ -677,14 +686,14 @@ shasum -a 256 "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/
 ## Steg 13: kontrollera ägare och rättigheter igen (efter installationen)
 
 ```bash
-ls -ld / /Library "/Library/Application Support" "/Library/Application Support/ClaudeCode"
+ls -lde@ / /Library "/Library/Application Support" "/Library/Application Support/ClaudeCode"
 ```
 
 - Samma kommando som i steg 2, och de tre första raderna ska se ut som där. Nu ska också den fjärde raden
   finnas: `drwxr-xr-x`, ägaren `root` och gruppen `wheel`, för `/Library/Application Support/ClaudeCode`.
 
 ```bash
-ls -ld "/Library/Application Support/ClaudeCode/vera" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/managed-settings.json"
+ls -lde@ "/Library/Application Support/ClaudeCode/vera" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/managed-settings.json"
 ```
 
 - Visar mappen `vera` och de två filerna. `vera` ska vara `drwxr-xr-x`. Filerna ska vara `-rw-r--r--`
@@ -692,16 +701,21 @@ ls -ld "/Library/Application Support/ClaudeCode/vera" "/Library/Application Supp
   gruppen `wheel` på alla tre.
 
 ```bash
-ls -ld "/Library/Application Support/ClaudeCode/vera/venv" "/Library/Application Support/ClaudeCode/vera/venv/bin" "/Library/Application Support/ClaudeCode/vera/venv/bin/python"
+ls -lde@ "/Library/Application Support/ClaudeCode/vera/venv" "/Library/Application Support/ClaudeCode/vera/venv/bin" "/Library/Application Support/ClaudeCode/vera/venv/bin/python"
 ```
 
 - Visar projektets Python från steg 9: mappen `venv`, mappen `bin` i den och `python`. Mapparna ska vara
   `drwxr-xr-x`. `python` är en **länk** till Python i utvecklarverktygen: raden börjar med `l` och slutar
   med `-> python3` eller liknande. Det är rätt. Ägaren ska vara `root` och gruppen `wheel` på alla tre.
 
+- Filerna i projektet har uppgiften `com.apple.provenance`, och `ditto` och `cp` tar med den. Det är väntat
+  att vakten och inställningarna har den här också.
+
 **Kan gruppen eller andra skriva någonstans (ett `w` på plats 6 eller 9), är ägaren inte `root`, är
-gruppen inte `wheel` för `ClaudeCode`, `vera`, `venv` och filerna, eller står det `+` eller `@` efter de
-tio tecknen: installationen räknas som misslyckad. Stoppa och fråga.**
+gruppen inte `wheel` för `ClaudeCode`, `vera`, `venv` och filerna, eller visar någon rad en extra uppgift
+eller rättighet som inte är rätt enligt regeln i steg 2 (bara `@` med exakt en indragen rad
+`com.apple.provenance` och en siffra är rätt, och `+` stoppar alltid): installationen räknas som misslyckad.
+Stoppa och fråga.**
 
 ## Efteråt
 

@@ -1078,7 +1078,7 @@ VENV_PIP = (
 )
 VENV_AGARE = f'sudo chown -R root:wheel "{NY_VENV}"'
 VENV_RATTIGHETER = f'sudo chmod -R go-w "{NY_VENV}"'
-VENV_LS = f'ls -ld "{NY_VENV}" "{NY_VENV}/bin" "{NY_PYTHON}"'
+VENV_LS = f'ls -lde@ "{NY_VENV}" "{NY_VENV}/bin" "{NY_PYTHON}"'
 
 
 def test_beslut_1_installera_skapar_python_pa_den_nya_platsen():
@@ -1637,7 +1637,8 @@ FORPROV_KOMMANDON = (
     f"rmdir {FORPROV_MAPP}/.claude",
     f"rmdir {FORPROV_MAPP}",
 )
-KEDJAN = 'ls -ld / /Library "/Library/Application Support" "/Library/Application Support/ClaudeCode"'
+# ls -lde@ visar varje extra uppgift och rättighet (Hugos beslut 2026-10-28 kväll, samma regel som H1).
+KEDJAN = 'ls -lde@ / /Library "/Library/Application Support" "/Library/Application Support/ClaudeCode"'
 
 # Hugos beslut 2026-10-28 om vakten, beslut 2: INSTALLERA.md beskriver hur Hugo själv flyttar nvm-mappen
 # sist i PATH. Agenten ändrar inte Hugos skalfiler.
@@ -1710,7 +1711,7 @@ def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
         "sudo cp -i ",
         "sudo chown ",
         "sudo chmod ",
-        'ls -ld "/Library/Application Support/ClaudeCode',
+        'ls -lde@ "/Library/Application Support/ClaudeCode',
         KEDJAN,
         FLYTTA_UNDAN,
         FLYTTA_TILLBAKA,
