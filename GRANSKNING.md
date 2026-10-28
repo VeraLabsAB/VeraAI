@@ -6007,3 +6007,18 @@ Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28, i chatten.
 - **Hela testsviten körs** (Hugos svar i chatten 2026-10-28, i byggsessionen), också de gamla testen som gör
   mjuka länkar i pytests tillfälliga mapp till `/usr/bin/git`, som i granskning 17. Nya test gör inga sådana
   länkar.
+
+### Hugos beslut 2026-10-28 kväll
+
+Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28 kväll, i chatten.
+
+- **Sessionerna får köras i auto redan före vakten.** Villkor: Shop and Gos riktiga underlag ligger utanför
+  `~/VERA`, varje session börjar och slutar med `git status`, och granskning 18 kontrollerar att inget utanför
+  projektet har ändrats.
+- **Den halvfärdiga H6-rättelsen lades undan med `git stash` och görs om från början.** `git stash` står inte på
+  listan i SPEC 7.1. Hugo gav OK i chatten 2026-10-28 kväll till exakt ett kommando:
+  `git stash push --include-untracked -m 'H6 halvfärdig, delvis gjord i auto 2026-10-28' -- sparr/kommandosparr.py scripts/tests/test_beslut_granskning_17.py`.
+- **Steg 2 och 13 i INSTALLERA.md får samma regel som H1:** exakt `com.apple.provenance` godtas, allt annat
+  stoppar, och `+` stoppar alltid.
+- **Möjlig orsak till bytet till auto** i granskning 17 och i förra byggsessionen: valet "Yes, and use auto mode"
+  när en plan godkänns. Inte bekräftat.
