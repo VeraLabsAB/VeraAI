@@ -9,6 +9,38 @@ underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 Testsviten: **3 198 passed**, 0 misslyckade (körd 2026-10-28 i projektet, i byggsessionen som härdade
 vakten efter granskning 12).
 
+## Läge 2026-10-28 kväll
+
+**Byggt** (commit 1427105, efter Hugos beslut 2026-10-28 om PATH-regeln, förprovet för `onFailure` och P7):
+
+- **Vakten** (`sparr/kommandosparr.py`): kommandolistan i SPEC 7.1, listan över tillåtna verktyg, och
+  PATH-regeln (regel 7). Ett kommando släpps bara igenom om programmet, och varje mapp ovanför det, ägs av
+  root och inte går att skriva i för gruppen eller andra. Kommandon som ändrar `PATH` stoppas.
+- **Testerna** (`scripts/tests/test_kommandosparr.py`): 463 tester för vakten, de låsta inställningarna och
+  INSTALLERA.md. Hela testsviten: **3 267 passed**, 0 misslyckade (körd 2026-10-28 kväll, före
+  installationen).
+- **INSTALLERA.md** (`sparr/INSTALLERA.md`): versionen med `/status`, mapparna ovanför med `ls -ld`,
+  förprovet för `onFailure`, kontrollsummor, kopiering med `root:wheel` och 755 respektive 644, `ls -ld`
+  igen efteråt, `/status` efter installationen och kontrollen efter installationen.
+
+**Inget är installerat än.** Inget i `/Library/Application Support/` är ändrat.
+
+**Beslut som behövs** (ordagrant från slutrapporten 2026-10-28):
+
+1. Testsviten efter installationen. .venv/bin/python ligger i projektet, som Hugo äger, så båda
+   pytest-kommandona stoppas. Vägar: (a) Hugo kör testsviten själv i Terminal, (b) pytest körs med en
+   Python i en mapp som root äger, (c) .venv flyttas till en mapp som root äger. Påverkar "Varje rättelse
+   får ett test".
+2. Vakten prövar PATH i sin egen miljö. Har Bash-verktygets skal en annan PATH kan en annan fil köras
+   (inte bekräftat). Ska varje mapp i PATH före programmet också ägas av root? Då måste nvm-mappen flyttas
+   bakåt i Hugos PATH, annars stoppas allt.
+3. Vakten kräver mer än beslutet: också filen själv och målet för en länk ska ägas av root. OK?
+4. "En annan källa" i /status: bara låsta källor (t.ex. från claude.ai), eller varje källa på raden?
+   INSTALLERA.md följer i dag ordalydelsen, det strängaste.
+5. Ny oberoende granskning, med omvägarna (P1) och PATH-regeln, och nya kontrollsummor.
+
+**Nästa steg:** Hugo fattar beslut 1–4, sedan en byggsession, sedan en oberoende granskning.
+
 ## Klart
 
 | Vad | Commit |
