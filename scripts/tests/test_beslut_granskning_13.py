@@ -21,10 +21,11 @@ import os
 import pytest
 
 from test_kommandosparr import (  # noqa: F401 (fixturerna används av pytest via namnen)
-    ALIAS_KOMMANDON,
     FORE_PROGRAMMET,
     INSTALLERA,
     PLATS,
+    SKRIPT_KORNING,
+    SKRIPT_SUMMA,
     SYSTEMETS_SOKVAG,
     TERMINAL_CLAUDE,
     _bedom,
@@ -193,7 +194,8 @@ def test_hugos_svar_3_hela_appens_mapp_ar_forbjuden():
 # ---------------------------------------------------------------------------------------------
 # P1 a: alias och funktioner kontrolleras i Terminal före och efter installationen.
 
-LISTANS_NAMN = ("git", "ls", "cat", "head", "tail", "grep", "diff", "find", "wc", "sort", "mkdir", "cp", "tar")
+# find står inte längre på listan (granskning 15, S1, Hugos beslut 2026-10-28).
+LISTANS_NAMN = ("git", "ls", "cat", "head", "tail", "grep", "diff", "wc", "sort", "mkdir", "cp", "tar")
 
 
 def test_p1a_listans_namn_ar_kommandona_pa_listan(vakt):
@@ -203,16 +205,18 @@ def test_p1a_listans_namn_ar_kommandona_pa_listan(vakt):
 def _alias_steget_fore():
     text = INSTALLERA.read_text(encoding="utf-8")
     (steget,) = [t for r, t in _steg(text) if "alias" in r.lower()]
-    return steget.split("**g. Kontrollera alias och funktioner**", 1)[1]
+    return steget.split("**g. Kontrollera skalet i Terminal med kontrollskriptet**", 1)[1].split("**h. ", 1)[0]
 
 
 def _alias_steget_efter():
-    return _kontrollen().split("\n2. ", 1)[0].split("**Alias och funktioner, igen efter installationen**", 1)[1]
+    return _kontrollen().split("\n2. ", 1)[0].split("**Skalet, igen efter installationen**", 1)[1]
 
 
 def test_p1a_alias_och_funktioner_kontrolleras_fore_och_efter_installationen():
+    # Hugos beslut 2026-10-28 efter granskning 15: kontrollen ligger i sparr/kontrollera-skalet.zsh, som Hugo
+    # kör före och efter installationen (prövat i test_beslut_granskning_15.py).
     _, rader = _installationskommandon()
-    for kommando in ALIAS_KOMMANDON:
+    for kommando in (SKRIPT_SUMMA, SKRIPT_KORNING):
         platser = [i for i, r in enumerate(rader) if r == kommando]
         assert len(platser) == 2, kommando
         assert platser[0] < _forsta_sudo(rader), "en gång före installationen"
@@ -220,14 +224,13 @@ def test_p1a_alias_och_funktioner_kontrolleras_fore_och_efter_installationen():
     for steget in (_alias_steget_fore(), _alias_steget_efter()):
         # Kodblocken i kontrollen efter installationen är indragna under sin listpunkt.
         utan_indrag = "\n".join(rad.strip() for rad in steget.splitlines())
-        for kommando in ALIAS_KOMMANDON:
+        for kommando in (SKRIPT_SUMMA, SKRIPT_KORNING):
             assert f"```bash\n{kommando}\n```" in utan_indrag, kommando
         en_rad = _en_rad(steget)
-        for namn in LISTANS_NAMN:
-            assert f"`{namn}`" in en_rad, namn
-        assert "snedstreck (`/`)" in en_rad
-        assert "stoppa och fråga" in en_rad.lower()
-        assert "Hugos beslut 2026-10-28, granskning 13, P1 a" in en_rad
+        assert "stoppa och fråga" in en_rad.lower() and "`AVVIKER`" in en_rad
+        assert "granskning 13, P1 a" in en_rad
+    skriptet = (INSTALLERA.parent / "kontrollera-skalet.zsh").read_text(encoding="utf-8")
+    assert "${(kv)aliases}" in skriptet and "${(kv)galiases}" in skriptet and "${(kv)saliases}" in skriptet
 
 
 # ---------------------------------------------------------------------------------------------

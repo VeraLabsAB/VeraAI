@@ -21,9 +21,10 @@ Reglerna, i den ordning de prövas (planen i GRANSKNING.md, "Granskning 11 – p
    radbrytning, inte heller inom citattecken. Inga osynliga eller styrande tecken. Inga tecken som
    skalet byter ut mot något annat (jokertecken, ~ och liknande) utanför citattecken.
 5. Första ordet ska stå på listan i SPEC 7.1.
-6. Reglerna under listan: mål bara i den tillfälliga mappen, find bara för att söka, pytest bara i de
-   två formerna, inga git-tillägg som skriver filer eller kör program, och läsande kommandon bara i
-   projektet och i den tillfälliga mappen.
+6. Reglerna under listan: mål bara i den tillfälliga mappen, grep bara med tillägg som söker, pytest bara
+   i de två formerna, inga git-tillägg som skriver filer eller kör program, och läsande kommandon bara i
+   projektet och i den tillfälliga mappen. find står inte på listan (granskning 15, S1, Hugos beslut
+   2026-10-28): i agentens skal är find Claude Codes bfs, som raderar med -rm.
 7. PATH-regeln (Hugos beslut 2026-10-28, beslut 1). Kommandon som ändrar PATH stoppas (prövas före
    regel 5). Programmet som kommandot pekar på letas upp som skalet gör, i PATH från vaktens miljö, och
    filen och varje mapp ovanför den ska ägas av systemet (root) och inte gå att skriva i för gruppen
@@ -95,13 +96,43 @@ PYTEST_FAST = ["-B", "-m", "pytest", "-p", "no:cacheprovider"]
 PYTEST_PROJEKTET = os.path.join("scripts", "tests")
 PYTEST_TB = ("auto", "long", "short", "line", "native", "no")
 
-LASANDE = ("ls", "cat", "head", "tail", "grep", "diff", "find", "wc", "sort")
-LASANDE_FORBJUDNA_KORTA = {"sort": "oT", "grep": "f"}
+LASANDE = ("ls", "cat", "head", "tail", "grep", "diff", "wc", "sort")
+LASANDE_FORBJUDNA_KORTA = {"sort": "oT"}
 LASANDE_FORBJUDNA_LANGA = {
     "sort": ("output", "compress-program", "temporary-directory"),
-    "grep": ("file",),
 }
-FIND_FORBJUDNA = ("exec", "execdir", "ok", "okdir", "delete", "fprint", "fprint0", "fprintf", "fls")
+# grep (granskning 15, S1, Hugos beslut 2026-10-28): i agentens skal är grep Claude Codes ugrep, som har
+# tillägg som kör program och skriver filer. Bara tillägg som söker släpps igenom, och namnen jämförs exakt.
+# Korta tillägg utan värde, korta tillägg som tar ett värde, långa tillägg utan värde, långa tillägg som tar
+# ett tal efter =, och långa tillägg som tar ett filmönster efter = (prövas som en sökväg).
+GREP_KORTA = "nirRlLcvwxEFHhosqI"
+GREP_KORTA_VARDE = "eABCm"
+GREP_KORTA_TAL = "ABCm"
+GREP_LANGA = (
+    "line-number",
+    "ignore-case",
+    "recursive",
+    "files-with-matches",
+    "files-without-match",
+    "count",
+    "invert-match",
+    "word-regexp",
+    "line-regexp",
+    "extended-regexp",
+    "fixed-strings",
+    "with-filename",
+    "no-filename",
+    "only-matching",
+    "no-messages",
+    "quiet",
+    "silent",
+)
+GREP_LANGA_TAL = ("after-context", "before-context", "context", "max-count")
+GREP_LANGA_MONSTER = ("include", "exclude", "exclude-dir")
+GREP_TILLATNA = (
+    "-n, -i, -r, -R, -l, -L, -c, -v, -w, -x, -E, -F, -H, -h, -o, -s, -q, -I, -e med ett mönster, -A, -B, -C "
+    "och -m med ett tal, motsvarande långa namn, och --include=, --exclude= och --exclude-dir="
+)
 
 GIT_UNDERKOMMANDON = ("status", "log", "diff", "add", "commit", "show", "archive")
 # git godtar förkortade långa tillägg (--out för --output), så ett tillägg stoppas om dess namn är
@@ -150,7 +181,7 @@ SKRIVBAR_FOR_GRUPP_ELLER_ANDRA = 0o022
 MAX_LANKAR = 32
 
 TILLATNA_KOMMANDON = (
-    f"'{PYTHON}' (bara pytest), git, ls, cat, head, tail, grep, diff, find, wc, sort, mkdir, cp -R och tar"
+    f"'{PYTHON}' (bara pytest), git, ls, cat, head, tail, grep, diff, wc, sort, mkdir, cp -R och tar"
 )
 
 
@@ -688,6 +719,9 @@ def _git_archive(argument, lage):
 
 def _lasande(ordlista, lage):
     namn = ordlista[0]
+    if namn == "grep":
+        _grep(ordlista, lage)
+        return
     korta = LASANDE_FORBJUDNA_KORTA.get(namn, "")
     langa = LASANDE_FORBJUDNA_LANGA.get(namn, ())
     efter_streck = False
@@ -698,12 +732,6 @@ def _lasande(ordlista, lage):
             pass
         elif ord_ == "--":
             efter_streck = True
-        elif namn == "find":
-            if ord_[1:] in FIND_FORBJUDNA:
-                raise _Stopp(
-                    f"find får bara söka. Tillägget '{ord_}' raderar filer, kör andra kommandon eller "
-                    "skriver filer (SPEC 7.1)."
-                )
         elif ord_.startswith("--"):
             tillagg, lika, varde = ord_[2:].partition("=")
             if _forbjudet_langt(tillagg, langa):
@@ -718,6 +746,64 @@ def _lasande(ordlista, lage):
                 )
             if any(bokstav in korta for bokstav in ord_[1:]):
                 _forbjudet_tillagg(namn, ord_)
+
+
+def _grep_tillagg(tillagg):
+    raise _Stopp(
+        f"grep: tillägget '{tillagg}' är inte tillåtet. grep får bara söka (granskning 15, S1, Hugos beslut "
+        f"2026-10-28). Tillåtna: {GREP_TILLATNA} (SPEC 7.1)."
+    )
+
+
+def _grep_tal(tillagg, varde):
+    if not (varde.isascii() and varde.isdigit()):
+        raise _Stopp(f"grep: tillägget '{tillagg}' ska följas av ett tal, inte '{varde}'.")
+
+
+def _grep(ordlista, lage):
+    """grep med bara de tillägg som söker. Allt annat stoppas, också tillägg som vakten inte känner till.
+    Mönstret prövas som en sökväg, som förut (Hugos beslut 2026-10-28)."""
+    argument = ordlista[1:]
+    efter_streck = False
+    i = 0
+    while i < len(argument):
+        ord_ = argument[i]
+        if efter_streck or not ord_.startswith("-") or ord_ == "-":
+            if ord_ != "-":
+                _las(ord_, "grep", lage)
+        elif ord_ == "--":
+            efter_streck = True
+        elif ord_.startswith("--"):
+            tillagg, lika, varde = ord_[2:].partition("=")
+            if tillagg in GREP_LANGA and not lika:
+                pass
+            elif tillagg in GREP_LANGA_TAL and lika:
+                _grep_tal(ord_, varde)
+            elif tillagg in GREP_LANGA_MONSTER and lika:
+                _las(varde, "grep", lage)
+            elif tillagg == "regexp" and lika:
+                _las(varde, "grep", lage)
+            else:
+                _grep_tillagg(ord_)
+        else:
+            for j in range(1, len(ord_)):
+                bokstav = ord_[j]
+                if bokstav in GREP_KORTA:
+                    continue
+                if bokstav not in GREP_KORTA_VARDE:
+                    _grep_tillagg(ord_)
+                varde = ord_[j + 1:]
+                if not varde:
+                    i += 1
+                    if i >= len(argument):
+                        raise _Stopp(f"grep: tillägget '{ord_}' saknar ett värde.")
+                    varde = argument[i]
+                if bokstav in GREP_KORTA_TAL:
+                    _grep_tal(ord_, varde)
+                else:
+                    _las(varde, "grep", lage)
+                break
+        i += 1
 
 
 def _forbjudet_tillagg(namn, tillagg):

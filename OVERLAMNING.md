@@ -299,7 +299,8 @@ granskningar inräknade. I korthet:
 - Testsviten: `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`
 - Testsviten mot en kopia utanför projektet, med kopians sökväg i stället för `scripts/tests`.
 - Git: `git status`, `git log`, `git diff`, `git add`, `git commit`, `git show`, `git archive`.
-- Läsa och söka: `ls`, `cat`, `head`, `tail`, `grep`, `diff`, `find` (bara för att söka), `wc`, `sort`.
+- Läsa och söka: `ls`, `cat`, `head`, `tail`, `grep` (bara med tillägg som söker), `diff`, `wc`, `sort`.
+  `find` och `rg` står inte på listan (granskning 15, S1, Hugos beslut 2026-10-28).
 - `mkdir`, `cp -R`, `tar` och `git archive` bara med mål i en tillfällig mapp utanför projektet.
 - `cd` används inte. Allt körs från projektmappen.
 - Nya filer i projektet skapas med Claudes fil-verktyg, inte med kommandon i terminalen.

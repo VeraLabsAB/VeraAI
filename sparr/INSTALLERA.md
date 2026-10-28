@@ -1,23 +1,7 @@
 # Installera vakten för kommandolistan
 
-Skriven 2026-10-28 i byggsessionen för granskning 11, Q1. Planen och Hugos beslut står i `GRANSKNING.md`
-under "Granskning 11 – plan för Q1". Ändrad samma dag efter Hugos beslut 2026-10-28 om PATH-regeln,
-förprovet för `onFailure` och P7 (`GRANSKNING.md`, "Beslut 2026-10-28: PATH-regel, förprov för onFailure,
-P7"). Ändrad igen samma dag efter Hugos beslut 2026-10-28 om vakten, beslut 1–4 (`GRANSKNING.md`,
-"Granskning 11 – plan för Q1"): projektets Python flyttas till en mapp som systemet äger (steg 9), och
-nvm-mappen flyttas sist i `PATH` (steg 4). Ändrad igen samma dag efter Hugos svar 2026-10-28, punkt 1–3:
-också Cryptexes-mappen flyttas sist (steg 4), den gamla `.venv` tas bort efter installationen, raden Setting
-sources läses i Terminal och bara en annan låst källa underkänner installationen, och ett sista steg i
-skrivbordsappen visar att vakten stoppar ett kommando som inte står på listan. Ändrad igen samma dag efter
-Hugos beslut 2026-10-28 om granskning 13 (`GRANSKNING.md`, "Granskning 11 – plan för Q1"): kontroll av alias
-och funktioner före och efter installationen (P1 a, steg 4 g och kontrollen efter installationen, steg 1),
-förbud för filerna som zsh läser vid start och de filer de läser in (P1 b), Claude Code för Terminal med
-hela sökvägen `~/.local/bin/claude` och en varning för installerarens förslag (P3 b, steg 1), och förbud för
-Claude Code för Terminal, skrivbordsappens Claude Code och appen (P4 a). Ändrad igen samma dag efter Hugos
-beslut 2026-10-28 om granskning 14 (`GRANSKNING.md`, "Hugos svar 2026-10-28 efter granskning 14"): förbud
-för `~/.zcompdump` och en kontroll av zsh:s mappar för funktioner (R1, steg 4 i), en kontroll av vilka filer
-zsh läser in (R2, steg 4 h), en vänd kontroll av alias och funktioner där allt som inte är väntat stoppar
-(R3, steg 4 g), och vad du ska se när ett steg går bra, och steg 4 d på en dator utan nvm (R5).
+Vilka beslut som har ändrat filen, och när, står i `GRANSKNING.md` under "Hugos svar 2026-10-28 efter
+granskning 15", "Historiken i INSTALLERA.md".
 
 Den här beskrivningen är till **Hugo** (och sedan **Casper**, på sin dator). Agenten kör inga av
 kommandona. Du kör dem själv i programmet **Terminal**, ett i taget, och skriver ditt
@@ -34,7 +18,7 @@ Agenten kan därför inte ändra filerna.
 |---|---|---|
 | `sparr/kommandosparr.py` | `/Library/Application Support/ClaudeCode/vera/kommandosparr.py` | **Vakten.** Ett litet program som Claude Code kör före varje verktyg. Det stoppar allt som inte står på listan i SPEC 7.1. Det stoppar också ett kommando vars program ligger i en mapp som du kan ändra utan lösenord, och kommandon som ändrar `PATH` (PATH-regeln, se nedan). |
 | `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.295 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Inte heller i filerna som zsh läser när det startar och de filer som de läser in: nvm-mappen `~/.nvm`, `~/.zkbd`, `~/.zsh_sessions`, `~/.zlogout` och systemets zsh-filer i `/etc` (granskning 13, P1 b), och `~/.zcompdump`,
-som zsh:s `compinit` läser in vid start (granskning 14, R1). Inte heller i Claude Code för Terminal (`~/.local/bin/claude` och `~/.local/share/claude`), i skrivbordsappens egen Claude Code (`~/Library/Application Support/Claude/claude-code`) eller i appen (`/Applications/Claude.app`) (granskning 13, P4 a). Inte heller någonstans i hela `~/Library/Application Support/Claude`, där också skrivbordsappens egna inställningar ligger (Hugos svar 2026-10-28 efter granskning 13, punkt 3). Läget "auto" går inte att använda, och skills kan inte köra skalkommandon. |
+som zsh:s `compinit` läser in vid start (granskning 14, R1), eller i den kompilerade versionen (`.zwc`) av någon av zsh:s startfiler eller av `~/.zcompdump`, som zsh läser i stället för filen (granskning 15, S2). Inte heller i Claude Code för Terminal (`~/.local/bin/claude` och `~/.local/share/claude`), i skrivbordsappens egen Claude Code (`~/Library/Application Support/Claude/claude-code`) eller i appen (`/Applications/Claude.app`) (granskning 13, P4 a). Inte heller någonstans i hela `~/Library/Application Support/Claude`, där också skrivbordsappens egna inställningar ligger (Hugos svar 2026-10-28 efter granskning 13, punkt 3). Läget "auto" går inte att använda, och skills kan inte köra skalkommandon. |
 | `requirements.txt` (listan över paket) | `/Library/Application Support/ClaudeCode/vera/venv` (skapas, kopieras inte) | **Projektets Python med pytest**, som testsviten körs med. Den låg förut i mappen `.venv` i projektet, som du äger, och då stoppade PATH-regeln testsviten. Nu ligger den där bara systemet kan ändra den (Hugos beslut 2026-10-28 om vakten, beslut 1). |
 
 Inställningarna börjar gälla så fort filen finns, i terminalen och i skrivbordsappen. Därför kopieras
@@ -144,14 +128,14 @@ Kontrollera versionen i Terminal. Öppna Terminal och kör:
 granskning 13, P3 b, som ersätter `claude` med hela sökvägen). Kör ett kommando i taget:
 
 ```bash
-cd ~/VERA
+cd ~/VERA/agent
 ```
 
 ```bash
 ~/.local/bin/claude
 ```
 
-- `cd ~/VERA` gör `~/VERA` till mappen du står i. `~/.local/bin/claude` startar Claude Code för Terminal, i
+- `cd ~/VERA/agent` gör projektets mapp, `~/VERA/agent`, till mappen du står i. `~/.local/bin/claude` startar Claude Code för Terminal, i
   den mappen. Frågar Claude Code om du litar på mappen: svara ja.
 - Säger Terminal `no such file or directory`: stoppa och fråga.
 
@@ -307,7 +291,7 @@ rmdir ~/vera-forprov
 
 **Stoppades `ls` inte i e: avbryt installationen.** Gå vidare till steg 4 bara om `ls` stoppades.
 
-## Steg 4: flytta nvm-mappen och Cryptexes-mappen sist i PATH, och kontrollera alias, funktioner och zsh:s filer (före installationen)
+## Steg 4: flytta nvm-mappen och Cryptexes-mappen sist i PATH, och kontrollera skalet: alias, funktioner och zsh:s filer (före installationen)
 
 Vakten kräver att varje mapp i `PATH` före programmet ägs av systemet och inte går att ändra för någon
 annan (Hugos beslut 2026-10-28 om vakten, beslut 2). På din dator står två mappar före `/usr/bin` och
@@ -322,7 +306,7 @@ annan (Hugos beslut 2026-10-28 om vakten, beslut 2). På din dator står två ma
 
 Båda står så både i den `PATH` som Claude Code själv har (och som vakten får) och i den `PATH` som
 agentens kommandon körs med (kontrollerat 2026-10-28, se `PROGRESS.md`). Utan det här steget stoppar vakten
-**alla** kommandon, också `git status`. Med båda mapparna sist går alla 13 program på listan igenom
+**alla** kommandon, också `git status`. Med båda mapparna sist går alla program på listan igenom
 (prövat med vakten mot din `PATH` 2026-10-28). Vakten har inget undantag för någon av mapparna (Hugos svar
 2026-10-28, punkt 1).
 
@@ -424,153 +408,91 @@ Code läser `PATH` när appen startar, så sessioner som redan är öppna har kv
 appen har fått den nya ordningen syns först efter installationen: i kontrollen efter installationen, steg
 3, ska `git status` gå igenom.
 
-**g. Kontrollera alias och funktioner** (Hugos beslut 2026-10-28, granskning 13, P1 a). Claude Code läser
-in `~/.zshrc` när en session startar, och tar med sig **alias** (ett kortnamn som skalet byter ut mot ett
-annat kommando) och **funktioner** (små program som skrivs direkt i skalet) till varje kommando som agenten
-kör. Vakten ser dem inte. Heter ett alias eller en funktion som ett kommando på listan, till exempel `git`,
-kör skalet aliaset eller funktionen i stället för programmet som vakten prövade. Gör det här i samma nya
-Terminal-fönster som i e, ett kommando i taget:
+**g. Kontrollera skalet i Terminal med kontrollskriptet** (Hugos beslut 2026-10-28 efter granskning 15).
+Claude Code läser in `~/.zshrc` när en session startar, och tar med sig **alias** (ett kortnamn som skalet
+byter ut mot ett annat kommando) och **funktioner** (små program som skrivs direkt i skalet) till varje
+kommando som agenten kör. Vakten ser dem inte. zsh kör också vissa funktioner av sig själv, till exempel de i
+**kroklistorna** (listor med funktioner som körs före varje kommando eller när skalet avslutas), och läser
+in andra filer från sina **startfiler**. Allt det kontrolleras av ett skript i projektet,
+`sparr/kontrollera-skalet.zsh`. Skriptet bara läser, och ändrar ingenting. Det kontrollerar att det bara
+finns väntade alias, funktioner och kroklistor (granskning 13, P1 a, granskning 14, R3, och Hugos svar
+2026-10-28 efter granskning 14, punkt 1), att zsh:s mappar för funktioner (`fpath`) bara är zsh:s egna och
+ägs av systemet (granskning 14, R1), att startfilerna bara läser in nvm:s två filer (granskning 14, R2), och
+att det inte finns någon kompilerad startfil (`.zwc`, granskning 15, S2). Kontrollen är **vänd**: allt som
+inte är väntat avviker, också sådant som verkar ofarligt.
 
-**Kontrollen är vänd** (granskning 14, R3, Hugos beslut 2026-10-28): du letar inte efter farliga namn,
-utan kontrollerar att **bara väntade namn** finns. Allt annat stoppar, också namn som verkar ofarliga.
-Skälet: ett farligt alias eller en farlig funktion behöver inte heta som ett kommando på listan. Ett
-**globalt alias** (`alias -g`) byts ut var det än står i ett kommando, så ett alias som heter `status`
-gör om `git status` till något annat. Och funktioner med vissa särskilda namn körs av zsh av sig själv,
-till exempel `TRAPDEBUG` (före varje kommando) och andra namn som börjar med `TRAP`, `preexec`, `precmd`,
-`chpwd`, `periodic`, `zshexit`, `zshaddhistory`, `zsh_directory_name` och `command_not_found_handler`.
+**Terminals egna funktioner** (Hugos beslut 2026-10-28 efter granskning 15, 8 d). I Terminal är exakt två
+namn godkända i kroklistorna: `update_terminal_cwd` i `precmd_functions` (talar om för Terminal vilken mapp
+skalet står i) och `shell_session_update` i `zshexit_functions` (sparar fönstret när det stängs). Skriptet
+kontrollerar med `whence -v` att båda kommer från Apples fil `/etc/zshrc_Apple_Terminal`, och med `ls -l`
+att `/etc/zshrc` och `/etc/zshrc_Apple_Terminal` ägs av `root` och att varken gruppen eller andra kan
+skriva i dem. Allt annat avviker.
 
-```bash
-alias
-```
-
-- `alias` visar alla alias, också globala alias, ett per rad, som `namn=vad det byts ut mot`. Det bara
-  visar, och ändrar ingenting.
-- **Väntat: exakt två rader**, `run-help=man` och `which-command=whence` (i valfri ordning). zsh har dem
-  alltid.
-- **Står någon annan rad där, eller visas ingenting alls: stoppa och fråga.** Installera inte. (Visas
-  ingenting kan något ha dolt utskriften.)
+Gör det här i samma nya Terminal-fönster som i e, ett kommando i taget. Kontrollera först skriptets
+kontrollsumma:
 
 ```bash
-alias -s
+shasum -a 256 ~/VERA/agent/sparr/kontrollera-skalet.zsh
 ```
 
-- `alias -s` visar alias för filändelser (till exempel att en fil som slutar på `.txt` öppnas med ett
-  visst program). `alias` ovan visar inte dem. Det bara visar, och ändrar ingenting.
-- **Väntat: ingenting.** Visas någon rad: stoppa och fråga. Installera inte.
+- Summan ska vara exakt (Hugos beslut 2026-10-28 efter granskning 15):
+  `4038b5eb32fadc7621ce69aa0fa5f4a511c0bc0ff70f5ee3f25a2260b016eb3d`
+  Den oberoende granskningen bekräftar samma summa. **Är summan en annan: stoppa och fråga.** Kör inte
+  skriptet.
+
+Kör sedan skriptet:
 
 ```bash
-builtin print -rl -- ${(ko)functions:#(_*|nvm*|shell_session*|update_terminal_cwd|compinit|compdef|compdump|compaudit|compinstall|bashcompinit|compgen|complete|getent)} SLUT
+source ~/VERA/agent/sparr/kontrollera-skalet.zsh
 ```
 
-- Kommandot är en enda lång rad, kopiera hela. Det visar namnen på alla funktioner **utom de väntade**,
-  ett per rad, och sist ordet `SLUT`. Det bara visar, och ändrar ingenting.
-- **Väntade funktioner**, som kommandot inte visar: namn som börjar med `_` (zsh:s hjälp för att fylla i
-  kommandon med tabb, ofta flera hundra), med `nvm` (nvm) eller med `shell_session` (Terminal), och
-  `update_terminal_cwd` (Terminal). Dessutom de nio som zsh:s `compinit` och `bashcompinit` lägger in när
-  nvm läses in: `compinit`, `compdef`, `compdump`, `compaudit`, `compinstall`, `bashcompinit`, `compgen`,
-  `complete` och `getent` (prövat med zsh 5.9 på Hugos dator 2026-10-28, i ett test utan Hugos filer).
-- **Väntat: en enda rad, `SLUT`.**
-- **Står något annat än `SLUT`, före `SLUT` eller i stället för det: stoppa och fråga.** Installera
-  inte. Det gäller också om `SLUT` saknas: då har något dolt utskriften, till exempel en funktion som
-  heter `builtin`.
-- Särskilt farligt är ett namn som är ett kommando på listan i SPEC 7.1: `git`, `ls`, `cat`, `head`,
-  `tail`, `grep`, `diff`, `find`, `wc`, `sort`, `mkdir`, `cp` och `tar`, eller ett namn med ett snedstreck
-  (`/`) i sig, till exempel `/usr/bin/git`, eller ett namn som börjar med `'/Library`: zsh kan ha alias och
-  funktioner med en hel sökväg som namn, och då gäller de också när agenten skriver hela sökvägen. Men
-  stoppa och fråga för **varje** namn som visas, inte bara för dem.
+- `source` kör skriptet i det skal du står i, så att det ser just det skalets alias och funktioner.
+- **Väntat: exakt två rader**, `OK` och sedan `SLUT`.
+- **Står det en rad som börjar med `AVVIKER`: stoppa och fråga.** Installera inte. Raden säger vad som
+  avviker, till exempel `AVVIKER: funktion: git` eller `AVVIKER: startfil: …`. Skicka raderna till den som
+  hjälper dig.
+- **Saknas `SLUT`, eller skriver Terminal ett fel: stoppa och fråga.** Då kan något ha dolt utskriften.
 
-**Kroklistor och särskilda funktioner** (Hugos svar 2026-10-28 efter granskning 14, punkt 1). zsh har
-**kroklistor**: listor med namn på funktioner som zsh kör av sig själv, till exempel före varje kommando
-(`preexec_functions`) eller när skalet avslutas (`zshexit_functions`). De ska vara tomma. Funktionerna
-`preexec`, `precmd`, `chpwd`, `periodic`, `zshexit`, `command_not_found_handler` och alla funktioner som
-börjar med `TRAP` körs också av sig själva, och de ska inte finnas. Kör, i samma Terminal-fönster:
+**h. Kontrollera agentens eget skal, i skrivbordsappen** (Hugos beslut 2026-10-28 efter granskning 15, S3).
+Agenten kör sina kommandon i ett annat skal än Terminal. Där lägger Claude Code själv in fyra funktioner:
+`find`, `grep`, `rg` och `pkill` (granskning 15). Kontrollen i g ser inte det skalet, så agenten kör en
+fast kontroll i sitt eget skal. Det går bara **före** installationen: efter den stoppar vakten kommandot.
 
-```bash
-builtin print -rl -- "preexec_functions=(${preexec_functions[*]})" "precmd_functions=(${precmd_functions[*]})" "chpwd_functions=(${chpwd_functions[*]})" "periodic_functions=(${periodic_functions[*]})" "zshaddhistory_functions=(${zshaddhistory_functions[*]})" "zshexit_functions=(${zshexit_functions[*]})" ${(Mko)functions:#(TRAP*|preexec|precmd|chpwd|periodic|zshexit|command_not_found_handler)} SLUT
-```
+1. Starta en ny session i fliken **Code** i skrivbordsappen, i `~/VERA/agent`, i läget **Manual**.
+2. Be agenten: "Kör exakt det här kommandot med Bash-verktyget, och ändra ingenting i det:" och klistra in
+   kommandot nedan (en enda lång rad).
 
-- Kommandot är en enda lång rad, kopiera hela. Det visar de sex kroklistorna, en per rad, med innehållet
-  mellan parenteserna. Sedan visar det namnet på varje särskild funktion som finns, och sist ordet `SLUT`.
-  Det bara visar, och ändrar ingenting.
-- **Väntat: exakt de här sju raderna**, i den här ordningen, med **ingenting** mellan parenteserna:
+   ```bash
+   builtin print -rl -- "preexec_functions=(${preexec_functions[*]})" "precmd_functions=(${precmd_functions[*]})" "chpwd_functions=(${chpwd_functions[*]})" "periodic_functions=(${periodic_functions[*]})" "zshaddhistory_functions=(${zshaddhistory_functions[*]})" "zshexit_functions=(${zshexit_functions[*]})" ${(ko)functions:#(_*|nvm*|shell_session*|update_terminal_cwd|compinit|compdef|compdump|compaudit|compinstall|bashcompinit|compgen|complete|getent)} SLUT
+   ```
 
-  ```
-  preexec_functions=()
-  precmd_functions=()
-  chpwd_functions=()
-  periodic_functions=()
-  zshaddhistory_functions=()
-  zshexit_functions=()
-  SLUT
-  ```
+3. Claude Code frågar om lov. Jämför först kommandot i frågan med kommandot ovan, tecken för tecken. Är det
+   samma: svara ja. Annars: svara nej, och stoppa och fråga.
+4. Läs utskriften i **verktygsrutan** (rutan med kommandot och svaret), inte agentens sammanfattning. Det
+   bara visar, och ändrar ingenting. **Väntat: exakt de här elva raderna**, i den här ordningen:
 
-- **Stoppa och fråga**, och installera inte, om:
-  - det står något mellan parenteserna på någon rad, till exempel `precmd_functions=(update_terminal_cwd)`,
-  - det står en rad till före `SLUT`, till exempel `TRAPDEBUG` eller `preexec` (en särskild funktion
-    finns),
-  - en rad saknas, eller `SLUT` saknas (då kan något ha dolt utskriften), eller
-  - Terminal skriver ett fel i stället.
-- **Inte bekräftat:** om Terminal själv lägger in sina egna funktioner (`update_terminal_cwd` och namn som
-  börjar med `shell_session`) i en kroklista. Apples fil för det (`/etc/zshrc_Apple_Terminal`) är inte
-  läst i den här versionen. Står ett sådant namn mellan parenteserna: stoppa och fråga ändå. Då behövs
-  ett beslut om det namnet.
+   ```
+   preexec_functions=()
+   precmd_functions=()
+   chpwd_functions=()
+   periodic_functions=()
+   zshaddhistory_functions=()
+   zshexit_functions=()
+   find
+   grep
+   pkill
+   rg
+   SLUT
+   ```
 
-**h. Kontrollera vilka filer zsh läser in** (granskning 14, R2, Hugos beslut 2026-10-28). De låsta
-inställningarna förbjuder agenten att skriva i de filer som zsh läser in på Hugos dator (`~/.nvm` med mera).
-Läser din zsh in andra filer, till exempel från oh-my-zsh, Homebrew, conda eller iTerm2, har de filerna inget
-förbud. Gör det här på **båda** datorerna, i samma Terminal-fönster:
-
-```bash
-grep -n -E 'source|\. |eval|compinit|autoload|fpath|ZDOTDIR' ~/.zshenv ~/.zprofile ~/.zshrc ~/.zlogin
-```
-
-- `grep` visar raderna i zsh:s fyra startfiler där en annan fil läses in (`source` eller en punkt), där
-  kod körs (`eval`), där zsh:s hjälp för tabb startas eller får fler mappar (`compinit`, `autoload`,
-  `fpath`), eller där zsh:s filer flyttas (`ZDOTDIR`). Varje rad börjar med filens namn och radnumret. Det
-  bara läser, och ändrar ingenting.
-- **Väntat på en dator med nvm:** två rader från `~/.zshrc`, de som läser in nvm:s två filer `nvm.sh` och
-  `bash_completion` (radnumren, och texten efter `#`, kan vara andra):
-  - `…/.zshrc:2:[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm`
-  - `…/.zshrc:3:[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion`
-- **Väntat på en dator utan nvm:** inga rader från filerna.
-- Rader som `grep: …/.zshenv: No such file or directory` är väntade: filen finns inte, och det är bra.
-- **Står någon annan rad där: stoppa och fråga.** Installera inte. Det behövs då en ny version av
-  inställningsfilen med förbud för de filer som raden läser in.
-
-**i. Kontrollera zsh:s mappar för funktioner** (granskning 14, R1, Hugos beslut 2026-10-28). nvm:s fil
-`bash_completion` startar zsh:s `compinit`. `compinit` läser in filen `~/.zcompdump` och funktioner från
-mapparna i zsh:s lista `fpath`. Den som kan skriva där kan lägga in funktioner som gäller i agentens
-kommandon. De låsta inställningarna förbjuder agenten att skriva i `~/.zcompdump`. Mapparna skyddas bara av
-att systemet äger dem, och det kontrollerar du här, i samma Terminal-fönster, ett kommando i taget:
-
-```bash
-print -rl -- $fpath
-```
-
-- Visar mapparna i `fpath`, en per rad, och ändrar ingenting.
-- **Väntat:** varje rad börjar med `/usr/share/zsh/` eller är `/usr/local/share/zsh/site-functions`. Med
-  zsh 5.9 på Hugos dator är det tre rader (prövat 2026-10-28 i ett test utan Hugos filer):
-  `/usr/local/share/zsh/site-functions`, `/usr/share/zsh/site-functions` och
-  `/usr/share/zsh/5.9/functions`. Siffrorna `5.9` kan vara andra med en annan version av zsh.
-- **Står någon annan mapp där**, till exempel en i din hemmapp, `/opt/homebrew`, `.oh-my-zsh` eller `.nvm`:
-  stoppa och fråga. Installera inte.
-
-```bash
-ls -ld $fpath
-```
-
-```bash
-ls -ld /usr/local /usr/local/share /usr/local/share/zsh /usr/local/share/zsh/site-functions
-```
-
-- Det första visar mapparna i `fpath`, det andra mapparna ovanför `/usr/local/share/zsh/site-functions`.
-  Båda bara läser, och ändrar ingenting. Läs raderna som i steg 2.
-- **Väntat på varje rad som finns:** ägaren är `root`, det står **inget `w`** på plats 6 eller 9, och inget
-  `+` eller `@` efter de tio tecknen.
-- En rad som säger `No such file or directory` är bra: mappen finns inte. Då ska mappen ovanför, som finns,
-  vara rätt enligt raden ovan. Det andra kommandot visar den.
-- **Är ägaren inte `root`, står det `w` på plats 6 eller 9, eller `+` eller `@`: stoppa och fråga.**
-  Installera inte.
+   De sex första raderna är kroklistorna, som ska vara tomma. Sedan kommer varje funktion som inte är
+   väntad, och där ska bara Claude Codes fyra stå. En särskild funktion som zsh kör av sig själv, till
+   exempel `TRAPDEBUG` eller `preexec`, skulle synas där.
+5. **Stoppa och fråga**, och installera inte, om det står något mellan parenteserna, om det står något annat
+   namn än `find`, `grep`, `pkill` och `rg`, om något av dem saknas, om `SLUT` saknas, om Claude Code vägrar
+   köra kommandot, eller om verktygsrutan visar ett fel. **Inte bekräftat:** att Claude Code släpper igenom
+   kommandot (granskning 15 såg att en inbyggd kontroll i Claude Code stoppade ett annat `print`-kommando),
+   och att namnen är desamma i en annan version av Claude Code.
 
 Ångra steget: `cp ~/.zshrc.fore-vera ~/.zshrc`, och starta om Terminal och Claude-appen. Då stoppar vakten
 alla kommandon igen.
@@ -578,13 +500,14 @@ alla kommandon igen.
 ## Steg 5: kontrollera att filerna är de som granskades
 
 ```bash
-shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-settings.json
+shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-settings.json ~/VERA/agent/requirements.txt
 ```
 
 - `shasum -a 256` räknar ut en **kontrollsumma** för varje fil: ett "fingeravtryck" på 64 tecken.
   Minsta ändring i en fil ger en helt annan summa. Kommandot bara läser, och ändrar ingenting.
-- Jämför de två summorna, tecken för tecken, med dem som den oberoende granskningen har skrivit upp
-  (Hugos beslut 2026-10-28). **Är någon summa olika: stoppa och fråga.** Kopiera ingenting.
+- Jämför de tre summorna, tecken för tecken, med dem som den oberoende granskningen har skrivit upp
+  (Hugos beslut 2026-10-28). `requirements.txt` är listan över paket som installeras i steg 9 (granskning
+  15, S6, Hugos beslut 2026-10-28). **Är någon summa olika: stoppa och fråga.** Kopiera ingenting.
 
 ## Steg 6: skapa mapparna och låt systemet äga dem
 
@@ -727,11 +650,12 @@ sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
 ## Steg 12: kontrollera att det är samma filer som ligger på plats
 
 ```bash
-shasum -a 256 "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/managed-settings.json"
+shasum -a 256 "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/managed-settings.json" ~/VERA/agent/requirements.txt
 ```
 
-- Samma kontroll som i steg 5, nu för filerna där de installerades. Summorna ska vara exakt samma som
-  i steg 5. **Är någon olika: stoppa och fråga.**
+- Samma kontroll som i steg 5, nu för filerna där de installerades, och för `requirements.txt`, som steg 9
+  installerade paketen från (granskning 15, S6). Summorna ska vara exakt samma som i steg 5. **Är någon
+  olika: stoppa och fråga.**
 
 ## Steg 13: kontrollera ägare och rättigheter igen (efter installationen)
 
@@ -767,7 +691,7 @@ tio tecknen: installationen räknas som misslyckad. Stoppa och fråga.**
 1. **Starta nya sessioner** i skrivbordsappen (och i terminalen, om du har Claude Code där). Sessioner som
    redan är öppna kan ha läst inställningarna innan filen fanns.
 2. **Kontrollera att de låsta inställningarna gäller** (Hugos beslut 2026-10-28, beslut 3). Raden visas
-   inte i skrivbordsappen, så den läses i Terminal (Hugos svar 2026-10-28, punkt 3): kör `cd ~/VERA` och
+   inte i skrivbordsappen, så den läses i Terminal (Hugos svar 2026-10-28, punkt 3): kör `cd ~/VERA/agent` och
    sedan `~/.local/bin/claude` (hela sökvägen, Hugos beslut 2026-10-28, granskning 13, P3 b), som i steg 1,
    skriv `/status` och leta upp raden **Setting sources**. Säger Terminal `no such file or directory`:
    stoppa och fråga. Raden ska visa `Enterprise managed settings (file)`,
@@ -808,33 +732,32 @@ tio tecknen: installationen räknas som misslyckad. Stoppa och fråga.**
       filen (och för mappen den ligger i, om den läser in fler filer därifrån). Den byggs med test,
       granskas oberoende och installeras av dig, som en ny version av vakten.
     - **Har ett program redan lagt in raden:** stoppa och fråga innan nästa session med agenten.
-    - Samma sak gäller `~/.zshenv`, `~/.zprofile` och `~/.zlogin`, och en rad som lägger till ett alias
-      eller en funktion. Gör efteråt kontrollen av alias och funktioner i steg 4 g igen.
-    - Samma sak gäller en rad med `eval`, `compinit`, `autoload`, `fpath` eller `ZDOTDIR`. Gör efteråt
-      kontrollerna i steg 4 h och 4 i igen (granskning 14, R1 och R2, Hugos beslut 2026-10-28).
+    - Samma sak gäller `~/.zshenv`, `~/.zprofile` och `~/.zlogin`, en rad som lägger till ett alias eller
+      en funktion, och en rad med `eval`, `compinit`, `autoload`, `fpath` eller `ZDOTDIR` (granskning 14, R1
+      och R2, Hugos beslut 2026-10-28). Gör efteråt kontrollen med skriptet i steg 4 g igen.
 
 ## Caspers dator
 
 Samma steg, i samma ordning, och samma versionskontroll i steg 1 (minst 2.1.295, med `/status` i
 skrivbordsappen och med `~/.local/bin/claude --version` i Terminal om Claude Code för Terminal finns där,
-med hela sökvägen och samma varning för installerarens förslag). Samma kontroll av alias och funktioner i
-steg 4 g och i kontrollen efter installationen, steg 1. Samma förprov i steg 3 och samma kontroll av
-mapparna i steg 2 och 13. Samma `managed-settings.json` fungerar: regeln som hindrar agenten att skriva i
+med hela sökvägen och samma varning för installerarens förslag). Samma kontrollskript i steg 4 g och i
+kontrollen efter installationen, steg 1, och samma kontroll av agentens skal i steg 4 h. Samma förprov i
+steg 3 och samma kontroll av mapparna i steg 2 och 13. Samma `managed-settings.json` fungerar: regeln som hindrar agenten att skriva i
 `.git` (`Edit(//**/.git/**)`) gäller varje `.git`-mapp på datorn och har inget användarnamn i sig.
 Skillnader:
 
-- Sökvägen till projektet kan vara en annan. Byt `~/VERA/agent` i steg 5, 7, 9 och 10 mot där projektet
-  ligger på Caspers dator.
+- Sökvägen till projektet kan vara en annan. Byt `~/VERA/agent` i steg 1, 4 g, 5, 7, 9, 10 och 12 mot där
+  projektet ligger på Caspers dator.
 - Steg 4: kör `echo $PATH` från steg 4 e först. Raden för Cryptexes-mappen (steg 4 c) läggs in också
   på Caspers dator (Hugos svar 2026-10-28, punkt 1). Raden för nvm-mappen (steg 4 b) behövs bara om nvm
   finns där. Utan nvm ska bara den sista raden i steg 4 d vara Cryptexes-raden (se steg 4 d). Står någon
   annan mapp än systemets före `/usr/bin`, till exempel Homebrew (`/opt/homebrew/bin`): stoppa och fråga,
   eftersom vakten då stoppar alla kommandon.
-- **Steg 4 h, vilka filer Caspers zsh läser in** (granskning 14, R2, Hugos beslut 2026-10-28). Förbuden i
-  de låsta inställningarna bygger på vad zsh läser in på Hugos dator. Casper gör därför steg 4 h på sin
-  dator före installationen. Visar `grep` något annat än nvm:s två rader (eller inga rader alls, utan nvm),
-  till exempel oh-my-zsh, Homebrews `brew shellenv`, conda eller iTerm2: stoppa och fråga. Installera
-  inte förrän en ny version av inställningsfilen har förbud för de filerna.
+- **Steg 4 g, vilka filer Caspers zsh läser in** (granskning 14, R2, Hugos beslut 2026-10-28). Förbuden i
+  de låsta inställningarna bygger på vad zsh läser in på Hugos dator. Casper kör därför skriptet i steg 4 g
+  på sin dator före installationen. Visar det en rad `AVVIKER: startfil: …`, till exempel för oh-my-zsh,
+  Homebrews `brew shellenv`, conda eller iTerm2: stoppa och fråga. Installera inte förrän en ny version av
+  inställningsfilen har förbud för de filerna.
 - **Claude Code för Terminal behövs på Caspers dator** (granskning 14, R5, Hugos beslut 2026-10-28). Raden
   Setting sources syns bara i Terminal (steg 1, "Efteråt" punkt 2 och kontrollen efter installationen,
   steg 1). Utan Claude Code för Terminal i `~/.local/bin/claude` går det inte att se att de låsta
@@ -856,7 +779,7 @@ uppgift 4, men ska vara gjort före läget "auto", före körningar utan att Hug
 körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28, 8).
 
 1. **De låsta inställningarna gäller.** Raden **Setting sources** visas inte i skrivbordsappen, så den läses
-   i Terminal (Hugos svar 2026-10-28, punkt 3): kör `cd ~/VERA` och sedan `~/.local/bin/claude` (hela
+   i Terminal (Hugos svar 2026-10-28, punkt 3): kör `cd ~/VERA/agent` och sedan `~/.local/bin/claude` (hela
    sökvägen, Hugos beslut 2026-10-28, granskning 13, P3 b), som i installationens steg 1, och skriv
    `/status`. Säger Terminal `no such file or directory`: stoppa och fråga. Raden ska
    visa `Enterprise managed settings (file)`, alltså inställningarna från filen du installerade
@@ -869,34 +792,22 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
    några gånger, och "auto" ska inte komma upp (code.claude.com/docs/en/settings-reference,
    `disableAutoMode`).
 
-   **Alias och funktioner, igen efter installationen** (Hugos beslut 2026-10-28, granskning 13, P1 a).
-   Öppna ett nytt Terminal-fönster (Cmd+N) och kör, ett i taget:
+   **Skalet, igen efter installationen** (Hugos beslut 2026-10-28, granskning 13, P1 a, och efter
+   granskning 15). Öppna ett nytt Terminal-fönster (Cmd+N) och kör, ett i taget, samma två kommandon som i
+   installationens steg 4 g:
 
    ```bash
-   alias
+   shasum -a 256 ~/VERA/agent/sparr/kontrollera-skalet.zsh
    ```
 
    ```bash
-   alias -s
+   source ~/VERA/agent/sparr/kontrollera-skalet.zsh
    ```
 
-   ```bash
-   builtin print -rl -- ${(ko)functions:#(_*|nvm*|shell_session*|update_terminal_cwd|compinit|compdef|compdump|compaudit|compinstall|bashcompinit|compgen|complete|getent)} SLUT
-   ```
-
-   ```bash
-   builtin print -rl -- "preexec_functions=(${preexec_functions[*]})" "precmd_functions=(${precmd_functions[*]})" "chpwd_functions=(${chpwd_functions[*]})" "periodic_functions=(${periodic_functions[*]})" "zshaddhistory_functions=(${zshaddhistory_functions[*]})" "zshexit_functions=(${zshexit_functions[*]})" ${(Mko)functions:#(TRAP*|preexec|precmd|chpwd|periodic|zshexit|command_not_found_handler)} SLUT
-   ```
-
-   Samma vända kontroll som i installationens steg 4 g (granskning 14, R3, Hugos beslut 2026-10-28):
-   `alias` ska visa exakt två rader, `run-help=man` och `which-command=whence`, `alias -s` ska inte visa
-   något, och det tredje kommandot ska visa en enda rad, `SLUT`. Det fjärde kommandot visar kroklistorna
-   och de särskilda funktionerna (Hugos svar 2026-10-28 efter granskning 14, punkt 1): väntat är exakt de
-   sju raderna i steg 4 g, från `preexec_functions=()` till `SLUT`, med ingenting mellan parenteserna och
-   ingen rad till före `SLUT`. **Står något annat där, eller saknas något av det: stoppa och fråga**,
-   och kör inte uppgift 4. Varje namn som visas stoppar, inte bara de som är farligast: ett kommando på
-   listan (`git`, `ls`, `cat`, `head`, `tail`, `grep`, `diff`, `find`, `wc`, `sort`, `mkdir`, `cp` och
-   `tar`), ett namn med ett snedstreck (`/`) i sig, eller ett särskilt namn som `TRAPDEBUG`.
+   Summan ska vara samma som i steg 4 g, och skriptet ska skriva exakt `OK` och `SLUT`. **Är summan en
+   annan, står det en rad som börjar med `AVVIKER`, eller saknas `SLUT`: stoppa och fråga**, och kör inte
+   uppgift 4. Kontrollen av agentens skal i steg 4 h går inte att göra efter installationen, eftersom vakten
+   stoppar kommandot.
 2. **Ihopkopplade kommandon stoppas.** Be agenten köra `ls; ls`. Det ska stoppas med ett fel som börjar
    "Stoppat av vakten" och säger att kommandon inte kopplas ihop.
 3. **Ett kommando på listan går igenom.** Be agenten köra `git status`. Claude Code frågar dig som vanligt

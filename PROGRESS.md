@@ -6,8 +6,37 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **3 456 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
-Hugos svar 2026-10-28 efter granskning 14, fortsättning).
+Testsviten: **3 669 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
+Hugos beslut om granskning 15).
+
+**Regler tills vakten är installerad** (Hugos beslut 2026-10-28 efter granskning 15):
+
+- Varje session körs i läget **Manual** tills vakten är installerad. Granskning 15 kördes av misstag i läget
+  auto.
+- **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
+- **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
+  på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-10-28, efter Hugos beslut om granskning 15
+
+**Byggt** (inte installerat, inte granskat, inga `sudo`-kommandon körda, inget i `/Library` rört, inga filer
+i hemmappen ändrade, inga kontrollsummor för filerna som ska installeras). Besluten och detaljerna står i
+`GRANSKNING.md`, "Hugos svar 2026-10-28 efter granskning 15".
+
+- **S1:** `find` är borttaget ur listan i SPEC 7.1 och ur vakten. `grep` står kvar, men bara med tillägg som
+  söker, eftersom verktyget Grep inte finns i skrivbordsappen (sett i byggsessionen). `rg` har aldrig stått
+  på listan. Granskarens väntade tester för S1 är gröna.
+- **S2:** förbud för den kompilerade versionen (`.zwc`) av varje förbjuden zsh-startfil och av
+  `~/.zcompdump`. Granskarens väntade test för S2 är grönt.
+- **S3:** INSTALLERA.md steg 4 h: agenten kör en fast, läsande kontroll i sitt eget skal före installationen.
+- **S5:** SPEC 7.1 säger hur `grep`, `find` och `rg` hanteras. **S6:** steg 5 och 12 kontrollerar
+  `requirements.txt`. **8 d:** Terminals två namn i kroklistorna, med ursprung och ägare, i skriptet.
+- **Förenklingen:** historiken är flyttad ur INSTALLERA.md, och kontrollerna i steg 4 ligger i
+  `sparr/kontrollera-skalet.zsh`, som Hugo kör i Terminal efter att ha kontrollerat dess kontrollsumma.
+- **`cd ~/VERA/agent`** i stället för `cd ~/VERA` i INSTALLERA.md, SPEC 7.1 och PROGRESS.md.
+- **Testsviten:** 3 669 passed, 0 misslyckade och inga väntat röda (före: 3 469 passed och 7 xfailed).
+- **Beslut som behövs:** se `GRANSKNING.md`, "Hugos svar 2026-10-28 efter granskning 15". Därefter en ny
+  oberoende granskning, med kontrollsummor, före installationen.
 
 ## Läge 2026-10-28, efter Hugos beslut om granskning 14
 
@@ -116,7 +145,8 @@ och andra filer i hemmappen inte ändrade, inga kontrollsummor). Besluten och de
 
 1. **P4:** förbuden räcker, ägandet ändras inte. Sandlådan ska förbjuda skrivning i appen, appens Claude
    Code och `~/.local/share/claude` (Öppet, punkt 4).
-2. **P3 b:** `cd ~/VERA` står kvar först, före `~/.local/bin/claude`.
+2. **P3 b:** `cd` står kvar först, före `~/.local/bin/claude`. Mappen är `~/VERA/agent` (rättat efter Hugos
+   beslut 2026-10-28 efter granskning 15).
 3. **Hela `~/Library/Application Support/Claude`** förbjuds för agentens fil-verktyg. Byggt, med test.
 4. **Ändringen i SPEC 7.1** (P2 och P3 b) godkänns.
 
@@ -140,8 +170,8 @@ Besluten och detaljerna står i `GRANSKNING.md`, "Granskning 11 – plan för Q1
   installationen tas den gamla `.venv` bort (INSTALLERA.md, "Efteråt"), och listan i SPEC 7.1 pekar bara på
   den nya platsen.
 - **Svar 3, Setting sources:** bara en annan låst källa underkänner installationen. `User settings`,
-  `Project settings` och `Project local settings` är väntade. Raden läses i Terminal (`cd ~/VERA`, `claude`,
-  `/status`). Nytt sista steg i kontrollen efter installationen: agenten ombeds köra `date` i
+  `Project settings` och `Project local settings` är väntade. Raden läses i Terminal (`cd ~/VERA/agent`, `claude`,
+  `/status`; mappen rättad efter granskning 15). Nytt sista steg i kontrollen efter installationen: agenten ombeds köra `date` i
   skrivbordsappen, och vakten ska stoppa det. Ersätter beslut 4 om vakten.
 - **OVERLAMNING.md** nämner inte längre den gamla `.venv`.
 - **Tester:** 8 nya, 508 för vakten. Hela testsviten: **3 312 passed**, 0 misslyckade.
@@ -285,7 +315,8 @@ fattade och byggda, se avsnittet ovan.)
    en egen testfil som körs med pytest och raderar eller skriver i projektet. Det stoppas av en **sandlåda**
    (ett skydd i macOS som gör att kommandon bara kan skriva i vissa mappar). **Öppen, inte byggd.** Hugos
    beslut 2026-10-28: sandlådan byggs i spärrsteget, men ska vara klar **före uppgift 5, eller före första
-   hela körningen på riktiga underlag om den kommer först**. **Sandlådan ska förbjuda skrivning i appen
+   hela körningen på riktiga underlag om den kommer först**. Hugos beslut 2026-10-28 efter granskning 15:
+   **sandlådan görs direkt efter installationen**, och ska också täcka det som står i punkt 8. **Sandlådan ska förbjuda skrivning i appen
    (`/Applications/Claude.app`), appens Claude Code (`~/Library/Application Support/Claude/claude-code`) och
    `~/.local/share/claude`** (Hugos svar 2026-10-28 efter granskning 13, punkt 1). De ägs av Hugo, och
    förbuden i de låsta inställningarna stoppar bara agentens fil-verktyg, inte en egen testfil.
@@ -318,6 +349,11 @@ fattade och byggda, se avsnittet ovan.)
    eftersom appens startmiljö går före `env` i alla inställningsfiler (svaren med länkar: "Läge 2026-10-28,
    efter Hugos beslut om granskning 14", steg 1). Vilka filer bash läser in (`~/.bash_profile`, `BASH_ENV`)
    är inte heller bekräftat. **Öppen, inte gjord.**
+8. **Det kontrollskriptet inte ser** (granskning 15, S4, godtagen av Hugos beslut 2026-10-28). Fällor satta
+   med kommandot `trap` (till exempel `trap '…' DEBUG`, som körs före varje kommando), skalets tabell över
+   program (`hash`, till exempel `hash git=…`, som får `git` att köra en annan fil oavsett `PATH`), och en funktion som heter
+   `builtin` och härmar kontrollens svar. Alla tre kräver en rad i en startfil, som har förbud. De ska täckas
+   av **sandlådan** (punkt 4). **Öppen, inte byggd.**
 
 ## Nästa steg i byggordningen
 
@@ -405,7 +441,7 @@ avsnitt 8, med namn och datum.
   (Claude Code för Terminal behålls, utanför `PATH`). Byggt, inte installerat. Detaljer: `GRANSKNING.md`.
 - **Hugos svar 2026-10-28 efter granskning 13, punkt 1–4:** förbuden räcker för appen och ägandet ändras
   inte, och sandlådan ska förbjuda skrivning i appen, appens Claude Code och `~/.local/share/claude` (1),
-  `cd ~/VERA` står kvar först (2), hela `~/Library/Application Support/Claude` förbjuds för agentens
+  `cd` till projektmappen står kvar först (2, mappen rättad till `~/VERA/agent` efter granskning 15), hela `~/Library/Application Support/Claude` förbjuds för agentens
   fil-verktyg (3), och ändringen i SPEC 7.1 godkänns (4). Byggt, inte installerat.
 - **Hugos beslut i chatten 2026-10-27:** listan över ägare och närstående ligger kvar i
   `foretag/<namn>/regelbok.json` tills spärrsteget, eftersom SPEC inte säger var den skyddade mappen ska

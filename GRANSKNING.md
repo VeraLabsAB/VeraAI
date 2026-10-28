@@ -5129,3 +5129,169 @@ Allt annat: `.venv/bin/python -B -m pytest -p no:cacheprovider` (mot `scripts/te
    en fil med kontrollsumma?
 
 Därefter: en ny oberoende granskning av den nya versionen, med kontrollsummor, före installationen.
+
+### Hugos svar 2026-10-28 efter granskning 15
+
+Skrivna av Hugo i uppdraget till byggsessionen i chatten 2026-10-28, som svar på "Beslut som behövs" ovan.
+Byggsessionen startade i läget auto. Den stannade innan något var läst eller ändrat, och fortsatte först när
+Hugo hade bytt till Manual.
+
+**Besluten (Hugos beslut 2026-10-28):**
+
+- **S1.** Ta bort `find` från listan i SPEC 7.1 och i vakten. Agenten söker filer med sina egna verktyg (Glob
+  och Grep). Kontrollera först att inget i arbetssättet, testerna eller dokumenten kräver `find` via Bash. Gör
+  samma bedömning för `grep` och `rg`, och ta bort dem om inget kräver dem. Om något kräver dem: bara
+  sökande tillägg släpps igenom, och allt annat stoppas, bland annat `-rm`, `-delete`, `-exec`, `-execdir`,
+  `-ok`, `-okdir`, `-fprint` och `-fls`. Granskarens väntade tester för S1 ska bli gröna.
+- **S2.** Förbud för agentens fil-verktyg att skriva i `.zwc`-versionen av varje zsh-startfil som redan är
+  förbjuden, och av `~/.zcompdump`. Granskarens väntade test ska bli grönt.
+- **S3.** Ett steg i INSTALLERA.md före installationen där Hugo i skrivbordsappen ber agenten köra en fast,
+  läsande kontroll i sitt eget skal och jämför verktygsrutan med en exakt lista: kroklistorna tomma, inga
+  särskilda funktioner, exakt de funktioner Claude Code själv lägger in. Vad han ska se och när han ska stoppa.
+- **S4.** Godtas. I PROGRESS.md under "Öppet": `trap`, `hash` och en funktion som heter `builtin` ska täckas av
+  sandlådan.
+- **S5.** Rätta texten i SPEC 7.1 så att den säger hur `grep`, `find` och `rg` hanteras efter S1.
+- **S6.** Steg 5 och 12 i INSTALLERA.md kontrollerar också `requirements.txt`.
+- **8 d.** I Terminal är exakt `update_terminal_cwd` i `precmd_functions` och `shell_session_update` i
+  `zshexit_functions` godkända. Kontrollen visar också med `whence -v` att båda kommer från
+  `/etc/zshrc_Apple_Terminal`, och med `ls -l` att `/etc/zshrc` och `/etc/zshrc_Apple_Terminal` ägs av root
+  utan skrivrätt för andra. Allt annat stoppar.
+- **Förenklingen** av INSTALLERA.md, utan att skyddet blir svagare: historiken flyttas hit, och kontrollerna i
+  steg 4 (alias, funktioner, kroklistor, `fpath`, startfiler) läggs i ett skript som bara läser, med en
+  kontrollsumma i INSTALLERA.md. Skriptet skriver OK eller exakt vad som avviker, och sist SLUT.
+- **`cd ~/VERA/agent`.** Projektets git-mapp är `~/VERA/agent`. Rätta `cd ~/VERA` överallt, med ett test.
+- **PROGRESS.md:** sandlådan görs direkt efter installationen. Stoppregel: vakten installeras när en granskning
+  inte hittar något allvarligt eller medel som är orättat; låga fynd går till "Öppet". Varje session körs i
+  läget Manual tills vakten är installerad; granskning 15 kördes av misstag i auto.
+
+**Byggt 2026-10-28** (inte installerat, inte granskat):
+
+- **S1, bedömningen.** `find`: inget i arbetssättet, testerna eller dokumenten kräver det via Bash. Testerna
+  prövade bara att vakten släppte igenom det, ett exempel i SPEC 7.1 (citattecken) använde det, och
+  OVERLAMNING.md räknade upp det. Filer kan listas med `ls -R`. **Borttaget.** `rg`: har aldrig stått på
+  listan, och vakten stoppar det redan. `grep`: **något kräver det.** Hugos beslut utgår från att agenten har
+  verktygen Glob och Grep, men **i skrivbordsappen finns de inte**. I byggsessionen svarade Claude Code på ett
+  anrop av Grep: "Grep is not available in this session — search file contents with `grep` via the Bash tool
+  instead", och Glob fanns inte heller bland verktygen. Utan `grep` kan agenten bara söka i en fil genom att
+  läsa hela filen (GRANSKNING.md har över 5 000 rader). Därför står `grep` kvar, med Hugos väg för det fallet:
+  bara tillägg som söker. **Dokumentationen är inte läst i den här frågan:** sidan tools-reference kom tillbaka
+  som en för lång fil som Claude Code sparade i hemmappen, och den lästes inte (CLAUDE.md).
+- **S1, vakten.** `find` är borta ur `LASANDE`, och `FIND_FORBJUDNA` och regeln för `find` är borttagna. `grep`
+  har en uttrycklig lista (`GREP_KORTA`, `GREP_KORTA_VARDE`, `GREP_LANGA`, `GREP_LANGA_TAL`,
+  `GREP_LANGA_MONSTER`): `-n`, `-i`, `-r`, `-R`, `-l`, `-L`, `-c`, `-v`, `-w`, `-x`, `-E`, `-F`, `-H`, `-h`,
+  `-o`, `-s`, `-q`, `-I`, `-e` med ett mönster, `-A`, `-B`, `-C` och `-m` med ett tal, samma med långa namn, och
+  `--include=`, `--exclude=` och `--exclude-dir=`. Namnen jämförs exakt (ingen förkortning). Allt annat stoppas,
+  också `-f`, `-P`, `-z`, `-Q`, `--filter`, `--pager`, `--view`, `--config`, `--save-config` och `---`. Mönster
+  och filmönster prövas som sökvägar, som förut. Markeringen `xfail` är borttagen från granskarens
+  `test_find_med_rm_stoppas`, som är grönt.
+- **S2.** `Edit(~/.zshrc.zwc)`, `Edit(~/.zshenv.zwc)`, `Edit(~/.zprofile.zwc)`, `Edit(~/.zlogin.zwc)`,
+  `Edit(~/.zlogout.zwc)`, samma fem för `//etc/`, och `Edit(~/.zcompdump.zwc)` (som `~/.zcompdump*` redan
+  täckte). `//etc/zshrc_*` täcker redan `zshrc_Apple_Terminal.zwc`. Markeringen `xfail` är borttagen från
+  granskarens `test_kompilerade_startfiler_har_ett_forbud`, som är grönt.
+- **S3.** INSTALLERA.md steg 4 h: en ny session i skrivbordsappen, i läget Manual, där agenten kör ett fast
+  kommando som visar de sex kroklistorna och varje funktion som inte är väntad, och sist `SLUT`. Väntat: elva
+  rader, de sex kroklistorna tomma, sedan `find`, `grep`, `pkill`, `rg` och `SLUT`. Hugo jämför kommandot i
+  frågan om lov med texten, och utskriften i verktygsrutan med listan. Särskilda funktioner syns i samma
+  lista, eftersom inget av deras namn är väntat. **Inte prövat i agentens skal:** kommandot står inte på
+  listan i SPEC 7.1, så byggsessionen körde det inte. Namnen kommer från granskning 15.
+- **S4.** PROGRESS.md, "Öppet", punkt 8, och punkt 4 (sandlådan).
+- **S5.** SPEC 7.1: "`find` står inte på listan", "`grep` får bara söka" med listan, "`rg` står inte heller på
+  listan", och i "Det PATH-regeln inte ser" att skalet för `grep` kör Claude Codes `ugrep`, och vad som
+  skyddar det. Exemplet för citattecken använder `grep` i stället för `find`. OVERLAMNING.md har samma ändring.
+- **S6.** `~/VERA/agent/requirements.txt` sist i `shasum` i steg 5 och 12.
+- **8 d.** I skriptet: kroklistorna jämförs exakt, `whence -v` för båda namnen ska säga "… is a shell function
+  from /etc/zshrc_Apple_Terminal", och `ls -ld` för `/etc/zshrc` och `/etc/zshrc_Apple_Terminal` ska visa
+  ägaren `root`, inget `w` för gruppen eller andra (strängare än beslutets "andra", som resten av
+  INSTALLERA.md), inget `+` eller `@`, och ingen länk. Tomma kroklistor avviker också, eftersom beslutet säger
+  att allt annat stoppar.
+- **Förenklingen.** Historiken står nedan. `sparr/kontrollera-skalet.zsh` gör det som steg 4 g, h och i gjorde:
+  alias (också globala och för filändelser), funktioner (samma väntade namn), kroklistor, `fpath` med ägare,
+  och startfiler (samma mönster i samma fyra filer, bara nvm:s två rader godtas). Dessutom två tillägg som
+  hör till startfilerna: en kompilerad startfil (`.zwc`, S2) eller en satt `ZDOTDIR` avviker. Skriptet körs i
+  en funktion utan namn med `emulate -L zsh`, så att inget finns kvar i skalet efteråt och skalets egna
+  inställningar inte ändrar kontrollen. Hugo kontrollerar skriptets kontrollsumma (står i steg 4 g) och kör
+  `source ~/VERA/agent/sparr/kontrollera-skalet.zsh`. Samma två kommandon i kontrollen efter installationen,
+  steg 1.
+- **Två saker som testerna hittade i skriptet:** inne i en funktion visar zsh inte en funktion som heter
+  `TRAPEXIT`, så listan över funktioner tas med från skalet utanför. Och med inställningen `SH_GLOB` i skalet
+  kan zsh inte läsa skriptet alls: då skrivs ett fel och ingen `SLUT`, och Hugo stoppar. Det är den säkra
+  riktningen.
+- **`cd ~/VERA/agent`** i INSTALLERA.md (steg 1, "Efteråt" punkt 2 och kontrollen efter installationen,
+  steg 1), SPEC 7.1 och PROGRESS.md. Äldre avsnitt i den här filen beskriver vad granskningarna såg, och är
+  inte ändrade.
+
+**INSTALLERA.md före och efter:**
+
+| | Före | Efter |
+|---|---|---|
+| Steg | 13 (steg 4 med nio delsteg, a–i) | 13 (steg 4 med åtta delsteg, a–h) |
+| Kommandorutor | 51 | 44 |
+| `sudo`-kommandon | 16 | 16 |
+| Rader | 989 | 900 |
+| Ord | 9 043 | 8 111 |
+
+`sudo`-kommandona är desamma. Steg 4 g och kontrollen efter installationen, steg 1, har två kommandon var i
+stället för fyra (g) och sju (g, h och i), och steg 4 h (S3) är nytt.
+
+**Tester:** ny fil `scripts/tests/test_beslut_granskning_15.py`: S1 (`find` och `rg` stoppas med varje
+tillägg, `grep` med 26 andra tillägg stoppas, listan i SPEC), S2 (varje förbud, och att varje förbjuden
+startfil har ett för sin `.zwc`), S3 (steget, och kommandot i `zsh -f` med Claude Codes fyra funktioner),
+S4, S5, S6, 8 d, skriptet (OK och SLUT, varje sorts avvikelse, inget kvar efteråt, kontrollsumman, att det
+inte skriver filer), `cd ~/VERA/agent`, historiken, att INSTALLERA.md är kortare, och PROGRESS.md. I
+`test_kommandosparr.py`: `grep` med tilläggen på listan går igenom, `find` och `rg` stoppas, och listan över
+kommandon i INSTALLERA.md har skriptet och kommandot i steg 4 h i stället för de gamla kommandona. I
+`test_beslut_granskning_13.py` och `test_beslut_granskning_14.py` prövar testerna som läste kommandona ur
+INSTALLERA.md nu skriptet. Proven av hur zsh beter sig med de gamla kommandona står kvar. Hela testsviten:
+**3 669 passed**, 0 misslyckade och inga väntat röda (före: 3 469 passed och 7 xfailed). Granskarens sju
+väntat röda tester för S1 och S2 är gröna, och de var röda på den gamla versionen. De nya testerna är inte
+körda mot en kopia av `f400bb7`.
+
+**Beslut som behövs (Hugo eller Casper):**
+
+1. **`grep` står kvar** (S1), eftersom verktyget Grep inte finns i skrivbordsappen. Godkänns det, och listan
+   över tillägg?
+2. **8 d, strängare än beslutet:** skriptet kräver att varken gruppen eller andra kan skriva i `/etc/zshrc`
+   och `/etc/zshrc_Apple_Terminal` (beslutet sa "andra"), och tomma kroklistor i Terminal avviker. Godkänns
+   det?
+3. **Två tillägg i skriptet:** en kompilerad startfil (`.zwc`) eller en satt `ZDOTDIR` avviker. Godkänns de?
+4. Därefter: en ny oberoende granskning av den nya versionen, med kontrollsummor, före installationen.
+
+**Kontrollsummor:** inte framtagna för vakten, inställningsfilen och `requirements.txt` (uppdraget). De tas fram
+i nästa oberoende granskning. Skriptets summa står i INSTALLERA.md steg 4 g, som Hugo beslutade, och ett test
+visar att den stämmer med filen.
+
+**Kommandon i byggsessionen:** bara från listan, ett i taget: `git status`, `git log`, `git diff`, `git add`,
+`git commit`, `ls`, `wc`, `grep` och `.venv/bin/python -B -m pytest -p no:cacheprovider` mot `scripts/tests`.
+Utanför listan: **varje kommando började med `cd` till projektmappen och `&&`** (`cd
+/Users/hugolindholmer/VERA/agent && …`), och det första var dessutom ihopkopplat (`git status && git log
+--oneline -3`). SPEC 7.1 säger att `cd` och `&&` inte används. Kommandona efter `&&` stod på listan. WebFetch för code.claude.com (svaret sparades i
+hemmappen och lästes inte). Inga `sudo`-kommandon, inget i `/Library` rört, inga filer i hemmappen ändrade,
+ingen radering prövad.
+
+#### Historiken i INSTALLERA.md
+
+Flyttad hit från början av `sparr/INSTALLERA.md` (Hugos beslut 2026-10-28 efter granskning 15), ordagrant:
+
+> Skriven 2026-10-28 i byggsessionen för granskning 11, Q1. Planen och Hugos beslut står i `GRANSKNING.md`
+> under "Granskning 11 – plan för Q1". Ändrad samma dag efter Hugos beslut 2026-10-28 om PATH-regeln,
+> förprovet för `onFailure` och P7 (`GRANSKNING.md`, "Beslut 2026-10-28: PATH-regel, förprov för onFailure,
+> P7"). Ändrad igen samma dag efter Hugos beslut 2026-10-28 om vakten, beslut 1–4 (`GRANSKNING.md`,
+> "Granskning 11 – plan för Q1"): projektets Python flyttas till en mapp som systemet äger (steg 9), och
+> nvm-mappen flyttas sist i `PATH` (steg 4). Ändrad igen samma dag efter Hugos svar 2026-10-28, punkt 1–3:
+> också Cryptexes-mappen flyttas sist (steg 4), den gamla `.venv` tas bort efter installationen, raden Setting
+> sources läses i Terminal och bara en annan låst källa underkänner installationen, och ett sista steg i
+> skrivbordsappen visar att vakten stoppar ett kommando som inte står på listan. Ändrad igen samma dag efter
+> Hugos beslut 2026-10-28 om granskning 13 (`GRANSKNING.md`, "Granskning 11 – plan för Q1"): kontroll av alias
+> och funktioner före och efter installationen (P1 a, steg 4 g och kontrollen efter installationen, steg 1),
+> förbud för filerna som zsh läser vid start och de filer de läser in (P1 b), Claude Code för Terminal med
+> hela sökvägen `~/.local/bin/claude` och en varning för installerarens förslag (P3 b, steg 1), och förbud för
+> Claude Code för Terminal, skrivbordsappens Claude Code och appen (P4 a). Ändrad igen samma dag efter Hugos
+> beslut 2026-10-28 om granskning 14 (`GRANSKNING.md`, "Hugos svar 2026-10-28 efter granskning 14"): förbud
+> för `~/.zcompdump` och en kontroll av zsh:s mappar för funktioner (R1, steg 4 i), en kontroll av vilka filer
+> zsh läser in (R2, steg 4 h), en vänd kontroll av alias och funktioner där allt som inte är väntat stoppar
+> (R3, steg 4 g), och vad du ska se när ett steg går bra, och steg 4 d på en dator utan nvm (R5).
+
+Ändrad 2026-10-28 efter Hugos beslut om granskning 15 (ovan): historiken flyttad hit, kontrollerna i steg 4
+g–i i `sparr/kontrollera-skalet.zsh` (steg 4 g), kontrollen av agentens skal (S3, steg 4 h), Terminals två
+namn med ursprung och ägare (8 d), `requirements.txt` i steg 5 och 12 (S6), förbuden för `.zwc` (S2) och
+`cd ~/VERA/agent`.

@@ -12,6 +12,7 @@ Proven med zsh körs med zsh -f, som inte läser några av Hugos filer, med en t
 systemets mappar i PATH. Kommandona hämtas ur INSTALLERA.md, så att det är just de som prövas.
 """
 
+import fnmatch
 import os
 import subprocess
 
@@ -58,6 +59,20 @@ def _caspers():
     return _en_rad(INSTALLERA.read_text(encoding="utf-8").split("## Caspers dator", 1)[1].split("\n## ", 1)[0])
 
 
+# Hugos beslut 2026-10-28 efter granskning 15: kontrollerna i steg 4 g–i ligger i ett skript, som Hugo kör före
+# och efter installationen. Kommandona nedan står inte längre i INSTALLERA.md. Proven av hur zsh beter sig med
+# dem står kvar, och skriptet prövas i test_beslut_granskning_15.py.
+SKRIPTET = INSTALLERA.parent / "kontrollera-skalet.zsh"
+
+
+def _skriptet():
+    return SKRIPTET.read_text(encoding="utf-8")
+
+
+def _steg_4_g():
+    return _en_rad(_steg_4().split("**g. Kontrollera skalet i Terminal med kontrollskriptet**", 1)[1].split("**h. ", 1)[0])
+
+
 # ---------------------------------------------------------------------------------------------
 # Bash-vägen byggdes inte.
 
@@ -88,14 +103,14 @@ def test_r1_installera_namner_forbudet_for_zcompdump():
 
 
 def test_r1_fpath_kontrolleras_fore_installationen():
-    _, rader = _installationskommandon()
-    for kommando in FPATH_KOMMANDON:
-        assert rader.count(kommando) == 1, kommando
-        assert rader.index(kommando) < _forsta_sudo(rader), kommando
-    steget = _en_rad(_steg_4().split("**i. Kontrollera zsh:s mappar för funktioner**", 1)[1])
-    assert "granskning 14, R1, Hugos beslut 2026-10-28" in steget
-    assert "`~/.zcompdump`" in steget and "`compinit`" in steget
-    assert "ägaren är `root`" in steget and "stoppa och fråga" in steget.lower()
+    # I skriptet: mapparna i fpath, och ägare och rättigheter för dem och för mapparna ovanför
+    # /usr/local/share/zsh/site-functions.
+    skriptet = _skriptet()
+    assert "for mapp in $fpath; do" in skriptet
+    assert "(/usr/share/zsh/*|/usr/local/share/zsh/site-functions)" in skriptet
+    assert "$fpath /usr/local /usr/local/share /usr/local/share/zsh /usr/local/share/zsh/site-functions" in skriptet
+    assert "granskning 14, R1" in skriptet
+    assert "(`fpath`)" in _steg_4_g() and "granskning 14, R1" in _steg_4_g()
 
 
 @inget_zsh
@@ -125,14 +140,15 @@ STEG_4_RADER = (
 
 
 def test_r2_steget_finns_fore_installationen_och_for_casper():
-    _, rader = _installationskommandon()
-    assert rader.count(ZSH_FILER_KOMMANDO) == 1
-    assert rader.index(ZSH_FILER_KOMMANDO) < _forsta_sudo(rader)
-    steget = _en_rad(_steg_4().split("**h. Kontrollera vilka filer zsh läser in**", 1)[1])
-    assert "granskning 14, R2, Hugos beslut 2026-10-28" in steget and "**båda** datorerna" in steget
-    assert "Står någon annan rad där: stoppa och fråga." in steget
+    # Skriptet söker med samma mönster i samma fyra startfiler.
+    skriptet = _skriptet()
+    assert "grep -n -E 'source|\\. |eval|compinit|autoload|fpath|ZDOTDIR'" in ZSH_FILER_KOMMANDO
+    assert "/usr/bin/grep -n -E 'source|\\. |eval|compinit|autoload|fpath|ZDOTDIR' -- $fil" in skriptet
+    assert "for fil in ~/.zshenv ~/.zprofile ~/.zshrc ~/.zlogin; do" in skriptet
+    assert "granskning 14, R2" in _steg_4_g()
     caspers = _caspers()
-    assert "Steg 4 h, vilka filer Caspers zsh läser in" in caspers and "stoppa och fråga" in caspers
+    assert "Steg 4 g, vilka filer Caspers zsh läser in" in caspers and "stoppa och fråga" in caspers
+    assert "`AVVIKER: startfil: …`" in caspers
 
 
 @inget_zsh
@@ -186,22 +202,17 @@ VANTADE_ALIAS = {"run-help=man", "which-command=whence"}
 
 
 def test_r3_installera_har_den_vanda_kontrollen_fore_och_efter():
-    # Före och efter installationen (räknat i test_beslut_granskning_13.py, P1 a), och typeset -f +
-    # används inte längre: efter nvm:s compinit visar det fler än 900 namn.
+    # Före och efter installationen (räknat i test_beslut_granskning_13.py, P1 a). Skriptet godtar exakt de två
+    # alias som zsh alltid har, och samma väntade funktioner som filtret i FUNKTIONER_KOMMANDO.
     _, rader = _installationskommandon()
-    assert rader.count(FUNKTIONER_KOMMANDO) == 2
     assert "typeset -f +" not in rader
-    assert ALIAS_KOMMANDON == ("alias", "alias -s", FUNKTIONER_KOMMANDO, KROK_KOMMANDO)
-    fore = _en_rad(_steg_4().split("**g. Kontrollera alias och funktioner**", 1)[1].split("**h. ", 1)[0])
-    efter = _en_rad(_kontrollen().split("**Alias och funktioner, igen efter installationen**", 1)[1].split("\n2. ", 1)[0])
-    for steget in (fore, efter):
-        assert "granskning 14, R3, Hugos beslut 2026-10-28" in steget
-        assert "exakt två rader" in steget and "`run-help=man`" in steget and "`which-command=whence`" in steget
-        assert "en enda rad, `SLUT`" in steget
-        assert "TRAPDEBUG" in steget
-    assert "**globalt alias**" in fore
-    assert "Leta efter namnen på kommandona" not in fore
-    assert "Leta efter samma namn" not in efter
+    skriptet = _skriptet()
+    assert "(run-help=man|which-command=whence)" in skriptet
+    filtret = FUNKTIONER_KOMMANDO.split("${(ko)functions:#", 1)[1].split("}", 1)[0]
+    assert "${@:#" + filtret + "}" in skriptet
+    fore = _steg_4_g()
+    assert "granskning 14, R3" in fore and "Kontrollen är **vänd**" in fore
+    assert "Skalet, igen efter installationen" in _kontrollen()
 
 
 @inget_zsh
@@ -296,21 +307,15 @@ KROK_BESLUT = "Hugos svar 2026-10-28 efter granskning 14, punkt 1"
 
 
 def test_svar_1_kroklistorna_kontrolleras_fore_och_efter_installationen():
-    _, rader = _installationskommandon()
-    platser = [i for i, r in enumerate(rader) if r == KROK_KOMMANDO]
-    assert len(platser) == 2
-    assert platser[0] < _forsta_sudo(rader) < platser[1]
-    # Kommandot nämner varje kroklista och varje särskild funktion som beslutet räknar upp.
-    for namn in KROKLISTOR + ("TRAP*", "preexec", "precmd", "chpwd", "periodic", "zshexit", "command_not_found_handler"):
-        assert namn in KROK_KOMMANDO, namn
-    fore = _steg_4().split("**g. Kontrollera alias och funktioner**", 1)[1].split("**h. ", 1)[0]
-    assert "\n".join(f"  {rad}" for rad in KROK_VANTAT.splitlines()) in fore, "de sju väntade raderna"
-    fore = _en_rad(fore)
-    assert KROK_BESLUT in fore and "**Stoppa och fråga**" in fore
-    assert "det står något mellan parenteserna" in fore and "`SLUT` saknas" in fore
-    assert "**Inte bekräftat:**" in fore and "`update_terminal_cwd`" in fore
-    efter = _en_rad(_kontrollen().split("**Alias och funktioner, igen efter installationen**", 1)[1].split("\n2. ", 1)[0])
-    assert KROK_BESLUT in efter and "sju raderna i steg 4 g" in efter
+    # Skriptet prövar varje kroklista. De särskilda funktionerna avviker som alla andra funktioner som inte är
+    # väntade, eftersom inget av deras namn står bland de väntade.
+    skriptet = _skriptet()
+    for lista in KROKLISTOR:
+        assert f"${{(j: :){lista}}}" in skriptet, lista
+    filtret = FUNKTIONER_KOMMANDO.split("${(ko)functions:#(", 1)[1].split(")}", 1)[0].split("|")
+    for namn in ("TRAPDEBUG", "preexec", "precmd", "chpwd", "periodic", "zshexit", "command_not_found_handler"):
+        assert not any(fnmatch.fnmatchcase(namn, m) for m in filtret), namn
+    assert KROK_BESLUT in _steg_4_g()
 
 
 @inget_zsh

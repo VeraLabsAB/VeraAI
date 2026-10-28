@@ -126,9 +126,11 @@ TILLATNA = [
     ("git-show-stat", "git show --stat HEAD"),
     ("git-archive-o", "git archive -o <T>/kopia.tar HEAD"),
     ("git-archive-output", "git archive --format=tar --output=<T>/kopia.tar HEAD"),
-    # ls, cat, head, tail, grep, diff, find, wc och sort, i projektet och i kopior.
+    # ls, cat, head, tail, grep, diff, wc och sort, i projektet och i kopior. find står inte på listan
+    # (granskning 15, S1, Hugos beslut 2026-10-28). ls -R listar filer i stället.
     ("ls", "ls"),
     ("ls-tillagg", "ls -la scripts"),
+    ("ls-R", "ls -R scripts"),
     ("ls-tillfallig", "ls <T>"),
     ("cat", "cat SPEC.md"),
     ("cat-kopia", "cat <T>/kopia/SPEC.md"),
@@ -136,10 +138,23 @@ TILLATNA = [
     ("tail", "tail -5 PROGRESS.md"),
     ("grep", "grep -n 'Q1' GRANSKNING.md"),
     ("grep-include", "grep -rn --include='*.py' 'def ' scripts"),
+    # grep med de tillägg som söker (granskning 15, S1, Hugos beslut 2026-10-28).
+    ("grep-E", "grep -n -E 'a.+b' SPEC.md"),
+    ("grep-hopskrivet", "grep -rnwiE x scripts"),
+    ("grep-l-L-c", "grep -lLc x SPEC.md"),
+    ("grep-v-x-F-H-h-o-s-q-I", "grep -vxFHhosqI x SPEC.md"),
+    ("grep-R", "grep -R x scripts"),
+    ("grep-e", "grep -e x -e y SPEC.md"),
+    ("grep-e-hopskrivet", "grep -nex SPEC.md"),
+    ("grep-sammanhang", "grep -A 3 -B2 -C 1 -m 5 x SPEC.md"),
+    ("grep-sammanhang-hopskrivet", "grep -nA3 x SPEC.md"),
+    ("grep-langa", "grep --line-number --ignore-case --recursive --fixed-strings x scripts"),
+    ("grep-langa-tal", "grep --context=2 --after-context=1 --before-context=1 --max-count=4 x SPEC.md"),
+    ("grep-exclude", "grep -r --exclude='*.json' --exclude-dir=testdata x ."),
+    ("grep-regexp", "grep --regexp=x SPEC.md"),
+    ("grep-efter-streck-i-projektet", "grep -e x -- SPEC.md"),
     ("diff", "diff SPEC.md <T>/kopia/SPEC.md"),
     ("diff-mappar", "diff -r scripts <T>/kopia/scripts"),
-    ("find-namn", "find . -name '*.py'"),
-    ("find-typ", "find scripts -type f"),
     ("wc", "wc -l SPEC.md"),
     ("sort", "sort <T>/lista.txt"),
     # mkdir, cp -R, tar och git archive med mål i den tillfälliga mappen.
@@ -374,7 +389,8 @@ def test_installationen_jamfor_kontrollsummor_fore_och_efter_kopieringen():
     # Hugos beslut 2026-10-28, punkt 4: Hugo jämför summorna med dem som granskningen skriver upp
     # innan han kopierar, och kontrollerar efteråt att det är samma filer som ligger på plats.
     _, rader = _installationskommandon()
-    summor = [i for i, r in enumerate(rader) if r.startswith("shasum -a 256 ")]
+    # Kontrollskriptets summa (Hugos beslut 2026-10-28 efter granskning 15) prövas i test_beslut_granskning_15.py.
+    summor = [i for i, r in enumerate(rader) if r.startswith("shasum -a 256 ") and r != SKRIPT_SUMMA]
     forsta_kopian = min(i for i, r in enumerate(rader) if r.startswith(("sudo ditto", "sudo cp")))
     sista_kopian = max(i for i, r in enumerate(rader) if r.startswith(("sudo ditto", "sudo cp")))
     fore = [i for i in summor if i < forsta_kopian]
@@ -398,7 +414,7 @@ LISTAN = "står inte på listan"
 GIT_TILLAGG = "git-tillägget"
 UTANFOR = "utanför projektet"
 TILLFALLIG = "tillfällig mapp"
-FIND = "find får bara söka"
+GREP_SOKER = "grep får bara söka"
 PYTEST_FORM = "pytest"
 TILLAGG = "tillägget"
 TAR = "tar"
@@ -556,20 +572,50 @@ STOPPAS = [
     ("git-archive-o-ut-ur-tillfallig", "git archive -o <T>/../x.tar HEAD", TILLFALLIG),
     ("git-commit-F-utanfor", "git commit -F /etc/passwd", UTANFOR),
     ("git-commit-file-utanfor", "git commit --file=../x", UTANFOR),
-    # find bara för att söka.
-    ("find-exec", "find . -exec rm '{}' +", FIND),
-    ("find-execdir", "find . -execdir rm '{}' +", FIND),
-    ("find-ok", "find . -ok rm '{}' +", FIND),
-    ("find-okdir", "find . -okdir rm '{}' +", FIND),
-    ("find-delete", "find . -delete", FIND),
-    ("find-namn-delete", "find . -name x -delete", FIND),
-    ("find-fprint", "find . -fprint x", FIND),
-    ("find-fprint0", "find . -fprint0 x", FIND),
-    ("find-fprintf", "find . -fprintf x '%p'", FIND),
-    ("find-fls", "find . -fls x", FIND),
-    ("find-roten", "find / -name x", UTANFOR),
-    ("find-ovanfor", "find .. -name x", UTANFOR),
-    ("find-ovanfor-tillfallig", "find <T>/.. -name x", UTANFOR),
+    # find står inte på listan (granskning 15, S1, Hugos beslut 2026-10-28): i agentens skal är find Claude
+    # Codes bfs, som raderar med -rm. Alla former stoppas, också de som bara söker.
+    ("find-namn", "find . -name '*.py'", LISTAN),
+    ("find-typ", "find scripts -type f", LISTAN),
+    ("find-rm", "find . -rm", LISTAN),
+    ("find-namn-rm", "find . -name x -rm", LISTAN),
+    ("find-exec", "find . -exec rm '{}' +", LISTAN),
+    ("find-execdir", "find . -execdir rm '{}' +", LISTAN),
+    ("find-ok", "find . -ok rm '{}' +", LISTAN),
+    ("find-okdir", "find . -okdir rm '{}' +", LISTAN),
+    ("find-delete", "find . -delete", LISTAN),
+    ("find-namn-delete", "find . -name x -delete", LISTAN),
+    ("find-fprint", "find . -fprint x", LISTAN),
+    ("find-fprint0", "find . -fprint0 x", LISTAN),
+    ("find-fprintf", "find . -fprintf x '%p'", LISTAN),
+    ("find-fls", "find . -fls x", LISTAN),
+    ("find-hel-sokvag", "/usr/bin/find . -name x", LISTAN),
+    ("find-roten", "find / -name x", LISTAN),
+    # rg (Claude Codes ugrep i agentens skal) har aldrig stått på listan.
+    ("rg", "rg x scripts", LISTAN),
+    ("rg-hel-sokvag", "/usr/local/bin/rg x", LISTAN),
+    # grep bara med tillägg som söker (granskning 15, S1). Allt annat stoppas, också tillägg som vakten inte
+    # känner till. Tilläggen som kör program eller skriver filer i ugrep enligt granskning 15 är med.
+    ("grep-filter", "grep --filter=sh x SPEC.md", GREP_SOKER),
+    ("grep-pager", "grep --pager x SPEC.md", GREP_SOKER),
+    ("grep-pager-varde", "grep --pager=less x SPEC.md", GREP_SOKER),
+    ("grep-view", "grep --view x SPEC.md", GREP_SOKER),
+    ("grep-config", "grep --config=x x SPEC.md", GREP_SOKER),
+    ("grep-save-config", "grep --save-config x SPEC.md", GREP_SOKER),
+    ("grep-tre-streck", "grep --- x SPEC.md", GREP_SOKER),
+    ("grep-Q", "grep -Q x SPEC.md", GREP_SOKER),
+    ("grep-P", "grep -P x SPEC.md", GREP_SOKER),
+    ("grep-z", "grep -nz x SPEC.md", GREP_SOKER),
+    ("grep-okant-kort", "grep -n% x SPEC.md", GREP_SOKER),
+    ("grep-forkortat", "grep --line x SPEC.md", GREP_SOKER),
+    ("grep-langt-utan-varde", "grep --context x SPEC.md", GREP_SOKER),
+    ("grep-langt-med-varde-som-inte-tar-nagot", "grep --count=3 x SPEC.md", GREP_SOKER),
+    ("grep-A-inte-tal", "grep -A x y SPEC.md", "ett tal"),
+    ("grep-context-inte-tal", "grep --context=sh x SPEC.md", "ett tal"),
+    ("grep-e-saknar-varde", "grep -e", "saknar ett värde"),
+    ("grep-e-utanfor", "grep -e /etc/x SPEC.md", UTANFOR),
+    ("grep-e-hopskrivet-utanfor", "grep -ne/etc/x SPEC.md", UTANFOR),
+    ("grep-regexp-utanfor", "grep --regexp=/etc/x SPEC.md", UTANFOR),
+    ("grep-exclude-dir-utanfor", "grep -r --exclude-dir=/etc x .", UTANFOR),
     # mkdir bara i den tillfälliga mappen.
     ("mkdir-projektet", "mkdir ny", TILLFALLIG),
     ("mkdir-projektet-hel", "mkdir <P>/ny", TILLFALLIG),
@@ -646,8 +692,8 @@ STOPPAS = [
     ("sort-output-forkortat", "sort --out=x SPEC.md", TILLAGG),
     ("sort-compress-program", "sort --compress-program=sh SPEC.md", TILLAGG),
     ("sort-T", "sort -T <T> SPEC.md", TILLAGG),
-    ("grep-f", "grep -f monster.txt SPEC.md", TILLAGG),
-    ("grep-file", "grep --file=x SPEC.md", TILLAGG),
+    ("grep-f", "grep -f monster.txt SPEC.md", GREP_SOKER),
+    ("grep-file", "grep --file=x SPEC.md", GREP_SOKER),
     ("sokvag-i-tillagg", "ls -/etc", TILLAGG),
 ]
 
@@ -804,7 +850,6 @@ LISTANS_PROGRAM = [
     ("tail", "tail SPEC.md"),
     ("grep", "grep -n x SPEC.md"),
     ("diff", "diff SPEC.md SPEC.md"),
-    ("find", "find scripts -type f"),
     ("wc", "wc -l SPEC.md"),
     ("sort", "sort SPEC.md"),
     ("mkdir", "mkdir <T>/kopia"),
@@ -1246,7 +1291,8 @@ def test_gamla_venv_tas_bort_efter_installationen_och_listan_pekar_bara_pa_den_n
 
 # Hugos svar 2026-10-28, punkt 3: bara en annan låst källa på raden Setting sources underkänner
 # installationen. User settings, Project settings och Project local settings är väntade. Raden visas inte
-# i skrivbordsappen, så den läses i Terminal: cd ~/VERA, claude och /status.
+# i skrivbordsappen, så den läses i Terminal: cd ~/VERA/agent (Hugos beslut 2026-10-28 efter granskning 15),
+# claude och /status.
 
 VANTADE_KALLOR = ("User settings", "Project settings", "Project local settings")
 
@@ -1273,10 +1319,10 @@ def test_setting_sources_lases_i_terminal():
     # Hugos beslut 2026-10-28, granskning 13, P3 b: hela sökvägen ~/.local/bin/claude ersätter claude.
     # Finns inte programmet där säger Terminal "no such file or directory", och då stoppar Hugo.
     _, rader = _installationskommandon()
-    assert rader.index("cd ~/VERA") + 1 == rader.index(TERMINAL_CLAUDE)
+    assert rader.index("cd ~/VERA/agent") + 1 == rader.index(TERMINAL_CLAUDE)
     assert "claude" not in rader
     for stalle in _setting_sources_stallen():
-        assert "Terminal" in stalle and "`cd ~/VERA`" in stalle and "`/status`" in stalle
+        assert "Terminal" in stalle and "`cd ~/VERA/agent`" in stalle and "`/status`" in stalle
         assert f"`{TERMINAL_CLAUDE}`" in stalle and "Hugos beslut 2026-10-28, granskning 13, P3 b" in stalle
         assert "no such file or directory" in stalle
         assert "command not found: claude`: stoppa" not in stalle
@@ -1603,7 +1649,7 @@ NVM_KOMMANDON = (NVM_KOPIA, NVM_LAGG_TILL, "tail -n 3 ~/.zshrc", "echo $PATH")
 # Hugos svar 2026-10-28, punkt 3: raden Setting sources läses i Terminal. Hugos beslut 2026-10-28, granskning
 # 13, P3 b: Claude Code för Terminal ligger i ~/.local/bin, utanför PATH, och startas med hela sökvägen.
 TERMINAL_CLAUDE = "~/.local/bin/claude"
-TERMINAL_KOMMANDON = ("cd ~/VERA", TERMINAL_CLAUDE)
+TERMINAL_KOMMANDON = ("cd ~/VERA/agent", TERMINAL_CLAUDE)
 TERMINAL_VERSION = (f"{TERMINAL_CLAUDE} --version", f"{TERMINAL_CLAUDE} update")
 # Hugos beslut 2026-10-28, granskning 13, P1 a: Hugo visar alias och funktioner i Terminal. Hugos beslut
 # 2026-10-28, granskning 14, R3: kontrollen är vänd. I stället för typeset -f + (alla namn, efter nvm:s
@@ -1639,6 +1685,19 @@ FPATH_KOMMANDON = (
     "ls -ld $fpath",
     "ls -ld /usr/local /usr/local/share /usr/local/share/zsh /usr/local/share/zsh/site-functions",
 )
+# Hugos beslut 2026-10-28 efter granskning 15: kontrollerna ovan (alias, funktioner, kroklistor, fpath och
+# startfiler) ligger i ett skript som Hugo kör i Terminal efter att ha kontrollerat kontrollsumman. Kommandona
+# ovan står inte längre i INSTALLERA.md, men proven av hur zsh beter sig med dem står kvar, eftersom skriptet
+# gör samma kontroller (test_beslut_granskning_15.py prövar skriptet).
+SKRIPT_SUMMA = "shasum -a 256 ~/VERA/agent/sparr/kontrollera-skalet.zsh"
+SKRIPT_KORNING = "source ~/VERA/agent/sparr/kontrollera-skalet.zsh"
+# S3: agentens eget skal, i skrivbordsappen före installationen. Kroklistorna, och varje funktion som inte är
+# väntad. Väntat: tomma kroklistor och Claude Codes fyra funktioner.
+AGENT_KOMMANDO = (
+    "builtin print -rl -- "
+    + " ".join(f'"{lista}=(${{{lista}[*]}})"' for lista in KROKLISTOR)
+    + f" ${{(ko)functions:#({VANTADE_FUNKTIONER})}} SLUT"
+)
 
 
 def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
@@ -1665,9 +1724,7 @@ def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
             NVM_KOMMANDON
             + TERMINAL_KOMMANDON
             + TERMINAL_VERSION
-            + ALIAS_KOMMANDON
-            + (KRYPTEX_LAGG_TILL, ZSH_FILER_KOMMANDO)
-            + FPATH_KOMMANDON
+            + (KRYPTEX_LAGG_TILL, SKRIPT_KORNING, AGENT_KOMMANDO)
         ), rad
 
 

@@ -209,7 +209,6 @@ def _nekas(regel_sokvag):
     return False
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="granskning 15, S2: inte rättat")
 @pytest.mark.parametrize("namn", [".zshrc.zwc", ".zshenv.zwc", ".zprofile.zwc", ".zlogin.zwc", ".zlogout.zwc"])
 def test_kompilerade_startfiler_har_ett_forbud(namn):
     assert _nekas(namn), namn
@@ -224,7 +223,6 @@ def test_zcompdump_och_dess_kompilerade_fil_har_ett_forbud(namn):
 # Skalet som agenten kör i: find är Claude Codes inbyggda bfs, som har -rm.
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="granskning 15, S1: inte rättat")
 @pytest.mark.parametrize("kommando", ["find <P> -name prov.txt -rm", "find <P> -rm"])
 def test_find_med_rm_stoppas(vakt, mappar, kommando):
     # I agentens skal är find en funktion som Claude Code lägger in, och den kör bfs (tools-reference,
