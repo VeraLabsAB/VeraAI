@@ -40,7 +40,14 @@ SYSTEMETS_PYTHON = "/usr/bin/python3"
 INSTALLERAD_VAKT = "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
 INSTALLERADE_INSTALLNINGAR = "/Library/Application Support/ClaudeCode/managed-settings.json"
 
-PYTEST = ".venv/bin/python -B -m pytest -p no:cacheprovider"
+# Hugos beslut 2026-10-28 om vakten, beslut 1 (alternativ c): projektets Python med pytest flyttas till en
+# mapp som root äger, bredvid vakten. Hugo skapar den själv (INSTALLERA.md). Pytest-kommandona i SPEC 7.1
+# pekar dit, och sökvägen står inom citattecken eftersom "Application Support" har ett mellanslag.
+NY_VENV = "/Library/Application Support/ClaudeCode/vera/venv"
+NY_PYTHON = f"{NY_VENV}/bin/python"
+PYTEST_FAST = "-B -m pytest -p no:cacheprovider"
+PYTEST = f"'{NY_PYTHON}' {PYTEST_FAST}"
+GAMLA_PYTEST = f".venv/bin/python {PYTEST_FAST}"
 
 # PATH-regeln (Hugos beslut 2026-10-28, beslut 1): vakten letar upp programmet i PATH och kontrollerar
 # var det ligger. Testerna använder datorns egna mappar för program, som ägs av systemet (root).
@@ -89,8 +96,9 @@ def _bedom(vakt, mappar, kommando, verktyg="Bash", sokvag=SYSTEMETS_SOKVAG):
 # Det som SPEC 7.1 tillåter går igenom. En rad per rad i tabellen i 7.1, och de regler under den
 # som tillåter något (läsa i kopior, provfiler i kopian, tillägg till pytest).
 
-# Rad 1 och 2: testsviten i projektet och mot en kopia. Reglerna 1–6 godtar formerna, men PATH-regeln
-# stoppar dem (se test_pytest_formerna_godtas_men_venv_stoppas_av_path_regeln).
+# Rad 1 och 2: testsviten i projektet och mot en kopia, med Python på den nya platsen. Ingen mapp som
+# root äger kan skapas i ett test, så formerna prövas med en Python i en mapp som testet låtsas att root
+# äger (se fixturen rotagd och testerna under "Hugos beslut 2026-10-28 om vakten").
 TILLATNA_PYTEST = [
     # Rad 1: testsviten i projektet.
     ("pytest-projektet", f"{PYTEST} -q scripts/tests"),
@@ -149,17 +157,6 @@ TILLATNA = [
 @pytest.mark.parametrize("kommando", [k for _, k in TILLATNA], ids=[i for i, _ in TILLATNA])
 def test_kommandon_pa_listan_gar_igenom(vakt, mappar, kommando):
     assert _bedom(vakt, mappar, kommando) is None
-
-
-@pytest.mark.parametrize("kommando", [k for _, k in TILLATNA_PYTEST], ids=[i for i, _ in TILLATNA_PYTEST])
-def test_pytest_formerna_godtas_men_venv_stoppas_av_path_regeln(vakt, mappar, kommando):
-    # PATH-regeln prövas sist. Att felet kommer från den visar att reglerna 1–6 godtar formen. Programmet
-    # .venv/bin/python ligger i projektet, som användaren äger, och stoppas därför (Hugos beslut
-    # 2026-10-28, beslut 1). Det gäller också på Hugos dator, där .venv/bin/python är en länk till
-    # systemets Python: länken ligger i en mapp som Hugo kan ändra.
-    _lagg_program(os.path.join(mappar["projekt"], ".venv", "bin"), "python")
-    fel = _bedom(vakt, mappar, kommando)
-    assert fel is not None and PLATS in fel and ".venv/bin/python" in fel, fel
 
 
 # Granskning 12, P4 (Hugos beslut 2026-10-28): vakten släpper bara igenom verktyg som står på en
@@ -408,6 +405,7 @@ TAR = "tar"
 VERKTYG = "står inte på listan över tillåtna verktyg"
 PLATS = "ägs inte av systemet (root) eller går att skriva i"
 OSAKER = "kan inte säkert avgöra vilken fil"
+FORE_PROGRAMMET = "före programmet i PATH"
 ANDRAR_PATH = "ändrar PATH"
 
 STOPPAS = [
@@ -602,11 +600,14 @@ STOPPAS = [
     ("tar-c-fran-etc", "tar -cf <T>/x.tar /etc", TAR),
     ("tar-c-C-roten", "tar -cf <T>/x.tar -C / etc", TAR),
     # pytest bara i de två formerna i 7.1, med de tillägg som 7.1 tillåter.
-    ("python-skript", ".venv/bin/python x.py", PYTEST_FORM),
-    ("python-c", ".venv/bin/python -c 'print(1)'", PYTEST_FORM),
-    ("pytest-utan-B", ".venv/bin/python -m pytest -p no:cacheprovider scripts/tests", PYTEST_FORM),
-    ("pytest-utan-cache", ".venv/bin/python -B -m pytest scripts/tests", PYTEST_FORM),
-    ("pip", ".venv/bin/python -B -m pip install x", PYTEST_FORM),
+    ("python-skript", f"'{NY_PYTHON}' x.py", PYTEST_FORM),
+    ("python-c", f"'{NY_PYTHON}' -c 'print(1)'", PYTEST_FORM),
+    ("pytest-utan-B", f"'{NY_PYTHON}' -m pytest -p no:cacheprovider scripts/tests", PYTEST_FORM),
+    ("pytest-utan-cache", f"'{NY_PYTHON}' -B -m pytest scripts/tests", PYTEST_FORM),
+    ("pip", f"'{NY_PYTHON}' -B -m pip install x", PYTEST_FORM),
+    # Hugos beslut 2026-10-28 om vakten, beslut 1: projektets gamla .venv står inte längre på listan.
+    ("gamla-venv", f"{GAMLA_PYTEST} -q scripts/tests", LISTAN),
+    ("gamla-venv-kopia", f"{GAMLA_PYTEST} <T>/kopia/scripts/tests", LISTAN),
     ("pytest-x", f"{PYTEST} -x scripts/tests", PYTEST_FORM),
     ("pytest-s", f"{PYTEST} -s scripts/tests", PYTEST_FORM),
     ("pytest-lf", f"{PYTEST} --lf scripts/tests", PYTEST_FORM),
@@ -844,17 +845,6 @@ def test_lank_i_en_mapp_som_anvandaren_ager_stoppas_aven_om_den_leder_till_syste
     assert fel is not None and PLATS in fel, fel
 
 
-def test_lank_i_en_rotmapp_till_en_mapp_som_anvandaren_ager_stoppas(vakt, mappar, tmp_path):
-    # Dit länken leder prövas också. Ingen rotmapp kan skapas i ett test, så länken prövas genom
-    # .venv/bin/python i projektet, som leder till ett program i en mapp som användaren äger.
-    egen = _lagg_program(str(tmp_path / "egen-bin"), "python3")
-    bin_ = os.path.join(mappar["projekt"], ".venv", "bin")
-    os.makedirs(bin_)
-    os.symlink(egen, os.path.join(bin_, "python"))
-    fel = _bedom(vakt, mappar, f"{PYTEST} -q scripts/tests")
-    assert fel is not None and PLATS in fel, fel
-
-
 def test_forsta_traffen_i_path_avgor(vakt, mappar, tmp_path):
     # Skalet kör det första programmet med namnet i PATH. Ligger systemets git först går det igenom,
     # ligger användarens git först stoppas det.
@@ -865,12 +855,14 @@ def test_forsta_traffen_i_path_avgor(vakt, mappar, tmp_path):
     assert fel is not None and PLATS in fel
 
 
-def test_fil_som_inte_far_koras_hoppas_over_som_skalet_gor(vakt, mappar, tmp_path):
-    # En fil med namnet som inte är körbar hoppar skalet över, och letar vidare i PATH.
+def test_fil_som_inte_far_koras_hoppas_over_som_skalet_gor(vakt, mappar, tmp_path, rotagd):
+    # En fil med namnet som inte är körbar hoppar skalet över, och letar vidare i PATH. Mappen före
+    # programmet ska ägas av root (beslut 2), så testet låtsas att den gör det.
     egen = tmp_path / "egen-bin"
     egen.mkdir()
     (egen / "git").write_text("inte ett program\n", encoding="utf-8")
     os.chmod(egen / "git", 0o644)
+    rotagd(egen)
     assert _bedom(vakt, mappar, "git status", sokvag=f"{egen}:{SYSTEMETS_SOKVAG}") is None
 
 
@@ -884,9 +876,11 @@ def test_program_i_en_mapp_som_inte_finns_stoppas(vakt, mappar, sokvag):
     assert fel is not None and OSAKER in fel, fel
 
 
-def test_venv_som_inte_finns_stoppas(vakt, mappar):
-    # .venv/bin/python pekar på en mapp som inte finns i projektet.
-    fel = _bedom(vakt, mappar, f"{PYTEST} -q scripts/tests")
+def test_python_som_inte_finns_stoppas(vakt, mappar, monkeypatch, tmp_path):
+    # Python på den nya platsen finns inte (till exempel före installationen).
+    saknas = str(tmp_path / "finns-inte" / "bin" / "python")
+    monkeypatch.setattr(vakt, "PYTHON", saknas)
+    fel = _bedom(vakt, mappar, f"{PYTEST.replace(NY_PYTHON, saknas)} -q scripts/tests")
     assert fel is not None and OSAKER in fel, fel
 
 
@@ -935,6 +929,248 @@ def test_kommandon_som_andrar_path_stoppas(vakt, mappar, kommando):
 def test_att_soka_efter_ordet_path_gar_igenom(vakt, mappar, kommando):
     # Bara kommandon som ändrar PATH stoppas, inte en sökning efter ordet.
     assert _bedom(vakt, mappar, kommando) is None
+
+
+# ---------------------------------------------------------------------------------------------
+# Hugos beslut 2026-10-28 om vakten, beslut 1–4 (GRANSKNING.md, "Granskning 11 – plan för Q1").
+#
+# Ett test kan inte skapa en mapp eller fil som ägs av root. Fixturen rotagd låtsas därför att de
+# sökvägar som testet anger ägs säkert av root, genom att byta ut vaktens _sakert_agd. Allt annat prövas
+# som vanligt, så en fil eller mapp som testet inte anger är fortfarande användarens.
+
+@pytest.fixture
+def rotagd(vakt, monkeypatch):
+    sakra = set()
+    vanlig = vakt._sakert_agd
+    monkeypatch.setattr(vakt, "_sakert_agd", lambda sokvag: sokvag in sakra or vanlig(sokvag))
+
+    def lagg_till(sokvag, mapparna_ovanfor=True):
+        for form in {os.path.normpath(str(sokvag)), os.path.realpath(str(sokvag))}:
+            sakra.add(form)
+            while mapparna_ovanfor and form != os.path.dirname(form):
+                form = os.path.dirname(form)
+                sakra.add(form)
+
+    return lagg_till
+
+
+@pytest.fixture
+def ny_python(vakt, monkeypatch, tmp_path):
+    """En Python i en mapp i testet, i stället för den nya platsen i /Library (som testet inte kan skapa)."""
+    fil = _lagg_program(str(tmp_path / "rot" / "vera" / "venv" / "bin"), "python")
+    monkeypatch.setattr(vakt, "PYTHON", fil)
+    return fil
+
+
+def test_rotagd_galler_bara_det_testet_anger(vakt, tmp_path, rotagd):
+    # Förutsättning för testerna nedan: utan rotagd är en mapp i testet användarens.
+    mapp = tmp_path / "rot"
+    mapp.mkdir()
+    assert not vakt._saker_plats(str(mapp))
+    rotagd(mapp)
+    assert vakt._saker_plats(str(mapp))
+    assert not vakt._saker_plats(str(_lagg_program(str(mapp), "git")))
+
+
+# Beslut 1 (alternativ c): .venv flyttas till en mapp som root äger. Pytest-kommandona i listan pekar dit.
+
+def _spec_tabellen():
+    text = SPEC.read_text(encoding="utf-8").split("### 7.1 Fast kommandolista", 1)[1].split("\n## ", 1)[0]
+    return [rad for rad in text.splitlines() if rad.startswith("| `")]
+
+
+def test_beslut_1_listan_och_vakten_pekar_pa_python_i_en_mapp_som_root_ager(vakt):
+    assert vakt.PYTHON == NY_PYTHON
+    assert NY_PYTHON.startswith("/Library/Application Support/ClaudeCode/")
+    pytest_rader = [rad for rad in _spec_tabellen() if "pytest" in rad]
+    assert len(pytest_rader) == 2
+    for rad in pytest_rader:
+        assert rad.startswith(f"| `{PYTEST} "), rad
+    assert not any(".venv/bin/python" in rad for rad in _spec_tabellen())
+
+
+@pytest.mark.parametrize("kommando", [k for _, k in TILLATNA_PYTEST], ids=[i for i, _ in TILLATNA_PYTEST])
+def test_beslut_1_pytest_formerna_gar_igenom_med_python_i_en_mapp_som_root_ager(
+    vakt, mappar, ny_python, rotagd, kommando
+):
+    rotagd(ny_python)
+    assert _bedom(vakt, mappar, kommando.replace(NY_PYTHON, ny_python)) is None
+
+
+@pytest.mark.parametrize("kommando", [k for _, k in TILLATNA_PYTEST], ids=[i for i, _ in TILLATNA_PYTEST])
+def test_beslut_1_pytest_formerna_stoppas_med_python_i_en_mapp_som_anvandaren_ager(
+    vakt, mappar, ny_python, kommando
+):
+    # PATH-regeln prövas sist. Att felet kommer från den visar att reglerna 1–6 godtar formen.
+    fel = _bedom(vakt, mappar, kommando.replace(NY_PYTHON, ny_python))
+    assert fel is not None and PLATS in fel and ny_python in fel, fel
+
+
+def test_beslut_1_gamla_venv_i_projektet_stoppas(vakt, mappar):
+    # Också om den finns: den står inte längre på listan.
+    _lagg_program(os.path.join(mappar["projekt"], ".venv", "bin"), "python")
+    fel = _bedom(vakt, mappar, f"{GAMLA_PYTEST} -q scripts/tests")
+    assert fel is not None and LISTAN in fel, fel
+
+
+VENV_SKAPA = f'sudo /usr/bin/python3 -m venv "{NY_VENV}"'
+VENV_PIP = (
+    f'sudo "{NY_PYTHON}" -m pip install --only-binary \':all:\' --no-cache-dir '
+    "-r ~/VERA/agent/requirements.txt"
+)
+VENV_AGARE = f'sudo chown -R root:wheel "{NY_VENV}"'
+VENV_RATTIGHETER = f'sudo chmod -R go-w "{NY_VENV}"'
+VENV_LS = f'ls -ld "{NY_VENV}" "{NY_VENV}/bin" "{NY_PYTHON}"'
+
+
+def test_beslut_1_installera_skapar_python_pa_den_nya_platsen():
+    # Hugo skapar mappen och installerar paketen själv, med sitt lösenord. Mappen och allt i den ska ägas
+    # av root:wheel och inte gå att skriva i för gruppen eller andra. Paketen installeras bara färdigbyggda
+    # (--only-binary), så att inget installationsskript körs som administratör, och utan cache, så att pip
+    # inte lämnar filer som root äger i Hugos hemmapp.
+    text, rader = _installationskommandon()
+    plats = {k: rader.index(k) for k in (VENV_SKAPA, VENV_PIP, VENV_AGARE, VENV_RATTIGHETER, VENV_LS)}
+    assert plats[VENV_SKAPA] < plats[VENV_PIP] < plats[VENV_AGARE] < plats[VENV_RATTIGHETER] < plats[VENV_LS]
+    # Efter att vakten är på plats och låst, före inställningarna, och kontrolleras med ls -ld efteråt.
+    vakten_last = max(i for i, r in enumerate(rader) if r.startswith("sudo chmod 644") and INSTALLERAD_VAKT in r)
+    installningarna = next(i for i, r in enumerate(rader) if r.startswith("sudo cp -i"))
+    assert vakten_last < plats[VENV_SKAPA] and plats[VENV_RATTIGHETER] < installningarna
+    assert plats[VENV_LS] > max(i for i, r in enumerate(rader) if r == KEDJAN)
+    # Testsviten med den nya platsen prövas i kontrollen efter installationen.
+    assert PYTEST in _kontrollen()
+
+
+# Beslut 2: varje mapp i PATH före programmet ska ägas av root.
+
+def test_beslut_2_mapp_som_anvandaren_ager_fore_programmet_stoppas(vakt, mappar, tmp_path):
+    # Mappen är tom, och git hittas i /usr/bin. Men ett git som läggs i mappen senare skulle köras i
+    # stället, och om skalet och vakten har olika PATH kan skalet hitta något där som vakten inte såg.
+    egen = tmp_path / "egen-bin"
+    egen.mkdir()
+    fel = _bedom(vakt, mappar, "git status", sokvag=f"{egen}:{SYSTEMETS_SOKVAG}")
+    assert fel is not None and FORE_PROGRAMMET in fel and str(egen) in fel, fel
+
+
+def test_beslut_2_mapp_som_inte_finns_fore_programmet_stoppas(vakt, mappar):
+    fel = _bedom(vakt, mappar, "git status", sokvag=f"/finns-inte/bin:{SYSTEMETS_SOKVAG}")
+    assert fel is not None and FORE_PROGRAMMET in fel, fel
+
+
+def test_beslut_2_mapp_under_en_mapp_som_anvandaren_ager_fore_programmet_stoppas(vakt, mappar, tmp_path, rotagd):
+    # Mappen själv låtsas ägas av root, men inte mappen ovanför den: då kan mappen bytas ut.
+    egen = tmp_path / "egen" / "bin"
+    egen.mkdir(parents=True)
+    rotagd(egen, mapparna_ovanfor=False)
+    fel = _bedom(vakt, mappar, "git status", sokvag=f"{egen}:{SYSTEMETS_SOKVAG}")
+    assert fel is not None and FORE_PROGRAMMET in fel, fel
+
+
+def test_beslut_2_rotmappar_fore_programmet_gar_igenom(vakt, mappar):
+    # /usr/sbin ägs av root och står före /usr/bin, där git ligger.
+    assert _bedom(vakt, mappar, "git status", sokvag="/usr/sbin:/usr/bin:/bin") is None
+
+
+def test_beslut_2_hugos_path_med_nvm_forst_stoppas_och_med_nvm_sist_gar_igenom(vakt, mappar, tmp_path):
+    # Som Hugos PATH 2026-10-28: nvm-mappen (som Hugo äger, med node, npm och npx) står först. Flyttas den
+    # efter systemets mappar går kommandona igenom (INSTALLERA.md beskriver hur).
+    nvm = str(tmp_path / ".nvm" / "versions" / "node" / "v24.18.0" / "bin")
+    for namn in ("node", "npm", "npx"):
+        _lagg_program(nvm, namn)
+    for _, kommando in LISTANS_PROGRAM:
+        fel = _bedom(vakt, mappar, kommando, sokvag=f"{nvm}:{SYSTEMETS_SOKVAG}")
+        assert fel is not None and FORE_PROGRAMMET in fel and nvm in fel, (kommando, fel)
+        assert _bedom(vakt, mappar, kommando, sokvag=f"{SYSTEMETS_SOKVAG}:{nvm}") is None, kommando
+
+
+def test_beslut_2_programmet_stoppar_nar_en_mapp_fore_programmet_ags_av_anvandaren(mappar, tmp_path):
+    # Samma sak som Claude Code kör det, med PATH från vaktens miljö.
+    egen = tmp_path / "egen-bin"
+    egen.mkdir()
+    svar = _kor_programmet(mappar, _indata(mappar, "git status"), sokvag=f"{egen}:{SYSTEMETS_SOKVAG}")
+    assert svar.returncode == 2 and FORE_PROGRAMMET in svar.stderr.decode("utf-8")
+
+
+@pytest.mark.parametrize("namn,kommando", LISTANS_PROGRAM, ids=[n for n, _ in LISTANS_PROGRAM])
+def test_program_i_en_mapp_som_hugo_ager_stoppas_nar_mappen_ligger_tidigare_i_path(
+    vakt, mappar, tmp_path, namn, kommando
+):
+    # Uppdragets extra test: programmet finns både i systemets mapp och i en mapp som användaren äger, och
+    # användarens mapp står tidigare i PATH. Skalet skulle köra användarens program, och det stoppas.
+    egen = str(tmp_path / "egen-bin")
+    fil = _lagg_program(egen, namn)
+    assert _bedom(vakt, mappar, kommando, sokvag=f"{SYSTEMETS_SOKVAG}:{egen}") is None
+    fel = _bedom(vakt, mappar, kommando, sokvag=f"{egen}:{SYSTEMETS_SOKVAG}")
+    assert fel is not None and PLATS in fel and fil in fel, fel
+
+
+# Beslut 3: också filen själv och målet för en länk ska ägas av root.
+
+def test_beslut_3_fil_som_anvandaren_ager_i_en_rotmapp_stoppas(vakt, mappar, tmp_path, rotagd):
+    rot = tmp_path / "rot-bin"
+    fil = _lagg_program(str(rot), "git")
+    rotagd(rot)
+    fel = _bedom(vakt, mappar, "git status", sokvag=f"{rot}:{SYSTEMETS_SOKVAG}")
+    assert fel is not None and PLATS in fel and fil in fel, fel
+
+
+def test_beslut_3_fil_som_root_ager_i_en_rotmapp_gar_igenom(vakt, mappar, tmp_path, rotagd):
+    # Motprov till testet ovan: när också filen ägs av root går kommandot igenom.
+    rot = tmp_path / "rot-bin"
+    fil = _lagg_program(str(rot), "git")
+    rotagd(fil)
+    assert _bedom(vakt, mappar, "git status", sokvag=f"{rot}:{SYSTEMETS_SOKVAG}") is None
+
+
+def test_beslut_3_lank_i_en_rotmapp_till_en_fil_som_anvandaren_ager_stoppas(vakt, mappar, tmp_path, rotagd):
+    egen = _lagg_program(str(tmp_path / "egen-bin"), "git")
+    rot = tmp_path / "rot-bin"
+    rot.mkdir()
+    os.symlink(egen, rot / "git")
+    rotagd(rot)
+    fel = _bedom(vakt, mappar, "git status", sokvag=f"{rot}:{SYSTEMETS_SOKVAG}")
+    assert fel is not None and PLATS in fel and f"länken leder till {egen}" in fel, fel
+
+
+def test_beslut_3_lank_i_en_rotmapp_till_en_fil_i_en_mapp_som_anvandaren_ager_stoppas(
+    vakt, mappar, tmp_path, rotagd
+):
+    # Filen dit länken leder låtsas ägas av root, men inte mappen den ligger i.
+    egen = _lagg_program(str(tmp_path / "egen-bin"), "git")
+    rotagd(egen, mapparna_ovanfor=False)
+    rot = tmp_path / "rot-bin"
+    rot.mkdir()
+    os.symlink(egen, rot / "git")
+    rotagd(rot)
+    fel = _bedom(vakt, mappar, "git status", sokvag=f"{rot}:{SYSTEMETS_SOKVAG}")
+    assert fel is not None and PLATS in fel, fel
+
+
+def test_beslut_3_lank_i_en_rotmapp_till_systemets_program_gar_igenom(vakt, mappar, tmp_path, rotagd):
+    rot = tmp_path / "rot-bin"
+    rot.mkdir()
+    os.symlink("/usr/bin/git", rot / "git")
+    rotagd(rot)
+    assert _bedom(vakt, mappar, "git status", sokvag=f"{rot}:{SYSTEMETS_SOKVAG}") is None
+
+
+# Beslut 4: den strängaste tolkningen. Varje källa på raden Setting sources i /status som inte är den
+# låsta filen stoppar installationen.
+
+ANNAN_KALLA = "Varje annan källa på raden stoppar installationen"
+
+
+def test_beslut_4_varje_annan_kalla_i_status_stoppar_installationen():
+    text = INSTALLERA.read_text(encoding="utf-8")
+    forsta_steget = _en_rad(_steg(text)[0][1])
+    efterat = _en_rad(text.split("## Efteråt", 1)[1].split("\n## ", 1)[0])
+    kontroll_1 = _en_rad(_kontrollen().split("\n2. ", 1)[0])
+    for stalle in (forsta_steget, efterat, kontroll_1, _spec_7_1()):
+        assert "Enterprise managed settings (file)" in stalle
+        assert ANNAN_KALLA in stalle
+        assert "Hugos beslut 2026-10-28 om vakten, beslut 4" in stalle
+    # Också Hugos och projektets egna inställningar räknas, inte bara låsta källor från claude.ai.
+    for stalle in (efterat, kontroll_1):
+        assert "User settings" in stalle and "Project settings" in stalle
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1210,10 +1446,11 @@ def _installationskommandon():
 
 FORPROV_MAPP = "~/vera-forprov"
 FORPROV_FIL = f"{FORPROV_MAPP}/.claude/settings.json"
+FORPROV_ECHO = "echo '{"
 FORPROV_KOMMANDON = (
     f"ls -ld {FORPROV_MAPP}",
     f"mkdir -p {FORPROV_MAPP}/.claude",
-    "echo '",
+    FORPROV_ECHO,
     f"cat {FORPROV_FIL}",
     f"rm {FORPROV_FIL}",
     f"rmdir {FORPROV_MAPP}/.claude",
@@ -1221,9 +1458,17 @@ FORPROV_KOMMANDON = (
 )
 KEDJAN = 'ls -ld / /Library "/Library/Application Support" "/Library/Application Support/ClaudeCode"'
 
+# Hugos beslut 2026-10-28 om vakten, beslut 2: INSTALLERA.md beskriver hur Hugo själv flyttar nvm-mappen
+# sist i PATH. Agenten ändrar inte Hugos skalfiler.
+NVM_KOPIA = "cp -i ~/.zshrc ~/.zshrc.fore-vera"
+NVM_RAD = '[ -n "$NVM_BIN" ] && path=( ${path:#$NVM_BIN} $NVM_BIN )'
+NVM_LAGG_TILL = f"echo '{NVM_RAD}' >> ~/.zshrc"
+NVM_KOMMANDON = (NVM_KOPIA, NVM_LAGG_TILL, "tail -n 3 ~/.zshrc", "echo $PATH")
+
 
 def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
-    # Utöver kopieringen: förprovet i en egen mapp, och ls -ld för att läsa ägare och rättigheter.
+    # Utöver kopieringen: förprovet i en egen mapp, nvm-mappen sist i PATH, projektets Python på den nya
+    # platsen, och ls -ld för att läsa ägare och rättigheter.
     _, rader = _installationskommandon()
     tillatna = (
         "shasum -a 256 ",
@@ -1236,10 +1481,26 @@ def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
         KEDJAN,
         FLYTTA_UNDAN,
         FLYTTA_TILLBAKA,
+        VENV_SKAPA,
+        VENV_PIP,
     ) + FORPROV_KOMMANDON
     assert rader
     for rad in rader:
-        assert rad.startswith(tillatna), rad
+        assert rad.startswith(tillatna) or rad in NVM_KOMMANDON, rad
+
+
+def test_beslut_2_installera_beskriver_hur_nvm_mappen_flyttas_sist_i_path():
+    text, rader = _installationskommandon()
+    plats = {k: rader.index(k) for k in NVM_KOMMANDON}
+    # Säkerhetskopian först, sedan raden, sedan kontrollen. Allt före installationen.
+    assert plats[NVM_KOPIA] < plats[NVM_LAGG_TILL] < plats["tail -n 3 ~/.zshrc"] < plats["echo $PATH"]
+    assert max(plats.values()) < _forsta_sudo(rader)
+    # Raden tar bort nvm-mappen ur listan och lägger den sist, och bara om nvm har angett mappen (annars
+    # skulle en tom mapp, alltså arbetsmappen, hamna sist i PATH).
+    assert NVM_RAD.startswith('[ -n "$NVM_BIN" ] && ')
+    (steget,) = [_en_rad(t) for r, t in _steg(text) if "nvm" in r.lower()]
+    assert "Quit Claude" in steget, "appen ska startas om så att den läser PATH på nytt"
+    assert "agenten ändrar inte" in steget.lower()
 
 
 def _steg(text):
@@ -1271,12 +1532,12 @@ def test_forprovet_gors_fore_installationen_och_stadas_bort():
     text, rader = _installationskommandon()
     # Hela kommandon jämförs exakt, så att "rmdir ~/vera-forprov" inte räknas som ".../.claude".
     plats = {
-        k: next(i for i, r in enumerate(rader) if (r.startswith(k) if k == "echo '" else r == k))
+        k: next(i for i, r in enumerate(rader) if (r.startswith(k) if k == FORPROV_ECHO else r == k))
         for k in FORPROV_KOMMANDON
     }
     assert max(plats.values()) < _forsta_sudo(rader)
-    assert plats[f"ls -ld {FORPROV_MAPP}"] < plats[f"mkdir -p {FORPROV_MAPP}/.claude"] < plats["echo '"]
-    assert plats["echo '"] < plats[f"rm {FORPROV_FIL}"] < plats[f"rmdir {FORPROV_MAPP}/.claude"]
+    assert plats[f"ls -ld {FORPROV_MAPP}"] < plats[f"mkdir -p {FORPROV_MAPP}/.claude"] < plats[FORPROV_ECHO]
+    assert plats[FORPROV_ECHO] < plats[f"rm {FORPROV_FIL}"] < plats[f"rmdir {FORPROV_MAPP}/.claude"]
     assert plats[f"rmdir {FORPROV_MAPP}/.claude"] < plats[f"rmdir {FORPROV_MAPP}"]
     assert not FORPROV_MAPP.lower().startswith("~/vera/")
     (forprovet,) = [_en_rad(t) for r, t in _steg(text) if "förprov" in r.lower()]
@@ -1285,7 +1546,7 @@ def test_forprovet_gors_fore_installationen_och_stadas_bort():
 
 def test_forprovets_vakt_pekar_pa_ett_skript_som_inte_finns_och_har_onfailure_block():
     _, rader = _installationskommandon()
-    rad = next(r for r in rader if r.startswith("echo '"))
+    rad = next(r for r in rader if r.startswith(FORPROV_ECHO))
     innehall, _, mal = rad[len("echo '"):].rpartition("' > ")
     assert mal == FORPROV_FIL
     installningar = json.loads(innehall)

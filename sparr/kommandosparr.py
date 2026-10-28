@@ -27,8 +27,10 @@ Reglerna, i den ordning de prövas (planen i GRANSKNING.md, "Granskning 11 – p
 7. PATH-regeln (Hugos beslut 2026-10-28, beslut 1). Kommandon som ändrar PATH stoppas (prövas före
    regel 5). Programmet som kommandot pekar på letas upp som skalet gör, i PATH från vaktens miljö, och
    filen och varje mapp ovanför den ska ägas av systemet (root) och inte gå att skriva i för gruppen
-   eller andra. Det gäller både sökvägen som den står och dit länkarna leder. Kan vakten inte säkert
-   avgöra vilken fil som körs, stoppas kommandot. Regeln prövas sist.
+   eller andra. Det gäller både sökvägen som den står och dit länkarna leder (Hugos beslut 2026-10-28
+   om vakten, beslut 3). Samma krav gäller varje mapp i PATH före programmet, och en sådan mapp som
+   inte finns stoppar också (beslut 2). Kan vakten inte säkert avgöra vilken fil som körs, stoppas
+   kommandot. Regeln prövas sist.
 
 Allt som vakten inte känner igen stoppas. Om vakten själv kraschar stoppas kommandot också, både här
 (kod 2) och av Claude Code (inställningen "onFailure": "block").
@@ -85,8 +87,9 @@ IHOPKOPPLING = {
 UTBYTESTECKEN = "*?[{()~^#"
 OSYNLIGA_KATEGORIER = ("Cc", "Cf", "Cn", "Co", "Cs", "Zl", "Zp", "Zs")
 
-# Regel 5 och 6: listan i SPEC 7.1.
-PYTHON = ".venv/bin/python"
+# Regel 5 och 6: listan i SPEC 7.1. Projektets Python med pytest ligger i en mapp som root äger, bredvid
+# vakten (Hugos beslut 2026-10-28 om vakten, beslut 1). I kommandot står sökvägen inom citattecken.
+PYTHON = "/Library/Application Support/ClaudeCode/vera/venv/bin/python"
 PYTEST_FAST = ["-B", "-m", "pytest", "-p", "no:cacheprovider"]
 PYTEST_PROJEKTET = os.path.join("scripts", "tests")
 PYTEST_TB = ("auto", "long", "short", "line", "native", "no")
@@ -143,8 +146,7 @@ SATTER_VARIABLER = ("export", "env", "typeset", "declare", "readonly", "local", 
 SKRIVBAR_FOR_GRUPP_ELLER_ANDRA = 0o022
 
 TILLATNA_KOMMANDON = (
-    ".venv/bin/python (bara pytest), git, ls, cat, head, tail, grep, diff, find, wc, sort, mkdir, "
-    "cp -R och tar"
+    f"'{PYTHON}' (bara pytest), git, ls, cat, head, tail, grep, diff, find, wc, sort, mkdir, cp -R och tar"
 )
 
 
@@ -412,13 +414,29 @@ def _hitta_programmet(namn, lage, sokvag):
         return fil
     if not isinstance(sokvag, str) or not sokvag:
         _osaker(namn, "PATH saknas")
-    for mapp in sokvag.split(":"):
+    mappar = sokvag.split(":")
+    for plats, mapp in enumerate(mappar):
         if not os.path.isabs(mapp):
             _osaker(namn, f"PATH har en mapp som inte är en hel sökväg, '{mapp}', före programmet")
         fil = os.path.join(mapp, namn)
         if _kan_koras(fil):
+            _mapparna_fore(namn, mappar[:plats])
             return fil
     _osaker(namn, "programmet finns inte i någon mapp i PATH")
+
+
+def _mapparna_fore(namn, mappar):
+    """Varje mapp i PATH före programmet ska ägas säkert av systemet (Hugos beslut 2026-10-28 om vakten,
+    beslut 2). Annars kan ett program med samma namn läggas där utan administratörslösenord, och om
+    skalet har en annan PATH än vakten kan skalet hitta en annan fil än vakten prövade."""
+    for mapp in mappar:
+        if not _saker_plats(mapp):
+            raise _Stopp(
+                f"mappen {mapp} står före programmet i PATH för '{namn}', och den mappen eller en mapp "
+                "ovanför den finns inte, ägs inte av systemet (root) eller går att skriva i för någon annan "
+                "än systemet. Ett program med samma namn kan läggas där utan administratörslösenord, så "
+                "kommandot stoppas (PATH-regeln, Hugos beslut 2026-10-28 om vakten, beslut 2)."
+            )
 
 
 def _sakert_agd(sokvag):
@@ -436,8 +454,8 @@ def _sakert_agd(sokvag):
 
 
 def _saker_plats(fil):
-    """Sant om filen och varje mapp ovanför den ägs säkert av systemet, både för sökvägen som den står
-    och för sökvägen dit länkarna leder."""
+    """Sant om filen (eller mappen) och varje mapp ovanför den ägs säkert av systemet, både för sökvägen
+    som den står och för sökvägen dit länkarna leder (Hugos beslut 2026-10-28 om vakten, beslut 3)."""
     for sokvag in (os.path.normpath(fil), os.path.realpath(fil)):
         if not _sakert_agd(sokvag):
             return False
@@ -470,8 +488,8 @@ def _programmet(namn, lage, sokvag):
 def _pytest(ordlista, lage):
     if ordlista[1:6] != PYTEST_FAST:
         raise _Stopp(
-            f"pytest: {PYTHON} får bara köras som '{PYTHON} -B -m pytest -p no:cacheprovider', följt av "
-            "tillåtna tillägg och ett mål (SPEC 7.1)."
+            f"pytest: Python får bara köras som \"'{PYTHON}' -B -m pytest -p no:cacheprovider\", följt "
+            "av tillåtna tillägg och ett mål (SPEC 7.1)."
         )
     mal = []
     i = 6

@@ -6,8 +6,59 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **3 198 passed**, 0 misslyckade (körd 2026-10-28 i projektet, i byggsessionen som härdade
-vakten efter granskning 12).
+Testsviten: **3 304 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, i
+byggsessionen efter Hugos beslut 1–4 om vakten).
+
+## Läge 2026-10-28, efter Hugos beslut 1–4 om vakten
+
+**Byggt** (inte installerat, inga `sudo`-kommandon körda, inget i `/Library` rört). Besluten och detaljerna
+står i `GRANSKNING.md`, "Granskning 11 – plan för Q1", "Hugos beslut 2026-10-28 om vakten, beslut 1–4".
+
+- **Beslut 1:** projektets Python flyttas till `/Library/Application Support/ClaudeCode/vera/venv`. Vakten och
+  SPEC 7.1:s pytest-rader pekar dit. Hugo skapar mappen och installerar pytest själv (INSTALLERA.md steg 9).
+- **Beslut 2:** varje mapp i `PATH` före programmet ska ägas av root. Vakten byggd, och INSTALLERA.md steg 4
+  beskriver hur Hugo själv flyttar nvm-mappen sist i `PATH`. Agenten har inte ändrat Hugos skalfiler.
+- **Beslut 3:** filen själv och länkens mål ska ägas av root. Vakten gjorde redan så, nu med egna tester.
+- **Beslut 4:** varje annan källa på raden Setting sources i `/status` stoppar installationen.
+- **Tester:** 37 nya i `scripts/tests/test_kommandosparr.py` (500 för vakten). Hela testsviten: **3 304
+  passed**, 0 misslyckade.
+
+**Bash-verktygets PATH och vaktens PATH** (beslut 2, kontrollerat 2026-10-28 med en provfil i
+scratchpad-mappen). Vaktens `PATH` är den som Claude Code själv startades med (Claude-appens `claude`,
+version 2.1.309), och den får en vakt som Claude Code startar. **Svaret: de är exakt lika.** Båda är:
+
+```
+/Users/hugolindholmer/.nvm/versions/node/v24.18.0/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:
+/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:
+/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:
+/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:
+/Library/Apple/usr/bin
+```
+
+(radbrutet här, i verkligheten en rad). nvm-mappen står först och ägs av Hugo, så **nvm-mappen behöver
+flyttas bakåt** (INSTALLERA.md steg 4). Alla 13 program på listan ligger i `/usr/bin` eller `/bin`.
+
+**Fynd som stoppar installationen tills vidare:** `/System/Cryptexes/App/usr/bin` står också före
+`/usr/bin`. Den leder till `/System/Volumes/Preboot/Cryptexes`, som har rättigheterna 777, så vakten stoppar
+alla kommandon också med nvm-mappen sist. Med både nvm-mappen och den mappen sist går alla 13 igenom (prövat
+med den nya vakten mot Hugos riktiga `PATH`). Öppen fråga till Hugo eller Casper.
+
+**Beslut som behövs:**
+
+1. **Cryptexes-mappen:** (a) flytta också `/System/Cryptexes/App/usr/bin` sist med raden i `~/.zshrc`
+   (rekommenderas, mappen har bara `safaridriver`), eller (b) ett undantag i vakten (rekommenderas inte).
+2. **Övergången:** tills Python på den nya platsen finns körs testsviten med `.venv/bin/python` som förut
+   (byggsessionens val, står i SPEC 7.1). Bekräftas?
+3. **Följd av beslut 4:** finns `User settings` eller `Project settings` på raden Setting sources i dag,
+   räknas installationen som misslyckad. Hugo läser raden i INSTALLERA.md steg 1, före installationen.
+4. **Ny oberoende granskning** av den nya versionen, med omvägarna (P1 från granskning 12) och PATH-regeln,
+   och nya kontrollsummor (beslut 5 från förra slutrapporten, inte besvarat).
+
+`OVERLAMNING.md` nämner fortfarande `.venv/bin/python` för testsviten. Den är inte ändrad (uppdraget gällde
+bara vakten, INSTALLERA.md, GRANSKNING.md och PROGRESS.md).
+
+**Nästa steg:** Hugo eller Casper svarar på 1–3, sedan en byggsession för svaret på 1, sedan en oberoende
+granskning.
 
 ## Läge 2026-10-28 kväll
 
@@ -39,7 +90,8 @@ vakten efter granskning 12).
    INSTALLERA.md följer i dag ordalydelsen, det strängaste.
 5. Ny oberoende granskning, med omvägarna (P1) och PATH-regeln, och nya kontrollsummor.
 
-**Nästa steg:** Hugo fattar beslut 1–4, sedan en byggsession, sedan en oberoende granskning.
+**Nästa steg:** Hugo fattar beslut 1–4, sedan en byggsession, sedan en oberoende granskning. (Beslut 1–4 är
+fattade och byggda, se avsnittet ovan.)
 
 ## Klart
 
@@ -174,6 +226,10 @@ avsnitt 8, med namn och datum.
   Versionen kontrolleras med `/status`, `ClaudeCode` får `root:wheel` och 755 och filerna 644, mapparna
   kontrolleras med `ls -ld` före och efter, och `/status` ska visa `Enterprise managed settings (file)`
   efteråt. Byggt, inte installerat. Detaljer: `GRANSKNING.md`.
+- **Hugos beslut 2026-10-28 om vakten, beslut 1–4:** (1) `.venv` flyttas till en mapp som root äger, och
+  pytest-kommandona pekar dit, (2) varje mapp i `PATH` före programmet ska ägas av root, (3) också filen själv
+  och länkens mål ska ägas av root, (4) varje annan källa i `/status` stoppar installationen. Byggt, inte
+  installerat. Detaljer: `GRANSKNING.md`, "Granskning 11 – plan för Q1".
 - **Hugos beslut i chatten 2026-10-27:** listan över ägare och närstående ligger kvar i
   `foretag/<namn>/regelbok.json` tills spärrsteget, eftersom SPEC inte säger var den skyddade mappen ska
   ligga. Testet att listan ligger utanför alla mappar agenten får skriva i skrivs då.

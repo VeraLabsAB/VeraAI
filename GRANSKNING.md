@@ -3275,6 +3275,77 @@ Avgjorda samma dag (Hugos beslut 2026-10-28, andra omgången): undantag (ingen m
 (stoppas alltid, beslut 7) och när sandlådan ska vara klar (före uppgift 5, eller före första hela körningen
 på riktiga underlag om den kommer först, beslut 6).
 
+### Hugos beslut 2026-10-28 om vakten, beslut 1–4
+
+Svar på frågorna 1–4 under "Beslut 2026-10-28: PATH-regel, förprov för onFailure, P7" (längre ned i den här
+filen). Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28:
+
+1. **Testsviten: alternativ (c).** `.venv` flyttas till en mapp som root äger. INSTALLERA.md får stegen för
+   att skapa mappen och installera paketen. Hugo kör de stegen själv med sitt lösenord. Pytest-kommandona i
+   listan pekar på den nya platsen.
+2. **Ja: varje mapp i PATH före programmet ska ägas av root.** Byggsessionen tar först reda på vilken PATH
+   Bash-verktyget har och jämför den med vaktens egen, och skriver svaret i PROGRESS.md. Om nvm-mappen
+   behöver flyttas bakåt beskrivs hur i INSTALLERA.md, men byggsessionen ändrar inte Hugos skalfiler.
+3. **Ja: även filen själv och målet för en länk ska ägas av root.**
+4. **Den strängaste tolkningen gäller:** varje källa på raden i `/status` som inte är den låsta filen
+   stoppar installationen.
+
+**Byggt 2026-10-28** (byggsessionen efter besluten, inte installerat, inga `sudo`-kommandon körda):
+
+- **Beslut 1.** Den nya platsen är `/Library/Application Support/ClaudeCode/vera/venv`, bredvid vakten.
+  Kedjan ovanför (`/`, `/Library`, `/Library/Application Support`, `ClaudeCode`) kontrolleras redan med
+  `ls -ld` i INSTALLERA.md. Vakten godtar bara `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'
+  -B -m pytest -p no:cacheprovider` (inom citattecken, eftersom sökvägen har ett mellanslag), och SPEC 7.1:s
+  två pytest-rader pekar dit. `.venv/bin/python` stoppas som "står inte på listan". INSTALLERA.md steg 9:
+  `sudo /usr/bin/python3 -m venv`, `pip install --only-binary ':all:' --no-cache-dir -r requirements.txt`
+  (inga installationsskript körs som administratör, ingen cache i Hugos hemmapp), `chown -R root:wheel` och
+  `chmod -R go-w`, efter att vakten är låst och före inställningarna. `ls -ld` på den nya mappen i steg 13,
+  och testsviten i kontrollen efter installationen, steg 3. Den gamla `.venv` tas bort av Hugo i Finder,
+  först när kontrollen visar att testsviten går.
+- **Beslut 2.** Vakten kräver nu att varje mapp i `PATH` före programmet, och varje mapp ovanför den, ägs av
+  root och inte går att skriva i för gruppen, andra eller den som kör vakten, både som sökvägen står och dit
+  länkarna leder. En sådan mapp som inte finns stoppar också (den strängaste läsningen av "ska ägas av
+  root"). En mapp efter programmet prövas inte. INSTALLERA.md steg 4 beskriver hur Hugo själv flyttar
+  nvm-mappen sist, med en rad sist i `~/.zshrc` och en säkerhetskopia först.
+- **Beslut 3.** Vakten gjorde redan så. Nu med egna tester och med beslutet i koden och SPEC 7.1.
+- **Beslut 4.** INSTALLERA.md (steg 1, "Efteråt" och kontrollen efter installationen, steg 1) och SPEC 7.1:
+  varje annan källa på raden Setting sources stoppar installationen, också användarens och projektets egna
+  inställningar. Steg 1 ber Hugo läsa raden redan före installationen och stoppa om där står något.
+
+**Bash-verktygets PATH och vaktens** (beslut 2). Prövat 2026-10-28 med en provfil i scratchpad-mappen (SPEC
+7.1, "Provfiler i kopian"). Bash-verktygets `PATH` lästes i provfilens miljö. Vaktens `PATH` är den som
+Claude Code själv startades med (programmet `claude` i Claude-appen, version 2.1.309), läst ur processens
+startmiljö med `sysctl` (KERN_PROCARGS2). En vakt startas av Claude Code och får den miljön. **De är exakt
+lika**, och båda börjar med nvm-mappen, som Hugo äger. Hela listan står i PROGRESS.md.
+
+**Fynd: `/System/Cryptexes/App/usr/bin`** (öppen fråga, se nedan). Mappen står före `/usr/bin` i Hugos
+`PATH`. Den ägs av root, men `/System/Cryptexes/App` är en länk till `/System/Volumes/Preboot/Cryptexes/App`,
+och `/System/Volumes/Preboot/Cryptexes` har rättigheterna 777. Disken är inte skrivskyddad. `os.access` säger
+att Hugos konto ändå inte kan skriva där (troligen macOS eget skydd), men rättigheterna säger att alla får.
+Vakten stoppar därför alla 13 kommandon, också när nvm-mappen är flyttad sist. Prövat med den nya vakten mot
+Hugos riktiga `PATH`: med nvm först stoppas alla 13, med nvm sist stoppas alla 13 (av Cryptexes-mappen), och
+med både nvm-mappen och Cryptexes-mappen sist går alla 13 igenom. Mappen innehåller bara `safaridriver`.
+
+**Tester** (`scripts/tests/test_kommandosparr.py`, namn som börjar med `test_beslut_1` till
+`test_beslut_4`, och `test_program_i_en_mapp_som_hugo_ager_stoppas_nar_mappen_ligger_tidigare_i_path`). Ett
+test kan inte skapa en mapp som root äger, så fixturen `rotagd` låtsas att de sökvägar testet anger gör det,
+och `test_rotagd_galler_bara_det_testet_anger` visar att allt annat prövas som vanligt. De nya testerna var
+röda (12 st) innan vakten, INSTALLERA.md och SPEC 7.1 ändrades, utom testerna för beslut 3, som var gröna
+eftersom vakten redan gjorde så.
+
+**Öppna frågor till Hugo eller Casper:**
+
+1. **Cryptexes-mappen.** Vägar: (a) Hugos rad i `~/.zshrc` (INSTALLERA.md steg 4) flyttar också
+   `/System/Cryptexes/App/usr/bin` sist. Byggsessionen rekommenderar (a): mappen har bara `safaridriver`,
+   som inte står på listan. (b) Ett undantag i vakten för just den mappen. Det gör vakten mindre sträng, och
+   rekommenderas inte. INSTALLERA.md steg 4 säger att inget installeras förrän frågan är besvarad.
+2. **Övergången.** Tills Python på den nya platsen finns körs testsviten med `.venv/bin/python` som förut,
+   annars kan ingen session, inte heller den oberoende granskningen, köra testsviten före installationen.
+   Det står i SPEC 7.1 som byggsessionens val och väntar på bekräftelse.
+3. **Följd av beslut 4.** Har Hugo egna inställningar för Claude Code (till exempel `~/.claude/settings.json`
+   med tillägg), visar `/status` troligen `User settings` på raden, och då räknas installationen som
+   misslyckad tills de är borttagna. Inte kontrollerat, eftersom byggsessionen inte läser utanför projektet.
+
 ## Bygget av vakten för Q1 (2026-10-28)
 
 Planens steg 1 (byggsessionen), gjord på Hugos uppdrag i chatten 2026-10-28. **Inget är installerat.**

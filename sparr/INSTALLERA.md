@@ -3,7 +3,9 @@
 Skriven 2026-10-28 i byggsessionen för granskning 11, Q1. Planen och Hugos beslut står i `GRANSKNING.md`
 under "Granskning 11 – plan för Q1". Ändrad samma dag efter Hugos beslut 2026-10-28 om PATH-regeln,
 förprovet för `onFailure` och P7 (`GRANSKNING.md`, "Beslut 2026-10-28: PATH-regel, förprov för onFailure,
-P7").
+P7"). Ändrad igen samma dag efter Hugos beslut 2026-10-28 om vakten, beslut 1–4 (`GRANSKNING.md`,
+"Granskning 11 – plan för Q1"): projektets Python flyttas till en mapp som systemet äger (steg 9),
+nvm-mappen flyttas sist i `PATH` (steg 4), och varje annan källa i `/status` stoppar installationen.
 
 Den här beskrivningen är till **Hugo** (och sedan **Casper**, på sin dator). Agenten kör inga av
 kommandona. Du kör dem själv i programmet **Terminal**, ett i taget, och skriver ditt
@@ -12,25 +14,31 @@ klistra in det i Terminal och tryck Retur.
 
 ## Vad som installeras
 
-Två filer kopieras till mappen `/Library/Application Support/ClaudeCode/`. Den mappen ägs av
-systemet, så det krävs ett administratörslösenord för att ändra där. Agenten kan därför inte ändra
-filerna.
+Två filer kopieras till mappen `/Library/Application Support/ClaudeCode/`, och projektets Python
+skapas där. Den mappen ägs av systemet, så det krävs ett administratörslösenord för att ändra där.
+Agenten kan därför inte ändra filerna.
 
 | Fil i projektet | Kopieras till | Vad den gör |
 |---|---|---|
 | `sparr/kommandosparr.py` | `/Library/Application Support/ClaudeCode/vera/kommandosparr.py` | **Vakten.** Ett litet program som Claude Code kör före varje verktyg. Det stoppar allt som inte står på listan i SPEC 7.1. Det stoppar också ett kommando vars program ligger i en mapp som du kan ändra utan lösenord, och kommandon som ändrar `PATH` (PATH-regeln, se nedan). |
 | `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.295 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Läget "auto" går inte att använda, och skills kan inte köra skalkommandon. |
+| `requirements.txt` (listan över paket) | `/Library/Application Support/ClaudeCode/vera/venv` (skapas, kopieras inte) | **Projektets Python med pytest**, som testsviten körs med. Den låg förut i mappen `.venv` i projektet, som du äger, och då stoppade PATH-regeln testsviten. Nu ligger den där bara systemet kan ändra den (Hugos beslut 2026-10-28 om vakten, beslut 1). |
 
 Inställningarna börjar gälla så fort filen finns, i terminalen och i skrivbordsappen. Därför kopieras
-vakten först och inställningarna sist.
+vakten först, sedan skapas projektets Python, och inställningarna kopieras sist.
 
 **PATH-regeln** (Hugos beslut 2026-10-28, beslut 1). `PATH` är listan över mappar där datorn letar efter
 ett program när du skriver dess namn, till exempel `git`. Ligger ett program med samma namn i en mapp
 som du själv kan ändra, kan det bytas ut utan lösenord. Vakten släpper därför bara igenom ett kommando om
 programmet, och varje mapp ovanför det, ägs av systemet (`root`) och inte går att ändra för någon annan.
-**Följd:** pytest-kommandona i SPEC 7.1 körs med `.venv/bin/python`, som ligger i projektet, och projektet
-ägs av dig. De stoppas alltså efter installationen, och agenten kan då inte köra testsviten. Det är ett
-beslut som behövs (se `GRANSKNING.md`).
+Samma krav gäller själva filen och, om filen är en **länk** (en hänvisning till en fil någon annanstans),
+filen dit länken leder (Hugos beslut 2026-10-28 om vakten, beslut 3). Det gäller också **varje mapp i
+`PATH` före programmet** (beslut 2): en sådan mapp som du äger stoppar kommandot, också när programmet inte
+ligger i den. Därför flyttas nvm-mappen sist i din `PATH` i steg 4.
+
+**Testsviten.** Pytest-kommandona i SPEC 7.1 körs med Python i
+`/Library/Application Support/ClaudeCode/vera/venv`, som du skapar i steg 9 (Hugos beslut 2026-10-28 om
+vakten, beslut 1). Den gamla mappen `.venv` i projektet används inte längre när vakten är installerad.
 
 ## Innan du börjar
 
@@ -64,6 +72,12 @@ På din dator hittas kommandot `claude` inte i Terminal (2026-10-28), så Claude
 4. Läs i samma ruta raden **Setting sources** (var inställningarna kommer från). Om den nämner
    inställningar från claude.ai (server-managed settings) går de före filen som installeras här, och då
    används inte filen. Stoppa i så fall och fråga.
+5. Skriv upp vad som står på raden **Setting sources** nu. Efter installationen ska raden bara visa
+   `Enterprise managed settings (file)`. Varje annan källa på raden stoppar installationen, också dina
+   egna inställningar och projektets (Hugos beslut 2026-10-28 om vakten, beslut 4, se "Efteråt"). Står
+   det redan nu något på raden, till exempel `User settings` eller `Project settings`, kommer den källan
+   troligen att stå kvar efter installationen. Stoppa i så fall och fråga redan nu, innan något
+   installeras.
 
 **Om versionen är äldre än 2.1.295: stoppa och uppdatera först.**
 
@@ -204,7 +218,80 @@ rmdir ~/vera-forprov
 
 **Stoppades `ls` inte i e: avbryt installationen.** Gå vidare till steg 4 bara om `ls` stoppades.
 
-## Steg 4: kontrollera att filerna är de som granskades
+## Steg 4: flytta nvm-mappen sist i PATH (före installationen)
+
+**Öppen fråga, installera inte än** (byggsessionen 2026-10-28). Också systemets mapp
+`/System/Cryptexes/App/usr/bin` står före `/usr/bin` i din `PATH`. Den ägs av systemet, men leder till
+`/System/Volumes/Preboot/Cryptexes`, som har rättigheterna 777 (alla får ändra, enligt mappens egna
+uppgifter). Vakten stoppar därför alla kommandon också när nvm-mappen är flyttad. Mappen innehåller bara
+programmet `safaridriver`. Hugo eller Casper bestämmer hur det löses (`GRANSKNING.md`, "Granskning 11 –
+plan för Q1", beslut 2). Gör inte det här steget, och installera inte, förrän frågan är besvarad.
+
+Vakten kräver att varje mapp i `PATH` före programmet ägs av systemet (Hugos beslut 2026-10-28 om vakten,
+beslut 2). På din dator står nvm-mappen först i `PATH`:
+`/Users/hugolindholmer/.nvm/versions/node/v24.18.0/bin`. **nvm** (Node Version Manager) är ett program som
+installerar Node, och mappen ägs av dig. Den står först både i den `PATH` som Claude Code själv har (och
+som vakten får) och i den `PATH` som agentens kommandon körs med (kontrollerat 2026-10-28, se
+`PROGRESS.md`). Utan det här steget stoppar vakten **alla** kommandon, också `git status`.
+
+nvm lägger in mappen från filen `~/.zshrc`, som skalet zsh (programmet som tolkar kommandona i Terminal)
+läser varje gång det startar. Här lägger du till en rad sist i den filen, som flyttar nvm-mappen sist i
+`PATH`. Agenten ändrar inte dina skalfiler, du gör det själv (Hugos beslut 2026-10-28 om vakten, beslut 2,
+och de låsta inställningarna förbjuder agenten att skriva i `~/.zshrc`). `node`, `npm` och `npx` fungerar
+som förut.
+
+**a. Gör en säkerhetskopia av filen:**
+
+```bash
+cp -i ~/.zshrc ~/.zshrc.fore-vera
+```
+
+- `cp` kopierar filen `~/.zshrc` till `~/.zshrc.fore-vera`. `-i` gör att datorn frågar innan den skriver
+  över en fil som redan finns. Om den frågar: svara `n` (nej), och stoppa och fråga.
+- Säger kommandot `No such file or directory` finns ingen `~/.zshrc`, och då läggs nvm in från en annan
+  fil. Stoppa och fråga.
+
+**b. Lägg till raden sist i filen** (kommandot är en enda rad, kopiera hela):
+
+```bash
+echo '[ -n "$NVM_BIN" ] && path=( ${path:#$NVM_BIN} $NVM_BIN )' >> ~/.zshrc
+```
+
+- `echo '…'` skriver ut texten mellan de enkla citattecknen, och `>>` (två större än-tecken) lägger
+  texten **sist** i filen. Med bara ett `>` skulle hela filen ersättas, så kopiera kommandot exakt. Har
+  det ändå blivit fel: hämta tillbaka säkerhetskopian med `cp ~/.zshrc.fore-vera ~/.zshrc`, och fråga.
+- Raden som hamnar i filen gör så här: `$NVM_BIN` är nvm-mappen. `path` är zsh:s namn på `PATH` som en
+  lista. `${path:#$NVM_BIN}` är listan utan nvm-mappen, och nvm-mappen läggs sedan sist. `[ -n "$NVM_BIN" ]
+  &&` betyder "bara om nvm har angett sin mapp", så att ingen tom mapp läggs till.
+
+**c. Kontrollera filen:**
+
+```bash
+tail -n 3 ~/.zshrc
+```
+
+- `tail -n 3` visar de tre sista raderna i filen, och ändrar ingenting. Den sista raden ska vara exakt
+  raden mellan citattecknen i b.
+
+**d. Kontrollera `PATH`.** Öppna ett **nytt** Terminal-fönster (Cmd+N), så att skalet läser filen på
+nytt, och kör:
+
+```bash
+echo $PATH
+```
+
+- Visar `PATH`: mapparna i ordning, åtskilda med `:`. nvm-mappen (den med `.nvm` i namnet) ska nu stå
+  **sist**, och den första mappen ska vara en av systemets, till exempel `/usr/local/bin`.
+- Står nvm-mappen fortfarande först: stoppa och fråga. Då läggs nvm troligen in från en annan fil, till
+  exempel `~/.zprofile` eller `~/.zlogin`.
+
+**e. Starta om Claude-appen** helt (**Claude > Quit Claude**, eller Cmd+Q), och öppna den igen. Claude
+Code läser `PATH` när appen startar, så sessioner som redan är öppna har kvar den gamla ordningen.
+
+Ångra steget: `cp ~/.zshrc.fore-vera ~/.zshrc`, och starta om Terminal och Claude-appen. Då stoppar vakten
+alla kommandon igen.
+
+## Steg 5: kontrollera att filerna är de som granskades
 
 ```bash
 shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-settings.json
@@ -215,7 +302,7 @@ shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-set
 - Jämför de två summorna, tecken för tecken, med dem som den oberoende granskningen har skrivit upp
   (Hugos beslut 2026-10-28). **Är någon summa olika: stoppa och fråga.** Kopiera ingenting.
 
-## Steg 5: skapa mapparna och låt systemet äga dem
+## Steg 6: skapa mapparna och låt systemet äga dem
 
 ```bash
 sudo mkdir "/Library/Application Support/ClaudeCode"
@@ -244,7 +331,7 @@ sudo chmod 755 "/Library/Application Support/ClaudeCode" "/Library/Application S
 - `chmod` sätter vem som får läsa, skriva och öppna. `755` på en mapp betyder: ägaren (systemet) får
   ändra, alla andra får bara titta in. Claude Code behöver kunna titta in för att hitta filerna.
 
-## Steg 6: kopiera vakten
+## Steg 7: kopiera vakten
 
 ```bash
 sudo ditto ~/VERA/agent/sparr/kommandosparr.py "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
@@ -253,7 +340,7 @@ sudo ditto ~/VERA/agent/sparr/kommandosparr.py "/Library/Application Support/Cla
 - `ditto` kopierar en fil. `~/VERA/agent/sparr/kommandosparr.py` är vakten i projektet, och den sista
   sökvägen är dit den kopieras.
 
-## Steg 7: låt systemet äga vakten och sätt rättigheterna
+## Steg 8: låt systemet äga vakten och sätt rättigheterna
 
 ```bash
 sudo chown root:wheel "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
@@ -272,7 +359,48 @@ sudo chmod 644 "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
   att alla kan läsa filerna, eftersom de inte innehåller några hemligheter. Det viktiga är att ingen utom
   systemet kan **ändra** dem.
 
-## Steg 8: kopiera de låsta inställningarna (sist, nu börjar de gälla)
+## Steg 9: skapa projektets Python på den nya platsen
+
+Testsviten körs med en egen Python som har pytest installerat. Den skapas nu i
+`/Library/Application Support/ClaudeCode/vera/venv`, där bara systemet kan ändra den (Hugos beslut
+2026-10-28 om vakten, beslut 1). Agenten kan då köra testsviten utan att PATH-regeln stoppar den, och kan
+inte byta ut Python eller pytest.
+
+```bash
+sudo /usr/bin/python3 -m venv "/Library/Application Support/ClaudeCode/vera/venv"
+```
+
+- `/usr/bin/python3 -m venv` skapar en **venv**: en egen mapp med Python och plats för paket, som inte
+  blandas med något annat på datorn. Det är samma Python som projektets gamla `.venv` och vakten använder.
+  Säger kommandot `File exists` eller `already exists`: stoppa och fråga.
+
+```bash
+sudo "/Library/Application Support/ClaudeCode/vera/venv/bin/python" -m pip install --only-binary ':all:' --no-cache-dir -r ~/VERA/agent/requirements.txt
+```
+
+- `pip install -r` installerar paketen som står i projektets fil `requirements.txt` (pytest 8.4.2) och de
+  paket pytest behöver. Det kräver internet.
+- `--only-binary ':all:'` gör att pip bara tar färdigbyggda paket. Då körs inget installationsskript från
+  paketen som administratör. Säger pip att ett paket inte finns färdigbyggt: stoppa och fråga.
+- `--no-cache-dir` gör att pip inte sparar en kopia av paketen i din hemmapp, där filerna annars skulle
+  ägas av systemet.
+- pip varnar troligen för att det körs som administratör ("Running pip as the 'root' user"), och kanske
+  för att det finns en nyare pip. Det är väntat här. Står det `Successfully installed` och `pytest-8.4.2`
+  sist, gick det bra. Står det `ERROR`: stoppa och fråga.
+
+```bash
+sudo chown -R root:wheel "/Library/Application Support/ClaudeCode/vera/venv"
+```
+
+```bash
+sudo chmod -R go-w "/Library/Application Support/ClaudeCode/vera/venv"
+```
+
+- `-R` gör att kommandot gäller mappen och allt i den. `chown -R root:wheel` gör systemet till ägare av
+  allt, och `chmod -R go-w` tar bort rätten att ändra för gruppen (`g`) och alla andra (`o`). Ingenting
+  annat ändras.
+
+## Steg 10: kopiera de låsta inställningarna (sist, nu börjar de gälla)
 
 ```bash
 sudo cp -i ~/VERA/agent/sparr/managed-settings.json "/Library/Application Support/ClaudeCode/managed-settings.json"
@@ -281,7 +409,7 @@ sudo cp -i ~/VERA/agent/sparr/managed-settings.json "/Library/Application Suppor
 - `cp` kopierar en fil. `-i` gör att datorn frågar innan den skriver över en fil som redan finns. Om
   den frågar: svara `n` (nej) och stoppa, eftersom filen då inte borde finnas (se "Innan du börjar").
 
-## Steg 9: låt systemet äga inställningarna och sätt rättigheterna
+## Steg 11: låt systemet äga inställningarna och sätt rättigheterna
 
 ```bash
 sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.json"
@@ -291,19 +419,19 @@ sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.
 sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
 ```
 
-- Samma som i steg 7, för inställningsfilen: systemet äger den, alla får läsa den, bara en
+- Samma som i steg 8, för inställningsfilen: systemet äger den, alla får läsa den, bara en
   administratör får ändra den.
 
-## Steg 10: kontrollera att det är samma filer som ligger på plats
+## Steg 12: kontrollera att det är samma filer som ligger på plats
 
 ```bash
 shasum -a 256 "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/managed-settings.json"
 ```
 
-- Samma kontroll som i steg 4, nu för filerna där de installerades. Summorna ska vara exakt samma som
-  i steg 4. **Är någon olika: stoppa och fråga.**
+- Samma kontroll som i steg 5, nu för filerna där de installerades. Summorna ska vara exakt samma som
+  i steg 5. **Är någon olika: stoppa och fråga.**
 
-## Steg 11: kontrollera ägare och rättigheter igen (efter installationen)
+## Steg 13: kontrollera ägare och rättigheter igen (efter installationen)
 
 ```bash
 ls -ld / /Library "/Library/Application Support" "/Library/Application Support/ClaudeCode"
@@ -320,9 +448,17 @@ ls -ld "/Library/Application Support/ClaudeCode/vera" "/Library/Application Supp
   (det första tecknet, `-`, betyder att det är en fil, och `644` skrivs så). Ägaren ska vara `root` och
   gruppen `wheel` på alla tre.
 
+```bash
+ls -ld "/Library/Application Support/ClaudeCode/vera/venv" "/Library/Application Support/ClaudeCode/vera/venv/bin" "/Library/Application Support/ClaudeCode/vera/venv/bin/python"
+```
+
+- Visar projektets Python från steg 9: mappen `venv`, mappen `bin` i den och `python`. Mapparna ska vara
+  `drwxr-xr-x`. `python` är en **länk** till Python i utvecklarverktygen: raden börjar med `l` och slutar
+  med `-> python3` eller liknande. Det är rätt. Ägaren ska vara `root` och gruppen `wheel` på alla tre.
+
 **Kan gruppen eller andra skriva någonstans (ett `w` på plats 6 eller 9), är ägaren inte `root`, är
-gruppen inte `wheel` för `ClaudeCode`, `vera` och filerna, eller står det `+` eller `@` efter de tio
-tecknen: installationen räknas som misslyckad. Stoppa och fråga.**
+gruppen inte `wheel` för `ClaudeCode`, `vera`, `venv` och filerna, eller står det `+` eller `@` efter de
+tio tecknen: installationen räknas som misslyckad. Stoppa och fråga.**
 
 ## Efteråt
 
@@ -332,7 +468,10 @@ tecknen: installationen räknas som misslyckad. Stoppa och fråga.**
    i en ny session och läs raden **Setting sources**. Den ska visa `Enterprise managed settings (file)`,
    alltså inställningarna från filen du installerade (code.claude.com/docs/en/managed-settings). **Saknas
    raden, saknas den texten, eller visas en annan källa, gäller inte vakten, och installationen räknas
-   som misslyckad.** Stoppa och fråga.
+   som misslyckad.** Stoppa och fråga. Varje annan källa på raden stoppar installationen, också dina
+   egna inställningar (till exempel `User settings`) och projektets (till exempel `Project settings` eller
+   `Local settings`), inte bara inställningar från claude.ai (Hugos beslut 2026-10-28 om vakten, beslut 4,
+   den strängaste tolkningen).
 3. **Gör kontrollen efter installationen** (sist i den här filen) i en ny session.
 4. **Agenten kan inte längre skriva i `~/.claude`** (Hugos beslut 2026-10-28, punkt 5). Där ligger
    bland annat Claudes minne mellan sessionerna (`~/.claude/projects/…/memory`). Det slutar gå att
@@ -346,19 +485,25 @@ tecknen: installationen räknas som misslyckad. Stoppa och fråga.**
    som inte är förgodkänt.
 8. **Agenten kan inte skriva i projektets mapp `.claude`, i `.mcp.json` eller i `.venv`** (Hugos beslut
    2026-10-28, 5). Inställningar och kopplingar för projektet skriver du eller Casper själva.
-9. **Agenten kan inte köra testsviten** (PATH-regeln, Hugos beslut 2026-10-28, beslut 1), eftersom
-   `.venv/bin/python` ligger i projektet, som du äger. Det gäller tills ett beslut om det är fattat.
+9. **Agenten kör testsviten med Python på den nya platsen** (Hugos beslut 2026-10-28 om vakten, beslut
+   1), med kommandona i SPEC 7.1. Den gamla mappen `.venv` i projektet används inte längre. När kontrollen
+   efter installationen, steg 3, visar att testsviten går, kan du ta bort den: dra mappen `.venv` i
+   `~/VERA/agent` till papperskorgen i Finder (mappen är dold, tryck Cmd+Shift+. för att se den). Gör det
+   inte före kontrollen.
 
 ## Caspers dator
 
 Samma steg, i samma ordning, och samma versionskontroll i steg 1 (med `/status`, minst 2.1.295, i
 skrivbordsappen och i terminalen om Claude Code finns där). Samma förprov i steg 3 och samma kontroll av
-mapparna i steg 2 och 11. Samma `managed-settings.json` fungerar: regeln som hindrar agenten att skriva i
-`.git` (`Edit(//**/.git/**)`) gäller varje `.git`-mapp på datorn och har inget användarnamn i sig. En
-skillnad:
+mapparna i steg 2 och 13. Samma `managed-settings.json` fungerar: regeln som hindrar agenten att skriva i
+`.git` (`Edit(//**/.git/**)`) gäller varje `.git`-mapp på datorn och har inget användarnamn i sig.
+Skillnader:
 
-- Sökvägen till projektet kan vara en annan. Byt `~/VERA/agent` i steg 4, 6 och 8 mot där projektet
+- Sökvägen till projektet kan vara en annan. Byt `~/VERA/agent` i steg 5, 7, 9 och 10 mot där projektet
   ligger på Caspers dator.
+- Steg 4 (nvm-mappen) gäller bara om en mapp som Casper äger står före systemets mappar i `PATH`. Kör
+  `echo $PATH` från steg 4 d först. Står någon annan mapp än systemets först, till exempel nvm eller
+  Homebrew (`/opt/homebrew/bin`): stoppa och fråga, eftersom vakten då stoppar alla kommandon.
 
 Kontrollen nedan görs också på Caspers dator.
 
@@ -375,7 +520,10 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
 
 1. **De låsta inställningarna gäller.** Skriv `/status` och läs raden **Setting sources**. Den ska visa
    `Enterprise managed settings (file)`, alltså inställningarna från filen du installerade
-   (code.claude.com/docs/en/managed-settings). Läs också raden **Claude Code**: versionen ska vara
+   (code.claude.com/docs/en/managed-settings). Varje annan källa på raden stoppar installationen, också
+   dina egna inställningar (till exempel `User settings`) och projektets (till exempel `Project settings`
+   eller `Local settings`): stoppa och fråga (Hugos beslut 2026-10-28 om vakten, beslut 4). Läs också
+   raden **Claude Code**: versionen ska vara
    2.1.295 eller senare. Läget "auto" ska inte gå att välja: i terminalens Claude Code, tryck Shift+Tab
    några gånger, och "auto" ska inte komma upp (code.claude.com/docs/en/settings-reference,
    `disableAutoMode`).
@@ -384,7 +532,11 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
 3. **Ett kommando på listan går igenom.** Be agenten köra `git status`. Claude Code frågar dig som vanligt
    om det får köras. Säg ja. Kommandot ska köras och visa läget i projektet. (`git` ligger i
    `/usr/bin`, som ägs av systemet, så PATH-regeln släpper igenom det. Stoppas det med "PATH-regeln":
-   skriv upp felet och fråga.)
+   skriv upp felet och fråga. Nämner felet en mapp med `.nvm` i namnet, har steg 4 inte fått effekt.)
+   Be sedan agenten köra testsviten med kommandot i SPEC 7.1,
+   `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`
+   (Hugos beslut 2026-10-28 om vakten, beslut 1). Det ska gå igenom, och sista raden ska säga hur många
+   tester som är gröna (`passed`) och att inga är röda.
 4. **sudo stoppas.** Be agenten köra `sudo ls`. Det ska stoppas, antingen av vakten ("sudo och su stoppas
    alltid") eller av förbudsregeln i inställningarna. Datorn ska **inte** fråga efter ditt lösenord. Gör
    den det: skriv inte lösenordet, avbryt med Ctrl+C, och stoppa.
@@ -439,7 +591,7 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
    ```
 
    Du ser två rader, var och en med en summa på 64 tecken och sökvägen till filen. Summorna ska vara
-   **exakt samma** som i steg 10 i installationen (och som de som granskningen skrev upp). Är någon olika:
+   **exakt samma** som i steg 12 i installationen (och som de som granskningen skrev upp). Är någon olika:
    stoppa och fråga.
 
    **e. Starta en ny session** och gör steg 2 och 3 igen: `ls; ls` ska stoppas med "Stoppat av vakten",
