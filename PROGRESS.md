@@ -523,8 +523,18 @@ fattade och byggda, se avsnittet ovan.)
     `git log -- /.vol/…`) prövas inte av vakten. git vägrar troligen sökvägar utanför projektet, men det är inte
     prövat. Förslag: SPEC säger exakt vilka kommandon I1 gäller, eller vakten prövar också gits sökvägar.
 13. **Steg 9 använder /usr/bin/python3 med sudo. Kan bytas till den fasta sökvägen senare** (Hugos beslut
-    2026-10-28 efter granskning 19). INSTALLERA.md steg 9 skapar projektets Python med
-    `sudo /usr/bin/python3 -m venv`, och lämnas som det är.
+    2026-10-28 efter granskning 19, bekräftat och inskrivet i Hugos beslut 2026-10-28 efter granskning 20, K4).
+    INSTALLERA.md steg 9 skapar projektets Python med `sudo /usr/bin/python3 -m venv`, och lämnas som det är.
+14. **De låga fynden i granskning 20** (Hugos beslut 2026-10-28 efter granskning 20: under Öppet). En rad var:
+    - **K1:** steg 2 b visar inte mapparna där vaktens Python läser in kod när den startar, bland annat
+      `/Library/Python/3.9/site-packages`, där en `.pth`-fil kör kod också med `-I`. **Rättas med `-I -S` nästa
+      gång vakten ändras.** `/Library/Python` kontrolleras för hand på Caspers dator före hans installation.
+    - **K2:** kan vakten inte skriva sitt fel (felkanalen stängd eller inte skrivbar) avslutar Python med kod 120,
+      inte 2. Stoppas ändå av `onFailure: block`.
+    - **K3:** en tom `cwd` (`""`) släpps igenom, eftersom vakten räknar den som sin egen arbetsmapp. **Rättas i
+      nästa version av vakten.**
+    - **K5:** steg 2 b säger inte var andra omgången börjar, och första raden visar en relativ sökväg som kan
+      förväxlas med regeln för andra omgången.
 
 ## Nästa steg i byggordningen
 

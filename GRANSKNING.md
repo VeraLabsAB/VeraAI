@@ -6829,3 +6829,13 @@ läsande, och inga filer öppnades. Inga `cd`, `&&`, `|` eller `sed` utom i steg
    (ny granskning), eller under Öppet? Granskaren föreslår raden i steg 2 b före installationen på Caspers dator.
 2. **K2, K3, K5:** rättas nu eller under Öppet?
 3. **K4:** bekräftar Hugo beslutet om steg 9 (PROGRESS.md, Öppet punkt 13)? Då skrivs det in bland besluten.
+
+### Hugos beslut 2026-10-28 (efter granskning 20)
+
+Skrivna av Hugo i uppdraget till sessionen 2026-10-28, i chatten.
+
+- **K1 läggs under Öppet.** Rättas med `-I -S` nästa gång vakten ändras. `/Library/Python` kontrolleras för hand på
+  Caspers dator före hans installation.
+- **K2, K3 och K5 läggs under Öppet.** K3 rättas i nästa version av vakten.
+- **K4: beslutet om steg 9 är bekräftat.** Steg 9 lämnas som det är (`sudo /usr/bin/python3 -m venv`, PROGRESS.md,
+  Öppet punkt 13).
