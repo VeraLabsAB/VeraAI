@@ -5657,3 +5657,339 @@ Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28, i chatten.
   OK. Testet visade också `shell_session_history_check` i `precmd_functions`, men den tar bort sig själv vid
   första prompten, så i Terminal finns den inte kvar när skriptet körs (stämmer med granskning 15, punkt 8).
   Testet låtsas därför att en första prompt har visats. Skriptet är inte ändrat för den.
+
+## Granskning 17 (av 89ac7b0 till 06e527e) (2026-10-28)
+
+Oberoende granskning av rättelserna efter granskning 16, gjord på Hugos uppdrag i chatten 2026-10-28, i en ny
+session som inte har sett bygget. Granskat läge: commit `06e527e` på grenen main (`git status` ren när
+granskningen började). Ingen kod, inga tester och ingen inställningsfil i projektet är ändrade. Skrivet i
+projektet: bara det här avsnittet. Granskarens prov ligger i kopior i scratchpad-mappen, **men ett av dem
+ändrade en systemfil utanför scratchpad (H1)**.
+
+**Läget:** appens uppgifter om sessionen visade först `permissionMode: default` (Manual). Under läsningen byttes
+läget till `auto`. Granskaren stoppade, sa till och väntade. Efter två kontroller visade det `default` igen, och
+granskningen började om därifrån. Före stoppet hade bara `SPEC.md` och `PROGRESS.md` lästs och `git log` körts.
+Läget kontrollerades igen innan arbetet återupptogs efter H1.
+
+### Viktigt först
+
+- **H1 (medel): granskarens prov satte en extra uppgift (`@`) på systemfilen `/etc/zshrc`.** Därför skriver
+  kontrollskriptet nu `AVVIKER` för `/etc/zshrc` på Hugos dator, och steg 4 g stoppar installationen. Testet
+  `test_g4_det_riktiga_skriptet_skriver_ok_i_ett_rent_fall` är rött av samma skäl. Innehållet i filen är inte
+  ändrat. Ett beslut behövs (alternativen står under H1).
+- **H6 (medel, inte bekräftat): förbuden i de låsta inställningarna kanske skiljer på stora och små bokstäver,
+  men Macen gör det inte.** Skrivförbuden är det enda som hindrar fil-verktygen från att skriva till exempel i
+  `.git/hooks`, i `~/.zshrc` och i Claude Codes egna program. Ett förprov före installationen kan avgöra det.
+- **Enligt stoppregeln kan vakten inte installeras** förrän H1 och H6 är avgjorda.
+- **Rättelserna själva håller:** `-R` stoppas i alla former (G3), `.ugrep` stoppas oavsett stora och små
+  bokstäver (G7), och inget av granskarens försök att lura kontrollen av `add-zsh-hook` gick igenom.
+- **Kontrollsummorna stämmer**, alla fyra (punkt 6).
+
+### Fynd
+
+| Nr | Nivå | Kort |
+|---|---|---|
+| H1 | MEDEL | Granskarens prov satte `com.apple.provenance` (`@`) på `/etc/zshrc`. Kontrollen stoppar nu installationen |
+| H2 | LÅG | En vanlig användare, och agenten via en testfil, kan sätta `@` på en fil som root äger, med en hård länk |
+| H3 | LÅG (känt) | Python i en testfil kan göra vad som helst. Listan begränsar kommandon, inte testkod |
+| H4 | LÅG | G4-testet läser riktiga systemfiler och blir rött av datorns läge, inte av koden |
+| H5 | LÅG | Kontrollen av `add-zsh-hook` jämför inte innehållet med filen, och prövar inte mappen filen ligger i |
+| H6 | MEDEL (inte bekräftat) | Okänt om skrivförbuden gäller `.GIT`, `.ZSHRC` och liknande. Macen skiljer inte på dem |
+
+**H1 – granskarens prov ändrade `/etc/zshrc`. MEDEL.**
+- **Vad som gjordes:** för att visa att skriptet bara prövar filen för `add-zsh-hook` och inte mappen den ligger
+  i, skrev granskaren ett test i kopian (`scratchpad/g17/ny/scripts/tests/test_granskare_17.py`,
+  `test_add_zsh_hook_rot_agd_fil_i_mapp_som_anvandaren_kan_andra`). Testet gjorde en **hård länk** (ett andra
+  namn på samma fil) med `os.link("/private/etc/zshrc", …)` till pytests tillfälliga mapp
+  (`/private/var/folders/qr/…/T/pytest-of-hugolindholmer/pytest-<nr>/test_add_zsh_hook_rot_agd_fil_0/zsh/5.9/functions/add-zsh-hook`).
+  Testet kördes två gånger, 2026-10-28 strax före kl. 19.08 (den andra gången kl. 19.07.53, enligt filens ctime). Länken gjordes i en mapp utanför
+  scratchpad, till en fil utanför scratchpad. Det var fel, och en sådan länk står inte i uppdraget.
+- **Vad som ändrades**, läst med `os.stat` och `ls -ld@e` i en provfil i kopian efteråt:
+  - `/etc/zshrc` har den extra uppgiften `com.apple.provenance` (11 byte), syns som `-r--r--r--@`.
+  - Antalet namn på filen är 3 i stället för 1 (de två hårda länkarna).
+  - Senaste ändring av filens uppgifter (ctime): 2026-10-28 19:07:53, alltså när provet kördes.
+  - **Innehållet är inte ändrat:** senaste ändring av innehållet (mtime) är fortfarande 2026-08-13 04:51:55.
+    Ägare (`root wheel`) och rättigheter (`-r--r--r--`) är oförändrade.
+  - `/etc/zshrc_Apple_Terminal` och `/usr/share/zsh/5.9/functions/add-zsh-hook` har inget `@` och är inte
+    ändrade.
+- **Före:** Hugo körde `ls -ld@e /etc/zshrc` kl. 17.02 samma dag, och då fanns inget `@` (Hugos beslut
+  2026-10-28 efter granskning 16). Byggsessionen körde efter det G4-testet, som kräver `OK`, och hela sviten var
+  grön (3 724 passed). **Att granskarens länk gav `@` är alltså med stor sannolikhet orsaken**, men inte bevisat:
+  macOS sätter `com.apple.provenance` själv, och granskaren kan inte se när just den uppgiften kom till.
+- **Följder:** kontrollskriptet godtar bara exakt tio tecken i rättighetsfältet, så det skriver nu `AVVIKER: ls
+  -l: /etc/zshrc har extra rättigheter eller uppgifter (+ eller @)` (sett i granskarens prov med det riktiga
+  skriptet och systemets `/etc/zshrc`). Steg 4 g stoppar alltså installationen på Hugos dator. Det är den säkra
+  riktningen: inget slinker igenom, men installationen kan inte göras som det står. Testsviten har ett rött test
+  (punkt 9).
+- **Inte gjort, efter Hugos besked i chatten:** granskaren har inte försökt ta bort uppgiften och inte rört de
+  två extra namnen. De ligger i pytests egna tillfälliga mappar, som pytest tar bort av sig själv efter några
+  körningar. Det ändrar inte uppgiften på filen.
+- **Alternativen** (inget är genomfört):
+  1. **Skriptet godtar exakt `com.apple.provenance` och ingen annan uppgift**, på filerna och mapparna det prövar.
+     Skriptet läser då namnen med `ls -ld@` och godtar ett `@` bara om den enda uppgiften heter
+     `com.apple.provenance`. Ett `+` (extra rättigheter) stoppar som förut.
+     - För: löser H1 och H2 på varje dator, utan sudo. Uppgiften ger inga rättigheter och ändrar inte filen. Den
+       kan inte sättas av någon som skriver i filen, bara av macOS. Samma sak behövs troligen i testerna, som
+       redan godtar `@` i sina kopior (`TECKEN_KOPIA`).
+     - Emot: skriptet ändras och får en ny kontrollsumma, en ny oberoende granskning behövs, och kontrollen blir
+       lite mindre sträng. Skriptet ser inte längre om någon har gjort en hård länk till filen (men en hård länk
+       ändrar inte innehållet eller rättigheterna). Vad `com.apple.provenance` innehåller är inte dokumenterat
+       av Apple.
+     - Caspers dator: fungerar likadant, oavsett om hans filer har uppgiften eller inte.
+  2. **Uppgiften tas bort med sudo**, till exempel `sudo xattr -d com.apple.provenance /etc/zshrc`, som Hugo kör
+     själv i Terminal.
+     - **Går det ens? Inte bekräftat.** `/etc/zshrc` ligger på datavolymen (`/private/etc`), inte i systemets
+       skrivskyddade del, så det bör inte stoppas av systemskyddet. Men `com.apple.provenance` styrs av macOS
+       själv, och granskaren vet inte om macOS låter även root ta bort den, eller sätter den igen. Det syns först
+       när det provas.
+     - För: skriptet ändras inte, ingen ny granskning av skriptet.
+     - Emot: kräver sudo på en systemfil, utanför installationsstegen. Osäkert om det fungerar. Löser inte H2:
+       samma sak kan hända igen, till exempel av en testfil, ända tills sandlådan finns.
+     - Caspers dator: behövs bara om hans `/etc/zshrc` har `@`. Det ser han med de fyra kommandona från
+       granskning 16, punkt 2.
+  3. **Annat:**
+     - (a) **Skriptet godtar alla `@`, men stoppar fortfarande `+`.** En vanlig användare kan inte själv sätta
+       en uppgift på en fil som root äger, det kräver skrivrätt. Bara macOS (som med provenance) eller root kan.
+       För: enklare än 1. Emot: bredare än 1, och samma nackdelar med ny summa och ny granskning.
+     - (b) **Hugo ersätter `/etc/zshrc` med en ren kopia av sig själv** (`sudo cp`), så att filen får ett nytt
+       inode-nummer utan uppgiften. Emot: sudo på en systemfil, och det är inte bekräftat att kopian blir utan
+       `com.apple.provenance`. Rekommenderas inte.
+     - (c) **Vänta och se**, alltså göra ingenting. Uppgiften försvinner inte av sig själv, och kontrollen får
+       aldrig lättas på plats (Hugos regel 2026-10-28). Det löser inget.
+     - Granskarens bedömning: **1 är bäst**. Den löser också H2, och kräver ingen sudo utanför installationen.
+
+**H2 – vem som helst kan sätta `@` på en fil som root äger. LÅG (säker riktning).**
+- H1 visar det: en hård länk till en fil som root äger gick att göra utan lösenord, och då satte macOS
+  `com.apple.provenance` på filen. Det gäller filer på datavolymen, till exempel `/etc/zshrc` och
+  `/etc/zshrc_Apple_Terminal`. Filerna i `/usr/share/zsh` ligger på systemvolymen, och dit kan en hård länk inte
+  göras från en annan volym (inte prövat, efter Hugos besked att inte göra fler länkar).
+- Agenten kan göra det med en egen testfil (H3), före och efter installationen, tills sandlådan finns.
+- Följden är bara att kontrollen stoppar installationen eller kontrollen efter den, alltså den säkra riktningen.
+  Inget kan slinka igenom på det här sättet.
+- Förslag: alternativ 1 under H1.
+
+**H3 – Python i en testfil kan göra vad som helst. LÅG (känt, beslut finns).**
+- Listan i SPEC 7.1 begränsar kommandona, inte vad testkoden gör. Det står redan i SPEC 7.1 ("Det vakten inte
+  stoppar: en egen testfil") och i PROGRESS.md, Öppet, punkt 4. H1 visar det på riktigt: en testfil i
+  scratchpad ändrade en systemfil utanför scratchpad, i en granskning där reglerna sa "prov bara i scratchpad".
+- Skyddet är **sandlådan**, som ska göras direkt efter installationen och vara klar före uppgift 5, eller före
+  första hela körningen på riktiga underlag om den kommer först (Hugos beslut 2026-10-28). Den ska också hindra
+  att en testfil gör länkar till filer utanför scratchpad.
+- Förslag: tills sandlådan finns, en mening i SPEC 7.1 under "Provfiler i kopian": en provfil får inte läsa,
+  skriva eller länka till filer utanför kopian och den tillfälliga mappen, utom systemets program som den kör.
+  Det är text, inte ett skydd.
+
+**H4 – G4-testet beror på datorns läge. LÅG.**
+- `test_g4_det_riktiga_skriptet_skriver_ok_i_ett_rent_fall` läser systemets `/etc/zshrc` och
+  `/etc/zshrc_Apple_Terminal` och kräver `OK` (Hugos val i chatten 2026-10-28). Testet är rött nu, men koden är
+  densamma som när det var grönt. Ett rött test säger då inte om koden är fel eller datorn har ändrats.
+- Testet visar ändå något nyttigt: att det riktiga skriptet skriver `OK` på just den här datorn i dag. Nu visar
+  det i stället H1.
+- Förslag: låt felmeddelandet säga att testet beror på datorns filer, och skilj det från testerna av koden, till
+  exempel med ett eget namn eller en egen markering. Ändras först efter beslutet om H1.
+
+**H5 – `add-zsh-hook`: ursprung och ägare, men inte innehåll eller mapp. LÅG.**
+- Skriptet godtar `add-zsh-hook` om `whence -v` säger att den kommer från
+  `/usr/share/zsh/<en mapp>/functions/add-zsh-hook`, och filen ägs av root utan skrivrätt för andra. Granskarens
+  prov (punkt 2) gav `AVVIKER` i alla fall utom med den rätta filen.
+- Två saker prövas inte. **Innehållet:** zsh ger en funktion samma ursprung som funktionen som kördes när den
+  skapades (prov f). Om kod som körs inne i den rätta `add-zsh-hook` skapar en ny `add-zsh-hook`, skulle den nya
+  få den rätta filen som ursprung. Granskaren hittade inget sätt att få det att hända (en fälla med `trap … DEBUG`
+  gav fällans ursprung, inte filens). **Mappen:** bara filen prövas, inte mapparna ovanför. De ligger i
+  `/usr/share`, som macOS systemskydd låser.
+- Bedömning: det räcker i dag att pröva ursprung och ägare. `add-zsh-hook` står inte på listan i SPEC 7.1, så
+  agenten kör den aldrig. En funktion med fel innehåll skulle inte ändra något som vakten släpper igenom.
+- Förslag (frivilligt): jämför också innehållet. Läs in filen i en tillfällig funktion och jämför med
+  `${functions[add-zsh-hook]}`. Om det görs, i samma version som alternativ 1 under H1.
+
+**H6 – stora och små bokstäver i skrivförbuden. MEDEL (inte bekräftat).**
+- **Prövat på den här Macen** (provfil i scratchpad): `.UGREP` och `.Ugrep` är samma fil som `.ugrep`, och
+  `.GIT/HOOKS` är samma mapp som `.git/hooks`. `.ugrep.`, `.ugrep ` (med mellanslag) och `.ｕgrep` (bred
+  bokstav) är andra filer.
+- **Vakten** jämför `.ugrep` utan hänsyn till stora och små bokstäver (`casefold`), och stoppade alla former
+  granskaren provade (punkt 4). Vakten prövar bara Bash-kommandon.
+- **Fil-verktygen** (Write och Edit) stoppas bara av förbuden i `managed-settings.json`. **Om Claude Code
+  jämför förbuden utan hänsyn till stora och små bokstäver är inte bekräftat.** Granskaren försökte läsa
+  dokumentationen (code.claude.com, permissions) med WebFetch, men svaret var för stort och sparades av Claude
+  Code i hemmappen, där granskaren inte läser. Jämför Claude Code exakt, kan agenten skriva till exempel
+  `.GIT/hooks/pre-commit`. Den filen kör git vid varje `git commit`, alltså egen kod utan att vakten ser det.
+- **Förbuden, ett i taget:**
+
+| Förbud | Spelar stora och små bokstäver roll? | Skyddar något viktigt bara med förbudet? |
+|---|---|---|
+| `Bash(sudo *)`, `Bash(su *)`, `Bash(su)` | Troligen för namnet (`SUDO` kan hitta `/usr/bin/sudo` på en Mac som inte skiljer, inte prövat) | Nej: vakten släpper bara igenom exakta namn på listan |
+| `Edit(//**/.git/**)`, `Edit(//**/.git)` | Ja | **Ja:** `.git/hooks` och `.git/config` kör kod vid `git commit` och andra git-kommandon |
+| `Edit(//**/.ugrep)`, `Edit(~/.ugrep)` | Ja | Lite: läses bara av `ug`, som Claude Codes `grep` inte kör i dag (G7) |
+| `Edit(~/.zshrc)`, `~/.zshenv`, `~/.zprofile`, `~/.zlogin`, `~/.zlogout` och deras `.zwc` | Ja | **Ja:** läses av skalet som agenten kör i, och av Terminal |
+| `Edit(//etc/…)` (zsh-filerna och deras `.zwc`) | Ja | Nej: root äger `/etc`, så fil-verktygen kan inte skriva där ändå |
+| `Edit(~/.nvm/**)`, `~/.zkbd/**`, `~/.zsh_sessions/**`, `~/.zcompdump*` | Ja | **Ja:** läses in av skalet vid start |
+| `Edit(~/.bashrc)`, `~/.bash_profile`, `~/.profile` | Ja | Delvis: läses om skalet blir bash (Öppet, punkt 7) |
+| `Edit(~/.gitconfig)`, `Edit(~/.config/git/**)` | Ja | **Ja:** gits inställningar kan köra program (till exempel `core.pager`, `core.hooksPath`) |
+| `Edit(~/.claude/**)`, `Edit(~/.claude.json)` | Ja | **Ja:** Claude Codes egna inställningar, minnen och skills. Låsta regler och vakter dämpar det (`allowManagedHooksOnly`, `allowManagedPermissionRulesOnly`) |
+| `Edit(//**/.claude/**)`, `Edit(//**/.mcp.json)` | Ja | **Ja:** projektets inställningar och MCP-servrar, som startar program |
+| `Edit(~/Library/LaunchAgents/**)` | Ja | **Ja:** program som startar av sig själva vid inloggning |
+| `Edit(~/.ssh/**)` | Ja | **Ja:** nycklar och inställningar för andra datorer |
+| `Edit(~/bin/**)`, `Edit(~/.local/bin/**)`, `Edit(~/.local/bin/claude)`, `Edit(~/.local/share/claude/**)` | Ja | **Ja:** Claude Code för Terminal |
+| `Edit(~/Library/Application Support/Claude/**)` och `…/claude-code/**` | Ja | **Ja:** skrivbordsappens Claude Code, som också är programmet `grep` kör i agentens skal (SPEC 7.1) |
+| `Edit(//Applications/Claude.app/**)` | Ja | **Ja:** appen ägs av Hugo |
+| `Edit(//opt/homebrew/**)` | Ja | Lite: mappen finns troligen inte på Hugos dator |
+| `Edit(//**/.venv/**)` | Ja | Lite efter installationen, när den gamla `.venv` är borttagen |
+
+- Varje del i sökvägen räknas, också mapparna, till exempel `~/library/LaunchAgents` eller `~/.CLAUDE`.
+- **Förslag: ett förprov före installationen**, på samma sätt som förprovet för `onFailure`. I en tillfällig mapp
+  utanför `~/VERA`: `.claude/settings.json` med förbudet `Edit(//**/.ugrep)` och `Edit(//**/.git/**)`, en mapp
+  `.git`, och sedan be Claude skriva filerna `.UGREP` och `.GIT/prov`. Stoppas båda gäller förbuden oavsett
+  bokstäver. Går någon igenom behövs ett beslut före installationen, till exempel att förbuden skrivs med
+  mönster för båda formerna, eller att sandlådan görs först. Mappen raderas efteråt. Kan sedan göras igen på
+  riktigt i spärrtestet efter installationen, som Hugo har beslutat.
+
+### Punkt 1: varje commit
+
+| Commit | Säger | Gör det, och inget mer? |
+|---|---|---|
+| `89ac7b0` | Hugos beslut efter granskning 16 | Ja: bara GRANSKNING.md, 15 rader |
+| `1dbedb1` | G3: `-R` borttaget | Ja: `R` borta ur `GREP_KORTA` och ur texten med tillåtna tillägg, SPEC 7.1 och statusraden, 16 nya tester, raden `grep-R` borttagen ur `TILLATNA` |
+| `8cfba7c` | G7: förbud mot `.ugrep` | Ja: `_ugrep` i `_mal` och för källan i `_cp`, två förbud i `managed-settings.json`, SPEC 7.1, tabellen i INSTALLERA.md, tester |
+| `43ea3b5` | G2 och G6: meningarna | Ja: steg 4 h punkt 5, SPEC 7.1, en rad i GRANSKNING.md om Hugos OK, två tester |
+| `77dce23` | G4: testet, och `add-zsh-hook` i skriptet | Ja: skriptet, steg 4 g med ny summa, GRANSKNING.md, nya tester, en rad i var och en av `test_beslut_granskning_14.py` och `_15.py`. Beslutet i 89ac7b0 sa "det riktiga, oförändrade kontrollskriptet", men skriptet ändrades efter Hugos beslut i chatten, och det står i commiten och i GRANSKNING.md |
+| `58daf69` | Kontrollsummor i steg 5 | Ja: tre summor i steg 5 och ett test |
+| `06e527e` | PROGRESS.md | Ja: bara PROGRESS.md |
+
+Inga ändringar som inte nämns.
+
+### Punkt 2: `add-zsh-hook`
+
+Prövat med det riktiga skriptet i `_kor` från `test_beslut_granskning_15.py` (Terminals fil och `/etc`-filerna
+är provfiler, bara root godtas som ägare), i en provfil i kopian av 06e527e:
+
+| Prov | `whence -v` säger | Skriptet |
+|---|---|---|
+| a. Skriven direkt i skalet | `from zsh` | AVVIKER |
+| b. Rätt fil laddad, sedan `functions[add-zsh-hook]='…'` | ingen fil alls | AVVIKER |
+| c. Rätt fil laddad, sedan omskriven med `eval` | `from zsh` | AVVIKER |
+| d. Egen mapp först i `fpath` | den egna filen | AVVIKER (också för `fpath`) |
+| e. Egen fil med hel sökväg (`autoload -Uz +X /…/add-zsh-hook`) | den egna filen | AVVIKER |
+| f. Skapad inne i en annan funktion som laddats från en egen fil | den andra funktionens fil | AVVIKER |
+| g. Rätt fil laddad, borttagen, sedan `functions -c` från en egen funktion | `from zsh` | AVVIKER |
+| h. Rätt fil laddad, och en egen funktion `whence` som ljuger | rätt fil (ljuget) | AVVIKER (`funktion: whence`, och fel svar för Terminals två funktioner) |
+| i. Rätt fil laddad | rätt fil | inget för `add-zsh-hook` |
+| Fälla `trap … DEBUG` som skriver om den medan den rätta körs, som i Terminal (systemets `/etc/zshrc`) | `from zsh` eller `.zshrc` | AVVIKER |
+
+- **En länk eller fil i zsh:s mapp som pekar någon annanstans:** kan inte provas utan att ändra i `/usr/share`.
+  Skriptet godtar inte en länk (`ls -ld` visar `l`), och mönstret kräver exakt en mapp mellan `/usr/share/zsh/`
+  och `/functions/`, så `..` kan bara peka på `/usr/share/functions`, som inte finns.
+- **En fil som root äger i en mapp som en vanlig användare kan ändra:** se H1 och H5. Skriptet prövar inte
+  mappen, men mönstret låser platsen till `/usr/share/zsh`.
+- **Räcker ursprung och ägare?** Ja, i dag (H5). Innehållet kan jämföras som ett extra skydd.
+
+### Punkt 3: G3
+
+- **Vakten**, 28 former provade i en provfil (`vakt.bedom`): `-R`, `-rR`, `-Rr`, `-nRi`, `-iRn`, `-R` efter
+  mönstret (`x scripts -R`), `-m1R`, `-A1R`, `-R1`, `-RA1`, `'-R'`, `"-nR"`, `--dereference-recursive` (med och
+  utan `=`, förkortat, med stora bokstäver), `--dereference`, `--recursive=yes`, och ugreps och systemets andra
+  tillägg för länkar (`-S`, `--dereference-files`, `-O`, `-p`) **stoppas alla**. Går igenom, och ska göra det:
+  `-e -R`, `-eR`, `--regexp=-R` (`-R` är mönstret), och `-R` efter `--` (ett filnamn, prövas som sökväg).
+- **Följer `-r` länkar inne i mappar?** Prövat med en mapp i scratchpad med en länk till en fil och en länk till
+  en mapp, båda inom scratchpad:
+  - Agentens riktiga `grep -r` (Claude Codes funktion): bara filen i mappen, inte länkarna.
+  - Claude Codes program med namnet `ugrep`: `-r` bara filen i mappen, `-R` också båda länkarna.
+  - Systemets `/usr/bin/grep`: varken `-r` eller `-R` följer länkarna.
+
+### Punkt 4: G7 och stora och små bokstäver
+
+- **Vakten** stoppar `.UGREP`, `.Ugrep`, `.uGrEp`, `.UgReP` som mål för `mkdir`, `mkdir -p`, `cp -R`, `tar -x -C`,
+  `tar -c -f` och `git archive -o`/`--output`, som källa till `cp -R`, och via `x/../.UGREP`. Ett osynligt
+  tecken i namnet stoppas av den allmänna regeln. `.ugrep.`, `.ugrep ` och `.ｕgrep` går igenom, men är andra
+  filer på den här Macen (prövat), så det är rätt.
+- **Förbuden i `managed-settings.json`:** se H6.
+
+### Punkt 5: röda före rättelsen
+
+`test_beslut_granskning_16.py` från 06e527e kopierad med `cp -R` till en kopia av 89ac7b0 (`git archive`,
+`tar -x`) och körd där med pytest: **36 röda, 21 gröna**. Det stämmer med byggsessionens commit-meddelanden.
+
+- **Röda före (36):** de 7 korta formerna av `-R` och listtestet (G3), de 12 kommandona som skriver `.ugrep`,
+  länken till `.ugrep`, de 2 förbuden i inställningarna och SPEC-testet (G7), G2 och G6, de 3 fallen av
+  `add-zsh-hook` från en annan plats, `add-zsh-hook` från zsh:s mapp godtas, `add-zsh-hook` som inte ägs av root,
+  de 3 kontrollsummorna i steg 5, `add-zsh-hook` i INSTALLERA.md, och
+  `test_g4_det_riktiga_skriptet_skriver_ok_i_ett_rent_fall`. **Det sista bevisar inget**, eftersom det är rött
+  också efter rättelsen på den här datorn i dag (H1, H4).
+- **Gröna redan före (21), väntat:** de 4 långa formerna av `-R` (vakten jämförde redan långa namn exakt), de 4
+  med `-r` som ska gå igenom, de 7 `grep`-tilläggen för en inställningsfil (stoppades redan), de 5 andra namnen
+  och läsningarna som ska gå igenom, och testet som bara visar att Terminals fil läser in `add-zsh-hook`.
+
+### Punkt 6: kontrollsummor (sha256)
+
+Räknade med Pythons `hashlib` i en provfil i en ren kopia av 06e527e (`git archive`, `tar -x`):
+
+| Fil | sha256 | Uppdraget | INSTALLERA.md |
+|---|---|---|---|
+| `sparr/kommandosparr.py` | `b730b27fff418430983f7c06ca2f58b04c890d3ff3bc7c9bf1d832e64bbad481` | **Stämmer** | **Stämmer** (steg 5) |
+| `sparr/managed-settings.json` | `e1222e168de38f819ebf861319e9a9b2fc134ce52b3729ec23ceacb57682d463` | **Stämmer** | **Stämmer** (steg 5) |
+| `sparr/kontrollera-skalet.zsh` | `8ae712451b55f75dda5ecf429161ccbb34f1e98d90b53d03e5293319965e1583` | **Stämmer** | **Stämmer** (steg 4 g) |
+| `requirements.txt` | `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a` | **Stämmer** | **Stämmer** (steg 5) |
+
+Ändras skriptet efter H1 (alternativ 1 eller 3 a), gäller inte summan för `kontrollera-skalet.zsh` längre.
+
+### Punkt 7: sudo-raderna
+
+`git diff -Gsudo 9d383ec 06e527e -- sparr/INSTALLERA.md` visar ingenting: ingen rad med `sudo` är tillagd eller
+borttagen. Före och efter finns 21 rader med `sudo`, med exakt samma text (jämförda med `grep -n`). Bara
+radnumren har flyttats 14 rader nedåt, av texten som lagts till i steg 4 g, 4 h och 5.
+
+### Punkt 8: bokföring utan godkännande
+
+Nej. Ändringarna gäller bara vakten, de låsta inställningarna, kontrollskriptet, INSTALLERA.md, SPEC 7.1,
+PROGRESS.md, GRANSKNING.md och tester. Ingen kod i `scripts/` utanför testerna är ändrad, och inget i
+projektet kan bokföra något.
+
+### Punkt 9: testsviten
+
+`.venv/bin/python -B -m pytest -p no:cacheprovider -qq --tb=line -rfE scripts/tests` (övergången i SPEC 7.1):
+**3 724 tester: 3 723 passed, 1 failed.** Det röda är
+`test_beslut_granskning_16.py::test_g4_det_riktiga_skriptet_skriver_ok_i_ett_rent_fall`. Skälet är `@` på
+`/etc/zshrc` (H1), inte koden. Byggsessionen hade samma 3 724 gröna.
+
+Sviten kördes som vanligt efter Hugos val i chatten: pytest skriver i sin egen tillfälliga mapp utanför
+scratchpad, och några tester gör mjuka länkar där, till exempel till `/usr/bin/git`. En mjuk länk ändrar inte
+filen den pekar på. Inga tester i projektet gör hårda länkar (sökt efter `os.link` och `hardlink_to`).
+
+### Kommandon i den här granskningen
+
+Från listan, ett i taget, utan `cd` och utan `&&`: `git log`, `git show` (också `--stat`), `git diff` (också
+`--stat`, `--word-diff` och `-Gsudo`), `grep -n`, `grep -c`, `grep -r`, `wc -l`, `cat`, `mkdir -p`,
+`git archive --format=tar -o` och `tar -x -f … -C` till scratchpad-mappen, `cp -R` av en testfil till kopian,
+och `.venv/bin/python -B -m pytest -p no:cacheprovider` mot `scripts/tests` och mot filer i kopiorna (med `-q`,
+`-qq`, `--tb`, `-r` och `-k`). Egna provfiler skrevs med Write och Edit i kopian (`test_granskare_17.py` och
+`test_granskare_17_xattr.py`).
+
+**Avsteg och händelser:**
+- **H1:** en egen provfil gjorde två hårda länkar till `/etc/zshrc` (utanför scratchpad), och macOS satte då
+  `com.apple.provenance` på filen. Inte tillåtet enligt uppdraget ("prov och kopior görs i scratchpad").
+- En provfil körde `/bin/ls -ld@e` på `/etc/zshrc`, `/etc/zshrc_Apple_Terminal` och zsh:s `add-zsh-hook`, och
+  andra provfiler lät zsh läsa systemets `/etc/zshrc` (som G4-testet redan gör), för att se vad som hänt. Bara
+  läsning.
+- WebFetch av Claude Codes dokumentation (code.claude.com, permissions), två gånger. Svaren var för stora och
+  sparades av Claude Code i hemmappen (`~/.claude/projects/…/tool-results/`). Granskaren läste dem inte. Samma
+  sak hände med utskriften av `git show 9d383ec:sparr/INSTALLERA.md`.
+- **Utanför listan över tillåtna verktyg i SPEC 7.1:** appens verktyg som visar sessionens läge
+  (`mcp__ccd_session_mgmt__get_session`, fyra gånger) och appens verktyg för plan, slutruta och frågor.
+- Inga `sudo`-kommandon, inget i `/Library` rört, inga filer i hemmappen ändrade av granskaren, inget pushat.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **H1 och H2:** vilket alternativ för `/etc/zshrc` (1, 2 eller 3)? Granskaren föreslår 1. Alternativ 1 och 3 a
+   ger en ny version av skriptet, och då en ny oberoende granskning.
+2. **H6:** förprovet för stora och små bokstäver före installationen, eller installera först och pröva i
+   spärrtestet (som beslutet nedan säger)? Enligt stoppregeln är H6 på nivån medel.
+3. **H3:** en mening i SPEC 7.1 om provfiler tills sandlådan finns?
+4. **H4 och H5** (frivilliga): G4-testet skiljs från testerna av koden, och skriptet jämför innehållet i
+   `add-zsh-hook`.
+
+### Hugos beslut 2026-10-28 (efter rättelserna)
+
+Skrivna av Hugo i uppdraget till den här granskningen, i chatten 2026-10-28.
+
+- **Frågan om stora och små bokstäver i förbuden** bedöms i granskning 17 (H6) och provas på riktigt i
+  spärrtestet efter installationen.
+- **`typeset -f grep` i steg 4 h görs inte nu.** Det står under Öppet (PROGRESS.md, Öppet, punkt 9 c).
