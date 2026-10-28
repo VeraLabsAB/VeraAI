@@ -1,7 +1,8 @@
 """Q1 (granskning 11): vakten som spärrar den fasta kommandolistan i SPEC 7.1.
 
 Vakten ligger i sparr/kommandosparr.py. Claude Code kör den före varje verktyg som agenten använder,
-med datorns egen Python (/usr/bin/python3 -I). Den släpper bara igenom det som SPEC 7.1 tillåter och
+med Python i Apples utvecklarverktyg (/Library/Developer/CommandLineTools/usr/bin/python3 -I, granskning 19,
+J1). Den släpper bara igenom det som SPEC 7.1 tillåter och
 stoppar allt annat med ett fel på svenska. Planen och Hugos beslut står i GRANSKNING.md under
 "Granskning 11 – plan för Q1".
 
@@ -37,6 +38,9 @@ VAKTEN = SPARR / "kommandosparr.py"
 INSTALLNINGAR = SPARR / "managed-settings.json"
 INSTALLERA = SPARR / "INSTALLERA.md"
 SYSTEMETS_PYTHON = "/usr/bin/python3"
+# Granskning 19, J1 (Hugos beslut 2026-10-28): vakten körs med Python i Apples utvecklarverktyg, med hela sökvägen,
+# inte via /usr/bin/python3, som väljer utvecklarverktyg efter en inställning.
+VAKTENS_PYTHON = "/Library/Developer/CommandLineTools/usr/bin/python3"
 INSTALLERAD_VAKT = "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
 INSTALLERADE_INSTALLNINGAR = "/Library/Application Support/ClaudeCode/managed-settings.json"
 
@@ -375,11 +379,11 @@ def test_installationen_kraver_granskning_men_inte_provet():
 
 
 def test_systemets_python_stoppar_med_kod_2_nar_vakten_saknas(tmp_path):
-    # Det är därför provet stoppar: när vakten är bortflyttad kan /usr/bin/python3 inte öppna filen och
+    # Det är därför provet stoppar: när vakten är bortflyttad kan vaktens Python inte öppna filen och
     # avslutar med kod 2, som Claude Code läser som "stoppa". Provet visar alltså att en saknad vakt
     # stoppar, men prövar inte onFailure (som gäller andra koder än 0 och 2). Se INSTALLERA.md.
     svar = subprocess.run(
-        [SYSTEMETS_PYTHON, "-I", str(tmp_path / "kommandosparr.py")],
+        [VAKTENS_PYTHON, "-I", str(tmp_path / "kommandosparr.py")],
         input=b"{}",
         capture_output=True,
         env={"PATH": "/usr/bin:/bin"},
@@ -1359,7 +1363,7 @@ def test_vakten_stoppar_kommandot_i_appkontrollen(vakt, mappar):
 
 
 # ---------------------------------------------------------------------------------------------
-# Programmet: så som Claude Code kör det, med datorns egen Python och -I.
+# Programmet: så som Claude Code kör det, med vaktens Python och -I.
 
 def _kor_programmet(mappar, indata, fil=VAKTEN, projektmapp=True, cwd=None, sokvag=SYSTEMETS_SOKVAG):
     miljo = {} if sokvag is None else {"PATH": sokvag}
@@ -1368,7 +1372,7 @@ def _kor_programmet(mappar, indata, fil=VAKTEN, projektmapp=True, cwd=None, sokv
     if not isinstance(indata, bytes):
         indata = json.dumps(indata).encode("utf-8")
     return subprocess.run(
-        [SYSTEMETS_PYTHON, "-I", str(fil)],
+        [VAKTENS_PYTHON, "-I", str(fil)],
         input=indata,
         capture_output=True,
         env=miljo,
@@ -1457,7 +1461,7 @@ def test_programmet_laser_inte_in_filer_bredvid_sig(mappar, tmp_path):
 
 
 def test_vakten_anvander_bara_pythons_egna_delar():
-    # Vakten körs med /usr/bin/python3, utan projektets .venv, och får därför bara använda
+    # Vakten körs med vaktens Python (VAKTENS_PYTHON), utan projektets .venv, och får därför bara använda
     # Pythons standardbibliotek.
     tillatna = {"__future__", "json", "os", "pwd", "sys", "unicodedata"}
     trad = ast.parse(VAKTEN.read_text(encoding="utf-8"))

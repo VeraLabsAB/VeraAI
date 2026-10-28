@@ -47,8 +47,10 @@ Reglerna, i den ordning de prövas (planen i GRANSKNING.md, "Granskning 11 – p
 Allt som vakten inte känner igen stoppas. Om vakten själv kraschar stoppas kommandot också, både här
 (kod 2) och av Claude Code (inställningen "onFailure": "block").
 
-Vakten körs med datorns egen Python (/usr/bin/python3 -I) och använder bara Pythons egna delar. -I gör
-att Python inte läser in filer från vaktens mapp, arbetsmappen eller inställningar i miljön.
+Vakten körs med Python i Apples utvecklarverktyg, med hela sökvägen
+(/Library/Developer/CommandLineTools/usr/bin/python3 -I, granskning 19, J1, Hugos beslut 2026-10-28), och
+använder bara Pythons egna delar. Den ska fungera med Python 3.9. -I gör att Python inte läser in filer från
+vaktens mapp, arbetsmappen eller inställningar i miljön.
 """
 
 from __future__ import annotations
