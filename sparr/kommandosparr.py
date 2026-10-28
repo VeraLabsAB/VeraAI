@@ -19,7 +19,8 @@ Reglerna, i den ordning de prövas (planen i GRANSKNING.md, "Granskning 11 – p
    listan) får inte skriva där förbuden i managed-settings.json säger, och sökvägen jämförs utan hänsyn till stora
    och små bokstäver (granskning 17, H6, Hugos beslut 2026-10-28). Sökvägen prövas som den står, med ~ som
    hemmappen, efter ../ och dit länkarna leder, och med macOS andra namn för samma mapp (till exempel
-   /private/etc för /etc).
+   /private/etc för /etc). En sökväg vars första del direkt under roten börjar med punkt (till exempel /.vol och
+   /.nofollow) stoppas alltid, också i kommandon (granskning 18, I1, Hugos beslut 2026-10-28).
 3. Ingen mapp undantas (Hugos beslut 8). Kommandot ska köras i mappen där sessionen startade
    (CLAUDE_PROJECT_DIR), och den mappen får inte vara hemmappen eller en mapp ovanför den. Där vakten stoppar
    jämförs sökvägar utan hänsyn till stora och små bokstäver, och där den släpper igenom jämförs de exakt
@@ -219,6 +220,11 @@ MACOS_ANDRA_NAMN = (
     ("/private/tmp", "/tmp"),
     ("/private/var", "/var"),
 )
+# macOS har också namn direkt under roten som börjar med punkt, till exempel /.vol/<enhet>/<inode>/… och
+# /.nofollow/<sökväg>, som leder till samma fil som den vanliga sökvägen utan att synas som länkar. Vakten kan inte
+# räkna om dem, så varje sökväg vars första del under roten börjar med punkt stoppas (granskning 18, I1, Hugos
+# beslut 2026-10-28).
+PUNKT = "."
 
 GIT_UNDERKOMMANDON = ("status", "log", "diff", "add", "commit", "show", "archive")
 # git godtar förkortade långa tillägg (--out för --output), så ett tillägg stoppas om dess namn är
@@ -540,9 +546,9 @@ def _forbud_som_passar(former, hemmar):
     return None
 
 
-def _forbud_for(sokvag, baser, hem):
-    """Förbudet som sökvägen passar, eller None. Sökvägen prövas som den står och med ~ som hemmappen, i
-    förhållande till varje mapp i baser om den inte börjar med /, och både som text och dit länkarna leder."""
+def _former(sokvag, baser, hem):
+    """Sökvägens former: som den står och med ~ som hemmappen, i förhållande till varje mapp i baser om den inte
+    börjar med /, och både som text och dit länkarna leder."""
     tolkningar = [sokvag]
     if sokvag == "~" or sokvag.startswith("~/"):
         tolkningar.append(hem + sokvag[1:])
@@ -551,7 +557,26 @@ def _forbud_for(sokvag, baser, hem):
         hela = [tolkning] if os.path.isabs(tolkning) else [os.path.join(bas, tolkning) for bas in baser]
         for sok in hela:
             former += _andra_namn(sok) + _andra_namn(os.path.realpath(sok))
-    return _forbud_som_passar(former, [hem, os.path.realpath(hem)])
+    return former
+
+
+def _forbud_for(sokvag, baser, hem):
+    """Förbudet som någon av sökvägens former passar, eller None."""
+    return _forbud_som_passar(_former(sokvag, baser, hem), [hem, os.path.realpath(hem)])
+
+
+def _punkt_under_roten(sokvag, etikett, baser, hem):
+    """Stoppar sökvägen om första delen direkt under roten börjar med punkt i någon av sökvägens former, före och
+    efter att den har räknats om (granskning 18, I1, Hugos beslut 2026-10-28)."""
+    for form in _former(sokvag, baser, hem):
+        delar = [del_ for del_ in form.split("/") if del_ and del_ != "."]
+        if os.path.isabs(form) and delar and delar[0].startswith(PUNKT):
+            raise _Stopp(
+                f"{etikett}: '{sokvag}' leder till '/{delar[0]}', en mapp direkt under roten vars namn börjar med "
+                "punkt. macOS har sådana namn (till exempel /.vol och /.nofollow) som leder till samma fil som en "
+                "vanlig sökväg utan att synas som en länk, så sökvägen stoppas (granskning 18, I1, Hugos beslut "
+                "2026-10-28)."
+            )
 
 
 def _forbjuden_text(sokvag, regel):
@@ -574,12 +599,14 @@ def _skrivverktyg(verktyg, verktygsdata, cwd, projektmapp, hemmapp):
     regel = _forbud_for(sokvag, baser, hemmapp)
     if regel:
         raise _Stopp(f"{verktyg}: {_forbjuden_text(sokvag, regel)}")
+    _punkt_under_roten(sokvag, verktyg, baser, hemmapp)
 
 
 def _skrivforbud_kommando(sokvag, etikett, lage):
     regel = _forbud_for(sokvag, [lage.projekt], lage.hem)
     if regel:
         raise _Stopp(f"{etikett}: {_forbjuden_text(sokvag, regel)}")
+    _punkt_under_roten(sokvag, etikett, [lage.projekt], lage.hem)
 
 
 def _verklig(sokvag, bas):
@@ -589,6 +616,7 @@ def _verklig(sokvag, bas):
 
 
 def _las(sokvag, etikett, lage, bas=None):
+    _punkt_under_roten(sokvag, etikett, [bas or lage.projekt], lage.hem)
     verklig = _verklig(sokvag, bas or lage.projekt)
     if _inom(verklig, lage.projekt) or (lage.tillfallig and _inom(verklig, lage.tillfallig)):
         return
@@ -837,6 +865,7 @@ def _pytest(ordlista, lage):
         i += 1
     if len(mal) != 1:
         raise _Stopp("pytest: ange exakt ett mål, scripts/tests eller en kopia i den tillfälliga mappen.")
+    _punkt_under_roten(mal[0], "pytest", [lage.projekt], lage.hem)
     if os.path.normpath(mal[0]) == PYTEST_PROJEKTET:
         return
     if lage.tillfallig and _inom(_verklig(mal[0], lage.projekt), lage.tillfallig):
