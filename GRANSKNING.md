@@ -6865,3 +6865,44 @@ och `${…[*]}`, som zsh läser på sitt eget sätt). Ingen fråga visades, så 
   visa en fråga som Hugo godkänner. Agenten försökte inte köra kommandot på något annat sätt (delat, i ett skript
   eller med ett annat verktyg), eftersom beskedet förbjuder det och uppdraget säger stoppa.
 - **G1 är alltså inte stängd.** Kroklistorna och funktionerna i agentens skal är fortfarande inte kontrollerade.
+
+## Provkörning av steg 4 h i läget Manual 2026-10-28
+
+Gjord på Hugos uppdrag i chatten 2026-10-28 (G1 från granskning 16), i skrivbordsappens Code-flik, i
+`~/VERA/agent`. Vakten är inte installerad. Sessionen började och slutade med `git status`.
+
+**Läget.** Sessionen startade i läget **auto**. Agenten sa det till Hugo innan kommandot visades, och Hugo bytte
+till **Manual** i samma session och skrev "Ok, manual är på nu" i chatten. Claude Code bekräftade bytet till
+agenten innan kommandot skickades. Agenten räknade Hugos "Ok" som OK att köra. Avsteg från steg 4 h punkt 1:
+läget byttes i en pågående session, inte i en ny session som startades i Manual.
+
+**Resultat: GRÖNT. Kommandot kördes och svaret är exakt de elva raderna, i rätt ordning.** Kommandot skickades
+till Bash-verktyget en gång, tecken för tecken som det står i `sparr/INSTALLERA.md` steg 4 h. Claude Code stoppade
+det inte. Om Claude Code visade en fråga, och att Hugo jämförde den tecken för tecken innan han svarade ja, ser
+agenten inte. Det står här som Hugo bekräftar det i chatten.
+
+| Rad | Väntat | Svar | Stämmer |
+|---|---|---|---|
+| 1 | `preexec_functions=()` | `preexec_functions=()` | Stämmer |
+| 2 | `precmd_functions=()` | `precmd_functions=()` | Stämmer |
+| 3 | `chpwd_functions=()` | `chpwd_functions=()` | Stämmer |
+| 4 | `periodic_functions=()` | `periodic_functions=()` | Stämmer |
+| 5 | `zshaddhistory_functions=()` | `zshaddhistory_functions=()` | Stämmer |
+| 6 | `zshexit_functions=()` | `zshexit_functions=()` | Stämmer |
+| 7 | `find` | `find` | Stämmer |
+| 8 | `grep` | `grep` | Stämmer |
+| 9 | `pkill` | `pkill` | Stämmer |
+| 10 | `rg` | `rg` | Stämmer |
+| 11 | `SLUT` | `SLUT` | Stämmer |
+
+Inga rader för mycket och inga för lite.
+
+- **Vad det visar:** i agentens skal är kroklistorna tomma, och de enda funktionerna utöver de väntade är Claude
+  Codes fyra (`find`, `grep`, `pkill`, `rg`). Inget `TRAPDEBUG`, `preexec` eller annat som zsh kör av sig själv.
+- **Skillnad mot försöket i auto:** samma kommando stoppades där av Claude Codes inbyggda kontroll. I Manual gick
+  det igenom. Steg 4 h punkt 1 (läget Manual) behövs alltså.
+- **Jämförelsen** gjordes av agenten mot svaret från Bash-verktyget. Steg 4 h punkt 4 säger att Hugo läser
+  verktygsrutan själv. Det är Hugos del, och står inte här som gjort.
+- **Gäller den här versionen av Claude Code** och det här skalet i dag. Steg 4 h görs ändå före installationen,
+  på Hugos och Caspers dator.
+- **G1:** provkörd med gott resultat. Om G1 räknas som stängd är Hugos eller Caspers beslut.

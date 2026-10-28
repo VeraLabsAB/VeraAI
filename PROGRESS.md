@@ -497,7 +497,9 @@ fattade och byggda, se avsnittet ovan.)
    i dag. **Hugos beslut 2026-10-28: G2, G3, G4, G6 och G7 är rättade** (se "Läge 2026-10-28, efter rättelserna
    efter granskning 16"). **Kvar:** G1 (en session provkör steg 4 h med Hugos OK, före installationen; provkörd 2026-10-28 i läget
    auto: Claude Codes inbyggda kontroll stoppade kommandot innan det kördes, se `GRANSKNING.md`, "Provkörning av
-   steg 4 h 2026-10-28"; inte prövat i läget Manual), G5
+   steg 4 h 2026-10-28"; **provkörd igen 2026-10-28 i läget Manual: kommandot gick igenom och svaret var exakt
+   de elva raderna**, se `GRANSKNING.md`, "Provkörning av steg 4 h i läget Manual 2026-10-28"; läget byttes från
+   auto i samma session, inte i en ny; om G1 räknas som stängd är Hugos eller Caspers beslut), G5
    (bara en anmärkning om gamla tester), och tre saker från rättelserna: (a) om Claude Codes förbud
    `Edit(//**/.ugrep)` också gäller `.UGREP` (stora bokstäver) är inte bekräftat, och samma fråga gäller de andra
    förbuden, (b) vakten ser bara namnen i kommandot, inte innehållet i en mapp som kopieras eller ett arkiv som
