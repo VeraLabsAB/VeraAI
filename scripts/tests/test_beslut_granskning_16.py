@@ -7,18 +7,36 @@
   förbjuder fil-verktygen att skriva den.
 - G2: INSTALLERA.md steg 4 h säger att allt som inte är exakt de elva raderna betyder "stoppa och fråga".
 - G6: SPEC 7.1 säger att Claude Codes grep hoppar över filer i .gitignore och binära filer.
+- G4: det riktiga, oförändrade kontrollskriptet skriver OK i ett rent fall. Testet startar zsh som Terminal gör
+  (TERM_PROGRAM=Apple_Terminal, med en tillfällig hemmapp), läser in systemets /etc/zshrc, som läser in Apples
+  /etc/zshrc_Apple_Terminal, och sedan skriptet. Det läser systemfiler utanför projektet men skriver bara i
+  testets tillfälliga mapp (Hugos val i chatten 2026-10-28). På en dator utan Apples fil hoppas testet över.
+  Testet visade att Terminals fil läser in zsh:s funktion add-zsh-hook, som skriptet inte godtog. Hugos beslut i
+  chatten 2026-10-28: skriptet godtar den bara från zsh:s egen mapp, och filen ska ägas av root.
 """
 
 import os
 
 import pytest
 
-from test_beslut_granskning_15 import _steg_4_h
+from test_beslut_granskning_15 import (
+    AGARE_RAD,
+    NVM_RADER,
+    SKRIPTET,
+    STEG_4_RADER,
+    _avvikelser,
+    _kor,
+    _steg_4_h,
+    _zsh,
+    inget_zsh,
+)
 from test_kommandosparr import (  # noqa: F401 (fixturerna används av pytest via namnen)
+    INSTALLERA,
     _bedom,
     _en_rad,
     _installningar,
     _spec_7_1,
+    _steg,
     mappar,
     vakt,
 )
@@ -160,3 +178,92 @@ def test_g6_spec_sager_att_claude_codes_grep_inte_soker_i_allt():
     grep_regel = _grep_regeln()
     assert "**Claude Codes `grep` söker inte i allt** (granskning 16, G6, Hugos beslut 2026-10-28)" in grep_regel
     assert "`.gitignore`" in grep_regel and "binära filer" in grep_regel and "`-E`" in grep_regel
+
+
+# ---------------------------------------------------------------------------------------------
+# G4: det riktiga skriptet skriver OK i ett rent fall.
+
+SYSTEMETS_ZSHRC = "/etc/zshrc"
+APPLES_TERMINALFIL = "/etc/zshrc_Apple_Terminal"
+inte_mac = pytest.mark.skipif(
+    not (os.path.isfile(SYSTEMETS_ZSHRC) and os.path.isfile(APPLES_TERMINALFIL)),
+    reason="Apples filer för zsh och Terminal finns inte på den här datorn",
+)
+
+
+# Före varje prompt kör zsh funktionerna i precmd_functions. Terminals shell_session_history_check tar bort sig
+# själv där, så i Terminal finns den inte kvar när Hugo kör skriptet (prövat i byggsessionen 2026-10-28). Utskriften
+# från update_terminal_cwd (en kod till Terminal) visas inte.
+FORSTA_PROMPTEN = "for f in $precmd_functions; do $f >/dev/null 2>&1; done\n"
+TERMINAL_MILJO = {"TERM_PROGRAM": "Apple_Terminal", "TERM_SESSION_ID": "vera-prov", "TERM": "xterm-256color"}
+
+
+def _som_terminal(tmp_path, skriptet=SKRIPTET, efter_start=""):
+    hem = tmp_path / "hem"
+    hem.mkdir()
+    # Som Hugos ~/.zshrc efter steg 4: nvm:s rader och de två raderna som flyttar mappar sist i PATH.
+    (hem / ".zshrc").write_text(NVM_RADER + STEG_4_RADER, encoding="utf-8")
+    start = f"source {SYSTEMETS_ZSHRC}\nsource {hem / '.zshrc'}\n{FORSTA_PROMPTEN}{efter_start}\nsource {skriptet}\n"
+    return _zsh(hem, start, **TERMINAL_MILJO)
+
+
+@inte_mac
+@inget_zsh
+def test_g4_det_riktiga_skriptet_skriver_ok_i_ett_rent_fall(tmp_path):
+    resultat = _som_terminal(tmp_path)
+    assert resultat.stdout == "OK\nSLUT\n", resultat
+
+
+@inte_mac
+@inget_zsh
+def test_g4_terminal_laser_in_add_zsh_hook_fran_zsh_egen_mapp(tmp_path):
+    # Skälet till ändringen i skriptet: Terminals fil läser in add-zsh-hook, och den finns kvar.
+    resultat = _zsh(tmp_path, f"source {SYSTEMETS_ZSHRC}\nwhence -v -- add-zsh-hook\n", **TERMINAL_MILJO)
+    rad = resultat.stdout.splitlines()[0]
+    assert rad.startswith("add-zsh-hook is a shell function from /usr/share/zsh/"), resultat
+    assert rad.endswith("/functions/add-zsh-hook"), resultat
+
+
+@pytest.mark.parametrize(
+    "fore,vantat",
+    [
+        # En egen funktion med samma namn, från en annan fil.
+        ("source {annan}", "AVVIKER: whence -v: add-zsh-hook is a shell function from {annan}"),
+        # Skriven direkt i skalet.
+        ("add-zsh-hook() {{ }}", "AVVIKER: whence -v: add-zsh-hook is a shell function from zsh"),
+        # Bara anmäld, inte inläst: whence -v visar inte varifrån den kommer.
+        ("autoload -Uz add-zsh-hook", "AVVIKER: whence -v: add-zsh-hook is an autoload shell function"),
+    ],
+)
+@inget_zsh
+def test_g4_add_zsh_hook_fran_en_annan_plats_avviker(tmp_path, fore, vantat):
+    annan = tmp_path / "annan.zsh"
+    annan.write_text("add-zsh-hook() { : }\n", encoding="utf-8")
+    resultat = _kor(tmp_path, fore=fore.format(annan=annan))
+    assert _avvikelser(resultat) == [vantat.format(annan=annan)], resultat
+    assert resultat.stdout.endswith("SLUT\n") and "OK\n" not in resultat.stdout
+
+
+@inget_zsh
+def test_g4_add_zsh_hook_fran_zsh_egen_mapp_godtas(tmp_path):
+    resultat = _kor(tmp_path, fore="autoload -Uz +X add-zsh-hook")
+    assert resultat.stdout == "OK\nSLUT\n", resultat
+
+
+@inget_zsh
+def test_g4_add_zsh_hook_som_inte_ags_av_root_avviker(tmp_path):
+    # Ingen fil i /usr/share/zsh kan få en annan ägare i ett test. I en kopia där bara en påhittad användare
+    # godtas som ägare avviker därför filen för add-zsh-hook, som alla andra filer och mappar som prövas.
+    text = SKRIPTET.read_text(encoding="utf-8")
+    assert text.count(AGARE_RAD) == 1
+    kopia = tmp_path / "kopia.zsh"
+    kopia.write_text(text.replace(AGARE_RAD, "local -a agare=(vera_ingen)"), encoding="utf-8")
+    resultat = _zsh(tmp_path, f"autoload -Uz +X add-zsh-hook\nsource {kopia}\n")
+    rader = [r for r in _avvikelser(resultat) if "/functions/add-zsh-hook" in r]
+    assert len(rader) == 1 and rader[0].startswith("AVVIKER: ls -l: ") and "ägs inte av root" in rader[0], resultat
+
+
+def test_g4_installera_namner_add_zsh_hook():
+    (steget,) = [t for r, t in _steg(INSTALLERA.read_text(encoding="utf-8")) if r.startswith("## Steg 4:")]
+    g = _en_rad(steget.split("**g. ", 1)[1].split("**h. ", 1)[0])
+    assert "`add-zsh-hook`" in g and "granskning 16, G4" in g and "`/usr/share/zsh/" in g

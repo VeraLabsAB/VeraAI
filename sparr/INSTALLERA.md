@@ -426,7 +426,10 @@ namn godkända i kroklistorna: `update_terminal_cwd` i `precmd_functions` (talar
 skalet står i) och `shell_session_update` i `zshexit_functions` (sparar fönstret när det stängs). Skriptet
 kontrollerar med `whence -v` att båda kommer från Apples fil `/etc/zshrc_Apple_Terminal`, och med `ls -l`
 att `/etc/zshrc` och `/etc/zshrc_Apple_Terminal` ägs av `root` och att varken gruppen eller andra kan
-skriva i dem. Allt annat avviker.
+skriva i dem. Terminals fil läser också in zsh:s egen funktion `add-zsh-hook`. Den godtas bara om `whence -v`
+visar att den kommer från zsh:s egen mapp, `/usr/share/zsh/<version>/functions/add-zsh-hook`, och filen ägs av
+`root` utan skrivrätt för gruppen eller andra (Hugos beslut 2026-10-28 efter granskning 16, G4). Allt annat
+avviker.
 
 Gör det här i samma nya Terminal-fönster som i e, ett kommando i taget. Kontrollera först skriptets
 kontrollsumma:
@@ -435,8 +438,9 @@ kontrollsumma:
 shasum -a 256 ~/VERA/agent/sparr/kontrollera-skalet.zsh
 ```
 
-- Summan ska vara exakt (Hugos beslut 2026-10-28 efter granskning 15):
-  `4038b5eb32fadc7621ce69aa0fa5f4a511c0bc0ff70f5ee3f25a2260b016eb3d`
+- Summan ska vara exakt (Hugos beslut 2026-10-28 efter granskning 15, ny summa efter Hugos beslut 2026-10-28
+  efter granskning 16, G4):
+  `8ae712451b55f75dda5ecf429161ccbb34f1e98d90b53d03e5293319965e1583`
   Den oberoende granskningen bekräftar samma summa. **Är summan en annan: stoppa och fråga.** Kör inte
   skriptet.
 

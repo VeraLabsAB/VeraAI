@@ -446,7 +446,7 @@ def test_skriptet_visar_varje_annat_alias(tmp_path, rad, vantat):
     "namn",
     ["TRAPDEBUG", "TRAPEXIT", "preexec", "precmd", "chpwd", "periodic", "zshexit", "zshaddhistory",
      "zsh_directory_name", "command_not_found_handler", "git", "ls", "grep", "find", "/usr/bin/git", "status",
-     "print", "alias", "whence", "emulate", "add-zsh-hook"],
+     "print", "alias", "whence", "emulate"],
 )
 @inget_zsh
 def test_skriptet_visar_varje_funktion_som_inte_ar_vantad(tmp_path, namn):

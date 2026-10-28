@@ -14,6 +14,9 @@
 #   (granskning 13, P1 a, och granskning 14, R3).
 # - funktioner: bara de väntade namnen (granskning 14, R3, och Hugos svar 2026-10-28 efter granskning 14,
 #   punkt 1). Varje annan funktion avviker, också de som zsh kör av sig själv (TRAP..., preexec och liknande).
+#   add-zsh-hook, som Terminals fil läser in, godtas bara från zsh:s egen mapp
+#   /usr/share/zsh/<version>/functions, och filen ska ägas av root utan skrivrätt för gruppen eller andra
+#   (Hugos beslut 2026-10-28 efter granskning 16, G4).
 # - kroklistor: i Terminal exakt update_terminal_cwd i precmd_functions och shell_session_update i
 #   zshexit_functions, de andra tomma. Båda funktionerna ska komma från /etc/zshrc_Apple_Terminal (whence -v),
 #   och /etc/zshrc och /etc/zshrc_Apple_Terminal ska ägas av root utan skrivrätt för gruppen eller andra
@@ -29,7 +32,7 @@
   local terminalfil=/etc/zshrc_Apple_Terminal
   local -a etcfiler=(/etc/zshrc /etc/zshrc_Apple_Terminal)
   local -a agare=(root)
-  local -a avvikelser
+  local -a avvikelser match mbegin mend
   local namn varde fil rad text mapp
 
   # Ägs av någon i agare, ingen skrivrätt för gruppen eller andra, inga extra rättigheter (+) eller
@@ -73,9 +76,19 @@
   # Funktioner. Väntade: zsh:s hjälp för tabb (_...), nvm, Terminals egna och de nio från compinit och
   # bashcompinit. Namnen kommer som argument från skalet utanför den här funktionen (sist i filen): inne i en
   # funktion visar zsh inte TRAPEXIT.
-  for namn in ${@:#(_*|nvm*|shell_session*|update_terminal_cwd|compinit|compdef|compdump|compaudit|compinstall|bashcompinit|compgen|complete|getent)}; do
+  for namn in ${@:#(_*|nvm*|shell_session*|update_terminal_cwd|compinit|compdef|compdump|compaudit|compinstall|bashcompinit|compgen|complete|getent|add-zsh-hook)}; do
     avvikelser+=("funktion: $namn")
   done
+  # add-zsh-hook (G4): bara från zsh:s egen mapp, och filen ska ägas av root.
+  if (( ${@[(Ie)add-zsh-hook]} )); then
+    rad=$(whence -v -- add-zsh-hook)
+    if [[ $rad == (#b)"add-zsh-hook is a shell function from "(/usr/share/zsh/[^/]##/functions/add-zsh-hook) ]]; then
+      rad=$(_vera_kontrollera_agare ${match[1]})
+      [[ -z $rad ]] || avvikelser+=("ls -l: $rad")
+    else
+      avvikelser+=("whence -v: $rad")
+    fi
+  fi
 
   # Kroklistor (8 d).
   [[ ${(j: :)preexec_functions} == '' ]] || avvikelser+=("preexec_functions=(${(j: :)preexec_functions})")

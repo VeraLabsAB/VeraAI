@@ -209,7 +209,9 @@ def test_r3_installera_har_den_vanda_kontrollen_fore_och_efter():
     skriptet = _skriptet()
     assert "(run-help=man|which-command=whence)" in skriptet
     filtret = FUNKTIONER_KOMMANDO.split("${(ko)functions:#", 1)[1].split("}", 1)[0]
-    assert "${@:#" + filtret + "}" in skriptet
+    # Skriptet har dessutom add-zsh-hook sist i filtret och prövar den för sig: bara från zsh:s egen mapp
+    # (Hugos beslut 2026-10-28 efter granskning 16, G4, test_beslut_granskning_16.py).
+    assert "${@:#" + filtret[:-1] + "|add-zsh-hook)}" in skriptet
     fore = _steg_4_g()
     assert "granskning 14, R3" in fore and "Kontrollen är **vänd**" in fore
     assert "Skalet, igen efter installationen" in _kontrollen()

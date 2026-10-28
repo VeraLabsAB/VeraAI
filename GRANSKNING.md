@@ -5642,3 +5642,18 @@ Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28, i chatten.
 - **Meningen i SPEC 7.1 för G6** (Hugos OK i chatten 2026-10-28, i byggsessionen): granskning 16 föreslog
   ingen exakt formulering, så byggsessionen skrev ett förslag ("Claude Codes `grep` söker inte i allt …"), och
   Hugo godkände det som det stod.
+- **Testet för G4 läser in systemets `/etc/zshrc`** (Hugos val i chatten 2026-10-28, i byggsessionen). Det
+  riktiga skriptet skriver bara OK om Terminals funktioner kommer från `/etc/zshrc_Apple_Terminal`. Testet
+  startar därför zsh som Terminal gör (`TERM_PROGRAM=Apple_Terminal`, en tillfällig hemmapp), läser in
+  `/etc/zshrc` (som läser in Apples fil) och kör sedan skriptet. Det läser systemfiler utanför projektet men
+  skriver bara i testets tillfälliga mapp. Testet hoppas över på en dator utan Apples filer.
+- **Fynd i byggsessionen, och Hugos beslut i chatten 2026-10-28:** med skriptet oförändrat skrev testet
+  `AVVIKER: funktion: add-zsh-hook`. Apples Terminal-fil läser in zsh:s egen funktion `add-zsh-hook`
+  (`whence -v`: "add-zsh-hook is a shell function from /usr/share/zsh/5.9/functions/add-zsh-hook"), och den finns
+  kvar. Skriptet hade alltså med stor sannolikhet stoppat installationen i steg 4 g på Hugos dator (inte prövat i
+  Hugos riktiga Terminal). Hugos beslut: **skriptet ändras, strikt.** `add-zsh-hook` godtas bara om `whence -v`
+  visar exakt att den kommer från `/usr/share/zsh/<version>/functions/add-zsh-hook` och filen ägs av root utan
+  skrivrätt för gruppen eller andra. Från en annan plats, eller anmäld men inte inläst: `AVVIKER`. Saknas den:
+  OK. Testet visade också `shell_session_history_check` i `precmd_functions`, men den tar bort sig själv vid
+  första prompten, så i Terminal finns den inte kvar när skriptet körs (stämmer med granskning 15, punkt 8).
+  Testet låtsas därför att en första prompt har visats. Skriptet är inte ändrat för den.
