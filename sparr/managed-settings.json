@@ -12,6 +12,8 @@
       "Bash(su)",
       "Edit(//**/.git/**)",
       "Edit(//**/.git)",
+      "Edit(//**/.ugrep)",
+      "Edit(~/.ugrep)",
       "Edit(~/.zshrc)",
       "Edit(~/.zshenv)",
       "Edit(~/.zprofile)",

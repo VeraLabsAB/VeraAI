@@ -21,7 +21,8 @@ Reglerna, i den ordning de prövas (planen i GRANSKNING.md, "Granskning 11 – p
    radbrytning, inte heller inom citattecken. Inga osynliga eller styrande tecken. Inga tecken som
    skalet byter ut mot något annat (jokertecken, ~ och liknande) utanför citattecken.
 5. Första ordet ska stå på listan i SPEC 7.1.
-6. Reglerna under listan: mål bara i den tillfälliga mappen, grep bara med tillägg som söker, pytest bara
+6. Reglerna under listan: mål bara i den tillfälliga mappen, ingen fil eller mapp som heter .ugrep
+   (granskning 16, G7, Hugos beslut 2026-10-28), grep bara med tillägg som söker, pytest bara
    i de två formerna, inga git-tillägg som skriver filer eller kör program, och läsande kommandon bara i
    projektet och i den tillfälliga mappen. find står inte på listan (granskning 15, S1, Hugos beslut
    2026-10-28): i agentens skal är find Claude Codes bfs, som raderar med -rm.
@@ -135,6 +136,11 @@ GREP_TILLATNA = (
     "-n, -i, -r, -l, -L, -c, -v, -w, -x, -E, -F, -H, -h, -o, -s, -q, -I, -e med ett mönster, -A, -B, -C "
     "och -m med ett tal, motsvarande långa namn, och --include=, --exclude= och --exclude-dir="
 )
+
+# ugreps inställningsfil (granskning 16, G7, Hugos beslut 2026-10-28). Den kan sätta tillägg som kör andra
+# program, och vakten ser den inte. Inget kommando får skriva en fil eller mapp med det namnet, i någon mapp.
+# Namnet jämförs utan hänsyn till stora och små bokstäver, eftersom macOS i regel inte skiljer på dem.
+UGREP_FIL = ".ugrep"
 
 GIT_UNDERKOMMANDON = ("status", "log", "diff", "add", "commit", "show", "archive")
 # git godtar förkortade långa tillägg (--out för --output), så ett tillägg stoppas om dess namn är
@@ -389,7 +395,20 @@ def _las(sokvag, etikett, lage, bas=None):
     )
 
 
+def _ugrep(sokvag, etikett, lage):
+    """Stoppar en sökväg där någon del heter .ugrep, både som den står och dit länkarna leder."""
+    for sok in (sokvag, _verklig(sokvag, lage.projekt)):
+        if any(del_.casefold() == UGREP_FIL for del_ in sok.split("/")):
+            raise _Stopp(
+                f"{etikett}: '{sokvag}' skulle skriva en fil eller mapp som heter {UGREP_FIL}. Det är ugreps "
+                "inställningsfil, som kan köra andra program, och den får inte skapas eller ändras i någon mapp "
+                "(granskning 16, G7, Hugos beslut 2026-10-28)."
+            )
+
+
 def _mal(sokvag, etikett, lage):
+    if sokvag:
+        _ugrep(sokvag, etikett, lage)
     if not lage.tillfallig:
         raise _Stopp(
             f"{etikett}: får bara ha mål i en tillfällig mapp (scratchpad-mappen), och sessionen har "
@@ -850,6 +869,8 @@ def _cp(ordlista, lage):
         raise _Stopp("cp -R: ange vad som ska kopieras och vart.")
     for operand in operander[:-1]:
         _las(operand, "cp -R", lage)
+        # Kopian får samma namn som källan (granskning 16, G7).
+        _ugrep(operand, "cp -R", lage)
     _mal(operander[-1], "cp -R", lage)
 
 
