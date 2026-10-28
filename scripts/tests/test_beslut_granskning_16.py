@@ -5,14 +5,18 @@
 - G7: agenten får inte skapa eller ändra en fil som heter .ugrep (ugreps inställningsfil, som kan köra andra
   program), i någon mapp. Vakten stoppar kommandon som skulle skriva en sådan fil, och de låsta inställningarna
   förbjuder fil-verktygen att skriva den.
+- G2: INSTALLERA.md steg 4 h säger att allt som inte är exakt de elva raderna betyder "stoppa och fråga".
+- G6: SPEC 7.1 säger att Claude Codes grep hoppar över filer i .gitignore och binära filer.
 """
 
 import os
 
 import pytest
 
+from test_beslut_granskning_15 import _steg_4_h
 from test_kommandosparr import (  # noqa: F401 (fixturerna används av pytest via namnen)
     _bedom,
+    _en_rad,
     _installningar,
     _spec_7_1,
     mappar,
@@ -133,3 +137,26 @@ def test_g7_grep_tillagg_som_pekar_ut_en_installningsfil_stoppas(vakt, mappar, t
 def test_g7_star_i_spec():
     spec = _spec_7_1()
     assert "**`.ugrep` är förbjuden**" in spec and "granskning 16, G7, Hugos beslut 2026-10-28" in spec
+
+
+# ---------------------------------------------------------------------------------------------
+# G2 och G6: meningarna i INSTALLERA.md steg 4 h och SPEC 7.1.
+
+
+def test_g2_steg_4_h_sager_stoppa_for_allt_som_inte_ar_exakt_de_elva_raderna():
+    steget = _en_rad(_steg_4_h())
+    assert (
+        "**Visar verktygsrutan något annat än exakt de elva raderna, i den ordningen: stoppa och fråga, och "
+        "installera inte** (granskning 16, G2, Hugos beslut 2026-10-28)" in steget
+    )
+    assert "inte bara fallen som räknas upp här" in steget
+    assert "en annan ordning" in steget and "en rad för mycket" in steget and "avkortad" in steget
+    # Meningen står först i punkt 5, före de uppräknade fallen.
+    punkt_5 = steget.split(" 5. ", 1)[1]
+    assert punkt_5.startswith("**Visar verktygsrutan något annat än exakt de elva raderna")
+
+
+def test_g6_spec_sager_att_claude_codes_grep_inte_soker_i_allt():
+    grep_regel = _grep_regeln()
+    assert "**Claude Codes `grep` söker inte i allt** (granskning 16, G6, Hugos beslut 2026-10-28)" in grep_regel
+    assert "`.gitignore`" in grep_regel and "binära filer" in grep_regel and "`-E`" in grep_regel

@@ -488,9 +488,14 @@ fast kontroll i sitt eget skal. Det går bara **före** installationen: efter de
    De sex första raderna är kroklistorna, som ska vara tomma. Sedan kommer varje funktion som inte är
    väntad, och där ska bara Claude Codes fyra stå. En särskild funktion som zsh kör av sig själv, till
    exempel `TRAPDEBUG` eller `preexec`, skulle synas där.
-5. **Stoppa och fråga**, och installera inte, om det står något mellan parenteserna, om det står något annat
-   namn än `find`, `grep`, `pkill` och `rg`, om något av dem saknas, om `SLUT` saknas, om Claude Code vägrar
-   köra kommandot, eller om verktygsrutan visar ett fel. **Inte bekräftat:** att Claude Code släpper igenom
+5. **Visar verktygsrutan något annat än exakt de elva raderna, i den ordningen: stoppa och fråga, och
+   installera inte** (granskning 16, G2, Hugos beslut 2026-10-28). Det gäller allt som inte är exakt de elva
+   raderna, inte bara fallen som räknas upp här: till exempel raderna i en annan ordning, en rad för mycket
+   (som samma namn två gånger) eller för lite, eller ett annat namn i en kroklista. Ser verktygsrutan ut att
+   vara avkortad, öppna hela utskriften innan du jämför. **Stoppa och fråga** alltså bland annat om det står
+   något mellan parenteserna, om det står något annat namn än `find`, `grep`, `pkill` och `rg`, om något av
+   dem saknas, om `SLUT` saknas, om Claude Code vägrar köra kommandot, eller om verktygsrutan visar ett fel.
+   **Inte bekräftat:** att Claude Code släpper igenom
    kommandot (granskning 15 såg att en inbyggd kontroll i Claude Code stoppade ett annat `print`-kommando),
    och att namnen är desamma i en annan version av Claude Code.
 

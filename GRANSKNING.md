@@ -5639,3 +5639,6 @@ Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28, i chatten.
   och `/usr/share/zsh/5.9/functions` ägs av root. `/usr/local` och `/usr/local/share` ägs av root.
   `/usr/local/share/zsh` och `/usr/local/share/zsh/site-functions` finns inte.
 - **Caspers dator är inte kontrollerad.** Casper kör samma fyra kommandon före sin installation.
+- **Meningen i SPEC 7.1 för G6** (Hugos OK i chatten 2026-10-28, i byggsessionen): granskning 16 föreslog
+  ingen exakt formulering, så byggsessionen skrev ett förslag ("Claude Codes `grep` söker inte i allt …"), och
+  Hugo godkände det som det stod.
