@@ -42,6 +42,7 @@
       "Edit(~/.local/bin/claude)",
       "Edit(~/.local/share/claude/**)",
       "Edit(~/Library/Application Support/Claude/claude-code/**)",
+      "Edit(~/Library/Application Support/Claude/**)",
       "Edit(//Applications/Claude.app/**)",
       "Edit(//opt/homebrew/**)",
       "Edit(//**/.venv/**)"

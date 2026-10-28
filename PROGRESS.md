@@ -6,8 +6,8 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **3 350 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, i
-byggsessionen efter Hugos beslut om granskning 13).
+Testsviten: **3 351 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
+Hugos svar 2026-10-28 efter granskning 13).
 
 ## Läge 2026-10-28, efter Hugos beslut om granskning 13
 
@@ -40,19 +40,16 @@ och andra filer i hemmappen inte ändrade, inga kontrollsummor). Besluten och de
 - **`/Applications/Claude.app` ägs av Hugo** (`hugolindholmer staff`), liksom mapparna i den.
   `/Applications` ägs av root med gruppen `admin` och kan skrivas i av gruppen (`drwxrwxr-x`).
 
-**Öppet beslut (P4):** appen och appens Claude Code ägs av Hugo, inte av systemet. Förbuden stoppar agentens
-fil-verktyg, men inte program som Hugo själv kör eller den kända luckan (en egen testfil). Ska ägandet
-ändras, eller räcker förbuden? Inget ägande är ändrat.
+**Hugos svar 2026-10-28 efter granskning 13, punkt 1–4** (besvarar besluten som behövdes efter bygget):
 
-**Beslut som behövs:**
+1. **P4:** förbuden räcker, ägandet ändras inte. Sandlådan ska förbjuda skrivning i appen, appens Claude
+   Code och `~/.local/share/claude` (Öppet, punkt 4).
+2. **P3 b:** `cd ~/VERA` står kvar först, före `~/.local/bin/claude`.
+3. **Hela `~/Library/Application Support/Claude`** förbjuds för agentens fil-verktyg. Byggt, med test.
+4. **Ändringen i SPEC 7.1** (P2 och P3 b) godkänns.
 
-1. **P4:** se det öppna beslutet ovan.
-2. **P3 b, tolkning:** `cd ~/VERA` står kvar före `~/.local/bin/claude` (bara `claude` är utbytt mot hela
-   sökvägen). Bekräftas?
-3. **`~/Library/Application Support/Claude`** har också skrivbordsappens egna inställningar. Bara mappen
-   `claude-code` är förbjuden nu. Ska hela mappen förbjudas? Inte kontrollerat vad mer som ligger där.
-4. **Ny oberoende granskning** av den nya versionen, med kontrollsummor, före installationen. P5 (omvägarna
-   i en kopia) görs i en egen session före uppgift 5 (Öppet, punkt 6).
+**Beslut som behövs:** en ny oberoende granskning av den nya versionen, med kontrollsummor, före
+installationen. P5 (omvägarna i en kopia) görs i en egen session före uppgift 5 (Öppet, punkt 6).
 
 ## Läge 2026-10-28, efter Hugos svar 1–3
 
@@ -216,7 +213,10 @@ fattade och byggda, se avsnittet ovan.)
    en egen testfil som körs med pytest och raderar eller skriver i projektet. Det stoppas av en **sandlåda**
    (ett skydd i macOS som gör att kommandon bara kan skriva i vissa mappar). **Öppen, inte byggd.** Hugos
    beslut 2026-10-28: sandlådan byggs i spärrsteget, men ska vara klar **före uppgift 5, eller före första
-   hela körningen på riktiga underlag om den kommer först**.
+   hela körningen på riktiga underlag om den kommer först**. **Sandlådan ska förbjuda skrivning i appen
+   (`/Applications/Claude.app`), appens Claude Code (`~/Library/Application Support/Claude/claude-code`) och
+   `~/.local/share/claude`** (Hugos svar 2026-10-28 efter granskning 13, punkt 1). De ägs av Hugo, och
+   förbuden i de låsta inställningarna stoppar bara agentens fil-verktyg, inte en egen testfil.
 5. **Granskning 12 av vakten (2026-10-28)** står sist i `GRANSKNING.md`. Testsviten: 3 148 passed.
    Frågorna från bygget är besvarade, och kontrollsummorna står där. **Inte komplett:** punkt 3 (omvägar
    förbi vakten) gjordes inte, eftersom ett säkerhetsfilter stoppade den (P1, stoppar installationen).
@@ -321,6 +321,10 @@ avsnitt 8, med namn och datum.
   hela sökvägen `~/.local/bin/claude`, varning för installerarens förslag), P4 a (förbud för Claude Code för
   Terminal, appens Claude Code och appen), P5 a (omvägarna i en egen session före uppgift 5) och fråga 2
   (Claude Code för Terminal behålls, utanför `PATH`). Byggt, inte installerat. Detaljer: `GRANSKNING.md`.
+- **Hugos svar 2026-10-28 efter granskning 13, punkt 1–4:** förbuden räcker för appen och ägandet ändras
+  inte, och sandlådan ska förbjuda skrivning i appen, appens Claude Code och `~/.local/share/claude` (1),
+  `cd ~/VERA` står kvar först (2), hela `~/Library/Application Support/Claude` förbjuds för agentens
+  fil-verktyg (3), och ändringen i SPEC 7.1 godkänns (4). Byggt, inte installerat.
 - **Hugos beslut i chatten 2026-10-27:** listan över ägare och närstående ligger kvar i
   `foretag/<namn>/regelbok.json` tills spärrsteget, eftersom SPEC inte säger var den skyddade mappen ska
   ligga. Testet att listan ligger utanför alla mappar agenten får skriva i skrivs då.

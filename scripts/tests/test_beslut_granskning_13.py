@@ -179,6 +179,17 @@ def test_p4_installningarna_nekar_att_skriva_i_claude_code(regel):
     assert regel in _installningar()["permissions"]["deny"]
 
 
+def test_hugos_svar_3_hela_appens_mapp_ar_forbjuden():
+    # Hugos svar 2026-10-28 efter granskning 13, punkt 3: hela ~/Library/Application Support/Claude förbjuds för agentens
+    # fil-verktyg, inte bara mappen claude-code. Där ligger också skrivbordsappens egna inställningar.
+    # ** gäller allt under mappen, på varje djup (code.claude.com/docs/en/permissions).
+    neka = _installningar()["permissions"]["deny"]
+    assert "Edit(~/Library/Application Support/Claude/**)" in neka
+    vad = _en_rad(INSTALLERA.read_text(encoding="utf-8").split("## Innan du börjar", 1)[0])
+    assert "hela `~/Library/Application Support/Claude`" in vad
+    assert "Hugos svar 2026-10-28 efter granskning 13, punkt 3" in vad
+
+
 # ---------------------------------------------------------------------------------------------
 # P1 a: alias och funktioner kontrolleras i Terminal före och efter installationen.
 

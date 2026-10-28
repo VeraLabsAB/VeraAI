@@ -3535,6 +3535,32 @@ scratchpad-mappen). Hela testsviten: **3 350 passed**, 0 misslyckade (före: 3 3
   `scripts/tests` och mot en kopia i scratchpad-mappen), `mkdir -p`, `git archive -o`, `tar -x -f … -C` och
   `cp -R` till scratchpad-mappen, `grep`, `git status`, `git diff`, `git add` och `git commit`.
 
+### Hugos svar 2026-10-28 efter granskning 13, punkt 1–4
+
+Skrivna av Hugo i chatten 2026-10-28, som svar på slutrapportens "Beslut som behövs" efter bygget ovan
+(commit `115df46`). De kallas "efter granskning 13", så att de inte blandas ihop med "Hugos svar 2026-10-28,
+punkt 1–3" ovan.
+
+1. **P4: förbuden räcker, ägandet ändras inte** (Hugos svar 2026-10-28 efter granskning 13, punkt 1).
+   `/Applications/Claude.app`, skrivbordsappens Claude Code och `~/.local/share/claude` ägs fortsatt av Hugo.
+   **Sandlådan ska förbjuda skrivning i appen, appens Claude Code och `~/.local/share/claude`**: skrivet i
+   PROGRESS.md under "Öppet", punkt 4.
+2. **P3 b: `cd ~/VERA` står kvar först** (punkt 2). Tolkningen i bygget bekräftas: bara `claude` är utbytt
+   mot `~/.local/bin/claude`.
+3. **Hela `~/Library/Application Support/Claude` förbjuds för agentens fil-verktyg** (punkt 3), med test.
+4. **Ändringen i SPEC 7.1 godkänns** (punkt 4): texten efter P2 och P3 b i commit `115df46`.
+
+**Byggt 2026-10-28:**
+
+- Punkt 3: `Edit(~/Library/Application Support/Claude/**)` i `sparr/managed-settings.json`. Regeln för
+  undermappen `claude-code` står kvar (den täcks av den nya, men har ett eget test från P4). INSTALLERA.md:
+  tabellen i "Vad som installeras" och "Efteråt", punkt 8 (agenten kan inte skriva i skrivbordsappens egna
+  inställningar). Test: `test_hugos_svar_3_hela_appens_mapp_ar_forbjuden` i
+  `scripts/tests/test_beslut_granskning_13.py`.
+- Punkt 1: PROGRESS.md, "Öppet", punkt 4 (sandlådan). Inget ägande ändrat.
+- Punkt 2 och 4: inget att bygga. Besluten står här och i PROGRESS.md.
+- Hela testsviten: **3 351 passed**, 0 misslyckade (körd 2026-10-28 med `.venv/bin/python`).
+
 ## Bygget av vakten för Q1 (2026-10-28)
 
 Planens steg 1 (byggsessionen), gjord på Hugos uppdrag i chatten 2026-10-28. **Inget är installerat.**
