@@ -5993,3 +5993,17 @@ Skrivna av Hugo i uppdraget till den här granskningen, i chatten 2026-10-28.
 - **Frågan om stora och små bokstäver i förbuden** bedöms i granskning 17 (H6) och provas på riktigt i
   spärrtestet efter installationen.
 - **`typeset -f grep` i steg 4 h görs inte nu.** Det står under Öppet (PROGRESS.md, Öppet, punkt 9 c).
+
+### Hugos beslut 2026-10-28 (efter granskning 17)
+
+Skrivna av Hugo i uppdraget till byggsessionen 2026-10-28, i chatten.
+
+- **H1 och H2: alternativ 1.** Kontrollskriptet godtar exakt uppgiften `com.apple.provenance` och ingen annan.
+  `+` (extra rättigheter) stoppas som förut.
+- **H6:** vakten kontrollerar även verktygen som skriver eller ändrar filer, utan att skilja på stora och små
+  bokstäver. Prövas på riktigt i spärrtestet efter installationen.
+- **H3:** regeln om prov och test skrivs in i CLAUDE.md och SPEC 7.1.
+- **H4 och H5:** läggs under Öppet.
+- **Hela testsviten körs** (Hugos svar i chatten 2026-10-28, i byggsessionen), också de gamla testen som gör
+  mjuka länkar i pytests tillfälliga mapp till `/usr/bin/git`, som i granskning 17. Nya test gör inga sådana
+  länkar.
