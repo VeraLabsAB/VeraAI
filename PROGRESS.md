@@ -6,16 +6,48 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **3 724 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
-rättelserna efter granskning 16).
+Testsviten: **3 894 passed**, 0 misslyckade (körd 2026-10-28 kväll i projektet med `.venv/bin/python`, efter
+rättelserna efter granskning 17).
 
-**Regler tills vakten är installerad** (Hugos beslut 2026-10-28 efter granskning 15):
+**Regler tills vakten är installerad** (Hugos beslut 2026-10-28 efter granskning 15, ändrade 2026-10-28 kväll):
 
-- Varje session körs i läget **Manual** tills vakten är installerad. Granskning 15 kördes av misstag i läget
-  auto.
+- ~~Varje session körs i läget **Manual** tills vakten är installerad.~~ Granskning 15 kördes av misstag i läget
+  auto. **Sessionerna får köras i auto redan
+  före vakten** (Hugos beslut 2026-10-28 kväll). Villkor: Shop and Gos riktiga underlag ligger utanför `~/VERA`,
+  varje session börjar och slutar med `git status`, och granskning 18 kontrollerar att inget utanför projektet
+  har ändrats.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-10-28 kväll, efter rättelserna efter granskning 17
+
+**Rättat, inte granskat, inte installerat.** Besluten står i `GRANSKNING.md`, "Hugos beslut 2026-10-28 (efter
+granskning 17)" och "Hugos beslut 2026-10-28 kväll". Inga sudo-kommandon körda, inget i `/etc` eller `/Library`
+rört, inget pushat.
+
+- **H3** (653f0a4): regeln om prov och test står i CLAUDE.md och SPEC 7.1. En regel i text. Spärren är sandlådan.
+- **H1 och H2** (3072393): kontrollskriptet läser med `ls -lde@` och godtar exakt en extra uppgift, och bara om
+  den heter exakt `com.apple.provenance`. Andra namn, flera uppgifter och alla `+` avviker. G4-testet är grönt.
+- **Steg 2 och 13 i INSTALLERA.md** (c7ba2b9): samma regel, i enkla ord för Hugo, och kommandona är `ls -lde@`.
+  Projektets filer har `com.apple.provenance`, och `ditto` och `cp` tar med den till de installerade filerna.
+- **H6** (6a488fd): vakten prövar Write och Edit (och MultiEdit och NotebookEdit om de kommer på listan) mot
+  förbuden för fil-verktygen, utan hänsyn till stora och små bokstäver, med `~`, `../`, länkar och macOS andra
+  namn för samma mapp. Samma förbud gäller mål och källor i kommandon. Där vakten stoppar jämförs sökvägar utan
+  hänsyn till bokstäver. Om Claude Codes egna förbud gör samma sak prövas i spärrtestet efter installationen.
+- **Kontrollsummor (sha256)** (235eab6), räknade med Pythons `hashlib` i testerna:
+  `sparr/kommandosparr.py` `273e37f00faede9d3402c70fd7fdd585a97e064e21fbdd732018af273e5c2ad3`,
+  `sparr/managed-settings.json` `e1222e168de38f819ebf861319e9a9b2fc134ce52b3729ec23ceacb57682d463` (oförändrad),
+  `sparr/kontrollera-skalet.zsh` `10388d474a555e6d337a9468c5a1f5e2fd0ca04608e36024f73011dc5186d51f` och
+  `requirements.txt` `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a` (oförändrad).
+- **Läget:** första byggsessionen startade i Manual och bytte till auto mitt i H6. Den halvfärdiga H6-rättelsen
+  lades undan med `git stash` och gjordes om från början. Två stashar med samma meddelande finns kvar (Öppet,
+  punkt 10).
+- **Testsviten:** 3 894 passed (före: 3 723 passed, 1 failed). Varje rättelse prövad mot en kopia av versionen
+  före den.
+- **Nästa steg:** (1) oberoende granskning 18 i en ny session, med kontrollsummor och med kontrollen att inget
+  utanför projektet har ändrats, (2) en session provkör steg 4 h med Hugos OK (G1), (3) Hugo installerar enligt
+  `sparr/INSTALLERA.md`.
 
 ## Läge 2026-10-28, efter rättelserna efter granskning 16
 
@@ -422,14 +454,22 @@ fattade och byggda, se avsnittet ovan.)
    `Edit(//**/.ugrep)` också gäller `.UGREP` (stora bokstäver) är inte bekräftat, och samma fråga gäller de andra
    förbuden, (b) vakten ser bara namnen i kommandot, inte innehållet i en mapp som kopieras eller ett arkiv som
    packas upp, men det hamnar bara i den tillfälliga mappen, där `ugrep` inte letar, och (c) granskningens förslag
-   att visa `typeset -f grep` i steg 4 h ingick inte i beslutet och är inte gjort.
+   att visa `typeset -f grep` i steg 4 h ingick inte i beslutet och är inte gjort. **(a) är byggt i vakten efter
+   granskning 17 (H6)**, men Claude Codes egna förbud är fortfarande inte prövade.
+10. **De låga fynden i granskning 17 som inte är rättade** (Hugos beslut 2026-10-28, efter granskning 17).
+    **H4:** G4-testet (`test_g4_det_riktiga_skriptet_skriver_ok_i_ett_rent_fall`) läser riktiga systemfiler och
+    blir rött av datorns läge, inte av koden. Förslag: ett felmeddelande som säger det, och en egen markering
+    skild från testerna av koden. **H5:** kontrollskriptet prövar ursprung och ägare för `add-zsh-hook`, men inte
+    innehållet och inte mappen filen ligger i. Förslag (frivilligt): jämför innehållet med filen. **Också:**
+    `git stash` har två poster med meddelandet "H6 halvfärdig, delvis gjord i auto 2026-10-28" från
+    byggsessionerna. De kan tas bort när Hugo säger till (`git stash` står inte på listan).
 
 ## Nästa steg i byggordningen
 
 1. **Vakten för kommandolistan (granskning 11, Q1).** Byggsessionen är klar (f21a3a1, 773e919 och
    6686166), och fynden i granskning 12 är byggda (5cb9080, 08a3370, c066188). Rättelserna efter granskning
-   16 är gjorda (1dbedb1 till 58daf69). Kvar: **oberoende granskning 17 i en ny session**, med nya
-   kontrollsummor, sedan provkörs steg 4 h i en session med Hugos OK (G1), sedan kontrollerar
+   16 är gjorda (1dbedb1 till 58daf69), och efter granskning 17 (653f0a4 till 235eab6). Kvar: **oberoende
+   granskning 18 i en ny session**, med nya kontrollsummor, sedan provkörs steg 4 h i en session med Hugos OK (G1), sedan kontrollerar
    Hugo versionen och installerar enligt `sparr/INSTALLERA.md`, och
    därefter kontrollen efter installationen i en ny session (sist i `sparr/INSTALLERA.md`). Caspers dator
    får samma installation och samma kontroll. Före
