@@ -6879,7 +6879,8 @@ läget byttes i en pågående session, inte i en ny session som startades i Manu
 **Resultat: GRÖNT. Kommandot kördes och svaret är exakt de elva raderna, i rätt ordning.** Kommandot skickades
 till Bash-verktyget en gång, tecken för tecken som det står i `sparr/INSTALLERA.md` steg 4 h. Claude Code stoppade
 det inte. Om Claude Code visade en fråga, och att Hugo jämförde den tecken för tecken innan han svarade ja, ser
-agenten inte. Det står här som Hugo bekräftar det i chatten.
+agenten inte. **Hugo bekräftade det i chatten 2026-10-28** ("Ja, jämförd"): Claude Code visade en fråga, Hugo
+jämförde kommandot tecken för tecken och svarade ja.
 
 | Rad | Väntat | Svar | Stämmer |
 |---|---|---|---|
