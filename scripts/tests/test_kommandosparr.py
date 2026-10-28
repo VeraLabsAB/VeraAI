@@ -267,6 +267,53 @@ def test_kontrollen_efter_installationen_har_hugos_steg(steg):
     assert steg in _kontrollen()
 
 
+# Hugos beslut 2026-10-28, 7 (granskning 12, P2 och beslut a): provet där vakten fallerar står i
+# kontrollen efter installationen. Hugo flyttar vakten tillfälligt med sudo mv, ser att ett vanligt
+# kommando stoppas, flyttar tillbaka och jämför kontrollsummorna.
+FLYTTA_UNDAN = f'sudo mv "{INSTALLERAD_VAKT}" "{INSTALLERAD_VAKT}.av"'
+FLYTTA_TILLBAKA = f'sudo mv "{INSTALLERAD_VAKT}.av" "{INSTALLERAD_VAKT}"'
+
+
+def _kommandon_i_kontrollen():
+    block = re.findall(r"```bash\n(.*?)```", _kontrollen(), flags=re.S)
+    return [rad.strip() for b in block for rad in b.splitlines() if rad.strip()]
+
+
+def test_kontrollen_provar_en_vakt_som_fallerar():
+    assert "en vakt som fallerar" in _kontrollen()
+    rader = _kommandon_i_kontrollen()
+    assert FLYTTA_UNDAN in rader and FLYTTA_TILLBAKA in rader
+    summa = [
+        i
+        for i, r in enumerate(rader)
+        if r.startswith("shasum -a 256 ") and INSTALLERAD_VAKT in r and INSTALLERADE_INSTALLNINGAR in r
+    ]
+    # Ordningen: flytta undan, flytta tillbaka, jämför summorna.
+    assert summa and rader.index(FLYTTA_UNDAN) < rader.index(FLYTTA_TILLBAKA) < min(summa)
+
+
+def test_bara_kontrollen_flyttar_vakten_och_bara_fram_och_tillbaka():
+    _, rader = _installationskommandon()
+    flyttar = [r for r in rader if r.startswith("sudo mv")]
+    assert flyttar == [FLYTTA_UNDAN, FLYTTA_TILLBAKA]
+    installationen = INSTALLERA.read_text(encoding="utf-8").split(KONTROLL_RUBRIK, 1)[0]
+    assert "sudo mv" not in installationen
+
+
+def test_systemets_python_stoppar_med_kod_2_nar_vakten_saknas(tmp_path):
+    # Det är därför provet stoppar: när vakten är bortflyttad kan /usr/bin/python3 inte öppna filen och
+    # avslutar med kod 2, som Claude Code läser som "stoppa". Provet visar alltså att en saknad vakt
+    # stoppar, men prövar inte onFailure (som gäller andra koder än 0 och 2). Se INSTALLERA.md.
+    svar = subprocess.run(
+        [SYSTEMETS_PYTHON, "-I", str(tmp_path / "kommandosparr.py")],
+        input=b"{}",
+        capture_output=True,
+        env={"PATH": "/usr/bin:/bin"},
+        timeout=10,
+    )
+    assert svar.returncode == 2
+
+
 def test_installationen_jamfor_kontrollsummor_fore_och_efter_kopieringen():
     # Hugos beslut 2026-10-28, punkt 4: Hugo jämför summorna med dem som granskningen skriver upp
     # innan han kopierar, och kontrollerar efteråt att det är samma filer som ligger på plats.
@@ -916,6 +963,8 @@ def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
         "sudo cp -i ",
         "sudo chown ",
         "sudo chmod ",
+        FLYTTA_UNDAN,
+        FLYTTA_TILLBAKA,
     )
     assert rader
     for rad in rader:

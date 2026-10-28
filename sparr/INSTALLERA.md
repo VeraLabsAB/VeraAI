@@ -16,7 +16,7 @@ filerna.
 | Fil i projektet | Kopieras till | Vad den gör |
 |---|---|---|
 | `sparr/kommandosparr.py` | `/Library/Application Support/ClaudeCode/vera/kommandosparr.py` | **Vakten.** Ett litet program som Claude Code kör före varje verktyg. Det stoppar allt som inte står på listan i SPEC 7.1. |
-| `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.295 startar inte alls. Agenten får inte skriva i `.git`, i skalets och gits startfiler, i `~/.claude` eller i `~/Library/LaunchAgents`. |
+| `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.295 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Läget "auto" går inte att använda, och skills kan inte köra skalkommandon. |
 
 Inställningarna börjar gälla så fort filen finns, i terminalen och i skrivbordsappen. Därför kopieras
 vakten först och inställningarna sist.
@@ -60,6 +60,12 @@ filen. Stoppa i så fall och fråga.
 De låsta inställningarna innehåller också `"requiredMinimumVersion": "2.1.295"`, så att en äldre Claude
 Code inte startar alls efter installationen (Hugos beslut 2026-10-28). Kontrollen här behövs ändå,
 eftersom inställningarna inte gäller förrän de är installerade.
+
+Två inställningar har ingen lägsta version i dokumentationen: `disableSkillShellExecution` (skills kör
+inga skalkommandon) och `disableAutoMode` (läget "auto" går inte att använda). Sidorna
+**code.claude.com/docs/en/settings-reference**, **/skills** och **/permissions** nämner ingen version för
+dem, kontrollerat 2026-10-28. Lägsta version är alltså **inte bekräftat** (Hugos beslut 2026-10-28: byggs
+in ändå). Kontrollen efter installationen, steg 1, visar att läget "auto" saknas.
 
 **Båda versionerna ska vara 2.1.295 eller senare.** Om någon är äldre: **stoppa**, uppdatera den först
 (skrivbordsappen med **Claude > Check for Updates…**, och terminalens Claude Code enligt
@@ -158,6 +164,13 @@ shasum -a 256 "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/
    spara nytt där. Claude Code själv skriver fortfarande sina egna filer.
 4. **Vakterna i tillägget superpowers slutar fungera** (Hugos beslut 2026-10-28, 2), eftersom bara
    vakter från de låsta inställningarna får köras.
+5. **Bara verktygen på listan i SPEC 7.1 fungerar** (granskning 12, P4, Hugos beslut 2026-10-28). Andra
+   verktyg, till exempel webbsökning, appens webbläsare och kopplingar till andra tjänster, stoppas av
+   vakten. Behövs ett verktyg till blir det en ny version av vakten.
+6. **Läget "auto" går inte att välja** (granskning 12, P6). Claude Code frågar dig före varje kommando
+   som inte är förgodkänt.
+7. **Agenten kan inte skriva i projektets mapp `.claude`, i `.mcp.json` eller i `.venv`** (Hugos beslut
+   2026-10-28, 5). Inställningar och kopplingar för projektet skriver du eller Casper själva.
 
 ## Caspers dator
 
@@ -183,7 +196,9 @@ görs. Kör inte uppgift 4 förrän alla steg är klara.
 1. **De låsta inställningarna gäller.** Skriv `/status` och läs raden **Setting sources**. Den ska visa
    `Enterprise managed settings (file)`, alltså inställningarna från filen du installerade
    (code.claude.com/docs/en/managed-settings). Läs också raden **Claude Code**: versionen ska vara
-   2.1.295 eller senare.
+   2.1.295 eller senare. Läget "auto" ska inte gå att välja: i terminalens Claude Code, tryck Shift+Tab
+   några gånger, och "auto" ska inte komma upp (code.claude.com/docs/en/settings-reference,
+   `disableAutoMode`).
 2. **Ihopkopplade kommandon stoppas.** Be agenten köra `ls; ls`. Det ska stoppas med ett fel som börjar
    "Stoppat av vakten" och säger att kommandon inte kopplas ihop.
 3. **Ett kommando på listan går igenom.** Be agenten köra `git status`. Claude Code frågar dig som vanligt
@@ -206,3 +221,50 @@ görs. Kör inte uppgift 4 förrän alla steg är klara.
 
    Om kommandot i stället körs utan att vakten har prövat det, till exempel om `ls; ls` går igenom i
    worktree-sessionen: stoppa och fråga.
+8. **Provet med en vakt som fallerar:** ett vanligt kommando ska stoppas när vakten inte går att köra
+   (Hugos beslut 2026-10-28, 7, granskning 12 P2). Det här
+   steget gör du **själv i Terminal**, inte agenten. Gör det sist, när steg 1–7 är klara. Vakten flyttas
+   undan en kort stund, och flyttas sedan tillbaka. Inställningsfilen ändras inte.
+
+   **a. Flytta undan vakten.** Kommandot byter bara namn på filen, i samma mapp (`.av` på slutet):
+
+   ```bash
+   sudo mv "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py.av"
+   ```
+
+   - `mv` flyttar eller byter namn på en fil. `sudo` gör att det körs som administratör, och datorn
+     frågar efter ditt lösenord. När det är klart visas ingenting.
+
+   **b. Pröva.** Starta en ny session i fliken **Code**, startad i `~/VERA/agent`, och be agenten köra
+   `git status`. **Det ska stoppas.** Felet kommer från Claude Code och inte från vakten (vakten ligger ju
+   inte på plats), så det börjar inte med "Stoppat av vakten". Det säger att vakten (en hook,
+   `PreToolUse`) inte gick att köra, och nämner troligen `can't open file` och `No such file or
+   directory`. Eftersom vakten gäller alla verktyg stoppas allt i sessionen, också när agenten vill läsa
+   en fil. Det är den säkra riktningen.
+
+   **Om `git status` går igenom och visar läget i projektet: gör c direkt, och stoppa och fråga.**
+
+   **c. Flytta tillbaka vakten:**
+
+   ```bash
+   sudo mv "/Library/Application Support/ClaudeCode/vera/kommandosparr.py.av" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+   ```
+
+   **d. Jämför kontrollsummorna:**
+
+   ```bash
+   shasum -a 256 "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/managed-settings.json"
+   ```
+
+   Du ser två rader, var och en med en summa på 64 tecken och sökvägen till filen. Summorna ska vara
+   **exakt samma** som i steg 8 i installationen (och som de som granskningen skrev upp). Är någon olika:
+   stoppa och fråga.
+
+   **e. Starta en ny session** och gör steg 2 och 3 igen: `ls; ls` ska stoppas med "Stoppat av vakten",
+   och `git status` ska gå igenom. Då är vakten tillbaka och fungerar.
+
+   **Vad provet visar.** När vakten saknas kan `/usr/bin/python3` inte öppna filen och avslutar med kod 2,
+   och kod 2 betyder för Claude Code "stoppa". Provet visar alltså att en **saknad** vakt stoppar allt.
+   Det prövar inte inställningen `onFailure: "block"` i sig, som gäller när vakten fallerar på andra sätt
+   (en annan kod än 0 och 2, tidsgränsen, eller att programmet inte går att starta). Att Python ger kod 2
+   visas av testet `test_systemets_python_stoppar_med_kod_2_nar_vakten_saknas`.
