@@ -3278,7 +3278,7 @@ på riktiga underlag om den kommer först, beslut 6).
 ## Bygget av vakten för Q1 (2026-10-28)
 
 Planens steg 1 (byggsessionen), gjord på Hugos uppdrag i chatten 2026-10-28. **Inget är installerat.**
-Commitarna är `f21a3a1`, `773e919` och commiten som lägger till det här avsnittet. Ingen av dem är pushad.
+Commitarna är `f21a3a1`, `773e919` och `6686166` (som lägger till det här avsnittet). Ingen av dem är pushad.
 
 ### Vad som byggdes
 

@@ -30,7 +30,7 @@ granskning 11, Q1).
 | Granskning 8, N3, det som var kvar: `matcha_period` får regelboken, och ägarens bankrad kräver alltid underlag | ea51c97, de14da7 |
 | Efter granskning 9: en saknad, tom eller oläsbar ägarlista stoppar körningen (a), och ägarens bankrad märks "kräver mänsklig bedömning" i matchningen och blir aldrig en vanlig matchning (b) | dd0e1cf |
 | Efter granskning 10 (P1): en motpart i ägarlistan utan bokstäver och siffror, till exempel `-`, stoppar körningen | 16000a8 |
-| Granskning 11, Q1: vakten för kommandolistan (`sparr/kommandosparr.py`), förslaget till låsta inställningar, INSTALLERA.md och SPEC 7.1. **Inte granskad och inte installerad** | f21a3a1, 773e919 och commiten efter |
+| Granskning 11, Q1: vakten för kommandolistan (`sparr/kommandosparr.py`), förslaget till låsta inställningar, INSTALLERA.md och SPEC 7.1. **Inte granskad och inte installerad** | f21a3a1, 773e919, 6686166 |
 
 ## Öppet
 
@@ -62,8 +62,8 @@ granskning 11, Q1).
 
 ## Nästa steg i byggordningen
 
-1. **Vakten för kommandolistan (granskning 11, Q1).** Byggsessionen är klar (f21a3a1, 773e919 och commiten
-   efter). Kvar: **oberoende granskning** i en ny session (med kontrollsummorna för vakten och
+1. **Vakten för kommandolistan (granskning 11, Q1).** Byggsessionen är klar (f21a3a1, 773e919 och
+   6686166). Kvar: **oberoende granskning** i en ny session (med kontrollsummorna för vakten och
    inställningsfilen), sedan kontrollerar Hugo versionen och installerar enligt `sparr/INSTALLERA.md`, och
    därefter kontrollen efter installationen i en ny session (sist i `sparr/INSTALLERA.md`). Caspers dator
    får samma installation och samma kontroll. Före
