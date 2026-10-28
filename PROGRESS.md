@@ -6,8 +6,8 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **3 894 passed**, 0 misslyckade (körd 2026-10-28 kväll i projektet med `.venv/bin/python`, efter
-rättelserna efter granskning 17).
+Testsviten: **3 987 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
+rättelsen av I1 efter granskning 18).
 
 **Regler tills vakten är installerad** (Hugos beslut 2026-10-28 efter granskning 15, ändrade 2026-10-28 kväll):
 
@@ -19,6 +19,29 @@ rättelserna efter granskning 17).
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-10-28, efter rättelsen av I1 (granskning 18)
+
+**Rättat, inte granskat, inte installerat.** Besluten står i `GRANSKNING.md`, "Hugos beslut 2026-10-28 (efter
+granskning 18)". Sessionen kördes i läget auto (tillåtet enligt Hugos beslut 2026-10-28 kväll), och började och
+slutade med `git status`. Inga sudo-kommandon körda, inget i `/etc` eller `/Library` rört, inget pushat, inga
+`git stash`.
+
+- **I1** (0c7cdcb): vakten stoppar varje sökväg vars första del direkt under roten börjar med punkt (`/.vol`,
+  `/.nofollow`, `/.resolve` och liknande), oavsett stora och små bokstäver och extra snedstreck, före och efter
+  att sökvägen har räknats om. Det gäller Write och Edit och sökvägar i kommandon. En mening i SPEC 7.1.
+  93 nya tester (`test_beslut_granskning_18.py`). 64 är röda mot versionen före (f363b92), visat i en kopia i
+  scratchpad: skrivverktygen släpptes igenom där, kommandona stoppades redan av andra regler men utan I1-skälet.
+- **Kontrollsummor (sha256)** (43e2371), räknade med Pythons `hashlib` i en provfil i en ren kopia:
+  `sparr/kommandosparr.py` `4b271e0aeb1a662133603f3c674ff98d37367ea6ea5786add9937e73e48a62cf` (ny),
+  `sparr/managed-settings.json` `e1222e168de38f819ebf861319e9a9b2fc134ce52b3729ec23ceacb57682d463`,
+  `sparr/kontrollera-skalet.zsh` `10388d474a555e6d337a9468c5a1f5e2fd0ca04608e36024f73011dc5186d51f` och
+  `requirements.txt` `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a` (oförändrade).
+- **I2–I8** står under Öppet, punkt 11.
+- **Testsviten:** 3 987 passed (före: 3 894 passed).
+- **Nästa steg:** (1) **oberoende granskning 19** i en ny session, som bara gäller I1-ändringen (f363b92 till och
+  med den här commiten), med kontrollsummor, (2) en session provkör steg 4 h med Hugos OK (G1), (3) Hugo
+  installerar enligt `sparr/INSTALLERA.md`.
 
 ## Läge 2026-10-28 kväll, efter rättelserna efter granskning 17
 
@@ -463,13 +486,23 @@ fattade och byggda, se avsnittet ovan.)
     innehållet och inte mappen filen ligger i. Förslag (frivilligt): jämför innehållet med filen. **Också:**
     `git stash` har två poster med meddelandet "H6 halvfärdig, delvis gjord i auto 2026-10-28" från
     byggsessionerna. De kan tas bort när Hugo säger till (`git stash` står inte på listan).
+11. **De låga fynden i granskning 18** (Hugos beslut 2026-10-28 efter granskning 18: under Öppet, så att vakten
+    kan installeras snart). En rad var:
+    - **I2:** kontrollskriptet godtar en uppgift som heter `com.apple.provenance` plus en tabb, som om den hette exakt `com.apple.provenance`.
+    - **I3:** H6 byggdes på den undanlagda versionen, inte om från början, och den andra stash-posten (kl. 20.18) saknar ett nedskrivet OK (historiken står i `GRANSKNING.md`).
+    - **I4:** vakten ser inte hårda länkar: Write till en fil i projektet som är ett andra namn på `~/.zshrc` släpps igenom (till sandlådan).
+    - **I5:** Agent-verktyget med `isolation: "worktree"` får Claude Code att skriva i `.git` utan att vakten tittar (tas med i spärrtestet).
+    - **I6:** INSTALLERA.md steg 2 säger "den fjärde raden" om `No such file or directory`, men `ls` skriver den raden först.
+    - **I7:** INSTALLERA.md steg 13: `ditto` och `cp` tar med alla uppgifter, inte bara `com.apple.provenance`, så installationen kan stoppa i onödan.
+    - **I8:** regeln om prov och test: SPEC 7.1 har ett undantag som CLAUDE.md saknar, och "läsa riktiga systemfiler" är otydligt.
 
 ## Nästa steg i byggordningen
 
 1. **Vakten för kommandolistan (granskning 11, Q1).** Byggsessionen är klar (f21a3a1, 773e919 och
    6686166), och fynden i granskning 12 är byggda (5cb9080, 08a3370, c066188). Rättelserna efter granskning
-   16 är gjorda (1dbedb1 till 58daf69), och efter granskning 17 (653f0a4 till 235eab6). Kvar: **oberoende
-   granskning 18 i en ny session**, med nya kontrollsummor, sedan provkörs steg 4 h i en session med Hugos OK (G1), sedan kontrollerar
+   16 är gjorda (1dbedb1 till 58daf69), efter granskning 17 (653f0a4 till 235eab6) och I1 efter granskning 18
+   (0c7cdcb och 43e2371). Kvar: **oberoende granskning 19 i en ny session, som bara gäller I1-ändringen**, med
+   kontrollsummor, sedan provkörs steg 4 h i en session med Hugos OK (G1), sedan kontrollerar
    Hugo versionen och installerar enligt `sparr/INSTALLERA.md`, och
    därefter kontrollen efter installationen i en ny session (sist i `sparr/INSTALLERA.md`). Caspers dator
    får samma installation och samma kontroll. Före
