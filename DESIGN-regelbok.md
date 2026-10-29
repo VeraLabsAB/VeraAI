@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil), uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) och uppgift 3 (konteringsförslaget med K2 och ursprungskontrollen) i avsnitt 7 är byggda, och granskning 7:s M1 och M2 är rättade (täckningen och ingående och utgående moms, avsnitt 3), liksom M3 och en del av M4 (regeln ska passa förslaget, och kontrollsummor för regelbok, kontoplan, momsfil och matchningsformat, avsnitt 3), och M5–M8 och M10–M12 (förväxlingstecken och ägarens bankrader i avsnitt 1, en roll per konto i avsnitt 2, och bankradernas nyckelnamn i avsnitt 3). M9 hör till uppgift 5. Efter granskning 8 är N1–N4 och N7 rättade (dolda tecken enligt Unicodes lista, vilka tecken ett namn får ha och ägarens bankrader, avsnitt 1), och exemplet i avsnitt 3 har kodens nyckelnamn för bankrader (M11, Hugos OK 2026-10-27). Hugos beslut efter uppgift 2 och 3 och efter granskning 7 och 8 står i avsnitt 8. Uppgift 4 (flöde a, b och e med K5 och K8, `scripts/konteringsfloden.py`) är byggd 2026-10-29 i 4269f76, f6ed99e och e4cc538, med de antagna valen i avsnitt 8. Ändrar inget i SPEC.md |
+| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil), uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) och uppgift 3 (konteringsförslaget med K2 och ursprungskontrollen) i avsnitt 7 är byggda, och granskning 7:s M1 och M2 är rättade (täckningen och ingående och utgående moms, avsnitt 3), liksom M3 och en del av M4 (regeln ska passa förslaget, och kontrollsummor för regelbok, kontoplan, momsfil och matchningsformat, avsnitt 3), och M5–M8 och M10–M12 (förväxlingstecken och ägarens bankrader i avsnitt 1, en roll per konto i avsnitt 2, och bankradernas nyckelnamn i avsnitt 3). M9 hör till uppgift 5. Efter granskning 8 är N1–N4 och N7 rättade (dolda tecken enligt Unicodes lista, vilka tecken ett namn får ha och ägarens bankrader, avsnitt 1), och exemplet i avsnitt 3 har kodens nyckelnamn för bankrader (M11, Hugos OK 2026-10-27). Hugos beslut efter uppgift 2 och 3 och efter granskning 7 och 8 står i avsnitt 8. Uppgift 4 (flöde a, b och e med K5 och K8, `scripts/konteringsfloden.py`) är byggd 2026-10-29 i 4269f76, f6ed99e och e4cc538, med de antagna valen i avsnitt 8. Hugos beslut efter uppgift 4 (2026-10-29) är byggda i ded669d och 5753890: flöde e väljs med nyckeln `flode`, regeln för bankens avgifter heter `bankens-avgifter`, och testbutiken har regler för BUTIK-FORBRUKNING och LEV-TILLBEHOR (avsnitt 1 och 8). Ändrar inget i SPEC.md |
 | Gäller | Steg 4 i arbetsflödet (SPEC avsnitt 4): kontera enligt företagets regelbok, och kontrollerna K2, K5, K8 och K9 |
 | Exempel | Bara Syntet Testbutik AB och testdatan för 2025-Q1. **Allt är SYNTETISKT** |
 
@@ -211,6 +211,10 @@ Några saker att lägga märke till:
   felet SYNT-U-2025-019 (städartiklar med 12 %) fångas: BUTIK-STAD har bara varugruppen `ovrigt`.
 - **Regler för bankrader utan underlag** pekar på regelns namn i `matchning.json`. De två filerna hänger
   alltså ihop: matchningen säger *att* raden inte kräver underlag, regelboken säger *hur* den bokförs.
+  **Vilket flöde** en sådan regel hör till står uttryckligen i nyckeln `flode` (i dag bara `bankavgift`,
+  flöde e), aldrig utläst ur vilka konton regeln har (Hugos beslut 2026-10-29, efter uppgift 4, c). En regel
+  för pengar ut utan `flode` blir ett ärende. Ordet `bankavgift` är **reserverat**: ingen regel får heta så,
+  eftersom det är kärnans eget ord (`foretag/README.md`, "Reserverade namn").
 - `godkand` och `version` är till för människor och för loggen. Det som skyddar är kontrollsumman.
 - Ägartransaktioner (K7) har ingen regel som kan ge annat än D. En regel med motparten `AGARE-1` får bara
   ha nivå D, annars stoppas regelboken. Vilka motparter som är ägare eller närstående står i nyckeln
@@ -819,6 +823,21 @@ Syntet Testbutik AB och är fortfarande öppna frågor för riktiga företag. He
   Saknas nyckeln stoppas regelboken, och inget val görs åt företaget. D4 kräver ingen nyckel: momsen tas
   oförändrad ur underlaget. Gränsen för bankavgifter i D13 står redan i `matchning.json` och i regeln
   `R-BANK-AVGIFT` (250 kr).
+
+**Hugos beslut efter uppgift 4 (2026-10-29).** Hela texten står i `GRANSKNING.md`, "Beslut efter uppgift 4
+(2026-10-29)":
+
+- **a och b:** ett underlag från en ägare blir alltid ett K7-ärende utan förslag, och "ny motpart" får ingen nivå
+  förrän i uppgift 6.
+- **c:** "rena bankavgifter" i D13 är bankrader vars regel har `"flode": "bankavgift"`. Kärnan väljer aldrig flöde e
+  för att regeln bara har kontot `kostnad`. En regel för pengar ut utan `flode` ger ett ärende, "regeln saknar
+  flöde", med nivå D och inget förslag. `R-BANK-AVGIFT` har nyckeln. Regeln i testbutikens `matchning.json` heter
+  `bankens-avgifter`, eftersom `bankavgift` är ett reserverat ord (Hugos beslut i chatten samma dag).
+- **d:** "över gräns" ger nivå D för alla regler för pengar ut.
+- **e:** SPEC 7 nämner `kontera_period`.
+- **f:** testbutikens regelbok har `R-BUTIK-FORBRUKNING` (5460, exemplet i avsnitt 4b) och `R-LEV-TILLBEHOR`
+  (4010), båda nivå B. HYRESVARD, LEV-EL och LEV-TELE väntar på kontona 5010, 5020 och 6210 i ett eget steg, med en
+  ny titt på D2 (Hugos besked i chatten samma dag). Då får HYRESVARD nivå D, eftersom D10 och D11 är öppna.
 
 ### Hugo kan bestämma själv
 

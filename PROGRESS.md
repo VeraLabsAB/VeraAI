@@ -1,15 +1,15 @@
 # PROGRESS – Veras bokföringsagent
 
 Uppdaterad 2026-10-29. Specifikation: `SPEC.md`. Byggordning: `DESIGN-regelbok.md` avsnitt 7.
-Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12 är klart: vakten installerades på Hugos dator 2026-10-28. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4", och **D13 och D14** under "D13 och D14 beslutade" (baec52b). **Uppgift 4 är byggd** 2026-10-29 (4269f76, f6ed99e och e4cc538): flöde a, b och e med K5 och K8 i `scripts/konteringsfloden.py`, och den nya nyckeln `bokforing` i regelboken (Hugos OK i chatten 2026-10-29). Inte oberoende granskad och inte pushad. Nästa steg: se "Nästa steg i byggordningen". Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
+Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12 är klart: vakten installerades på Hugos dator 2026-10-28. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4", och **D13 och D14** under "D13 och D14 beslutade" (baec52b). **Uppgift 4 är byggd** 2026-10-29 (4269f76, f6ed99e och e4cc538): flöde a, b och e med K5 och K8 i `scripts/konteringsfloden.py`, och den nya nyckeln `bokforing` i regelboken (Hugos OK i chatten 2026-10-29). Inte oberoende granskad och inte pushad. **Hugos beslut efter uppgift 4 (a–f)** står i `GRANSKNING.md`, "Beslut efter uppgift 4 (2026-10-29)" (48e7ed3), och är byggda 2026-10-29 i ded669d (c: nyckeln `flode`, reserverade namn och regeln `bankens-avgifter`) och 5753890 (f och e). Inte pushade. Nästa steg: se "Nästa steg i byggordningen". Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
 
 Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **4 273 passed**, 0 misslyckade (körd senast 2026-10-29 efter uppgift 4: 4 192 från förut och 81 nya,
-de flesta i `scripts/tests/test_konteringsfloden.py` och `scripts/tests/test_las_regelbok.py`). Sedan installationen
+Testsviten: **4 304 passed**, 0 misslyckade (körd senast 2026-10-29 efter besluten efter uppgift 4: 4 273 från förut
+och 31 nya, de flesta i `scripts/tests/test_beslut_efter_uppgift_4.py`). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
 borttagen.
 
@@ -437,6 +437,9 @@ fattade och byggda, se avsnittet ovan.)
 | Uppgift 4, del 1: flöde a (leverantörsfakturor) med K5, K7 och K8 i `scripts/konteringsfloden.py` (`kontera_period`), och nyckeln `bokforing` i regelboken (metod, verifikationsdatum och "antaget", Hugos OK i chatten 2026-10-29). Ärenden från K5 och K8 har nivå D och "kräver mänsklig bedömning" direkt (B2) | 4269f76 |
 | Uppgift 4, del 2: flöde b (kvitton). SYNT-U-2025-028 blir K8, nivå D, SYNT-U-2025-004 får inget förslag | f6ed99e |
 | Uppgift 4, del 3: flöde e (bankavgifter) enligt D13. En avgift över gränsen blir ett ärende med nivå D | e4cc538 |
+| Hugos beslut efter uppgift 4 (a–f) inskrivna i `GRANSKNING.md`, och Öppet 21, 22, 24 och 25 stängda | 48e7ed3 |
+| Beslut c: flöde e väljs bara med regelbokens nyckel `flode` (`"bankavgift"`). En regel för pengar ut utan nyckeln blir ett ärende, "regeln saknar flöde", nivå D. Reserverade namn: en regel i `matchning.json` eller ett regel-id får inte heta `bankavgift`, och testbutikens regel heter nu `bankens-avgifter`. 22 av 26 nya tester röda mot 48e7ed3 | ded669d |
+| Beslut f och e: `R-BUTIK-FORBRUKNING` (5460) och `R-LEV-TILLBEHOR` (4010), nivå B, i testbutikens regelbok, och testregeln för DESIGN 4b borttagen. SPEC 7 nämner `kontera_period` | 5753890 |
 | Granskning 11, Q7 (Hugos beslut 2026-10-29): pusha som det är. Historiken skrivs inte om, och ingen tagg byts eller pushas. Repot på GitHub är privat och får inte göras publikt utan en ny genomgång av hela historiken först. `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd". Bara dokumentation | commiten "Q7 stängd: pusha som det är, repot förblir privat" |
 
 ## Öppet
@@ -589,7 +592,20 @@ fattade och byggda, se avsnittet ovan.)
     `kontera_period`.
 25. ~~**Exemplet i DESIGN 4b (SYNT-U-2025-015, BUTIK-FORBRUKNING) blir en ny motpart.**~~ **Stängd** (Hugos beslut
     2026-10-29, beslut f): testbutikens regelbok får regler för BUTIK-FORBRUKNING, HYRESVARD, LEV-TELE, LEV-TILLBEHOR
-    och LEV-EL, och regeln som bara fanns i testet tas bort.
+    och LEV-EL, och regeln som bara fanns i testet tas bort. Byggt för BUTIK-FORBRUKNING och LEV-TILLBEHOR (5753890).
+    Resten står i punkt 26.
+26. **Konton för hyra, el och telefon i testbutikens kontoplan** (Hugos besked i chatten 2026-10-29, `GRANSKNING.md`,
+    "Beslut efter uppgift 4"): kontona 5010 Lokalhyra, 5020 El för belysning och 6210 Telekommunikation ska läggas
+    till i testbutikens kontoplan i ett eget steg, med en ny titt på B3:s D2 ("de BAS-konton som redan finns i
+    kontoplanen"). Därefter får HYRESVARD, LEV-EL och LEV-TELE regler, och HYRESVARD ska ha nivå D (D10 och D11 är
+    öppna). Till dess blir deras underlag "ny motpart". **Öppen, inte byggd.**
+27. **Reserverade ord gäller bara regelnamn och regel-id** (Hugos beslut i chatten 2026-10-29). Spärren i
+    `test_karnan_ar_generell.py` söker också efter motparter, kassaregister, ägare, betalsätt och konton ur
+    regelboken. En motpart som heter exakt `bankavgift` skulle alltså fortfarande krocka med kärnans ord, och då
+    blir testet rött (inte tyst). Om reserverade ord ska stoppa fler namn bestämmer Hugo eller Casper.
+28. **Värdet D i ärendet "regeln saknar flöde"** valdes i byggsessionen 2026-10-29 (som "allt annat från banken" i
+    D13, den säkra riktningen), liksom att `flode` bara får stå i en regel för bankrader och att `bankavgift` kräver
+    exakt kontot `kostnad`. BESLUTSFATTARE SAKNAS för bekräftelse.
 
 ## Nästa steg i byggordningen
 
@@ -607,8 +623,8 @@ fattade och byggda, se avsnittet ovan.)
 2. **Push till GitHub.** Klar 2026-10-29: `main` är i fas med GitHub vid 6aba32d. Q7 är stängd (Hugos beslut
    2026-10-29): pusha som det är.
 3. **Uppgift 4 är byggd** (4269f76, f6ed99e och e4cc538, 2026-10-29): flöde a, b och e med K5 och K8, och
-   testerna i DESIGN 7 rad 4 är gröna. Besluten i Öppet, punkt 20–25, väntar på Hugo eller Casper. Inte
-   pushad. DESIGN 7 säger oberoende granskning efter uppgift 3 och 6, inte efter 4. Det som var förutsättningarna:
+   testerna i DESIGN 7 rad 4 är gröna. Hugos beslut efter uppgift 4 (a–f) är byggda (48e7ed3, ded669d och
+   5753890). Kvar: Öppet 26 (konton för hyra, el och telefon), 27 och 28. Inte pushad. DESIGN 7 säger oberoende granskning efter uppgift 3 och 6, inte efter 4. Det som var förutsättningarna:
    flöde a, b och e (leverantörsfakturor, kvitton och bankavgifter)
    med K5 och K8 (BYGGPLAN steg 22). Förutsättningar, Hugos beslut 2026-10-29 (`GRANSKNING.md`, "Beslut
    2026-10-29 – inför uppgift 4"):
