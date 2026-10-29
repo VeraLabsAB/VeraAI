@@ -30,6 +30,7 @@ Läs `SPEC.md` först. Svara alltid på svenska och förklara i klartext, utan j
 
 ```
 STATUS: grönt / gult / rött
+STEG I BYGGPLANEN: nummer – namn – pågår/klart
 KAN JAG GÅ VIDARE: ja / nej, och varför
 ÄNDRINGAR I CLAUDE.md: vilka, eller "inga"
 BESLUT SOM BEHÖVS: ...
@@ -39,6 +40,9 @@ NÄSTA STEG: ...
 - Varje ändring i CLAUDE.md nämns i slutrapporten, under ÄNDRINGAR I CLAUDE.md (Hugos beslut 2026-10-28).
 
 - Ordningen i byggstegen följs. Säg till om något hoppas över.
+- Varje session hör till ett steg i `BYGGPLAN.md`, och sessionens post i `PROGRESS.md` börjar med raden "Steg i byggplanen: N" (Hugos beslut 2026-10-29).
+- När ett steg blir klart eller börjar ändras "Läge nu" och stegets status i `BYGGPLAN.md` i samma commit som `PROGRESS.md`, aldrig den ena utan den andra (Hugos beslut 2026-10-29).
+- En granskningssession uppdaterar också `PROGRESS.md` och "Läge nu" i `BYGGPLAN.md`, inte bara `GRANSKNING.md` (Hugos beslut 2026-10-29). Testet `scripts/tests/test_byggplan_progress.py` kontrollerar att de stämmer.
 - Om något rör säkerhet eller kan leda till bokföring utan godkännande: säg det tydligt först och prioritera det.
 
 ## Vem som ger OK
