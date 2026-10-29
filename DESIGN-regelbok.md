@@ -61,7 +61,7 @@ fyra delar:
 
 | Del | Innehåll |
 |---|---|
-| **Vad regeln gäller** (`galler`) | Vilken källa (underlag, bankrad eller Z-rapport), vilken typ (kvitto eller leverantörsfaktura) och vilken motpart. För bankrader utan underlag: namnet på regeln i `matchning.json` (till exempel `bankavgift`) |
+| **Vad regeln gäller** (`galler`) | Vilken källa (underlag, bankrad eller Z-rapport), vilken typ (kvitto eller leverantörsfaktura) och vilken motpart. För bankrader utan underlag: namnet på regeln i `matchning.json` (till exempel `bankens-avgifter`) |
 | **Konteringen** (`kontering`) | Vilket konto kostnaden eller intäkten ska på, per **varugrupp**. Momsens konto bestäms inte här utan av momssatsen (avsnitt 2) |
 | **Villkor** (`villkor`) | Från och till vilket datum regeln gäller, högsta belopp, och om posten är avdragsbegränsad (K8) |
 | **Nivå** (`niva`) | Den lägsta nivån förslaget kan få: A, B, C eller D. Kontrollerna kan bara höja nivån, aldrig sänka den (avsnitt 5) |
@@ -192,7 +192,8 @@ verifierade** (avsnitt 2). Nivåerna och gränserna är exempel som Hugo bestäm
     },
     {
       "id": "R-BANK-AVGIFT",
-      "galler": {"kalla": "bankrad", "matchningsregel": "bankavgift"},
+      "galler": {"kalla": "bankrad", "matchningsregel": "bankens-avgifter"},
+      "flode": "bankavgift",
       "kontering": {"kostnad": "6570"},
       "villkor": {"giltig_fran": "2025-01-01"},
       "niva": "B",

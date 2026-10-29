@@ -94,7 +94,8 @@
     },
     {
       "id": "R-BANK-AVGIFT",
-      "galler": {"kalla": "bankrad", "matchningsregel": "bankavgift"},
+      "galler": {"kalla": "bankrad", "matchningsregel": "bankens-avgifter"},
+      "flode": "bankavgift",
       "kontering": {"kostnad": "6570"},
       "villkor": {"giltig_fran": "2025-01-01", "hogst_belopp_ore": 25000},
       "niva": "B",

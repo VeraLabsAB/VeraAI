@@ -23,7 +23,7 @@
       "anteckning": "Insättning av kontanterna från kassan. Har inget eget underlag. Stäms av mot Z-rapporternas kontanter i K10 (senare steg)."
     },
     {
-      "namn": "bankavgift",
+      "namn": "bankens-avgifter",
       "riktning": "ut",
       "referens_borjar_med": "AVG-",
       "beskrivning_borjar_med": "BANK AVGIFT",

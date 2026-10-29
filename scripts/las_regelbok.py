@@ -80,7 +80,16 @@ En regel har exakt nycklarna i REGEL_NYCKLAR, och får ha nycklarna i REGEL_VALF
                 avdragsbegransad  true eller false. true betyder att posten alltid blir ett ärende
                                   på nivå D (K8)
   niva        den lägsta nivån ett förslag med regeln kan få, en av NIVAER
+  flode       valfritt, och bara för en regel för bankrader: vilket flöde regeln hör till, ett av
+              FLODEN (Hugos beslut 2026-10-29, efter uppgift 4, c). Ett annat värde stoppar filen.
+              Kärnan väljer aldrig ett flöde utan nyckeln, till exempel för att regeln bara har
+              kontot kostnad. Flödet bankavgift bokför bara kostnaden mot banken, så en sådan regel
+              ska ha exakt kontot kostnad i konteringen (FLODETS_KONTERING)
   anteckning  fri text för människor. Används inte av koden
+
+Ett regel-id får inte heta som ett reserverat ord (las_matchningsformat.RESERVERADE_NAMN, efter
+normaliseringen), lika lite som en regel i matchningsformatet. Orden är kärnans egna namn på flöden
+(Hugos beslut 2026-10-29, efter uppgift 4).
 
 Regler för regelboken som helhet:
 
@@ -146,6 +155,7 @@ from inlasning_skydd import (
 from las_kontoplan import Kontoplan
 from las_matchningsformat import (
     MONSTER_NYCKLAR, Matchningsformat, MatchningsformatFel, kontrollera_matchningsformat, matchningsregel_for_bankrad,
+    reserverat_namn,
 )
 from las_momssatser import Momssatser, MomssatsFel
 from las_underlag import HELTAL_HOGST_SIFFROR, TYPER
@@ -178,7 +188,13 @@ VERIFIKATIONSDATUM = {
     "bankrad": ("transaktionsdag", "bokforingsdag"),
 }
 REGEL_NYCKLAR = ("id", "galler", "kontering", "villkor", "niva")
-REGEL_VALFRIA_NYCKLAR = ("anteckning",)
+REGEL_VALFRIA_NYCKLAR = ("flode", "anteckning")
+# Flödena som en regel för bankrader kan höra till med nyckeln 'flode' (Hugos beslut 2026-10-29, efter
+# uppgift 4, c), och kontona i konteringen som varje flöde bokför på. Varje flöde är också ett reserverat
+# ord, som ingen regel får heta (las_matchningsformat.RESERVERADE_NAMN).
+FLODE_BANKAVGIFT = "bankavgift"
+FLODEN = (FLODE_BANKAVGIFT,)
+FLODETS_KONTERING = {FLODE_BANKAVGIFT: ("kostnad",)}
 # Källorna en regel kan gälla, och nycklarna i 'galler' för varje källa utöver 'kalla'.
 KALLOR = {"underlag": ("typ", "motpart"), "z_rapport": ("kassaregister",), "bankrad": ("matchningsregel",)}
 KONTERING_Z_NYCKLAR = ("forsaljning", "betalsatt")
@@ -608,6 +624,24 @@ def _kontrollera_bankradsregel(regel, vad, matchningsregler, var):
         )
 
 
+def _kontrollera_flode(flode, regel, vad, var):
+    """Regelns 'flode' (beslut c): bara för bankrader, ett av FLODEN, och konteringen ska passa flödet."""
+    if regel["galler"]["kalla"] != "bankrad":
+        raise RegelbokFel(
+            var + ": " + vad + " har 'flode', men gäller " + repr(regel["galler"]["kalla"]) + ". 'flode' får bara"
+            " finnas i en regel för bankrader."
+        )
+    flode = _ett_av(flode, FLODEN, "'flode' i " + vad, var)
+    konton = FLODETS_KONTERING[flode]
+    if tuple(sorted(regel["kontering"])) != tuple(sorted(konton)):
+        raise RegelbokFel(
+            var + ": " + vad + " hör till flödet " + repr(flode) + " och ska bara ha kontot " + " och ".join(
+                map(repr, konton)) + " i 'kontering', inte " + ", ".join(map(repr, regel["kontering"])) + ". Flödet"
+            " bokför inget annat."
+        )
+    return flode
+
+
 def _kontrollera_agarregel(regel, vad, agare, var):
     """En regel för underlag från en ägare eller närstående ska ha nivå D (K7).
 
@@ -631,6 +665,12 @@ def _kontrollera_regelboksregel(regel, nummer, granser, agare, konton, momssatse
     _objekt(regel, vad, var)
     _kontrollera_nycklar(regel, REGEL_NYCKLAR, REGEL_VALFRIA_NYCKLAR, var + ", " + vad + ",", _REGELBOK)
     nytt = {"id": _regel_id(_text_i_json(regel["id"], "'id' i " + vad, var, _REGELBOK), "'id' i " + vad, var)}
+    if reserverat_namn(nytt["id"]) is not None:
+        raise RegelbokFel(
+            var + ": 'id' i " + vad + " är " + repr(nytt["id"]) + ", som är det reserverade ordet "
+            + repr(reserverat_namn(nytt["id"])) + ". Det är kärnans eget namn på ett flöde, och en regel får inte heta"
+            " så. Ge regeln ett annat id."
+        )
     vad = vad + " (" + nytt["id"] + ")"
     nytt["galler"] = _kontrollera_galler(regel["galler"], vad, var)
     nytt["villkor"] = _kontrollera_villkor(regel["villkor"], vad, granser, var)
@@ -639,6 +679,8 @@ def _kontrollera_regelboksregel(regel, nummer, granser, agare, konton, momssatse
     if not isinstance(regel["niva"], str) or regel["niva"] not in NIVAER:
         raise RegelbokFel(var + ": 'niva' i " + vad + " ska vara en av " + ", ".join(map(repr, NIVAER)) + ".")
     nytt["niva"] = regel["niva"]
+    if "flode" in regel:
+        nytt["flode"] = _kontrollera_flode(regel["flode"], nytt, vad, var)
     if "anteckning" in regel:
         nytt["anteckning"] = _text_i_json(regel["anteckning"], "'anteckning' i " + vad, var, _REGELBOK)
     if nytt["galler"]["kalla"] == "bankrad":

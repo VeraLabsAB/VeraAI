@@ -324,7 +324,7 @@ def texter_i_testdatans_bankfiler():
 
 def test_matchningen_och_bankfilerna_har_namn_att_soka_efter():
     # Skydd mot att testet nedan blir grönt för att det inte hittar några namn alls.
-    assert {"kortinlosen", "bankavgift", "AVR-", "BET-SWISH INBETALNING", "BANK AVGIFT"} <= set(
+    assert {"kortinlosen", "bankens-avgifter", "AVR-", "BET-SWISH INBETALNING", "BANK AVGIFT"} <= set(
         namn_i_matchningsformaten())
     assert {"AVR", "SWISH", "INS", "KORTKOP", "BET-KORT AVRAKNING", "KONTANTINSATTNING", "LEV-TELE", "SYNT-TE",
             "KORTKOP BUTIK-FORBRUKNING"} <= set(texter_i_testdatans_bankfiler())
@@ -470,10 +470,25 @@ def namn_i_regelbockerna():
 def test_regelbockerna_har_namn_att_soka_efter():
     # Skydd mot att testet nedan blir grönt för att det inte hittar några namn alls.
     namn = set(namn_i_regelbockerna())
-    assert {"R-LEV-TE", "R-Z-TB-KASSA-1", "R-BANK-AVGIFT", "LEV-TE", "RESTAURANG-1", "TB-KASSA-1", "bankavgift",
+    assert {"R-LEV-TE", "R-Z-TB-KASSA-1", "R-BANK-AVGIFT", "LEV-TE", "RESTAURANG-1", "TB-KASSA-1", "bankens-avgifter",
             "betalsatt_swish", "4010", "6570", "AGARE-1"} <= namn
     assert not namn & {"underlag", "kvitto", "leverantorsfaktura", "motkonto", "kostnad", "livsmedel"}
     assert REGELBOKSMODULEN in karnans_filer()
+
+
+def test_inget_foretag_har_ett_reserverat_namn():
+    # Kärnans egna namn på flöden (las_matchningsformat.RESERVERADE_NAMN) står i kärnan. Därför får inget
+    # företags namn vara ett av dem, annars slår testerna här larm på kärnans eget ord (Hugos beslut
+    # 2026-10-29, efter uppgift 4). las_matchningsformat och las_regelbok stoppar en regel med ett sådant namn.
+    # Bankradernas textmönster (till exempel "BANK AVGIFT") är inga namn och prövas med exakta stora och små
+    # bokstäver ovan, så de tas inte med här.
+    from las_matchningsformat import RESERVERADE_NAMN
+    from normalisering import normalisera_for_jamforelse
+
+    regelnamn = [regel["namn"] for fil in sorted(FORETAG.glob("*/matchning.json"))
+                 for regel in json.loads(fil.read_text(encoding="utf-8"))["kraver_inte_underlag"]]
+    foretagens = {normalisera_for_jamforelse(namn) for namn in regelnamn + namn_i_regelbockerna()}
+    assert RESERVERADE_NAMN and not foretagens & {normalisera_for_jamforelse(namn) for namn in RESERVERADE_NAMN}
 
 
 def test_karnan_innehaller_inga_namn_ur_regelbockerna():

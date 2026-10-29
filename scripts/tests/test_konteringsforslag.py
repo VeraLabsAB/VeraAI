@@ -1049,7 +1049,7 @@ REGELN = {
                                              " bankrader"),
     "bankrad_med_en_annan_regel": (bankavgiften, satt("kopplingar", "regel", "id", varde="R-BANK-SWISH"),
                                    "regeln i 'kopplingar' är 'R-BANK-SWISH', men bankraden",
-                                   "(radnummer 117) (regeln 'bankavgift' i matchningsformatet) har regeln"
+                                   "(radnummer 117) (regeln 'bankens-avgifter' i matchningsformatet) har regeln"
                                    " 'R-BANK-AVGIFT' på 2025-01-31"),
     "bankrad_som_inte_passar_matchningsformatet": (betalningen, satt("kopplingar", "regel", "id",
                                                                      varde="R-BANK-AVGIFT"),

@@ -311,6 +311,16 @@ def test_skydd_k4_motparter_som_bara_skiljer_sig_i_accenter_ar_olika(tmp_path):
     assert [(arende["kontroll"], arende["id"]) for arende in lika.arenden] == [("K4", "U-2")]
 
 
+# Regeln för bankens avgifter i testbutikens matchning.json bytte namn 2026-10-29 (Hugos beslut efter uppgift 4),
+# eftersom det gamla namnet blev ett reserverat ord. Avtrycket räknas med det gamla namnet, så att det fortfarande
+# visar att inget annat har ändrats sedan före Q2.
+_NAMNBYTEN = {"bankens-avgifter": "bankavgift"}
+
+
+def _gammalt_namn(namn):
+    return _NAMNBYTEN.get(namn, namn)
+
+
 def _fingeravtryck(resultat, regelbok, bankperiod):
     """SHA-256 av hela matchningens resultat och regelbokens uppslag för varje bankrad, som JSON."""
     data = {
@@ -319,12 +329,12 @@ def _fingeravtryck(resultat, regelbok, bankperiod):
         "arenden": [(a["bankrad"]["id"], a["kontroll"], a["typ"], list(a["kandidater"]), a["kraver_mansklig_bedomning"])
                     for a in resultat.arenden],
         "oavstamda": [post["id"] for post in resultat.oavstamda_underlag],
-        "kraver_inte": [(post["bankrad"]["id"], post["regel"], post["kraver_mansklig_bedomning"])
+        "kraver_inte": [(post["bankrad"]["id"], _gammalt_namn(post["regel"]), post["kraver_mansklig_bedomning"])
                         for post in resultat.kraver_inte_underlag],
         "vantande": [(post["bankrad"]["id"], post["arende_efter"], post["kraver_mansklig_bedomning"])
                      for post in resultat.vantande],
-        "uppslag": [(rad["id"], regelbok.ar_bankrad_mot_agare_eller_narstaende(rad),
-                     regelbok.matchningsregel_for_bankrad(rad)) for rad in bankperiod.rader],
+        "uppslag": [(rad["id"], regelbok.ar_bankrad_mot_agare_eller_narstaende(rad), _gammalt_namn(
+                     regelbok.matchningsregel_for_bankrad(rad))) for rad in bankperiod.rader],
     }
     return hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
 

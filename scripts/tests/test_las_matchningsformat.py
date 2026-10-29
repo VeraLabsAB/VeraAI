@@ -76,7 +76,7 @@ def test_testforetagets_format_laddas():
              "beskrivning_borjar_med": "BET-SWISH INBETALNING"},
             {"namn": "kontantinsattning", "riktning": "in", "referens_borjar_med": "INS-",
              "beskrivning_borjar_med": "KONTANTINSATTNING"},
-            {"namn": "bankavgift", "riktning": "ut", "referens_borjar_med": "AVG-",
+            {"namn": "bankens-avgifter", "riktning": "ut", "referens_borjar_med": "AVG-",
              "beskrivning_borjar_med": "BANK AVGIFT", "hogst_belopp_ore": 25000},
         ],
         "tidsfonster_dagar": {"leverantorsfaktura": 40, "kvitto": 3},
@@ -90,15 +90,15 @@ def test_testforetagets_format_laddas():
 
 def test_varfor_bankens_avgifter_inte_kraver_underlag_star_i_formatet():
     data = json.loads(MATCHNING_FIL.read_text(encoding="utf-8"))
-    avgift = [regel for regel in data["kraver_inte_underlag"] if regel["namn"] == "bankavgift"][0]
+    avgift = [regel for regel in data["kraver_inte_underlag"] if regel["namn"] == "bankens-avgifter"][0]
     assert "inget underlag" in avgift["anteckning"] and "testdata/README.md" in avgift["anteckning"]
     assert "ska den här regeln tas bort" in avgift["anteckning"]
 
 
 def test_varfor_bankens_avgifter_har_gransen_250_kr_star_i_formatet():
-    # Hugos beslut 2026-10-25: gränsen för bankavgift är 250 kr, och anteckningen säger varför.
+    # Hugos beslut 2026-10-25: gränsen för bankens avgifter är 250 kr, och anteckningen säger varför.
     data = json.loads(MATCHNING_FIL.read_text(encoding="utf-8"))
-    avgift = [regel for regel in data["kraver_inte_underlag"] if regel["namn"] == "bankavgift"][0]
+    avgift = [regel for regel in data["kraver_inte_underlag"] if regel["namn"] == "bankens-avgifter"][0]
     assert avgift["hogst_belopp_ore"] == 25000
     for text in ("250 kr", "Hugo", "aldrig undantar en stor betalning", "125 och 199 kr", "'över gräns'"):
         assert text in avgift["anteckning"], text
@@ -280,7 +280,7 @@ def test_regel_for_pengar_ut_utan_grans_stoppas(tmp_path):
 def test_testforetagets_regel_utan_grans_stoppas(tmp_path):
     # Samma sak i testföretagets eget format: utan gränsen går det inte att läsa.
     data = json.loads(MATCHNING_FIL.read_text(encoding="utf-8"))
-    del [regel for regel in data["kraver_inte_underlag"] if regel["namn"] == "bankavgift"][0]["hogst_belopp_ore"]
+    del [regel for regel in data["kraver_inte_underlag"] if regel["namn"] == "bankens-avgifter"][0]["hogst_belopp_ore"]
     stoppas(tmp_path, data, "regel nummer 4 i 'kraver_inte_underlag' saknar 'hogst_belopp_ore'")
 
 

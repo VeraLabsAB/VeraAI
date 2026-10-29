@@ -36,7 +36,11 @@ Matchningsformatet säger hur bankrader matchas mot underlag för just det före
 
 Två regler med samma riktning som kan passa samma bankrad stoppar formatet, så att det aldrig
 är oklart vilken regel en rad hör till. Antal dagar är heltal från 0 till och med HOGST_DAGAR.
-Minsta fel stoppar formatet med ett MatchningsformatFel.
+En regel får inte heta som ett ord i RESERVERADE_NAMN, jämfört efter normaliseringen
+(normalisering.normalisera_for_jamforelse: stora och små bokstäver och blanksteg räknas inte). De
+orden är kärnans egna namn på flöden (las_regelbok.FLODEN), och kärnan får aldrig innehålla ett
+företags namn (test_karnan_ar_generell.py), så ett företag får inte använda dem (Hugos beslut
+2026-10-29, efter uppgift 4). Minsta fel stoppar formatet med ett MatchningsformatFel.
 
 Filen läses med de gemensamma skydden i inlasning_skydd.py (UTF-8, dubbla nycklar, för djup
 nästling och för långa tal), på samma sätt som bankformat.json och kassaformat.json.
@@ -57,6 +61,11 @@ from inlasning_skydd import (
     _Filsort, _kontrollera_anteckning, _kontrollera_namn, _kontrollera_nycklar, _las_jsonfil, _tolka_json,
 )
 from las_underlag import HELTAL_HOGST_SIFFROR, TYPER
+from normalisering import normalisera_for_jamforelse
+
+# Ord som en regel i matchningsformatet eller regelboken inte får heta: kärnans egna namn på flöden
+# (las_regelbok.FLODEN). Listan står också i foretag/README.md (Hugos beslut 2026-10-29, efter uppgift 4).
+RESERVERADE_NAMN = ("bankavgift",)
 
 MATCHNINGSFORMAT_NYCKLAR = ("kraver_inte_underlag", "tidsfonster_dagar", "saknat_underlag_efter_dagar")
 MATCHNINGSFORMAT_VALFRIA_NYCKLAR = ("anteckning",)
@@ -149,12 +158,26 @@ def _kontrollera_grans(regel, vad):
     return varde
 
 
+def reserverat_namn(namn):
+    """Det reserverade ordet som namnet är lika med efter normaliseringen, eller None (RESERVERADE_NAMN)."""
+    for reserverat in RESERVERADE_NAMN:
+        if normalisera_for_jamforelse(namn) == normalisera_for_jamforelse(reserverat):
+            return reserverat
+    return None
+
+
 def _kontrollera_regel(regel, nummer, var):
     """En regel i kraver_inte_underlag. Returnerar den som ett nytt objekt, utan anteckningen."""
     vad = var + ", regel nummer " + str(nummer) + " i 'kraver_inte_underlag'"
     _nycklar(regel, REGEL_NYCKLAR, REGEL_VALFRIA_NYCKLAR, vad)
     _kontrollera_anteckning(regel, vad, _MATCHNINGSFORMAT)
     ny = {"namn": _kontrollera_namn(regel["namn"], "'namn'", vad, _MATCHNINGSFORMAT, "ett namn")}
+    reserverat = reserverat_namn(ny["namn"])
+    if reserverat is not None:
+        raise MatchningsformatFel(
+            vad + ": 'namn' är " + repr(ny["namn"]) + ", som är det reserverade ordet " + repr(reserverat) + ". Det är"
+            " kärnans eget namn på ett flöde, och en regel får inte heta så. Ge regeln ett annat namn."
+        )
     if not isinstance(regel["riktning"], str) or regel["riktning"] not in RIKTNINGAR:
         raise MatchningsformatFel(vad + ": 'riktning' ska vara en av " + ", ".join(map(repr, RIKTNINGAR)) + ".")
     ny["riktning"] = regel["riktning"]

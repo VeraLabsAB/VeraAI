@@ -33,20 +33,25 @@ flöde a, och bankkontot i kredit. Ett kvitto utan bankrad får inget förslag �
 bland matchningens oavstämda underlag.
 
 Flöde e, bankrader utan underlag som regelboken pekar ut som rena avgifter (DESIGN avsnitt 4e, Hugos
-beslut 2026-10-29, D13): en bankrad som matchningen har lagt bland raderna som inte kräver underlag,
-och vars regel i regelboken (Regelbok.regel_for_bankrad, på datumet för 'bankrad') bara har kontot
-'kostnad'. En verifikation: kostnaden i debet och bankkontot i kredit, båda med bankraden som ursprung,
-utan moms och med bankraden som underlag tills bankens specifikation finns (Ö11). Bankrader vars regel
-har andra konton (kortinlösen, Swish och kontanter) hör till flöde d (uppgift 5) och får varken förslag
-eller ärende här. Gränserna står i konfigurationen, aldrig här: matchningsformatets hogst_belopp_ore
-och regelns eget hogst_belopp_ore i villkoren.
+beslut 2026-10-29, D13 och beslut c efter uppgift 4): en bankrad som matchningen har lagt bland raderna
+som inte kräver underlag, och vars regel i regelboken (Regelbok.regel_for_bankrad, på datumet för
+'bankrad') säger det uttryckligen med nyckeln 'flode' (las_regelbok.FLODE_BANKAVGIFT). Kärnan väljer
+aldrig flödet utan nyckeln, till exempel för att regeln bara har kontot 'kostnad'. En verifikation:
+kostnaden i debet och bankkontot i kredit, båda med bankraden som ursprung, utan moms och med
+bankraden som underlag tills bankens specifikation finns (Ö11). Gränserna står i konfigurationen,
+aldrig här: matchningsformatets hogst_belopp_ore och regelns eget hogst_belopp_ore i villkoren.
 
+  regeln saknar flöde (beslut c): pengar ut på en regel utan 'flode'. Inget annat flöde tar pengar ut
+     från banken utan underlag, så Vera gissar inte: ett ärende med nivå D och "kräver mänsklig
+     bedömning" (som allt annat från banken, D13), inget förslag. Pengar in på en regel utan 'flode'
+     (kortinlösen, Swish och kontanter) hör till flöde d (uppgift 5) och får varken förslag eller
+     ärende här.
   över gräns (D13): en bankrad som passar en regel i matchningsformatet för pengar ut men är större än
      matchningsformatets gräns (matchningens ärende "över gräns"), eller större än gränsen i regelns
      villkor. Allt annat från banken kräver en faktura: ett ärende med nivå D och "kräver mänsklig
-     bedömning", inget förslag. Andra bankrader utan underlag är matchningens ärenden (K3, "saknat
-     underlag"), och deras nivå sätts i nivåsteget.
-  oklar post: pengar in på en regel som bara har en kostnad. Inget förslag.
+     bedömning", inget förslag, för alla regler för pengar ut (beslut d). Andra bankrader utan underlag
+     är matchningens ärenden (K3, "saknat underlag"), och deras nivå sätts i nivåsteget.
+  oklar post: pengar in på en regel för flödet för bankavgifter. Inget förslag.
   ingen regel på datumet: ingen regel i regelboken gäller bankraden på datumet.
 
 Kontrollerna för varje underlag, innan något förslag görs:
@@ -105,7 +110,7 @@ from belopp import formatera_ore as _kronor
 from konteringsforslag import skapa_konteringsforslag
 from las_kontoplan import Kontoplan
 from las_momssatser import Momssatser, MomssatsFel
-from las_regelbok import VECKODAGAR, Regelbok, RegelbokFel
+from las_regelbok import FLODE_BANKAVGIFT, VECKODAGAR, Regelbok, RegelbokFel
 from matcha_bank import matcha_period
 
 ARENDE_NYCKLAR = ("kontroll", "typ", "text", "niva", "kraver_mansklig_bedomning", "underlag", "bankrader", "regel",
@@ -126,6 +131,7 @@ _FEL_MOMS = "moms stämmer inte med satsen"
 _AVDRAGSBEGRANSAT = "avdragsbegränsat"
 _NY_MOTPART = "ny motpart"
 _INGEN_REGEL = "ingen regel på datumet"
+_SAKNAR_FLODE = "regeln saknar flöde"
 _KRAVER_BEDOMNING = "kräver mänsklig bedömning"
 # Nivån som ärenden från K5 och K8 bär direkt (B2).
 _NIVA_D = "D"
@@ -448,9 +454,16 @@ def _bankrad_utan_underlag(rad, namn, korning):
         return [], [_arende(_REGELBOKEN, _INGEN_REGEL, "Bankraden med radnummer " + str(rad["radnr"]) + " passar"
                             " regeln " + repr(namn) + " för bankrader utan underlag, men ingen regel i regelboken gäller"
                             " den på " + datum + ". Inget förslag görs.", bankrader=[rad["id"]])]
-    if set(regel["kontering"]) != {_KOSTNAD}:
-        # Kortinlösen, Swish och kontanter: flöde d (uppgift 5).
-        return [], []
+    if regel.get("flode") != FLODE_BANKAVGIFT:
+        if rad[_BELOPPSFALT] > 0:
+            # Pengar in (kortinlösen, Swish och kontanter): flöde d (uppgift 5).
+            return [], []
+        return [], [_arende(
+            _REGELBOKEN, _SAKNAR_FLODE, "Bankraden med radnummer " + str(rad["radnr"]) + " passar regeln " + repr(namn)
+            + " för bankrader utan underlag, och regeln " + regel["id"] + " i regelboken gäller pengar ut men säger"
+            " inte vilket flöde den hör till (nyckeln 'flode'). Vera gissar inte. Inget förslag görs. En människa"
+            " avgör vad raden är, och regelboken behöver nyckeln.", bankrader=[rad["id"]], regel=regel["id"],
+            niva=_NIVA_D, kraver=True)]
     if rad[_BELOPPSFALT] > 0:
         return [], [_arende(_REGELBOKEN, _OKLAR_POST, "Bankraden med radnummer " + str(rad["radnr"]) + " är pengar in,"
                             " men regeln " + regel["id"] + " gäller avgifter, som är pengar ut. Inget förslag görs.",

@@ -194,8 +194,8 @@ def test_kvartalets_matchningar_ar_ratt(kvartalet):
         regler[post["regel"]] = regler.get(post["regel"], 0) + 1
     forvantat = {regel: len([rad for rad in kvartalet["rader"] if rad["referens"].startswith(prefix)])
                  for regel, prefix in [("kortinlosen", "AVR-"), ("swish", "SWISH-"), ("kontantinsattning", "INS-"),
-                                       ("bankavgift", "AVG-")]}
-    assert regler == forvantat == {"kortinlosen": 74, "swish": 278, "kontantinsattning": 13, "bankavgift": 6}
+                                       ("bankens-avgifter", "AVG-")]}
+    assert regler == forvantat == {"kortinlosen": 74, "swish": 278, "kontantinsattning": 13, "bankens-avgifter": 6}
     assert sum(regler.values()) == 395 - 16 - 8  # alla rader utom leverantörsbetalningarna och kortköpen
     # Oavstämda: fakturorna som förfaller efter 31 mars. Ingen bankrad betalar dem.
     referenser = {rad["referens"] for rad in kvartalet["rader"]}
@@ -840,17 +840,17 @@ def test_testdatans_avgifter_ligger_inom_gransen(kvartalet):
     # de tre avgifterna på 199 kr ärenden, så gränsen prövas verkligen på testdatans rader.
     avgifter = sorted(-rad["belopp_ore"] for rad in kvartalet["rader"] if rad["referens"].startswith("AVG-"))
     assert avgifter == [12500] * 3 + [19900] * 3
-    bankavgift = [r for r in MATCHNINGSFORMAT["kraver_inte_underlag"] if r["namn"] == "bankavgift"][0]
+    bankavgift = [r for r in MATCHNINGSFORMAT["kraver_inte_underlag"] if r["namn"] == "bankens-avgifter"][0]
     assert bankavgift["hogst_belopp_ore"] == 25000
     lagre = copy.deepcopy(MATCHNINGSFORMAT)
-    [r for r in lagre["kraver_inte_underlag"] if r["namn"] == "bankavgift"][0]["hogst_belopp_ore"] = 19899
+    [r for r in lagre["kraver_inte_underlag"] if r["namn"] == "bankens-avgifter"][0]["hogst_belopp_ore"] = 19899
     resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], regelbok_for(lagre), "2025-04-30")
     over = [a for a in resultat.arenden if a["typ"] == "över gräns"]
-    assert [(a["regel"], a["bankrad"]["belopp_ore"]) for a in over] == [("bankavgift", -19900)] * 3
+    assert [(a["regel"], a["bankrad"]["belopp_ore"]) for a in over] == [("bankens-avgifter", -19900)] * 3
     assert len(resultat.arenden) == 4  # och det planterade ärendet
     kontrollera_grupperna(resultat, kvartalet["bankperiod"], kvartalet["period"])
     # Exakt på 199 kr: inom gränsen, inga nya ärenden.
-    [r for r in lagre["kraver_inte_underlag"] if r["namn"] == "bankavgift"][0]["hogst_belopp_ore"] = 19900
+    [r for r in lagre["kraver_inte_underlag"] if r["namn"] == "bankens-avgifter"][0]["hogst_belopp_ore"] = 19900
     resultat = matcha_period(kvartalet["bankperiod"], kvartalet["period"], regelbok_for(lagre), "2025-04-30")
     assert [a["typ"] for a in resultat.arenden] == ["saknat underlag"]
 

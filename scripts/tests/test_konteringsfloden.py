@@ -415,12 +415,12 @@ def test_4e_bankavgifterna_i_januari(korning, radnr, ore):
 
 def test_alla_bankavgifter_far_ett_forslag_och_inget_annat_fran_matchningen_gor_det(korning):
     utan_underlag = [post for post in korning.resultat.matchning.kraver_inte_underlag]
-    avgifter = [post["bankrad"] for post in utan_underlag if post["regel"] == "bankavgift"]
+    avgifter = [post["bankrad"] for post in utan_underlag if post["regel"] == "bankens-avgifter"]
     assert len(avgifter) == 4  # två i januari och två i februari
     for rad in avgifter:
         assert len(bankradens_forslag(korning, rad)) == 1
     # Kortinlösen, Swish och kontanter hör till flöde d (uppgift 5): inget förslag och inget ärende här.
-    andra = [post["bankrad"] for post in utan_underlag if post["regel"] != "bankavgift"]
+    andra = [post["bankrad"] for post in utan_underlag if post["regel"] != "bankens-avgifter"]
     assert andra
     alla_bankrader = {id_ for arende in korning.resultat.arenden for id_ in arende["bankrader"]}
     for rad in andra:
@@ -436,7 +436,7 @@ def test_ingen_moms_pa_bankavgifterna(korning):
 
 def matchning_med_grans(tmp_path, grans):
     data = json.loads((TESTBUTIKEN / "matchning.json").read_text(encoding="utf-8"))
-    [regel for regel in data["kraver_inte_underlag"] if regel["namn"] == "bankavgift"][0]["hogst_belopp_ore"] = grans
+    [regel for regel in data["kraver_inte_underlag"] if regel["namn"] == "bankens-avgifter"][0]["hogst_belopp_ore"] = grans
     fil = tmp_path / "matchning.json"
     fil.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     return fil

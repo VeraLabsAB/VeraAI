@@ -210,7 +210,7 @@ def test_testforetagets_fil_laddas():
     assert regelbok.regel_for_underlag("leverantorsfaktura", "LEV-TE", datum)["id"] == "R-LEV-TE"
     assert regelbok.regel_for_underlag("kvitto", "RESTAURANG-1", datum)["villkor"]["avdragsbegransad"] is True
     assert regelbok.regel_for_z_rapport("TB-KASSA-1", datum)["id"] == "R-Z-TB-KASSA-1"
-    assert regelbok.regel_for_bankrad("bankavgift", datum)["villkor"]["hogst_belopp_ore"] == 25000
+    assert regelbok.regel_for_bankrad("bankens-avgifter", datum)["villkor"]["hogst_belopp_ore"] == 25000
     # Ny motpart: ingen regel. Det blir ett ärende senare, Vera gissar inget konto.
     assert regelbok.regel_for_underlag("leverantorsfaktura", "HYRESVARD", datum) is None
     # Före regelns första dag finns ingen regel.
@@ -247,7 +247,7 @@ def test_testforetagets_fil_har_exakt_vardena_i_design_och_fyra_tillagg():
     # Tilläggens källor.
     assert "Stängt söndagar, 1 januari och 6 januari" in (AGENT / "testdata" / "README.md").read_text(encoding="utf-8")
     bankavgift = [r for r in ladda_matchningsformat(TESTBUTIKEN / "matchning.json")["kraver_inte_underlag"]
-                  if r["namn"] == "bankavgift"]
+                  if r["namn"] == "bankens-avgifter"]
     assert bankavgift[0]["hogst_belopp_ore"] == 25000
     assert "En regel med motparten `AGARE-1` får bara" in (AGENT / "DESIGN-regelbok.md").read_text(encoding="utf-8")
     assert "| AGARE-1 | Ägare 1 (påhittad person)" in (AGENT / "testforetag" / "FIKTIVT_FORETAG.md").read_text(

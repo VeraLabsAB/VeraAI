@@ -78,7 +78,7 @@ GENVAGAR = ("_tolka_rader", "_tolka_kassarader", "_las_underlagsfil",
             "_kontrollera_galler", "_kontrollera_villkor", "_kontrollera_kontering", "_kontrollera_bankradsregel",
             "_kontrollera_varugrupp", "_kontrollera_granser", "_kontrollera_k9", "_kontrollera_oppettider",
             "_kontrollera_godkand", "_konfigurationen", "_konto_per_varugrupp", "_kontrollera_agare_och_narstaende",
-            "_kontrollera_agarregel", "_kontrollera_bokforing")
+            "_kontrollera_agarregel", "_kontrollera_bokforing", "_kontrollera_flode")
 # Nycklarna som skapar en Kontoplan, Momssatser, ett Matchningsformat eller en Regelbok, och det som ligger i dem.
 KONFIGURATIONENS_INRE = ("_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_MATCHNINGSNYCKEL", "_REGELBOKSNYCKEL", "_status",
                          "_konton", "_roller", "_varugrupper", "_tolerans_ore_per_rad", "_kontrollsumma",

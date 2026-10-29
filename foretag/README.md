@@ -82,7 +82,17 @@ En regel för pengar ut får aldrig gälla obegränsat (Hugos beslut 2026-10-25)
 - Saknas gränsen i en regel för pengar ut, eller är den inte ett heltal större än 0 med högst 15 siffror, stoppas formatet.
 - En regel för pengar in får inte ha en gräns. Den skulle inte användas, och en gräns som inte gör något ska inte se ut som ett skydd. Om insättningar också ska ha en gräns är inte bestämt.
 
-För Syntet Testbutik har regeln `bankavgift` gränsen 25000 öre (250 kr), som Hugo har bestämt. Avgifterna i testdatan är 125 och 199 kr.
+För Syntet Testbutik har regeln `bankens-avgifter` gränsen 25000 öre (250 kr), som Hugo har bestämt. Avgifterna i testdatan är 125 och 199 kr. Regeln hette `bankavgift` till 2026-10-29, då det blev ett reserverat ord (nedan).
+
+### Reserverade namn
+
+Några ord är **kärnans egna namn**, till exempel på ett flöde, och får därför stå i kärnans kod. Kärnan får aldrig innehålla ett företags egna namn (SPEC 2, testet `test_karnan_ar_generell.py`). Därför får **ingen regel i `matchning.json` (`namn`) eller i `regelbok.json` (`id`) heta som ett reserverat ord** (Hugos beslut 2026-10-29, efter uppgift 4). Då kan ett företags namn aldrig krocka med kärnans ord.
+
+Reserverade ord i dag:
+
+- `bankavgift`: flödet för bankens avgifter (nyckeln `flode` i regelboken, se nedan).
+
+Namnet jämförs efter samma normalisering som regel-id: stora och små bokstäver och blanksteg räknas inte, så `Bankavgift`, `BANKAVGIFT` och `bank avgift` stoppas också. Ett namn som bara liknar ordet, till exempel `bank-avgift` eller `bankens-avgifter`, godtas. En regel med ett reserverat namn stoppar hela filen (`las_matchningsformat` och `las_regelbok`). Listan står i koden som `RESERVERADE_NAMN` i `scripts/las_matchningsformat.py`, och ett test kontrollerar att den här listan har samma ord.
 
 Saknas en nyckel, finns en okänd nyckel eller är ett värde fel, stoppas inläsningen med ett tydligt fel (`MatchningsformatFel`).
 
@@ -164,6 +174,7 @@ Företagets **regelbok**: för varje känd motpart, kassa eller sorts bankrad, v
 | `granser` | Ja | Företagets gränser i **öre**: `a_hogst_ore` (högsta belopp för nivå A) och `b_hogst_ore` (för nivå B). Heltal större än 0. A-gränsen får inte vara högre än B-gränsen |
 | `k9` | Ja | Värdena för K9 (ovanliga belopp): `minst_historik` (heltal från 1), `hogst_procent_av_median` (från 100) och `lagst_procent_av_median` (0–100). `minst_historik` är också hur många gånger en regel ska ha godkänts innan den kan ge nivå A (DESIGN avsnitt 5) |
 | `oppettider` | Ja | Företagets stängda dagar, för varningssignalen i K8 (Hugos beslut D21): `stangda_veckodagar` (en lista med `mandag`, `tisdag`, `onsdag`, `torsdag`, `fredag`, `lordag`, `sondag`) och `stangda_datum` (en lista med hela datum, `ÅÅÅÅ-MM-DD`). Det finns ingen återkommande dag utan år (Hugos beslut 2026-10-26), så en helgdag skrivs in för varje år. Varje dag får stå en gång. En lista får vara tom, om företaget inte har sådana stängda dagar. Läses och kontrolleras, men används inte än |
+| `bokforing` | Ja | Företagets val för hur flödena bokför (Hugos beslut 2026-10-29, B3, D1 och D14): `antaget` (`true` om valen är påhittade, som för ett testföretag, annars `false`), `metod` (i dag bara `faktureringsmetoden`, kontantmetoden är inte byggd) och `verifikationsdatum`, som säger vilket datum varje sorts verifikation får: `leverantorsfaktura` (`fakturadatum`), `betalning` (`transaktionsdag` eller `bokforingsdag`), `kvitto` (`kvittodatum`, `transaktionsdag` eller `bokforingsdag`) och `bankrad` (`transaktionsdag` eller `bokforingsdag`). `transaktionsdag` och `bokforingsdag` är bankradens fält. Valfritt `anteckning`. **Nyckeln krävs**: saknas den, eller är ett val något annat än de byggda, stoppas regelboken, och inget val görs åt företaget |
 | `agare_och_narstaende` | Ja | Lista med motparter som är **ägare eller närstående** (K7, Hugos beslut 2026-10-26), till exempel `["AGARE-1"]`. **Listan krävs och ska ha minst en motpart.** En saknad, tom eller oläsbar lista stoppar hela körningen (Hugos beslut 2026-10-27, byggt i commit dd0e1cf). En motpart utan bokstäver och siffror, till exempel `-` eller `.`, räknas som tom och stoppar också hela körningen, eftersom den aldrig kan kännas igen i en bankrad (Hugos beslut 2026-10-28, granskning 10, P1). Varje motpart är text och får stå en gång. Dublettkontrollen i listan jämför motparterna efter samma normalisering som i K4 (stora och små bokstäver, bindestreck och osynliga tecken räknas inte), så `AGARE-1` och `agare-1` räknas som samma och stoppar filen, men "Åsa Öberg" och "Asa Oberg" får båda stå där. **Ägarkontrollerna bortser dessutom från accenter** (Hugos beslut 2026-10-29, granskning 11, Q2 och Q2b): uppslaget för bankrader, kontrollen att ingen regel i `matchning.json` nämner en ägare, uppslaget `ar_agare_eller_narstaende` och kontrollen att en regel för en ägare har nivå D. "Åsa Öberg" i listan känns alltså igen i "UTTAG ASA OBERG". K4 och matchningen mot motparter bryr sig fortfarande om accenter. Uppslaget `ar_agare_eller_narstaende` säger om en motpart står i listan, och ska användas av nivåsteget |
 | `regler` | Ja | Lista med minst en regel, se nedan |
 | `anteckning` | Nej | Fri text för människor. Används inte av koden |
@@ -177,6 +188,7 @@ En regel:
 | `kontering` | Ja | Kontona. För `underlag`: ett konto per varugrupp, till exempel `{"livsmedel": "4010"}`. För `z_rapport`: `forsaljning` (ett konto per varugrupp) och `betalsatt` (ett konto per betalsätt, med postnamnet i kassaformatet). För `bankrad`: en eller flera av `motkonto`, `avgift` och `kostnad` |
 | `villkor` | Ja | `giltig_fran` (krävs), och valfritt `giltig_till` (eller `null`, tills vidare), `hogst_belopp_ore` (regelns egen gräns i öre) och `avdragsbegransad` (`true` eller `false`, K8) |
 | `niva` | Ja | Den lägsta nivån ett förslag med regeln kan få: `A`, `B`, `C` eller `D` |
+| `flode` | Nej | Bara för `bankrad`: vilket flöde regeln hör till (Hugos beslut 2026-10-29, efter uppgift 4, c). I dag finns bara `bankavgift`: bankraden bokförs som en avgift, med kontot `kostnad` i debet och bankkontot i kredit, utan moms och med bankraden som underlag (D13). En sådan regel ska ha exakt `kostnad` i `kontering`. **Kärnan väljer aldrig ett flöde utan nyckeln**: en regel för pengar ut utan `flode` ger inget förslag, utan ett ärende (nivå D, "regeln saknar flöde"). Regler för pengar in (kortinlösen, Swish och kontanter) har ingen `flode` och hör till flöde d (uppgift 5) |
 | `anteckning` | Nej | Fri text för människor |
 
 Dessutom stoppas filen om:
@@ -188,6 +200,8 @@ Dessutom stoppas filen om:
 - en regel för bankrader med **pengar ut** saknar `hogst_belopp_ore`, eller har en högre gräns än regeln i `matchning.json`,
 - en regels `hogst_belopp_ore` är högre än företagets `b_hogst_ore`. **En regel kan bara skärpa företagets gränser, aldrig höja dem** (Hugos beslut D20),
 - en regel för `bankrad` har nivå `A`. Bankrader utan underlag blir aldrig nivå A (D20),
+- `flode` har ett annat värde än de byggda, finns i en regel som inte gäller `bankrad`, eller står i en regel vars `kontering` inte är exakt det flödet bokför på,
+- en regels `id` är ett reserverat ord (se "Reserverade namn" under `matchning.json`),
 - en regel för `underlag` vars motpart står i `agare_och_narstaende` (efter normaliseringen och utan accenter, Q2b) har en annan nivå än `D`. **En regel för ägare och närstående har alltid nivå D** (K7, Hugos beslut 2026-10-26),
 - samma motpart står två gånger i `agare_och_narstaende`, eller en motpart där är tom, inte text eller saknar bokstäver och siffror. Då stoppas hela körningen, liksom när listan saknas eller är tom.
 
@@ -197,11 +211,15 @@ Dessutom stoppas filen om:
 
 ### Testbutikens regelbok
 
-`syntet-testbutik/regelbok.json` är **SYNTETISK**. Den är exemplet i DESIGN-regelbok.md avsnitt 1 med tre tillägg, alla med redan bestämda värden och godkända av Hugo 2026-10-26 (ett test kontrollerar det):
+`syntet-testbutik/regelbok.json` är **SYNTETISK**. Den är exemplet i DESIGN-regelbok.md avsnitt 1 (där `R-BANK-AVGIFT` har `"flode": "bankavgift"` och pekar på regeln `bankens-avgifter`, Hugos beslut 2026-10-29) med tillägg, alla med redan bestämda värden och godkända av Hugo (ett test kontrollerar det). Tre godkändes 2026-10-26:
 
 - `oppettider`, med testbutikens stängda dagar ur `testdata/README.md` (söndagar, 1 januari och 6 januari 2025),
 - `hogst_belopp_ore` 25000 (250 kr) i `R-BANK-AVGIFT`. Bankavgiften är pengar ut och måste därför ha en gräns. Värdet är gränsen i `matchning.json` som Hugo bestämde 2026-10-25,
 - `agare_och_narstaende` med `AGARE-1`, det syntetiska värdet ur DESIGN-regelbok.md avsnitt 1 och `testforetag/FIKTIVT_FORETAG.md` (Ägare 1, en påhittad person). Testbutiken har ingen regel för ägaren än.
+
+Ett godkändes 2026-10-29 (Hugos OK i chatten, i sessionen för uppgift 4):
+
+- `bokforing`, med valen som är **antagna** för testföretaget (B3, D1 och D14): faktureringsmetoden, leverantörsfakturan på fakturadatum, betalningen och bankrader utan underlag på transaktionsdagen och kvittot på kvittodatum.
 
 Gränserna är Hugos beslut D18 och D19: A-gräns 20 000 kr (`2000000` öre), B-gräns 40 000 kr (`4000000` öre), 3 godkännanden innan nivå A, och K9 med 3 / 300 % / 33 %. Konton och varugrupper är SYNTETISKA och inte verifierade av en redovisningskonsult (D1–D16).
 
