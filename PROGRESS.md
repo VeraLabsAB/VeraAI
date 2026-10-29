@@ -1,7 +1,7 @@
 # PROGRESS – Veras bokföringsagent
 
 Uppdaterad 2026-10-29. Specifikation: `SPEC.md`. Byggordning: `DESIGN-regelbok.md` avsnitt 7.
-Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29). Steg 12 är delvis klart: vakten installerades på Hugos dator 2026-10-28, Caspers dator återstår. Spärrtestet är klart och grönt (2026-10-29). **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Nästa steg: push, därefter uppgift 4. Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
+Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12 är klart: vakten installerades på Hugos dator 2026-10-28. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4". Nästa steg: uppgift 4 i en ny session (se "Nästa steg i byggordningen"). Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
 
 Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 
@@ -578,10 +578,26 @@ fattade och byggda, se avsnittet ovan.)
    gör att ägaren känns igen när banken skriver namnet utan accenter, och Q2b gör samma sak i underlagen och i
    kontrollen att en regel för ägaren har nivå D. **Granskade** i granskning 21 (3bbcbe4, grön), och
    dokumentationen rättad efter den.
-2. **Push till GitHub.** Q7 är stängd (Hugos beslut 2026-10-29): pusha som det är. `git push` står inte på
-   kommandolistan i SPEC 7.1, så vakten stoppar det i en session.
-3. **Uppgift 4**: flöde a, b och e (leverantörsfakturor, kvitton och bankavgifter) med K5 och K8.
-4. Uppgift 5: Z-rapporter, kortinlösen, Swish och kontantinsättningar (och M9 från granskning 7).
+2. **Push till GitHub.** Klar 2026-10-29: `main` är i fas med GitHub vid 6aba32d. Q7 är stängd (Hugos beslut
+   2026-10-29): pusha som det är.
+3. **Nästa steg: uppgift 4 i en ny session**: flöde a, b och e (leverantörsfakturor, kvitton och bankavgifter)
+   med K5 och K8 (BYGGPLAN steg 22). Förutsättningar, Hugos beslut 2026-10-29 (`GRANSKNING.md`, "Beslut
+   2026-10-29 – inför uppgift 4"):
+   - **B1:** uppgift 4 byggs nu, på syntetisk data, med vakten installerad och Claude Code i det läge som frågar
+     (inte Auto) tills provet med en fallerande vakt (Öppet 16) är gjort. Det går före Hugos beslut 2026-10-28
+     kväll om auto (överst i filen) för den här uppgiften. Sandlådan (Öppet 4) ska vara klar före uppgift 5,
+     eller före första körningen på riktiga underlag om den kommer först.
+   - **B2:** ärenden från K5 och K8 skapas med märkningen "kräver mänsklig bedömning" (samma som P4) och nivå D
+     direkt. Nivåsteget i uppgift 6 får aldrig sänka en sådan nivå, bara höja.
+   - **B3:** påhittade val för Syntet Testbutik AB, märkta "antaget" i testföretagets konfiguration (nya nycklar
+     där är OK): D1 faktureringsmetoden, D2 de BAS-konton som redan finns i kontoplanen, D4 momsen i öre exakt
+     som på underlaget utan avrundning per verifikation, och D14 leverantörsfaktura på fakturadatum och
+     betalningen på bankens datum, kvitto på kvittodatum, bankavgift på bankens datum (Hugos besked i chatten
+     2026-10-29). Valen gäller bara testföretaget. Strider ett val mot DESIGN stannar byggsessionen och frågar.
+   - **Öppet före start:** D13 (moms på bankavgifter, och om bankraden räcker som underlag) är inte beslutad.
+     Om "bankens datum" är transaktionsdagen eller bankens bokföringsdag är inte sagt.
+4. Uppgift 5: Z-rapporter, kortinlösen, Swish och kontantinsättningar (och M9 från granskning 7). Kräver
+   sandlådan (BYGGPLAN steg 15).
 5. Uppgift 6: nivåerna A–D och K9, med nivå D för ägarens bankrader. Därefter en oberoende granskning.
 
 Uppgift 4 och 5 kräver bokföringsbeslut (DESIGN D1–D16) som väntar på en redovisningskonsult. Till dess

@@ -7255,3 +7255,39 @@ står i granskning 11 (Q7, och fråga 5 under "Beslut som behövs"). Beslutet sv
 - **Ny regel:** repot får inte göras publikt utan en ny genomgång av hela historiken först.
 - **Push:** `git push` står inte på kommandolistan i SPEC 7.1, så vakten stoppar det i en session. Pushen görs inte
   av den här sessionen.
+
+## Beslut 2026-10-29 – inför uppgift 4
+
+Hugos beslut 2026-10-29, fattade i chatten med mentorn och skrivna in på uppdrag i chatten samma dag. B1–B3
+ordagrant:
+
+B1. Byggordning: Hugos beslut 2026-10-28 gäller. Sandlådan ska vara klar
+    före uppgift 5, eller före första körningen på riktiga underlag om den
+    kommer först. Uppgift 4 får byggas nu, på syntetisk data, med vakten
+    installerad och Claude Code i det läge som frågar (inte Auto) tills
+    provet med en fallerande vakt (Öppet 16) är gjort. BYGGPLAN:s beroende
+    "steg 22 kräver steg 15" tas bort; steg 15 flyttas till före steg 23
+    (uppgift 5).
+
+B2. Nivå D före nivåsteget: ärenden från K5 och K8 bär sin egen nivå.
+    De skapas med märkningen "kräver mänsklig bedömning" (samma märkning
+    som P4) och nivå D direkt. Nivåsteget i uppgift 6 får aldrig sänka en
+    sådan nivå, bara höja.
+
+B3. Påhittade val för Syntet Testbutik, märkta "antaget" i testföretagets
+    konfiguration, nya nycklar där är OK: D1 faktureringsmetoden;
+    D2 de BAS-konton som redan finns i kontoplanen; D4 moms i öre exakt
+    som på underlaget, ingen avrundning per verifikation; D13/D14
+    leverantörsfaktura på fakturadatum, betalning på bankens datum.
+    Dessa val gäller bara testföretaget. För en riktig kund är de kundens.
+    Om ett val strider mot DESIGN ska byggsessionen stanna och fråga.
+
+**Tillägg om D13 och D14 (Hugos besked i chatten 2026-10-29, i sessionen som skrev in besluten):**
+
+- **D13 lämnades öppen.** I DESIGN-regelbok.md avsnitt 8 frågar D13 om bankavgifter har moms och om bankraden
+  räcker som underlag tills specifikationen finns (Ö11). B3 svarar inte på det, utan bara på datumet (D14). D13
+  ska beslutas före uppgift 4.
+- **D14 gäller alla tre flödena i uppgift 4**, antaget för testföretaget: leverantörsfaktura på fakturadatum
+  (och betalningen på bankens datum, som i B3), kvitto på kvittodatum, bankavgift på bankens datum.
+- Anmärkning från sessionen: "bankens datum" säger inte om det är transaktionsdagen eller bankens bokföringsdag.
+  Bankfilen har båda (DESIGN-regelbok.md avsnitt 4b). Enligt B3 stannar byggsessionen och frågar.

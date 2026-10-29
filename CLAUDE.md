@@ -13,6 +13,8 @@ Läs `SPEC.md` först. Svara alltid på svenska och förklara i klartext, utan j
 - Varje rättelse får ett test som bevisar den.
 - Prov och test får bara skapa, ändra eller länka filer i scratchpad eller i testets tillfälliga mapp. Aldrig länkar (hårda eller mjuka) till något utanför de mapparna. Nya test får inte läsa eller röra riktiga systemfiler. Det här är en regel i text: vakten kan inte hålla den, eftersom ett test kör egen Python. Den tekniska spärren är sandlådan, som ska vara klar före uppgift 5 (Hugos beslut 2026-10-28, granskning 17, H3).
 
+- Repot på GitHub är privat och får inte göras publikt utan en ny genomgång av hela git-historiken (beslut 2026-10-29).
+
 ## Aldrig
 
 - Använd riktiga kunders uppgifter. Bara fiktiva testföretag i `testforetag/`. Uppgifter från gamla Shop and Go-projektet (arkivmappen) får inte kopieras hit.

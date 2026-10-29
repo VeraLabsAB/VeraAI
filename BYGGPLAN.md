@@ -3,6 +3,9 @@
 Skapad 2026-10-29. Utgår från `PROGRESS.md` (2026-10-28, 4 076 gröna tester), `SPEC.md`, `DESIGN-regelbok.md`
 avsnitt 7 och två researchrapporter från 2026-10-29: "Så kan Vera bli en bättre agent" och "Byråtjänster Vera saknar".
 
+**Rättad 2026-10-29 efter PROGRESS.md:** status för steg 12–21 och beroendet för steg 22 (Hugos beslut 2026-10-29,
+B1, `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4").
+
 **Målet:** Vera ska kunna göra i princip allt som Jolene, Fortnox, Bokio, Spiris, Wint och Lennart redan gör åt
 ett litet aktiebolag, plus några saker som ingen av dem gör. Det enda Vera aldrig gör är att betala, skriva under
 eller lämna in något utan att en människa hos kunden har godkänt och signerat.
@@ -12,7 +15,8 @@ eller lämna in något utan att en människa hos kunden har godkänt och signera
 - Ett steg är en Claude Code-session. Stora steg delas upp i flera sessioner, och då står det i steget.
 - Varje steg avslutas med full testsvit och slutrapportrutan (STATUS, KAN JAG GÅ VIDARE, beslut, nästa steg).
 - Efter varje fas görs en oberoende granskning i en ny session innan nästa fas börjar.
-- Ett steg får inte börja förrän stegen det beror på är klara. Säkerhetsstegen i fas B går alltid före.
+- Ett steg får inte börja förrän stegen det beror på är klara. Säkerhetsstegen i fas B går alltid före, med ett
+  undantag: steg 22 (uppgift 4) får byggas före steg 15–19 (Hugos beslut 2026-10-29, B1, se fas C).
 - Där det står **Beslut** måste Hugo (eller en redovisningskonsult) svara innan steget byggs.
 - Statusen uppdateras här och i `PROGRESS.md` när ett steg blir klart.
 
@@ -55,20 +59,20 @@ Status: ✅ klart · 🔶 pågår · ⬜ inte påbörjat
 
 ---
 
-## Fas B – Säkerhetsgrunden (pågår, går före allt annat)
+## Fas B – Säkerhetsgrunden (pågår, går före allt annat utom steg 22, se B1)
 
 | # | Steg | Status | Klart när | Beror på |
 |---|---|---|---|---|
-| 12 | **Hugo installerar vakten** enligt `sparr/INSTALLERA.md` | 🔶 nästa | `/status` visar `Enterprise managed settings (file)` och vakten stoppar `date` i skrivbordsappen | 11 |
-| 13 | Kontrollen efter installationen, i en ny session (sist i INSTALLERA.md), inklusive provet med en vakt som fallerar | ⬜ | Alla steg i kontrollen visar väntat svar | 12 |
-| 14 | Samma installation och kontroll på Caspers dator (`/Library/Python` kontrolleras för hand först, K1 granskning 20) | ⬜ | Samma resultat som steg 13 | 13 |
-| 15 | **Sandlådan** (Öppet 4 och 8): skrivning bara i tillåtna mappar, förbud för appen, appens Claude Code och `~/.local/share/claude`, täcker `trap`, `hash` och `builtin` | ⬜ | Spärrtest: en egen testfil som försöker skriva utanför projektet stoppas | 13 |
+| 12 | **Hugo installerar vakten** enligt `sparr/INSTALLERA.md` | ✅ | `/status` visar `Enterprise managed settings (file)` och vakten stoppar `date` i skrivbordsappen. Gjort på Hugos dator 2026-10-28 (`GRANSKNING.md`, "Installation på Hugos dator 2026-10-28"). Caspers dator är steg 14 | 11 |
+| 13 | Kontrollen efter installationen, i en ny session (sist i INSTALLERA.md), inklusive provet med en vakt som fallerar | 🔶 | Alla steg i kontrollen visar väntat svar. Steg 1–7 och 9 gjorda vid installationen, och spärrtestet 2026-10-29 är grönt. **Kvar: steg 8, provet med en vakt som fallerar** (PROGRESS.md, Öppet 16) | 12 |
+| 14 | Samma installation och kontroll på Caspers dator (`/Library/Python` kontrolleras för hand först, K1 granskning 20) | ⬜ | Samma resultat som steg 13. Planerad till helgen vecka 44 (PROGRESS.md, Öppet 15) | 13 |
+| 15 | **Sandlådan** (Öppet 4 och 8): skrivning bara i tillåtna mappar, förbud för appen, appens Claude Code och `~/.local/share/claude`, täcker `trap`, `hash` och `builtin`. Ska vara klar före steg 23 (uppgift 5), eller före första körningen på riktiga underlag om den kommer först (Hugos beslut 2026-10-28 och 2026-10-29, B1) | ⬜ | Spärrtest: en egen testfil som försöker skriva utanför projektet stoppas | 13 |
 | 16 | Bash-vägen prövas i skrivbordsappen (Öppet 7) | ⬜ | Beslut skrivet: bash eller zsh | 15 |
 | 17 | Omvägarna förbi vakten med kommandotexter i en kopia (granskning 13, P5) | ⬜ | Inga omvägar hittade, eller rättade | 15 |
 | 18 | Nästa version av vakten: `-I -S` (K1) och tom `cwd` (K3) från granskning 20 | ⬜ | Tester gröna, ny granskning | 17 |
-| 19 | Spärrtest i en ny session | ⬜ | Alla spärrtester blockeras och syns i loggen | 15–18 |
-| 20 | Q3 + Q4 + Q2: gemensam ordindelning, kommentaren i `las_regelbok.py`, ägarnamn utan accenter | ⬜ | Tester gröna | 19 |
-| 21 | Q7: pusha som det är (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Historiken skrivs inte om, och ingen tagg byts eller pushas (taggen `v0-shop-and-go` finns inte i repot) | ✅ | Repot på GitHub är privat (kontrollerat av Hugo 2026-10-29). Repot får inte göras publikt utan en ny genomgång av hela historiken först | 20 |
+| 19 | Spärrtest i en ny session | ⬜ | Alla spärrtester blockeras och syns i loggen. (Ett första spärrtest efter installationen gjordes 2026-10-29 och är grönt, men det här steget är spärrtestet efter steg 15–18) | 15–18 |
+| 20 | Q3 + Q4 + Q2: gemensam ordindelning, kommentaren i `las_regelbok.py`, ägarnamn utan accenter | ✅ | Tester gröna. Q2, Q2b, Q3 och Q4 klara (3e3c18c, d7d38e0, 1dcf769, bd851ba, 2bc9762) och granskade i granskning 21 (3bbcbe4, grön). Byggt före steg 19 | 19 |
+| 21 | Q7: pusha som det är (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Historiken skrivs inte om, och ingen tagg byts eller pushas (taggen `v0-shop-and-go` finns inte i repot) | ✅ | Repot på GitHub är privat (kontrollerat av Hugo 2026-10-29). Repot får inte göras publikt utan en ny genomgång av hela historiken först. Q7 stängd och pushat 2026-10-29 (`main` i fas med GitHub vid 6aba32d) | 20 |
 
 ---
 
@@ -76,7 +80,7 @@ Status: ✅ klart · 🔶 pågår · ⬜ inte påbörjat
 
 | # | Steg | Klart när | Lånat från | Beror på |
 |---|---|---|---|---|
-| 22 | **Uppgift 4:** flöde a, b och e (leverantörsfakturor, kvitton, bankavgifter) med K5 och K8 | Testerna i DESIGN 7, rad 4, är gröna | – | 21 |
+| 22 | **Uppgift 4:** flöde a, b och e (leverantörsfakturor, kvitton, bankavgifter) med K5 och K8. Byggs på syntetisk data, med vakten installerad och Claude Code i det läge som frågar (inte Auto) tills provet med en fallerande vakt (Öppet 16) är gjort. Förutsättningar: B2 och B3 i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4". **Beslut:** D13 (moms på bankavgifter, bankraden som underlag) är öppen och ska beslutas före start | Testerna i DESIGN 7, rad 4, är gröna | – | 12, 20, 21. Beror inte på steg 15 (Hugos beslut 2026-10-29, B1) |
 | 23 | **Uppgift 5:** flöde c och d (Z-rapporter, kortinlösen, Swish, kontantinsättningar) och M9 | Försäljning per sats och månad stämmer på öret med `facit.json` | Jolene (Z-nummerserien, bokför aldrig dagskassa utan kontroll) | 15, 22 |
 | 24 | **Uppgift 6:** nivåerna A–D och K9, nivå D för ägarens bankrader | Varje skäl ger rätt nivå. Högsta nivån vinner | – | 23 |
 | 25 | Oberoende granskning av uppgift 4–6 | Inga allvarliga eller medelfynd kvar | – | 24 |
