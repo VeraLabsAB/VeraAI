@@ -32,6 +32,23 @@ ihop kvittot med en bankrad, på datumet för 'kvitto'. Kostnaden och momsen per
 flöde a, och bankkontot i kredit. Ett kvitto utan bankrad får inget förslag än: det väntar och står
 bland matchningens oavstämda underlag.
 
+Flöde e, bankrader utan underlag som regelboken pekar ut som rena avgifter (DESIGN avsnitt 4e, Hugos
+beslut 2026-10-29, D13): en bankrad som matchningen har lagt bland raderna som inte kräver underlag,
+och vars regel i regelboken (Regelbok.regel_for_bankrad, på datumet för 'bankrad') bara har kontot
+'kostnad'. En verifikation: kostnaden i debet och bankkontot i kredit, båda med bankraden som ursprung,
+utan moms och med bankraden som underlag tills bankens specifikation finns (Ö11). Bankrader vars regel
+har andra konton (kortinlösen, Swish och kontanter) hör till flöde d (uppgift 5) och får varken förslag
+eller ärende här. Gränserna står i konfigurationen, aldrig här: matchningsformatets hogst_belopp_ore
+och regelns eget hogst_belopp_ore i villkoren.
+
+  över gräns (D13): en bankrad som passar en regel i matchningsformatet för pengar ut men är större än
+     matchningsformatets gräns (matchningens ärende "över gräns"), eller större än gränsen i regelns
+     villkor. Allt annat från banken kräver en faktura: ett ärende med nivå D och "kräver mänsklig
+     bedömning", inget förslag. Andra bankrader utan underlag är matchningens ärenden (K3, "saknat
+     underlag"), och deras nivå sätts i nivåsteget.
+  oklar post: pengar in på en regel som bara har en kostnad. Inget förslag.
+  ingen regel på datumet: ingen regel i regelboken gäller bankraden på datumet.
+
 Kontrollerna för varje underlag, innan något förslag görs:
 
   Regeln: regelboken ger regeln för underlagets typ och motpart på underlagets datum. Ingen regel
@@ -84,6 +101,7 @@ import datetime as dt
 from types import MappingProxyType
 from typing import NamedTuple
 
+from belopp import formatera_ore as _kronor
 from konteringsforslag import skapa_konteringsforslag
 from las_kontoplan import Kontoplan
 from las_momssatser import Momssatser, MomssatsFel
@@ -95,7 +113,10 @@ ARENDE_NYCKLAR = ("kontroll", "typ", "text", "niva", "kraver_mansklig_bedomning"
 # Flaggan i ett ärende från K8 när underlaget är daterat en dag då företaget har stängt (DESIGN avsnitt 6).
 STANGD_DAG = "köpt en dag då företaget har stängt"
 
-# Ärendenas kontroller och typer.
+# Ärendenas kontroller och typer. "över gräns" är samma typ som matchningens (matcha_bank.py).
+_K3 = "K3"
+_OVER_GRANS = "över gräns"
+_OKLAR_POST = "oklar post"
 _K5 = "K5"
 _K7 = "K7"
 _K8 = "K8"
@@ -116,6 +137,9 @@ _KVITTO = "kvitto"
 # andra värden är namnet på ett fält i bankraden.
 _UNDERLAGETS_DATUM = ("fakturadatum", "kvittodatum")
 _BETALNING = "betalning"
+_BANKRAD = "bankrad"
+# Nyckeln i konteringen för en regel för bankrader som bara har en kostnad (las_regelbok.KONTERING_BANKRAD_NYCKLAR).
+_KOSTNAD = "kostnad"
 # Rollerna i kontoplanen som flödena bokför på (las_kontoplan.ROLLER).
 _BANK = "bank"
 _LEVERANTORSSKULDER = "leverantorsskulder"
@@ -407,6 +431,45 @@ def _kvitto(underlag, regel, konton, bankrad, korning):
 _FLODEN = {_LEVERANTORSFAKTURA: _leverantorsfaktura, _KVITTO: _kvitto}
 
 
+def _over_grans(rad, regel, text):
+    """D13: en bankrad som passar en regel för bankrader utan underlag men är över gränsen. Nivå D, inget förslag."""
+    return _arende(_K3, _OVER_GRANS, text + " Enligt D13 kräver allt annat från banken en faktura. Inget förslag görs."
+                   " En människa avgör vad raden är och vilket underlag den ska ha.", bankrader=[rad["id"]],
+                   regel=None if regel is None else regel["id"], niva=_NIVA_D, kraver=True)
+
+
+def _bankrad_utan_underlag(rad, namn, korning):
+    """Flöde e för en bankrad som matchningen har lagt bland raderna som inte kräver underlag. (förslag, ärenden)."""
+    bokforing = korning.bokforing
+    val = bokforing["verifikationsdatum"][_BANKRAD]
+    datum = _verifikationens_datum(val, None, rad)
+    regel = korning.regelbok.regel_for_bankrad(namn, datum)
+    if regel is None:
+        return [], [_arende(_REGELBOKEN, _INGEN_REGEL, "Bankraden med radnummer " + str(rad["radnr"]) + " passar"
+                            " regeln " + repr(namn) + " för bankrader utan underlag, men ingen regel i regelboken gäller"
+                            " den på " + datum + ". Inget förslag görs.", bankrader=[rad["id"]])]
+    if set(regel["kontering"]) != {_KOSTNAD}:
+        # Kortinlösen, Swish och kontanter: flöde d (uppgift 5).
+        return [], []
+    if rad[_BELOPPSFALT] > 0:
+        return [], [_arende(_REGELBOKEN, _OKLAR_POST, "Bankraden med radnummer " + str(rad["radnr"]) + " är pengar in,"
+                            " men regeln " + regel["id"] + " gäller avgifter, som är pengar ut. Inget förslag görs.",
+                            bankrader=[rad["id"]], regel=regel["id"], kraver=True)]
+    grans = regel["villkor"].get("hogst_belopp_ore")
+    if grans is not None and -rad[_BELOPPSFALT] > grans:
+        return [], [_over_grans(rad, regel, "Bankraden med radnummer " + str(rad["radnr"]) + " passar regeln "
+                                + regel["id"] + ", men beloppet " + _kronor(-rad[_BELOPPSFALT]) + " kr är större än"
+                                " regelns gräns, " + _kronor(grans) + " kr.")]
+    kontoplan, belopp = korning.kontoplan, -rad[_BELOPPSFALT]
+    return [_skapa(
+        "F-BANKRAD-" + rad["id"], datum, "Bankrad utan underlag, radnummer " + str(rad["radnr"]),
+        [_rad(regel["kontering"][_KOSTNAD], belopp, 0, _bankradens(rad["id"])),
+         _rad(kontoplan.rollens_konto(_BANK, datum), 0, belopp, _bankradens(rad["id"]))],
+        regel, korning, "Regeln " + regel["id"] + " i regelboken, för bankrader utan underlag (regeln " + repr(namn)
+        + " i matchningsformatet). Utan moms och med bankraden som underlag tills bankens specifikation finns (D13,"
+        " Ö11). Verifikationen får bankradens " + val + _antaget(bokforing) + ".", bankrader=[rad["id"]])], []
+
+
 def kontera_period(regelbok, kontoplan, momssatser, underlagsperiod, bankperiod, bedomningsdatum):
     """Kör flödena på perioderna. Returnerar ett Konteringsresultat, annars KonteringsflodeFel eller MatchningFel.
 
@@ -431,4 +494,16 @@ def kontera_period(regelbok, kontoplan, momssatser, underlagsperiod, bankperiod,
             nya_forslag, nya = _FLODEN[underlag["typ"]](underlag, regel, konton, bankrad, korning)
             forslag += nya_forslag
             arenden += nya
+    for post in matchning.kraver_inte_underlag:
+        nya_forslag, nya = _bankrad_utan_underlag(post["bankrad"], post["regel"], korning)
+        forslag += nya_forslag
+        arenden += nya
+    for arende in matchning.arenden:
+        if arende["typ"] == _OVER_GRANS:
+            rad = arende["bankrad"]
+            datum = _verifikationens_datum(bokforing["verifikationsdatum"][_BANKRAD], None, rad)
+            arenden.append(_over_grans(rad, regelbok.regel_for_bankrad(arende["regel"], datum), (
+                "Bankraden med radnummer " + str(rad["radnr"]) + " passar regeln " + repr(arende["regel"]) + " för"
+                " bankrader utan underlag, men beloppet " + _kronor(-rad[_BELOPPSFALT]) + " kr är större än gränsen i"
+                " matchningsformatet, " + _kronor(arende["hogst_belopp_ore"]) + " kr.")))
     return Konteringsresultat(forslag=tuple(forslag), arenden=_frys(arenden), matchning=matchning)

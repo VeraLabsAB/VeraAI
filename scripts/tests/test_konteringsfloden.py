@@ -52,11 +52,10 @@ class Korning:
     """En körning av flödena, med testbutikens filer om inget annat anges."""
 
     def __init__(self, regelbok=TESTBUTIKEN / "regelbok.json", momssatser=TESTBUTIKEN / "momssatser.json",
-                 underlag=DATAMAPP / "underlag", bedomning=BEDOMNING):
+                 underlag=DATAMAPP / "underlag", bedomning=BEDOMNING, matchning=TESTBUTIKEN / "matchning.json"):
         self.kontoplan = las_kontoplan(TESTBUTIKEN / "kontoplan.json")
         self.momssatser = las_momssatser(momssatser)
-        self.regelbok = las_regelbok(regelbok, self.kontoplan, self.momssatser,
-                                     las_matchningsformat(TESTBUTIKEN / "matchning.json"))
+        self.regelbok = las_regelbok(regelbok, self.kontoplan, self.momssatser, las_matchningsformat(matchning))
         self.manader, self.bankperiod = bankperiod()
         self.underlagsperiod = las_underlagsperiod(underlag, "2025-01-01", "2025-03-31")
         self.resultat = kontera_period(self.regelbok, self.kontoplan, self.momssatser, self.underlagsperiod,
@@ -392,6 +391,115 @@ def test_004_ar_en_dublett_och_far_inget_forslag(korning):
     assert korning.forslag_for("SYNT-U-2025-004") == [] and korning.arenden_for("SYNT-U-2025-004") == []
     # Originalet SYNT-U-2025-003 bokförs en gång.
     assert len(korning.forslag_for("SYNT-U-2025-003")) == 2
+
+
+# --- Flöde e: bankavgifter (DESIGN 4e, D13) ---
+
+def bankradens_forslag(korning, rad):
+    return [forslag for forslag in korning.resultat.forslag
+            if [post["id"] for post in forslag.kopplingar["bankrader"]] == [rad["id"]]]
+
+
+@pytest.mark.parametrize("radnr, ore", [(117, 12500), (118, 19900)])
+def test_4e_bankavgifterna_i_januari(korning, radnr, ore):
+    rad = korning.bankrad(1, radnr)
+    forslag, = bankradens_forslag(korning, rad)
+    assert forslag.forslag_id == "F-BANKRAD-" + rad["id"]
+    # Transaktionsdagen (D14), utan moms och med bankraden som ursprung på båda raderna (D13).
+    assert forslag.verifikation["datum"] == "2025-01-31" == rad["transaktionsdag"]
+    assert raderna(forslag) == [("6570", ore, 0, [("bankrad", "belopp_ore")]),
+                                ("1940", 0, ore, [("bankrad", "belopp_ore")])]
+    assert forslag.kopplingar["underlag"] == [] and forslag.kopplingar["regel"]["id"] == "R-BANK-AVGIFT"
+    assert "D13" in forslag.motivering
+
+
+def test_alla_bankavgifter_far_ett_forslag_och_inget_annat_fran_matchningen_gor_det(korning):
+    utan_underlag = [post for post in korning.resultat.matchning.kraver_inte_underlag]
+    avgifter = [post["bankrad"] for post in utan_underlag if post["regel"] == "bankavgift"]
+    assert len(avgifter) == 4  # två i januari och två i februari
+    for rad in avgifter:
+        assert len(bankradens_forslag(korning, rad)) == 1
+    # Kortinlösen, Swish och kontanter hör till flöde d (uppgift 5): inget förslag och inget ärende här.
+    andra = [post["bankrad"] for post in utan_underlag if post["regel"] != "bankavgift"]
+    assert andra
+    alla_bankrader = {id_ for arende in korning.resultat.arenden for id_ in arende["bankrader"]}
+    for rad in andra:
+        assert bankradens_forslag(korning, rad) == [] and rad["id"] not in alla_bankrader
+
+
+def test_ingen_moms_pa_bankavgifterna(korning):
+    ingaende = korning.kontoplan.rollens_konto("ingaende_moms", "2025-01-01")
+    for forslag in korning.resultat.forslag:
+        if forslag.forslag_id.startswith("F-BANKRAD-"):
+            assert ingaende not in [rad["konto"] for rad in forslag.verifikation["rader"]]
+
+
+def matchning_med_grans(tmp_path, grans):
+    data = json.loads((TESTBUTIKEN / "matchning.json").read_text(encoding="utf-8"))
+    [regel for regel in data["kraver_inte_underlag"] if regel["namn"] == "bankavgift"][0]["hogst_belopp_ore"] = grans
+    fil = tmp_path / "matchning.json"
+    fil.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return fil
+
+
+def avgiftsregelns_grans(grans):
+    def andring(regelbok):
+        [regel for regel in regelbok["regler"] if regel["id"] == "R-BANK-AVGIFT"][0]["villkor"]["hogst_belopp_ore"] = grans
+    return andring
+
+
+def test_avgift_over_matchningens_grans_blir_ett_arende_med_niva_d(tmp_path):
+    # Med gränsen 150 kr i matchningsformatet (och i regeln, som inte får ha en högre) är avgiften 199 kr
+    # över gränsen. Gränsen läses ur konfigurationen, som i testbutikens 250 kr.
+    korning = Korning(regelbok=regelbok_med(tmp_path, avgiftsregelns_grans(15000)),
+                      matchning=matchning_med_grans(tmp_path, 15000))
+    rad, rad_125 = korning.bankrad(1, 118), korning.bankrad(1, 117)
+    arende, = [arende for arende in korning.resultat.arenden if arende["bankrader"] == (rad["id"],)]
+    assert (arende["kontroll"], arende["typ"], arende["niva"]) == ("K3", "över gräns", "D")
+    assert arende["kraver_mansklig_bedomning"] is True and arende["regel"] == "R-BANK-AVGIFT"
+    assert "199,00 kr" in arende["text"] and "150,00 kr" in arende["text"] and "D13" in arende["text"]
+    assert bankradens_forslag(korning, rad) == []
+    # Matchningens eget ärende finns kvar, och avgiften på 125 kr får sitt förslag.
+    assert [post["typ"] for post in korning.resultat.matchning.arenden if post["bankrad"]["id"] == rad["id"]] == [
+        "över gräns"]
+    assert len(bankradens_forslag(korning, rad_125)) == 1
+
+
+def test_avgift_over_regelns_egen_grans_blir_ett_arende_med_niva_d(tmp_path):
+    # Regeln skärper matchningsformatets 250 kr till 150 kr. Matchningen släpper igenom raden, flödet inte.
+    korning = Korning(regelbok=regelbok_med(tmp_path, avgiftsregelns_grans(15000)))
+    rad = korning.bankrad(1, 118)
+    arende, = [arende for arende in korning.resultat.arenden if arende["bankrader"] == (rad["id"],)]
+    assert (arende["kontroll"], arende["typ"], arende["niva"], arende["kraver_mansklig_bedomning"]) == (
+        "K3", "över gräns", "D", True)
+    assert "regelns gräns, 150,00 kr" in arende["text"]
+    assert bankradens_forslag(korning, rad) == []
+
+
+def test_avgift_exakt_pa_regelns_grans_far_ett_forslag(tmp_path):
+    korning = Korning(regelbok=regelbok_med(tmp_path, avgiftsregelns_grans(19900)))
+    assert len(bankradens_forslag(korning, korning.bankrad(1, 118))) == 1
+
+
+def test_avgift_utan_regel_pa_datumet_blir_ett_arende(tmp_path):
+    def andring(regelbok):
+        [regel for regel in regelbok["regler"] if regel["id"] == "R-BANK-AVGIFT"][0]["villkor"]["giltig_till"] = (
+            "2025-01-30")
+    korning = Korning(regelbok=regelbok_med(tmp_path, andring))
+    rad = korning.bankrad(1, 117)
+    arende, = [arende for arende in korning.resultat.arenden if arende["bankrader"] == (rad["id"],)]
+    assert (arende["kontroll"], arende["typ"], arende["regel"]) == ("regelboken", "ingen regel på datumet", None)
+    assert bankradens_forslag(korning, rad) == []
+
+
+def test_bankavgiftens_datum_foljer_regelbokens_val(tmp_path):
+    def andring(regelbok):
+        regelbok["bokforing"]["verifikationsdatum"]["bankrad"] = "bokforingsdag"
+    korning = Korning(regelbok=regelbok_med(tmp_path, andring))
+    rad = korning.bankrad(1, 117)
+    forslag, = bankradens_forslag(korning, rad)
+    assert forslag.verifikation["datum"] == rad["bokforingsdag"]
+    assert "bokforingsdag" in forslag.motivering
 
 
 # --- Regeln och K7 ---
