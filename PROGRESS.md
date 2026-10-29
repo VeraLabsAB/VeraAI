@@ -1,6 +1,7 @@
 # PROGRESS – Veras bokföringsagent
 
 Uppdaterad 2026-10-28. Specifikation: `SPEC.md`. Byggordning: `DESIGN-regelbok.md` avsnitt 7.
+Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29). Steg 12 är delvis klart: vakten installerades på Hugos dator 2026-10-28, Caspers dator återstår. Nästa steg är spärrtestet i en ny session.
 Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
@@ -539,6 +540,7 @@ fattade och byggda, se avsnittet ovan.)
       nästa version av vakten.**
     - **K5:** steg 2 b säger inte var andra omgången börjar, och första raden visar en relativ sökväg som kan
       förväxlas med regeln för andra omgången.
+15. Caspers dator: om ~/.local/bin läggs i PATH ska den stå sist, annars stoppar vakten git. Efter en ändring i ~/.zshrc måste Claude-appen avslutas helt med Cmd+Q, annars behåller den den gamla PATH (lärdom 2026-10-29).
 
 ## Nästa steg i byggordningen
 
