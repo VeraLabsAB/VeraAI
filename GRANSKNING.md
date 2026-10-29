@@ -7005,3 +7005,18 @@ Skrivet in på Hugos uppdrag i chatten 2026-10-29.
   igen.
 - **G1 räknas som stängd.** Steg 4 h gav exakt de elva raderna både vid provkörningen och vid installationen.
 - **Prov 17:** Hugo har själv sett "Stoppat av vakten" för `date` i underagentens verktygsruta.
+
+## Hugos beslut 2026-10-29 om Q2–Q4
+
+Skrivet in på Hugos uppdrag i chatten 2026-10-29. Fynden står i granskning 11 (Q2, Q3 och Q4).
+
+- **Q3: ja.** En offentlig funktion för sökformen i `normalisering.py` (`sokform_for_namn`), som både sökningen
+  (`star_som_hela_ord`) och regelboken (`las_regelbok.py`) använder, så att "vad som räknas som tomt" bara står på
+  ett ställe.
+- **Q4: ja.** Kommentaren överst i `las_regelbok.py` ska säga samma sak som SPEC 11: allt stoppas fortfarande,
+  men ett dolt tecken, trasig JSON och ett fel som hittas före listan stoppar med det felets egen text.
+- **Q2: ja.** Ägaren ska kännas igen även när banken skriver namnet utan accenter (å, ä, ö, é), till exempel
+  "ASA OBERG" för "Åsa Öberg". Det gäller **bara ägaruppslaget**. Den gemensamma jämförelsen
+  (`normalisera_for_jamforelse`), dublettkontrollen K4 och matchningen mot motparter får inte ändras. Andra
+  stavningar (till exempel AA eller OE) tas när riktiga bankfiler finns (Ö5). **Q2 byggs i en egen session.**
+- Q3 och Q4 ska inte ändra hur något fungerar.
