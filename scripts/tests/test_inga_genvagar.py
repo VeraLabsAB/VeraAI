@@ -64,8 +64,11 @@ SKYDDSMODUL = "inlasning_skydd"
 INLASNINGSMODULER = ("las_bank", "las_kassa", "las_underlag", "las_matchningsformat", "las_kontoplan", "las_momssatser",
                      "las_regelbok")
 # Kärnmoduler som inte läser filer men har egna byggstenar: alla deras namn som börjar med understreck.
+# konteringsfloden: _k5, _leverantorsfaktura och de andra byggstenarna gör var sin del av flödena. Ensamma
+# hoppar de över kontrollerna (till exempel K5 och K8 före förslaget), så bara kontera_period får användas.
 FORSLAGSMODUL = "konteringsforslag"
-MODULER_MED_BYGGSTENAR = INLASNINGSMODULER + (FORSLAGSMODUL,)
+FLODESMODUL = "konteringsfloden"
+MODULER_MED_BYGGSTENAR = INLASNINGSMODULER + (FORSLAGSMODUL, FLODESMODUL)
 GENVAGAR = ("_tolka_rader", "_tolka_kassarader", "_las_underlagsfil",
             # Kontoplanens och momsfilens delkontroller, och kontrollerna som ger ett ofryst resultat
             "_kontrollera_kontoplan", "_kontrollera_konton", "_kontrollera_konto", "_kontrollera_roller",
@@ -75,7 +78,7 @@ GENVAGAR = ("_tolka_rader", "_tolka_kassarader", "_las_underlagsfil",
             "_kontrollera_galler", "_kontrollera_villkor", "_kontrollera_kontering", "_kontrollera_bankradsregel",
             "_kontrollera_varugrupp", "_kontrollera_granser", "_kontrollera_k9", "_kontrollera_oppettider",
             "_kontrollera_godkand", "_konfigurationen", "_konto_per_varugrupp", "_kontrollera_agare_och_narstaende",
-            "_kontrollera_agarregel")
+            "_kontrollera_agarregel", "_kontrollera_bokforing")
 # Nycklarna som skapar en Kontoplan, Momssatser, ett Matchningsformat eller en Regelbok, och det som ligger i dem.
 KONFIGURATIONENS_INRE = ("_KONTOPLANSNYCKEL", "_MOMSNYCKEL", "_MATCHNINGSNYCKEL", "_REGELBOKSNYCKEL", "_status",
                          "_konton", "_roller", "_varugrupper", "_tolerans_ore_per_rad", "_kontrollsumma",
@@ -139,7 +142,8 @@ def forbjudna_namn(mapp=SCRIPTS):
     """Alla namn som leder till en genväg: genvägarna, byggstenarna och deras alias."""
     forbjudna = (set(GENVAGAR) | set(PERIODENS_INRE) | set(KONFIGURATIONENS_INRE) | {SKYDDSMODUL}
                  | toppnamn(mapp / (SKYDDSMODUL + ".py"))
-                 | {namn for namn in toppnamn(mapp / (FORSLAGSMODUL + ".py")) if namn.startswith("_")})
+                 | {namn for modul in (FORSLAGSMODUL, FLODESMODUL) for namn in toppnamn(mapp / (modul + ".py"))
+                    if namn.startswith("_")})
     for modul in MODULER_MED_BYGGSTENAR:
         forbjudna |= namn_som_leder_till_genvagar(mapp / (modul + ".py"), forbjudna)
     return forbjudna
@@ -381,10 +385,12 @@ def test_inlasningsmodulerna_har_inga_byggstenar_under_offentligt_namn():
     import las_regelbok
     import matcha_bank
 
+    import konteringsfloden
     import konteringsforslag
 
     assert offentliga_namn_for_byggstenar([las_bank, las_kassa, las_underlag, las_matchningsformat, matcha_bank,
-                                           las_kontoplan, las_momssatser, las_regelbok, konteringsforslag]) == []
+                                           las_kontoplan, las_momssatser, las_regelbok, konteringsforslag,
+                                           konteringsfloden]) == []
 
 
 def test_kontrollen_hittar_byggstenar_under_offentligt_namn_nar_programmet_kor():
@@ -458,6 +464,10 @@ def projekt(tmp_path):
     (tmp_path / "konteringsforslag.py").write_text(
         "_FORSLAGSNYCKEL = object()\n_FORSLAGEN = {}\ndef _kontrollera_k2(verifikation, kontoplan): ...\n"
         "def skapa_konteringsforslag(forslag, regelbok, kontoplan): ...\n", encoding="utf-8")
+    (tmp_path / "konteringsfloden.py").write_text(
+        "from konteringsforslag import skapa_konteringsforslag\ndef _k5(underlag, regel, momssatser): ...\n"
+        "def kontera_period(regelbok, kontoplan, momssatser, underlagsperiod, bankperiod, bedomningsdatum): ...\n",
+        encoding="utf-8")
     (tmp_path / "inlasning_skydd.py").write_text("def _las_fil(sokvag, filsort): ...\n", encoding="utf-8")
     (tmp_path / "belopp.py").write_text("def tolka_belopp(text): ...\n", encoding="utf-8")
     return tmp_path
@@ -751,6 +761,48 @@ def test_i1_kontoplanen_och_momsfilen_las_pa_ratt_satt_slapps_igenom(projekt, ko
     assert genvagar_i(projekt) == []
 
 
+# --- Flödena (uppgift 4) ---
+#
+# kontera_period i konteringsfloden.py är en ny offentlig funktion. Den behövs eftersom flödena a, b och e
+# måste köra matchningen, K5, K8 och skapa_konteringsforslag i rätt ordning, på samma perioder och samma
+# regelbok. Den är det enda sättet att få förslag ur underlag och bankrader. Byggstenarna i modulen (alla
+# namn som börjar med understreck) hoppar ensamma över kontrollerna och är därför förbjudna för annan
+# kärnkod, som konteringsforslag.py:s.
+
+def test_flodena_omfattas_av_skyddet():
+    # konteringsfloden.py är en vanlig kärnfil: den är inte undantagen, så alla förbud gäller den, och den
+    # använder ingen genväg. Förslagen skapar den bara med skapa_konteringsforslag.
+    modul = SCRIPTS / "konteringsfloden.py"
+    assert modul in karnfiler(SCRIPTS) and modul.name not in UNDANTAGNA
+    assert genvagar_i_fil(modul, forbjudna_namn()) == []
+
+
+def test_flodenas_alla_byggstenar_ar_forbjudna():
+    privata = {namn for namn in toppnamn(SCRIPTS / "konteringsfloden.py") if namn.startswith("_")}
+    assert {"_k5", "_underlagets_arenden", "_leverantorsfaktura", "_skapa", "_Korning"} <= privata
+    assert privata <= forbjudna_namn()
+    for namn in ["kontera_period", "Konteringsresultat", "KonteringsflodeFel", "ARENDE_NYCKLAR", "STANGD_DAG",
+                 "bokforing", "METODER", "VERIFIKATIONSDATUM"]:
+        assert namn not in forbjudna_namn(), namn
+
+
+FLODENAS_GENVAGSKOD = {
+    "k5_utan_flodet": "from konteringsfloden import _k5\n",
+    "flodet_utan_k5_och_k8": "import konteringsfloden\nf = konteringsfloden._leverantorsfaktura(None, None, {}, None, None)\n",
+    "flodet_via_tabellen": "import konteringsfloden as k\nf = k._FLODEN\n",
+    "flodet_getattr": "import konteringsfloden\nf = getattr(konteringsfloden, '_leverantors' + 'faktura')\n",
+    "korningen_byggs_for_hand": "from konteringsfloden import _Korning\n",
+    "flodenas_stjarna": "from konteringsfloden import *\n",
+}
+
+
+@pytest.mark.parametrize("kod", FLODENAS_GENVAGSKOD.values(), ids=FLODENAS_GENVAGSKOD.keys())
+def test_i1_kontrollen_hittar_genvagar_forbi_flodenas_kontroller(projekt, kod):
+    (projekt / "rapport.py").write_text(kod, encoding="utf-8")
+    fynd = genvagar_i(projekt)
+    assert fynd and all(rad.startswith("rapport.py:") for rad in fynd), fynd
+
+
 def test_matchningen_omfattas_av_skyddet():
     # matcha_bank.py är en vanlig kärnfil: den är inte undantagen, så alla förbud gäller den, och den
     # använder ingen genväg. Bankrader och underlag får den bara från las_bankfil och las_underlagsperiod.
@@ -818,6 +870,9 @@ VANLIG_KOD = {
                   "januari = las_bankfil('bank.csv', {}, 0, 100)\nkvartal = sla_ihop_bankperioder([januari])\n"
                   "rader = kvartal.rader\nsaldon = (kvartal.ingaende_saldo_ore, kvartal.utgaende_saldo_ore)\n"
                   "ok = type(kvartal) is Bankperiod\n",
+    "kontera_period": "from konteringsfloden import kontera_period, Konteringsresultat, KonteringsflodeFel\n"
+                      "r = kontera_period(None, None, None, None, None, '2025-01-31')\nf = (r.forslag, r.arenden)\n"
+                      "val = None.bokforing\n",
     "getattr_med_vanlig_text": "f = getattr(object(), 'namn', None)\n",
     "beskrivning": '"""Läser bankfilen med las_bankfil, som använder inlasning_skydd och kör K1."""\n',
     "egen_funktion": "def tolka(rader):\n    return [rad for rad in rader]\n",

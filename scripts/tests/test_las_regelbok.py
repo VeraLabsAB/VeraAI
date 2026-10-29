@@ -109,6 +109,13 @@ def regler():
     ]
 
 
+def bokforing():
+    """Felfria val i 'bokforing', med andra datum än testbutikens där det finns flera att välja på."""
+    return {"antaget": True, "metod": "faktureringsmetoden",
+            "verifikationsdatum": {"leverantorsfaktura": "fakturadatum", "betalning": "bokforingsdag",
+                                   "kvitto": "transaktionsdag", "bankrad": "bokforingsdag"}}
+
+
 def bok(**andrat):
     """En felfri regelbok, med de ändringar som anges."""
     data = {
@@ -119,6 +126,8 @@ def bok(**andrat):
         "granser": {"a_hogst_ore": 1000, "b_hogst_ore": 5000},
         "k9": {"minst_historik": 3, "hogst_procent_av_median": 300, "lagst_procent_av_median": 33},
         "oppettider": {"stangda_veckodagar": ["sondag"], "stangda_datum": ["2025-01-01"]},
+        # Nyckeln krävs (Hugos beslut 2026-10-29, inför uppgift 4).
+        "bokforing": bokforing(),
         # Listan krävs och får inte vara tom (Hugos beslut 2026-10-27, beslut a). En påhittad ägare.
         "agare_och_narstaende": ["PAHITTAD-AGARE"],
         "regler": regler(),
@@ -192,6 +201,11 @@ def test_testforetagets_fil_laddas():
     assert regelbok.granser == {"a_hogst_ore": 2000000, "b_hogst_ore": 4000000}
     assert regelbok.k9 == {"minst_historik": 3, "hogst_procent_av_median": 300, "lagst_procent_av_median": 33}
     assert regelbok.oppettider == {"stangda_veckodagar": ["sondag"], "stangda_datum": ["2025-01-01", "2025-01-06"]}
+    # B3, D1 och D14, antagna för testföretaget (Hugos beslut 2026-10-29).
+    assert regelbok.bokforing == {"antaget": True, "metod": "faktureringsmetoden",
+                                  "verifikationsdatum": {"leverantorsfaktura": "fakturadatum",
+                                                         "betalning": "transaktionsdag", "kvitto": "kvittodatum",
+                                                         "bankrad": "transaktionsdag"}}
     datum = "2025-02-06"
     assert regelbok.regel_for_underlag("leverantorsfaktura", "LEV-TE", datum)["id"] == "R-LEV-TE"
     assert regelbok.regel_for_underlag("kvitto", "RESTAURANG-1", datum)["villkor"]["avdragsbegransad"] is True
@@ -207,17 +221,25 @@ def test_testforetagets_fil_laddas():
     assert regelbok.ar_agare_eller_narstaende("LEV-TE") is False
 
 
-def test_testforetagets_fil_har_exakt_vardena_i_design_och_tre_tillagg():
-    # Inga nya värden har hittats på: filen är exemplet i DESIGN-regelbok.md avsnitt 1, med tre
+def test_testforetagets_fil_har_exakt_vardena_i_design_och_fyra_tillagg():
+    # Inga nya värden har hittats på: filen är exemplet i DESIGN-regelbok.md avsnitt 1, med fyra
     # tillägg som Hugo har godkänt och som alla kommer från redan bestämda värden:
     # - 'oppettider' (Hugos beslut D21), med testbutikens stängda dagar ur testdata/README.md,
     # - gränsen för bankavgiften, som är en regel för pengar ut och därför måste ha
     #   'hogst_belopp_ore'. Värdet är gränsen i matchning.json, som Hugo bestämde 2026-10-25,
     # - 'agare_och_narstaende' (Hugos beslut 2026-10-26), med det syntetiska värdet AGARE-1 ur
-    #   DESIGN-regelbok.md avsnitt 1 och testforetag/FIKTIVT_FORETAG.md.
+    #   DESIGN-regelbok.md avsnitt 1 och testforetag/FIKTIVT_FORETAG.md,
+    # - 'bokforing' (Hugos OK i chatten 2026-10-29, i sessionen för uppgift 4), med valen i B3, D1 och D14:
+    #   faktureringsmetoden, fakturadatum, kvittodatum och transaktionsdagen, märkta antagna.
     design = json_block_i_design("regler")
     design["oppettider"] = {"stangda_veckodagar": ["sondag"], "stangda_datum": ["2025-01-01", "2025-01-06"]}
     design["agare_och_narstaende"] = ["AGARE-1"]
+    bokforing_ = json.loads(REGELBOK_FIL.read_text(encoding="utf-8"))["bokforing"]
+    assert bokforing_.pop("anteckning").startswith("ANTAGET för testföretaget (Hugos beslut 2026-10-29")
+    assert bokforing_ == {"antaget": True, "metod": "faktureringsmetoden",
+                          "verifikationsdatum": {"leverantorsfaktura": "fakturadatum", "betalning": "transaktionsdag",
+                                                 "kvitto": "kvittodatum", "bankrad": "transaktionsdag"}}
+    design["bokforing"] = json.loads(REGELBOK_FIL.read_text(encoding="utf-8"))["bokforing"]
     avgift = [regel_ for regel_ in design["regler"] if regel_["id"] == "R-BANK-AVGIFT"]
     assert len(avgift) == 1 and "hogst_belopp_ore" not in avgift[0]["villkor"]
     avgift[0]["villkor"]["hogst_belopp_ore"] = 25000
@@ -502,6 +524,28 @@ def test_utan_anteckning_godtas(tmp_path, konfiguration):
     assert las(tmp_path, {k: v for k, v in bok().items() if k != "anteckning"}, konfiguration).version == 1
 
 
+def test_bokforing_lases_och_kan_inte_andras(tmp_path, konfiguration):
+    regelbok = las(tmp_path, bok(), konfiguration)
+    assert regelbok.bokforing == bokforing()
+    regelbok.bokforing["metod"] = "kontantmetoden"
+    assert regelbok.bokforing == bokforing()
+
+
+@pytest.mark.parametrize("nyckel, varde", [("betalning", "transaktionsdag"), ("kvitto", "kvittodatum"),
+                                           ("kvitto", "bokforingsdag"), ("bankrad", "transaktionsdag")])
+def test_alla_byggda_datum_godtas(tmp_path, konfiguration, nyckel, varde):
+    data = bok()
+    data["bokforing"]["verifikationsdatum"][nyckel] = varde
+    assert las(tmp_path, data, konfiguration).bokforing["verifikationsdatum"][nyckel] == varde
+
+
+def test_bokforing_som_inte_ar_antagen_och_med_anteckning_godtas(tmp_path, konfiguration):
+    data = bok()
+    data["bokforing"].update(antaget=False, anteckning="Beslutat av företaget.")
+    # Anteckningen är för människor och följer inte med.
+    assert las(tmp_path, data, konfiguration).bokforing == {**bokforing(), "antaget": False}
+
+
 def test_tomma_listor_med_stangda_dagar_godtas(tmp_path, konfiguration):
     regelbok = las(tmp_path, bok(oppettider={"stangda_veckodagar": [], "stangda_datum": []}), konfiguration)
     assert regelbok.oppettider == {"stangda_veckodagar": [], "stangda_datum": []}
@@ -772,6 +816,35 @@ STOPPAS = {
     "saknar_minst_historik": (andrad((("k9", "minst_historik"), BORT)), "saknar nyckeln 'minst_historik'"),
     "okand_nyckel_i_oppettider": (andrad((("oppettider", "oppna_dagar"), [])), "okänd nyckel: 'oppna_dagar'"),
     "saknar_stangda_datum": (andrad((("oppettider", "stangda_datum"), BORT)), "saknar nyckeln 'stangda_datum'"),
+    # 'bokforing' (Hugos beslut 2026-10-29, inför uppgift 4): inget val görs åt företaget.
+    "okand_nyckel_i_bokforing": (andrad((("bokforing", "avrundning"), "ingen")), "okänd nyckel: 'avrundning'"),
+    "saknar_metod": (andrad((("bokforing", "metod"), BORT)), "saknar nyckeln 'metod'"),
+    "saknar_antaget": (andrad((("bokforing", "antaget"), BORT)), "saknar nyckeln 'antaget'"),
+    "saknar_verifikationsdatum": (andrad((("bokforing", "verifikationsdatum"), BORT)),
+                                  "saknar nyckeln 'verifikationsdatum'"),
+    "saknar_datum_for_kvitto": (andrad((("bokforing", "verifikationsdatum", "kvitto"), BORT)),
+                                "saknar nyckeln 'kvitto'"),
+    "okant_datum_i_bokforing": (andrad((("bokforing", "verifikationsdatum", "kassa"), "datum")),
+                                "okänd nyckel: 'kassa'"),
+    "kontantmetoden_ar_inte_byggd": (andrad((("bokforing", "metod"), "kontantmetoden")),
+                                     "'metod' i 'bokforing' är 'kontantmetoden', men ska vara 'faktureringsmetoden'."
+                                     " Andra val är inte byggda"),
+    "metod_heltal": (andrad((("bokforing", "metod"), 1)), "'metod' i 'bokforing' är heltal"),
+    "antaget_text": (andrad((("bokforing", "antaget"), "ja")), "'antaget' i 'bokforing' ska vara true eller false,"
+                     " inte text"),
+    "antaget_heltal": (andrad((("bokforing", "antaget"), 1)), "ska vara true eller false, inte heltal"),
+    "bokforing_lista": (bok(bokforing=["faktureringsmetoden"]), "'bokforing' ska vara ett objekt"),
+    "verifikationsdatum_text": (andrad((("bokforing", "verifikationsdatum"), "fakturadatum")),
+                                "'verifikationsdatum' i 'bokforing' ska vara ett objekt"),
+    "fakturan_pa_betaldagen": (andrad((("bokforing", "verifikationsdatum", "leverantorsfaktura"), "transaktionsdag")),
+                               "'leverantorsfaktura' i 'verifikationsdatum' är 'transaktionsdag', men ska vara"
+                               " 'fakturadatum'"),
+    "betalningen_pa_fakturadatum": (andrad((("bokforing", "verifikationsdatum", "betalning"), "fakturadatum")),
+                                    "ska vara en av 'transaktionsdag', 'bokforingsdag'"),
+    "kvitto_med_okant_datum": (andrad((("bokforing", "verifikationsdatum", "kvitto"), "Kvittodatum")),
+                               "'kvitto' i 'verifikationsdatum' är 'Kvittodatum'"),
+    "bankrad_datum_heltal": (andrad((("bokforing", "verifikationsdatum", "bankrad"), 20250131)), "är heltal"),
+    "anteckning_i_bokforing_tom": (andrad((("bokforing", "anteckning"), "")), "'anteckning' i 'bokforing'"),
     "okand_nyckel_i_godkand": (andrad((("godkand", "tid"), "12:00")), "okänd nyckel: 'tid'"),
     "saknar_godkand_av": (andrad((("godkand", "av"), BORT)), "saknar nyckeln 'av'"),
     # Fel typ

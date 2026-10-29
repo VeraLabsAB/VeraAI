@@ -9,6 +9,17 @@
   },
   "k9": {"minst_historik": 3, "hogst_procent_av_median": 300, "lagst_procent_av_median": 33},
   "oppettider": {"stangda_veckodagar": ["sondag"], "stangda_datum": ["2025-01-01", "2025-01-06"]},
+  "bokforing": {
+    "antaget": true,
+    "anteckning": "ANTAGET för testföretaget (Hugos beslut 2026-10-29, B3, D1 och D14): faktureringsmetoden, leverantörsfakturan på fakturadatum och betalningen på transaktionsdagen, kvittot på kvittodatum och bankrader utan underlag på transaktionsdagen. INTE verifierat av en redovisningskonsult. För en riktig kund är valen kundens.",
+    "metod": "faktureringsmetoden",
+    "verifikationsdatum": {
+      "leverantorsfaktura": "fakturadatum",
+      "betalning": "transaktionsdag",
+      "kvitto": "kvittodatum",
+      "bankrad": "transaktionsdag"
+    }
+  },
   "agare_och_narstaende": ["AGARE-1"],
   "regler": [
     {

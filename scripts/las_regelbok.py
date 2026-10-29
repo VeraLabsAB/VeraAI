@@ -20,7 +20,15 @@ Filen ska ha exakt nycklarna i REGELBOK_NYCKLAR, och får ha nycklarna i REGELBO
               nycklarna i OPPETTIDER_NYCKLAR. stangda_veckodagar är en lista med veckodagar ur
               VECKODAGAR, och stangda_datum en lista med datum, ÅÅÅÅ-MM-DD. Varje dag får stå en
               gång. En lista får vara tom: då har företaget inga sådana stängda dagar. Läses och
-              kontrolleras, men används inte än
+              kontrolleras, och används av varningssignalen i K8 (konteringsfloden.py)
+  bokforing   företagets val för hur flödena bokför (Hugos beslut 2026-10-29, B3, D1 och D14):
+              exakt nycklarna i BOKFORING_NYCKLAR, och valfritt de i BOKFORING_VALFRIA_NYCKLAR.
+              antaget är true eller false och säger om valen är påhittade (för ett testföretag)
+              eller beslutade av företaget. metod är en av METODER. verifikationsdatum har exakt
+              nycklarna i VERIFIKATIONSDATUM och säger vilket datum varje sorts verifikation får:
+              ett av värdena för nyckeln i VERIFIKATIONSDATUM. Ett datum från bankraden heter som
+              bankradens fält (las_bank.py). Nyckeln krävs: saknas den stoppas regelboken, och
+              inget val görs åt företaget (Hugos beslut 2026-10-29)
   regler      en lista med minst en regel, se nedan
   anteckning  fri text för människor. Används inte av koden
   agare_och_narstaende
@@ -146,7 +154,8 @@ from normalisering import (
     star_som_hela_ord_utan_accenter, tecken_med_namn,
 )
 
-REGELBOK_NYCKLAR = ("foretag", "version", "godkand", "granser", "k9", "oppettider", "agare_och_narstaende", "regler")
+REGELBOK_NYCKLAR = ("foretag", "version", "godkand", "granser", "k9", "oppettider", "bokforing", "agare_och_narstaende",
+                    "regler")
 REGELBOK_VALFRIA_NYCKLAR = ("anteckning",)
 # Läggs till i varje fel i listan över ägare och närstående (Hugos beslut 2026-10-27).
 _UTAN_AGARLISTA = ("Utan en giltig lista över ägare och närstående (K7) kan ägarens transaktioner inte kännas igen."
@@ -156,6 +165,18 @@ GRANSER_NYCKLAR = ("a_hogst_ore", "b_hogst_ore")
 K9_NYCKLAR = ("minst_historik", "hogst_procent_av_median", "lagst_procent_av_median")
 OPPETTIDER_NYCKLAR = ("stangda_veckodagar", "stangda_datum")
 VECKODAGAR = ("mandag", "tisdag", "onsdag", "torsdag", "fredag", "lordag", "sondag")
+BOKFORING_NYCKLAR = ("antaget", "metod", "verifikationsdatum")
+BOKFORING_VALFRIA_NYCKLAR = ("anteckning",)
+# Metoderna som flödena kan bokföra med. Kontantmetoden är inte byggd (DESIGN-regelbok.md avsnitt 4a, D1).
+METODER = ("faktureringsmetoden",)
+# Vilket datum varje sorts verifikation kan få (D14): nyckeln är verifikationen, värdena är de datum som
+# är byggda. fakturadatum och kvittodatum är underlagets datum, de andra är bankradens fält med samma namn.
+VERIFIKATIONSDATUM = {
+    "leverantorsfaktura": ("fakturadatum",),
+    "betalning": ("transaktionsdag", "bokforingsdag"),
+    "kvitto": ("kvittodatum", "transaktionsdag", "bokforingsdag"),
+    "bankrad": ("transaktionsdag", "bokforingsdag"),
+}
 REGEL_NYCKLAR = ("id", "galler", "kontering", "villkor", "niva")
 REGEL_VALFRIA_NYCKLAR = ("anteckning",)
 # Källorna en regel kan gälla, och nycklarna i 'galler' för varje källa utöver 'kalla'.
@@ -355,6 +376,36 @@ def _kontrollera_oppettider(oppettider, var):
              for nummer, dag in enumerate(_lista(oppettider["stangda_datum"], "'stangda_datum'", var), start=1)]
     return {"stangda_veckodagar": _inga_dubbletter(veckodagar, "'stangda_veckodagar'", var),
             "stangda_datum": _inga_dubbletter(datum, "'stangda_datum'", var)}
+
+
+def _ett_av(varde, tillatna, vad, var):
+    """varde ska vara exakt en av texterna i tillatna."""
+    if not isinstance(varde, str) or varde not in tillatna:
+        raise RegelbokFel(
+            var + ": " + vad + " är " + (repr(varde) if isinstance(varde, str) else _json_typ(varde)) + ", men ska"
+            " vara " + ("" if len(tillatna) == 1 else "en av ") + ", ".join(map(repr, tillatna)) + ". Andra val är"
+            " inte byggda, och inget val görs åt företaget."
+        )
+    return varde
+
+
+def _kontrollera_bokforing(bokforing, var):
+    """Företagets val för flödena (B3, D1 och D14): om valen är antagna, metoden och datumet per verifikation."""
+    _objekt(bokforing, "'bokforing'", var)
+    _kontrollera_nycklar(bokforing, BOKFORING_NYCKLAR, BOKFORING_VALFRIA_NYCKLAR, var + ", 'bokforing',", _REGELBOK)
+    if type(bokforing["antaget"]) is not bool:
+        raise RegelbokFel(var + ": 'antaget' i 'bokforing' ska vara true eller false, inte "
+                          + _json_typ(bokforing["antaget"]) + ".")
+    if "anteckning" in bokforing:
+        _text_i_json(bokforing["anteckning"], "'anteckning' i 'bokforing'", var, _REGELBOK)
+    datum = _objekt(bokforing["verifikationsdatum"], "'verifikationsdatum' i 'bokforing'", var)
+    _kontrollera_nycklar(datum, tuple(VERIFIKATIONSDATUM), (), var + ", 'verifikationsdatum' i 'bokforing',", _REGELBOK)
+    return {
+        "antaget": bokforing["antaget"],
+        "metod": _ett_av(bokforing["metod"], METODER, "'metod' i 'bokforing'", var),
+        "verifikationsdatum": {nyckel: _ett_av(datum[nyckel], tillatna, repr(nyckel) + " i 'verifikationsdatum'", var)
+                               for nyckel, tillatna in VERIFIKATIONSDATUM.items()},
+    }
 
 
 def _kontrollera_agare_och_narstaende(agare, var):
@@ -723,6 +774,7 @@ def _kontrollera_regelbok(data, kontoplan, momssatser, matchningsformat, var):
         "granser": granser,
         "k9": _kontrollera_k9(data["k9"], var),
         "oppettider": _kontrollera_oppettider(data["oppettider"], var),
+        "bokforing": _kontrollera_bokforing(data["bokforing"], var),
         "agare_och_narstaende": agare,
         "regler": _kontrollera_regelbokens_regler(data["regler"], granser, agare, konton, momssatser, matchningsregler,
                                                   var),
@@ -802,6 +854,11 @@ class Regelbok:
     @property
     def oppettider(self):
         return _kopia(self._regelboken["oppettider"])
+
+    @property
+    def bokforing(self):
+        """Företagets val för flödena: antaget, metod och verifikationsdatum, som en ny kopia."""
+        return _kopia(self._innehall()["bokforing"])
 
     @property
     def agare_och_narstaende(self):

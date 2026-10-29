@@ -150,13 +150,15 @@ def test_karnans_egna_ord_ar_verkligen_karnans_nycklar():
 # Underlagets nycklar är kärnans egen form för underlag (las_underlag.py), gemensam för alla
 # företag. Några av dem ("datum", "moms", "momssats") råkar också vara namn i testbutikens
 # kassaformat. De godtas som textsträngar bara i las_underlag.py, där formen beskrivs, i
-# matcha_bank.py, som läser underlagens uppgifter (till exempel "datum"), och i
+# matcha_bank.py, som läser underlagens uppgifter (till exempel "datum"), i
 # konteringsforslag.py, som läser underlagens momsrader ("moms" och "momssats") och har samma ord
-# "datum" för verifikationens datum. Alla andra kärnfiler prövas som förut.
+# "datum" för verifikationens datum, och i konteringsfloden.py, som läser underlagens datum och
+# momsrader och bygger förslagen. Alla andra kärnfiler prövas som förut.
 UNDERLAGSMODULEN = SCRIPTS / "las_underlag.py"
 MATCHNINGSMODULEN = SCRIPTS / "matcha_bank.py"
 FORSLAGSMODULEN = SCRIPTS / "konteringsforslag.py"
-UNDERLAGETS_ANVANDARE = (UNDERLAGSMODULEN, MATCHNINGSMODULEN, FORSLAGSMODULEN)
+FLODESMODULEN = SCRIPTS / "konteringsfloden.py"
+UNDERLAGETS_ANVANDARE = (UNDERLAGSMODULEN, MATCHNINGSMODULEN, FORSLAGSMODULEN, FLODESMODULEN)
 UNDERLAGETS_EGNA_ORD = set(las_underlag.NYCKLAR) | set(las_underlag.MOMSRAD_NYCKLAR)
 
 # Regelbokens nycklar är kärnans egen form för regelboken (las_regelbok.py), gemensam för alla
@@ -516,6 +518,55 @@ def test_forslagsmodulen_provas_av_alla_kontroller():
             | {nyckel for nycklar, valfria in konteringsforslag.KALLOR.values() for nyckel in nycklar + valfria})
     assert egna & set(namn_i_kassaformaten()) == {"datum", "momssats"} <= UNDERLAGETS_EGNA_ORD
     assert kassanamn_i_filer([FORSLAGSMODULEN], namn_i_kassaformaten()) != []
+
+
+# --- Flödena a, b och e (uppgift 4) ---
+
+def test_flodena_provas_av_alla_kontroller():
+    # Skydd: konteringsfloden.py är en kärnfil, så att alla sökningar ovan (företagsnamn, konton,
+    # momssatser, kassaformatens, regelbökernas och testdatans namn och bankfilernas texter) gäller den.
+    # Undantaget för underlagets nycklar släpper bara igenom underlagets egna ord, och utan undantaget
+    # slår kontrollen larm på filen.
+    assert FLODESMODULEN in karnans_filer() and FLODESMODULEN in UNDERLAGETS_ANVANDARE
+    fynd = kassanamn_i_filer([FLODESMODULEN], namn_i_kassaformaten())
+    assert fynd and all(fynd_.split(" har textsträngen ")[-1].strip("'") in UNDERLAGETS_EGNA_ORD for fynd_ in fynd)
+
+
+def namn_i_regelbockernas_val():
+    """Värdena i alla företags regelbok.json som hör till företaget och inte är kärnans egna ord.
+
+    Stängda datum ur 'oppettider' och anteckningar. Valen i 'bokforing' (metod och datum) är kärnans
+    ord (las_regelbok.METODER och VERIFIKATIONSDATUM) och tas inte med.
+    """
+    namn = set()
+    for fil in sorted(FORETAG.glob("*/regelbok.json")):
+        data = json.loads(fil.read_text(encoding="utf-8"))
+        namn.update(data["oppettider"]["stangda_datum"])
+        namn.update([data["foretag"], data["godkand"]["av"]])
+    return sorted(namn)
+
+
+def test_regelbockernas_val_har_namn_att_soka_efter():
+    # Skydd mot att testet nedan blir grönt för att det inte hittar något alls.
+    assert {"2025-01-06", "syntet-testbutik"} <= set(namn_i_regelbockernas_val())
+
+
+def test_karnan_innehaller_inga_stangda_dagar_eller_foretagets_namn_ur_regelbockerna():
+    """Vilka dagar företaget har stängt och vad det heter står i regelboken, aldrig i kärnan (K8:s varningssignal)."""
+    fynd = namn_ur_testdatan_i_filer(karnans_filer(), namn_i_regelbockernas_val())
+    assert not fynd, "Värden ur regelbökerna i kärnan:\n" + "\n".join(fynd)
+
+
+def test_regelbockernas_val_ar_karnans_ord():
+    # Valen i 'bokforing' är de som kärnan har byggda, inte företagets egna namn. Ett nytt värde i en
+    # regelbok stoppas av las_regelbok, så kärnan kan aldrig behöva ett företags eget ord här.
+    import las_regelbok
+
+    for fil in sorted(FORETAG.glob("*/regelbok.json")):
+        bokforing = json.loads(fil.read_text(encoding="utf-8"))["bokforing"]
+        assert bokforing["metod"] in las_regelbok.METODER
+        for nyckel, varde in bokforing["verifikationsdatum"].items():
+            assert varde in las_regelbok.VERIFIKATIONSDATUM[nyckel]
 
 
 def znummer_i_testdatans_kassafiler():
