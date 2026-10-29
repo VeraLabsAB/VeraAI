@@ -43,8 +43,9 @@ intill namnet inte döljer det (N3, granskning 8). sokform_for_namn ger namnet i
 star_som_hela_ord söker efter, och regelboken använder samma funktion (granskning 11, Q3).
 star_som_hela_ord_utan_accenter gör samma sak, men accenter räknas inte, så att "Åsa Öberg" står i
 "UTTAG ASA OBERG" och omvänt. Den används bara av ägaruppslaget i regelboken (granskning 11, Q2, Hugos
-beslut 2026-10-29). Allt annat, till exempel K4 och matchningen mot motparter, bryr sig fortfarande om
-accenter.
+beslut 2026-10-29). normalisera_utan_accenter ger texten som normalisera_for_jamforelse, men utan accenter,
+för regelbokens ägarkontroller som jämför två namn (Q2b, Hugos beslut 2026-10-29). Allt annat, till
+exempel K4, dublettkontrollen i ägarlistan och matchningen mot motparter, bryr sig fortfarande om accenter.
 """
 
 import unicodedata
@@ -228,3 +229,13 @@ def star_som_hela_ord_utan_accenter(namn, text):
     aldrig i färre. Ett namn utan bokstäver och siffror stoppas redan av regelboken.
     """
     return star_som_hela_ord(_utan_accenter(namn), _utan_accenter(text))
+
+
+def normalisera_utan_accenter(text):
+    """Som normalisera_for_jamforelse, men utan accenter: "Åsa Öberg" och "ASA OBERG" ger samma text.
+
+    Bara för ägarkontrollerna i regelboken som jämför två namn (las_regelbok.py, granskning 11, Q2b, Hugos
+    beslut 2026-10-29). Accenterna tas bort på samma sätt som i star_som_hela_ord_utan_accenter, och sedan
+    normaliseras texten med normalisera_for_jamforelse.
+    """
+    return normalisera_for_jamforelse(_utan_accenter(text))

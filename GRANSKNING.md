@@ -7020,3 +7020,8 @@ Skrivet in på Hugos uppdrag i chatten 2026-10-29. Fynden står i granskning 11 
   (`normalisera_for_jamforelse`), dublettkontrollen K4 och matchningen mot motparter får inte ändras. Andra
   stavningar (till exempel AA eller OE) tas när riktiga bankfiler finns (Ö5). **Q2 byggs i en egen session.**
 - Q3 och Q4 ska inte ändra hur något fungerar.
+- **Q2b: ja.** `ar_agare_eller_narstaende` och kontrollen att en regel för ägarens underlag har nivå D ska också
+  bortse från accenter. Samma jämförelse som i dag, bara utan accenter på båda sidor. `normalisera_for_jamforelse`,
+  `sokform_for_namn` och `star_som_hela_ord` får inte ändras.
+- **Q8 (senare):** matchningen mot motparter har en egen kopia av `star_som_hela_ord`. Den ska samlas på ett
+  ställe, som i Q3. Rör inte ägare. Läggs under Öppet.

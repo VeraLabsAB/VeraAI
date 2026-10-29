@@ -37,8 +37,9 @@ Filen ska ha exakt nycklarna i REGELBOK_NYCKLAR, och får ha nycklarna i REGELBO
               den blir tom när den delas i ord som i star_som_hela_ord och aldrig kan kännas igen i en
               bankrad (granskning 10, P1, Hugos beslut 2026-10-28). Uppslaget ar_agare_eller_narstaende
               säger om en motpart står i listan, och ar_bankrad_mot_agare_eller_narstaende om en
-              motpart i listan står i en bankrad (M7, N3), utan hänsyn till accenter (Q2, Hugos
-              beslut 2026-10-29), så att nivåsteget kan använda det. En
+              motpart i listan står i en bankrad (M7, N3), båda utan hänsyn till accenter (Q2 och
+              Q2b, Hugos beslut 2026-10-29), så att nivåsteget kan använda det. Dublettkontrollen i
+              listan bryr sig fortfarande om accenter. En
               sådan bankrad passar aldrig en regel i matchningsformatet (matchningsregel_for_bankrad)
 
 En regel har exakt nycklarna i REGEL_NYCKLAR, och får ha nycklarna i REGEL_VALFRIA_NYCKLAR:
@@ -82,8 +83,8 @@ Regler för regelboken som helhet:
   gränsen i matchning.json.
 - En regel för bankrader får aldrig ha nivå A, eftersom bankrader utan underlag aldrig blir A
   (Hugos beslut D20).
-- En regel för underlag vars motpart står i agare_och_narstaende (efter normaliseringen) måste
-  ha nivå D (K7). Annars stoppas filen.
+- En regel för underlag vars motpart står i agare_och_narstaende (efter normaliseringen och utan
+  hänsyn till accenter, Q2b, Hugos beslut 2026-10-29) måste ha nivå D (K7). Annars stoppas filen.
 - Förväxlingstecken (M5, granskning 7, och N2, granskning 8): en motpart (i 'galler' och i
   agare_och_narstaende) och ett kassaregister får bara ha bokstäverna a–z och A–Z, med eller utan
   accent (som å, ä, ö och é), siffrorna 0–9, mellanslag, bindestreck (alla sorter, som blir "-" när
@@ -141,8 +142,8 @@ from las_matchningsformat import (
 from las_momssatser import Momssatser, MomssatsFel
 from las_underlag import HELTAL_HOGST_SIFFROR, TYPER
 from normalisering import (
-    andra_skriftsystem, blandat_ord, normalisera_for_jamforelse, sokform_for_namn, star_som_hela_ord_utan_accenter,
-    tecken_med_namn,
+    andra_skriftsystem, blandat_ord, normalisera_for_jamforelse, normalisera_utan_accenter, sokform_for_namn,
+    star_som_hela_ord_utan_accenter, tecken_med_namn,
 )
 
 REGELBOK_NYCKLAR = ("foretag", "version", "godkand", "granser", "k9", "oppettider", "agare_och_narstaende", "regler")
@@ -557,10 +558,15 @@ def _kontrollera_bankradsregel(regel, vad, matchningsregler, var):
 
 
 def _kontrollera_agarregel(regel, vad, agare, var):
-    """En regel för underlag från en ägare eller närstående (efter normaliseringen) ska ha nivå D (K7)."""
-    motpart = normalisera_for_jamforelse(regel["galler"]["motpart"])
+    """En regel för underlag från en ägare eller närstående ska ha nivå D (K7).
+
+    Motparten jämförs efter normaliseringen och utan hänsyn till accenter (normalisering.normalisera_utan_accenter,
+    granskning 11, Q2b, Hugos beslut 2026-10-29), så att en regel för "Asa Oberg" ska ha nivå D när "Åsa Öberg"
+    står i listan, och omvänt.
+    """
+    motpart = normalisera_utan_accenter(regel["galler"]["motpart"])
     for namn in agare:
-        if normalisera_for_jamforelse(namn) == motpart and regel["niva"] != "D":
+        if normalisera_utan_accenter(namn) == motpart and regel["niva"] != "D":
             raise RegelbokFel(
                 var + ": " + vad + " gäller motparten " + repr(regel["galler"]["motpart"]) + ", som står i"
                 " 'agare_och_narstaende' (som " + repr(namn) + "), och har nivå " + repr(regel["niva"]) + ". En regel"
@@ -854,12 +860,14 @@ class Regelbok:
     def ar_agare_eller_narstaende(self, motpart):
         """True om motparten står i 'agare_och_narstaende', annars False (K7).
 
-        Motparten jämförs efter normaliseringen (normalisering.py), som i K4 och regel_for_underlag.
+        Motparten jämförs efter normaliseringen (normalisering.py), som i K4 och regel_for_underlag, men utan
+        hänsyn till accenter (normalisering.normalisera_utan_accenter, granskning 11, Q2b, Hugos beslut
+        2026-10-29): "Asa Oberg" är en ägare när "Åsa Öberg" står i listan, och omvänt.
         """
         if not isinstance(motpart, str):
             raise RegelbokFel("Uppslaget i regelboken: motpart ska vara text, inte " + _json_typ(motpart) + ".")
-        sokt = normalisera_for_jamforelse(motpart)
-        return any(normalisera_for_jamforelse(namn) == sokt for namn in self._innehall()["agare_och_narstaende"])
+        sokt = normalisera_utan_accenter(motpart)
+        return any(normalisera_utan_accenter(namn) == sokt for namn in self._innehall()["agare_och_narstaende"])
 
     def ar_bankrad_mot_agare_eller_narstaende(self, rad):
         """True om en motpart i 'agare_och_narstaende' står i bankradens beskrivning eller referens (K7, M7).

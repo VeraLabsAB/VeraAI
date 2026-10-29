@@ -8,6 +8,10 @@ och kontrollen att ingen regel i matchningsformatet nämner en ägare. Den gemen
 
 Testen för Q2 var röda före rättelsen. Skyddstesten var gröna både före och efter. Allt skrivs i
 testets tillfälliga mapp.
+
+Q2b (samma avsnitt i GRANSKNING.md): accenter spelar heller ingen roll i de andra två ägarkontrollerna,
+Regelbok.ar_agare_eller_narstaende (en motpart i ett underlag) och kontrollen att en regel för ägarens
+underlag har nivå D. Dublettkontrollen i ägarlistan och kontrollen av tvetydiga regler ändras inte.
 """
 
 import hashlib
@@ -18,7 +22,9 @@ from pathlib import Path
 
 import pytest
 
-from test_las_regelbok import bok, konfiguration, las  # noqa: F401 (konfiguration är en fixture)
+from test_las_regelbok import (  # noqa: F401 (konfiguration är en fixture)
+    bok, konfiguration, las, med_agare, regel, stoppas, underlag as galler_for_underlag,
+)
 from test_matcha_bank import (  # noqa: F401 (kvartalet är en fixture)
     FORMAT, REGELBOK, bankrader, kvartalet, matcha, period, regelbok_for, sammanfattning, tomt, underlag,
 )
@@ -107,7 +113,130 @@ def test_q2_en_matchningsregel_som_namner_agaren_utan_accenter_stoppar_regelboke
     assert regelbok_for(format_, agare=("AGARE-9",)) is not None
 
 
+# --- Q2b: ägaren känns igen utan accenter också i underlagen (röda före rättelsen) ---
+
+# (namn i ägarlistan, motpart i underlaget eller i regeln). Båda riktningarna, och accenter som egna tecken.
+UTAN_ACCENTER = [
+    ("Åsa Öberg", "Asa Oberg"),
+    ("Åsa Öberg", "ASA OBERG"),
+    ("Asa Oberg", "Åsa Öberg"),
+    ("Asa Oberg", "ÅSA ÖBERG"),
+    ("René", "Rene"),
+    ("Rene", "René"),
+    ("Ärlig Ägare", "arlig agare"),
+    ("Asa Oberg", "A" + RING + "sa O" + TREMA + "berg"),
+    ("A" + RING + "sa O" + TREMA + "berg", "Asa Oberg"),
+    ("Rene", "Rene" + AKUT),
+    ("Rene" + AKUT, "Rene"),
+    ("Åsa Öberg", "A" + RING + "sa Oberg"),
+]
+
+
+@pytest.mark.parametrize("agare, motpart", UTAN_ACCENTER)
+def test_q2b_ar_agare_eller_narstaende_bortser_fran_accenter(tmp_path, konfiguration, agare, motpart):  # noqa: F811
+    regelbok = las(tmp_path, bok(agare_och_narstaende=[agare]), konfiguration)
+    assert regelbok.ar_agare_eller_narstaende(motpart), (agare, motpart)
+
+
+@pytest.mark.parametrize("agare, motpart", UTAN_ACCENTER)
+def test_q2b_galler_aven_narstaende_langre_ned_i_listan(tmp_path, konfiguration, agare, motpart):  # noqa: F811
+    # Ägare och närstående står i samma lista. Den närstående står här efter en annan ägare.
+    regelbok = las(tmp_path, bok(agare_och_narstaende=["AGARE-X", agare]), konfiguration)
+    assert regelbok.ar_agare_eller_narstaende(motpart), (agare, motpart)
+
+
+def test_q2b_ett_fristaende_accenttecken_i_underlaget(tmp_path, konfiguration):  # noqa: F811
+    # Motparten i ett underlag kan ha vilka tecken som helst, också ett fristående "¨" efter bokstaven (N4).
+    regelbok = las(tmp_path, bok(agare_och_narstaende=["Asa Oberg"]), konfiguration)
+    assert regelbok.ar_agare_eller_narstaende("Asa O" + FRISTAENDE_TREMA + "berg")
+    regelbok = las(tmp_path, bok(agare_och_narstaende=["Åsa Öberg"]), konfiguration)
+    assert regelbok.ar_agare_eller_narstaende("Asa O" + FRISTAENDE_TREMA + "berg")
+
+
+@pytest.mark.parametrize("niva", ["A", "B", "C"])
+@pytest.mark.parametrize("agare, motpart", UTAN_ACCENTER)
+def test_q2b_regel_for_agaren_utan_accenter_ska_ha_niva_d(tmp_path, konfiguration, agare, motpart, niva):  # noqa: F811
+    data = med_agare([agare], regel("R-6", galler_for_underlag(motpart=motpart), {"grupp_a": "9001"}, niva=niva))
+    stoppas(tmp_path, data, konfiguration, "regel nummer 6 (R-6) gäller motparten " + repr(motpart),
+            "som står i 'agare_och_narstaende' (som " + repr(agare) + ")", "har nivå " + repr(niva),
+            "ska alltid ha nivå D")
+
+
+@pytest.mark.parametrize("agare, motpart", UTAN_ACCENTER)
+def test_q2b_regel_for_narstaende_utan_accenter_ska_ha_niva_d(tmp_path, konfiguration, agare, motpart):  # noqa: F811
+    data = med_agare(["AGARE-X", agare], regel("R-6", galler_for_underlag("kvitto", motpart), {"grupp_a": "9001"}))
+    stoppas(tmp_path, data, konfiguration, "gäller motparten " + repr(motpart), "(som " + repr(agare) + ")",
+            "ska alltid ha nivå D")
+
+
 # --- Skyddstest (gröna både före och efter rättelsen) ---
+
+@pytest.mark.parametrize("agare, motpart", UTAN_ACCENTER)
+def test_skydd_regel_for_agaren_utan_accenter_med_niva_d_godtas(tmp_path, konfiguration, agare, motpart):  # noqa: F811
+    data = med_agare([agare], regel("R-6", galler_for_underlag(motpart=motpart), {"grupp_a": "9001"}, niva="D"))
+    assert las(tmp_path, data, konfiguration).regler[-1]["niva"] == "D"
+
+
+def test_skydd_andra_motparter_ar_inte_agare(tmp_path, konfiguration):  # noqa: F811
+    regelbok = las(tmp_path, bok(agare_och_narstaende=["Åsa Öberg", "AGARE-1"]), konfiguration)
+    for motpart in ("Asa Obergsson", "Asa", "Oberg", "Åsa Öberg AB", "AGARE-10", "AGARE-1X", "AGARE 2", "MOTPART-A"):
+        assert not regelbok.ar_agare_eller_narstaende(motpart), motpart
+    # En regel för en sådan motpart får ha vilken nivå som helst.
+    data = med_agare(["Åsa Öberg"], regel("R-6", galler_for_underlag(motpart="Asa Obergsson"), {"grupp_a": "9001"},
+                                          niva="A"))
+    assert las(tmp_path, data, konfiguration).regler[-1]["niva"] == "A"
+
+
+def test_skydd_ar_agare_eller_narstaende_hittar_aldrig_farre_an_forut(tmp_path, konfiguration):  # noqa: F811
+    # Varje ägarnamn och varje motpart av tecknen nedan: där den gamla jämförelsen (normalisera_for_jamforelse på
+    # båda sidor) säger ja, säger uppslaget också ja. Namn som regelboken stoppar hoppas över.
+    tecken = ["a", "Å", "é", "0", "-", " ", "e" + AKUT, "A" + RING, FRISTAENDE_TREMA, chr(0x200B)]
+    namn = ["".join(delar) for langd in (1, 2) for delar in itertools.product(tecken, repeat=langd)]
+    motparter = ["".join(delar) for langd in (1, 2, 3) for delar in itertools.product(tecken, repeat=langd)]
+    provade, lika = 0, 0
+    for nummer, ett in enumerate(namn):
+        mapp = tmp_path / str(nummer)
+        mapp.mkdir()
+        try:
+            regelbok = las(mapp, bok(agare_och_narstaende=[ett]), konfiguration)
+        except RegelbokFel:
+            continue
+        provade += 1
+        for motpart in motparter:
+            if normalisering.normalisera_for_jamforelse(motpart) == normalisering.normalisera_for_jamforelse(ett):
+                lika += 1
+                assert regelbok.ar_agare_eller_narstaende(motpart), (ett, motpart)
+    assert provade > 20 and lika > 100, (provade, lika)
+
+
+def test_skydd_dubbletter_i_agarlistan_som_forut(tmp_path, konfiguration):  # noqa: F811
+    # Dublettkontrollen i ägarlistan bryr sig fortfarande om accenter: "Åsa Öberg" och "Asa Oberg" får stå
+    # bredvid varandra, men inte "Åsa Öberg" och "ÅSA ÖBERG".
+    regelbok = las(tmp_path, bok(agare_och_narstaende=["Åsa Öberg", "Asa Oberg"]), konfiguration)
+    assert regelbok.agare_och_narstaende == ["Åsa Öberg", "Asa Oberg"]
+    for andra in ("ÅSA ÖBERG", "åsa öberg", "A" + RING + "sa O" + TREMA + "berg"):
+        stoppas(tmp_path, bok(agare_och_narstaende=["Åsa Öberg", andra]), konfiguration,
+                repr(andra) + " står flera gånger i 'agare_och_narstaende' (som 'Åsa Öberg')")
+
+
+def test_skydd_tvetydiga_regler_som_forut(tmp_path, konfiguration):  # noqa: F811
+    # Två regler för "Café AB" och "Cafe AB" är olika regler, som förut. Uppslaget för den ena hittar inte den andra.
+    data = bok(regler=bok()["regler"] + [
+        regel("R-6", galler_for_underlag(motpart="Café AB"), {"grupp_a": "9001"}),
+        regel("R-7", galler_for_underlag(motpart="Cafe AB"), {"grupp_a": "9002"}),
+    ])
+    regelbok = las(tmp_path, data, konfiguration)
+    assert regelbok.regel_for_underlag("leverantorsfaktura", "CAFÉ AB", "2025-01-01")["id"] == "R-6"
+    assert regelbok.regel_for_underlag("leverantorsfaktura", "CAFE AB", "2025-01-01")["id"] == "R-7"
+    regelbok = las(tmp_path, bok(regler=bok()["regler"] + [regel("R-6", galler_for_underlag(motpart="Café AB"),
+                                                                 {"grupp_a": "9001"})]), konfiguration)
+    assert regelbok.regel_for_underlag("leverantorsfaktura", "Cafe AB", "2025-01-01") is None
+    # Samma stavning med andra stora och små bokstäver är tvetydig, som förut.
+    data = bok(regler=bok()["regler"] + [
+        regel("R-6", galler_for_underlag(motpart="Café AB"), {"grupp_a": "9001"}),
+        regel("R-7", galler_for_underlag(motpart="CAFÉ AB"), {"grupp_a": "9002"}),
+    ])
+    stoppas(tmp_path, data, konfiguration, "reglerna 'R-6' och 'R-7' kan båda passa samma sak")
 
 def test_skydd_agare_1_hittas_inte_i_agare_10(tmp_path, konfiguration):  # noqa: F811
     for beskrivning in ("UTTAG AGARE-10", "UTTAG AGARE-1X", "UTTAGAGARE-1", "KOP AGARE-12 AB"):
