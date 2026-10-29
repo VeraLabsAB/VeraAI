@@ -25,9 +25,9 @@ Status: ✅ klart · 🔶 pågår · ⬜ inte påbörjat
 ## Läge nu
 
 - **Uppdaterad:** 2026-10-29
-- **Pågående steg:** 22 – Uppgift 4, flöde a, b och e (byggd och granskad, P1 och P2 kvar)
+- **Pågående steg:** 22 – Uppgift 4, flöde a, b och e (byggd och granskad, P1 och P2 kvar); 12 – Ny version av inställningsfilen utan `disableAutoMode`, väntar på att Hugo installerar om (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Auto tillåts igen")
 - **Senast avslutade steg:** 13 – Kontrollen efter installationen, med provet med en vakt som fallerar (2026-10-29, `GRANSKNING.md`, "Steg 8, provet med en vakt som fallerar, 2026-10-29")
-- **Nästa steg:** Hugo eller Casper svarar på de 7 frågorna i granskning 22 (`GRANSKNING.md`). Därefter rättelser av P1 och P2 i en egen session, och Öppet 26. Steg 15 (sandlådan) ska vara klar före steg 23 (uppgift 5)
+- **Nästa steg:** Hugo installerar den nya inställningsfilen (INSTALLERA.md, "Byte av inställningsfil": steg 10–13, sedan kontrollen steg 1, 2, 3 och 9). Hugo eller Casper svarar på de 7 frågorna i granskning 22 (`GRANSKNING.md`). Därefter rättelser av P1 och P2 i en egen session, och Öppet 26. Steg 15 (sandlådan) ska vara klar före steg 23 (uppgift 5)
 - **Opushat:** ja, e4d8cd7 och commitarna efter den (`main` på GitHub står vid d127c3e)
 
 ---
@@ -71,9 +71,9 @@ Status: ✅ klart · 🔶 pågår · ⬜ inte påbörjat
 
 | # | Steg | Status | Klart när | Beror på |
 |---|---|---|---|---|
-| 12 | **Hugo installerar vakten** enligt `sparr/INSTALLERA.md` | ✅ | `/status` visar `Enterprise managed settings (file)` och vakten stoppar `date` i skrivbordsappen. Gjort på Hugos dator 2026-10-28 (`GRANSKNING.md`, "Installation på Hugos dator 2026-10-28"). Caspers dator är steg 14 | 11 |
+| 12 | **Hugo installerar vakten** enligt `sparr/INSTALLERA.md` | 🔶 ny version av inställningsfilen väntar på ominstallation | Den nya filen utan `disableAutoMode` (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Auto tillåts igen") är installerad med steg 10–13, och kontrollen steg 1, 2, 3 och 9 är gjord igen, med läget "auto" valbart i steg 1 (INSTALLERA.md, "Byte av inställningsfil"). Första installationen: `/status` visar `Enterprise managed settings (file)` och vakten stoppar `date` i skrivbordsappen. Gjort på Hugos dator 2026-10-28 (`GRANSKNING.md`, "Installation på Hugos dator 2026-10-28"). Caspers dator är steg 14 | 11 |
 | 13 | Kontrollen efter installationen, i en ny session (sist i INSTALLERA.md), inklusive provet med en vakt som fallerar | ✅ 2026-10-29 | Alla steg i kontrollen visar väntat svar. Steg 1–7 och 9 gjorda vid installationen, och spärrtestet 2026-10-29 är grönt. Steg 8 (provet med en vakt som fallerar) och steg 9 igen efter det är gjorda och gröna 2026-10-29, med samma kontrollsummor (`GRANSKNING.md`, "Steg 8, provet med en vakt som fallerar, 2026-10-29", PROGRESS.md, Öppet 16 stängd) | 12 |
-| 14 | Samma installation och kontroll på Caspers dator (`/Library/Python` kontrolleras för hand först, K1 granskning 20) | ⬜ | Samma resultat som steg 13. Planerad till helgen vecka 44 (PROGRESS.md, Öppet 15) | 13 |
+| 14 | Samma installation och kontroll på Caspers dator (`/Library/Python` kontrolleras för hand först, K1 granskning 20) | ⬜ | Samma resultat som steg 13. Planerad till helgen vecka 44 (PROGRESS.md, Öppet 15). Casper installerar den nya inställningsfilen utan `disableAutoMode` (Hugos beslut 2026-10-29, "Beslut 2026-10-29 – Auto tillåts igen"), med summan i INSTALLERA.md steg 5. Läget "auto" används på Caspers dator först när steg 8 i kontrollen är gjort där | 13 |
 | 15 | **Sandlådan** (Öppet 4 och 8): skrivning bara i tillåtna mappar, förbud för appen, appens Claude Code och `~/.local/share/claude`, täcker `trap`, `hash` och `builtin`. Ska vara klar före steg 23 (uppgift 5), eller före första körningen på riktiga underlag om den kommer först (Hugos beslut 2026-10-28 och 2026-10-29, B1) | ⬜ | Spärrtest: en egen testfil som försöker skriva utanför projektet stoppas | 13 |
 | 16 | Bash-vägen prövas i skrivbordsappen (Öppet 7) | ⬜ | Beslut skrivet: bash eller zsh | 15 |
 | 17 | Omvägarna förbi vakten med kommandotexter i en kopia (granskning 13, P5) | ⬜ | Inga omvägar hittade, eller rättade | 15 |

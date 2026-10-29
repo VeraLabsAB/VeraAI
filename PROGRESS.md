@@ -1,7 +1,7 @@
 # PROGRESS – Veras bokföringsagent
 
 Uppdaterad 2026-10-29. Specifikation: `SPEC.md`. Byggordning: `DESIGN-regelbok.md` avsnitt 7.
-Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12 är klart: vakten installerades på Hugos dator 2026-10-28. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Steg 13 är klart**: provet med en vakt som fallerar (steg 8 i kontrollen) är gjort och grönt 2026-10-29. **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4", och **D13 och D14** under "D13 och D14 beslutade" (baec52b). **Uppgift 4 är byggd** 2026-10-29 (4269f76, f6ed99e och e4cc538): flöde a, b och e med K5 och K8 i `scripts/konteringsfloden.py`, och den nya nyckeln `bokforing` i regelboken (Hugos OK i chatten 2026-10-29). Granskad i granskning 22 (e4d8cd7), gult: P1 och P2 kvar, 7 frågor väntar på Hugo. Pushad (`main` på GitHub står vid d127c3e). **Hugos beslut efter uppgift 4 (a–f)** står i `GRANSKNING.md`, "Beslut efter uppgift 4 (2026-10-29)" (48e7ed3), och är byggda 2026-10-29 i ded669d (c: nyckeln `flode`, reserverade namn och regeln `bankens-avgifter`) och 5753890 (f och e). Inte pushade. Nästa steg: se "Nästa steg i byggordningen". Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
+Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12: vakten installerades på Hugos dator 2026-10-28. Steg 12 pågår igen 2026-10-29: en ny version av inställningsfilen, där läget Auto tillåts igen (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Auto tillåts igen"), väntar på att Hugo installerar om. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Steg 13 är klart**: provet med en vakt som fallerar (steg 8 i kontrollen) är gjort och grönt 2026-10-29. **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4", och **D13 och D14** under "D13 och D14 beslutade" (baec52b). **Uppgift 4 är byggd** 2026-10-29 (4269f76, f6ed99e och e4cc538): flöde a, b och e med K5 och K8 i `scripts/konteringsfloden.py`, och den nya nyckeln `bokforing` i regelboken (Hugos OK i chatten 2026-10-29). Granskad i granskning 22 (e4d8cd7), gult: P1 och P2 kvar, 7 frågor väntar på Hugo. Pushad (`main` på GitHub står vid d127c3e). **Hugos beslut efter uppgift 4 (a–f)** står i `GRANSKNING.md`, "Beslut efter uppgift 4 (2026-10-29)" (48e7ed3), och är byggda 2026-10-29 i ded669d (c: nyckeln `flode`, reserverade namn och regeln `bankens-avgifter`) och 5753890 (f och e). Inte pushade. Nästa steg: se "Nästa steg i byggordningen". Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
 
 Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 
@@ -23,6 +23,31 @@ borttagen.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-10-29, ny version av inställningsfilen (Auto tillåts igen)
+
+Steg i byggplanen: 12 (ny version av inställningsfilen, pågår tills Hugo har installerat om)
+
+- **Hugos beslut 2026-10-29: läget Auto tillåts igen** (vänder P6 från granskning 12). Beslutet står ordagrant i
+  `GRANSKNING.md`, "Beslut 2026-10-29 – Auto tillåts igen". Grund: steg 8 i kontrollen efter installationen är gjort
+  (175db51), vakten körs före behörighetsfrågan i alla lägen, och förbudslistan gäller oförändrat.
+- **Villkor tills steg 15 (sandlådan) är klart:**
+  1. Shop and Gos riktiga underlag ligger utanför `~/VERA`.
+  2. Varje session börjar och slutar med `git status`.
+  3. Nästa oberoende granskning kontrollerar att inget utanför projektet har ändrats.
+- **Byggt:** raden `"disableAutoMode": "disable",` är borttagen ur `sparr/managed-settings.json`, inget annat i filen
+  är ändrat. Testet `test_installningarna_tillater_laget_auto_men_inte_att_hoppa_over_behorigheter` kräver att nyckeln
+  saknas och att `disableBypassPermissionsMode` fortfarande är `"disable"` (rött före, grönt efter). Ny summa för
+  inställningsfilen i INSTALLERA.md steg 5: `149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2` (förut
+  `ab34081665b9052c1ff7c35a1b3a983107fc6a763f1f1aab6476523109cb80b0`). Summan räknades med Python i testet, eftersom
+  `shasum` inte står på kommandolistan i SPEC 7.1. INSTALLERA.md har fått avsnittet "Byte av inställningsfil" och
+  hänvisar till beslutet där den sa att Auto inte går att välja. SPEC.md är inte ändrad (den säger inte att Auto är
+  avstängt).
+- **Gäller först efter ominstallationen.** Inget installerades i den här sessionen. Tills Hugo har gjort om steg 10–13
+  och kontrollen steg 1, 2, 3 och 9 gäller den installerade filen, där Auto är avstängt. Casper installerar den nya
+  filen i steg 14.
+- **Testsviten:** 4 312 passed, 0 röda (ett test ersatt av ett annat), med kommandot i SPEC 7.1.
+- **Opushat:** e4d8cd7 och commitarna efter den, och den här.
 
 ## Läge 2026-10-29, efter steg 8 i kontrollen
 

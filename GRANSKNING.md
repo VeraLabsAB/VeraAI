@@ -7579,3 +7579,43 @@ innan de kördes. De gjordes om med ett enkelt mönster och med hela `scripts/te
 **Kommandon:** `ls; ls`, `git status` (först och sist), `date`, `grep -n`, `wc -l`, pytest-kommandot i SPEC 7.1 för
 hela `scripts/tests`, `git add` och `git commit -F` med meddelandet i en fil i scratchpad. Verktyg: Read, Edit, Write (bara för meddelandet i scratchpad), AskUserQuestion och appens verktyg för plan
 och slutruta.
+
+## Beslut 2026-10-29 – Auto tillåts igen
+
+"Hugos beslut 2026-10-29: Läget Auto tillåts igen (vänder P6 från granskning 12). Grund: steg 8 i kontrollen efter installationen är gjort (175db51), vakten körs före behörighetsfrågan i alla lägen, och förbudslistan gäller oförändrat. Villkor tills steg 15 (sandlådan) är klart: (1) Shop and Gos riktiga underlag ligger utanför ~/VERA, (2) varje session börjar och slutar med git status, (3) nästa oberoende granskning kontrollerar att inget utanför projektet har ändrats."
+
+Skrivet in ordagrant på uppdraget i chatten 2026-10-29. Byggt i samma session (byggplanens steg 12, ny version av
+inställningsfilen):
+
+- **Inställningsfilen:** raden `"disableAutoMode": "disable",` under `permissions` är borttagen ur
+  `sparr/managed-settings.json`. Inget annat i filen är ändrat. `"disableBypassPermissionsMode": "disable"` står kvar,
+  så läget "hoppa över alla behörigheter" går fortfarande inte att välja.
+- **Test:** `test_installningarna_stanger_av_laget_auto` är ersatt av
+  `test_installningarna_tillater_laget_auto_men_inte_att_hoppa_over_behorigheter` i `scripts/tests/test_kommandosparr.py`.
+  Det kräver att nyckeln `disableAutoMode` inte finns (varken under `permissions` eller överst), och att
+  `disableBypassPermissionsMode` fortfarande är `"disable"`. Rött före ändringen, grönt efter.
+- **Kontrollsumma:** `sparr/managed-settings.json` hade
+  `ab34081665b9052c1ff7c35a1b3a983107fc6a763f1f1aab6476523109cb80b0` och har nu
+  `149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2` (INSTALLERA.md steg 5). `shasum` står inte på
+  kommandolistan i SPEC 7.1, så summan räknades inte med `shasum` i sessionen, utan med Python (SHA-256, samma
+  räknesätt) i testet `test_steg_5_har_filernas_kontrollsummor`. Hugo kontrollerar den med `shasum -a 256` i
+  installationens steg 5 före bytet. Summan för `kommandosparr.py` är oförändrad.
+- **INSTALLERA.md:** texten om läget "auto" i tabellen överst, efter steg 1, i "Efteråt" punkt 7, före kontrollen
+  och i kontrollen steg 1 är ändrad (steg 1 ska nu visa att "auto" går att välja), och ett nytt avsnitt "Byte av
+  inställningsfil" säger hur den nya filen installeras. Texterna är korta, eftersom testet
+  `test_installera_ar_kortare_an_fore_granskning_15` kräver färre än 989 rader och 9 043 ord (filen hade 9 024 ord
+  före, och har 9 040 efter). Det som inte fick plats står här:
+  - **Byte av inställningsfil, utförligt:** kör steg 5 och jämför summan med den i steg 5. Gör om steg 10–13. I steg 10
+    frågar `cp -i` den här gången om filen som redan finns ska skrivas över: svara `y`. Det skiljer sig från första
+    installationen, där en sådan fråga betydde "stoppa". Frågar den inte, fanns ingen fil där: stoppa och fråga. I steg
+    12 ska summan vara den nya. Starta nya sessioner och gör kontrollen efter installationen, steg 1, 2, 3 och 9, igen.
+    I steg 1 ska "auto" komma upp när man trycker Shift+Tab. Kommer det inte upp gäller den gamla filen: stoppa och fråga.
+  - **Granskning före bytet:** "Efteråt" punkt 10 och SPEC 7.1 säger att en ny version av inställningsfilen granskas
+    oberoende innan den installeras. Avsnittet "Byte av inställningsfil" säger därför "granskad". Om bytet får göras
+    utan en ny granskning, eftersom ändringen bara tar bort en rad, är ett beslut för Hugo eller Casper.
+  - **Caspers dator:** provet i steg 8 ska vara gjort före läget "auto" (Hugos beslut 2026-10-28, 8). Det är gjort på
+    Hugos dator, inte på Caspers. Texten före kontrollen säger det.
+- **SPEC.md 7.1** är inte ändrad. Den säger inte att läget "auto" är avstängt, bara att provet i steg 8 ska vara
+  gjort före läget "auto", och det villkoret står kvar.
+- **Gäller först efter ominstallationen.** Tills Hugo har gjort om steg 10–13 gäller den installerade filen, med
+  `disableAutoMode`. Steg 12 i byggplanen är 🔶 tills dess. Casper installerar den nya filen (steg 14).

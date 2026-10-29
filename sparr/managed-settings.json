@@ -5,7 +5,6 @@
   "disableSkillShellExecution": true,
   "permissions": {
     "disableBypassPermissionsMode": "disable",
-    "disableAutoMode": "disable",
     "deny": [
       "Bash(sudo *)",
       "Bash(su *)",

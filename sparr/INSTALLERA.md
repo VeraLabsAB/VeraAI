@@ -18,7 +18,7 @@ Agenten kan därför inte ändra filerna.
 |---|---|---|
 | `sparr/kommandosparr.py` | `/Library/Application Support/ClaudeCode/vera/kommandosparr.py` | **Vakten.** Ett litet program som Claude Code kör före varje verktyg. Det stoppar allt som inte står på listan i SPEC 7.1. Det stoppar också ett kommando vars program ligger i en mapp som du kan ändra utan lösenord, och kommandon som ändrar `PATH` (PATH-regeln, se nedan). |
 | `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.295 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Inte heller i filerna som zsh läser när det startar och de filer som de läser in: nvm-mappen `~/.nvm`, `~/.zkbd`, `~/.zsh_sessions`, `~/.zlogout` och systemets zsh-filer i `/etc` (granskning 13, P1 b), och `~/.zcompdump`,
-som zsh:s `compinit` läser in vid start (granskning 14, R1), eller i den kompilerade versionen (`.zwc`) av någon av zsh:s startfiler eller av `~/.zcompdump`, som zsh läser i stället för filen (granskning 15, S2). Inte heller i Claude Code för Terminal (`~/.local/bin/claude` och `~/.local/share/claude`), i skrivbordsappens egen Claude Code (`~/Library/Application Support/Claude/claude-code`) eller i appen (`/Applications/Claude.app`) (granskning 13, P4 a). Inte heller någonstans i hela `~/Library/Application Support/Claude`, där också skrivbordsappens egna inställningar ligger (Hugos svar 2026-10-28 efter granskning 13, punkt 3). Inte heller i en fil som heter `.ugrep`, i någon mapp, som är inställningsfilen för det program som `grep` kör i agentens skal (granskning 16, G7). Läget "auto" går inte att använda, och skills kan inte köra skalkommandon. |
+som zsh:s `compinit` läser in vid start (granskning 14, R1), eller i den kompilerade versionen (`.zwc`) av någon av zsh:s startfiler eller av `~/.zcompdump`, som zsh läser i stället för filen (granskning 15, S2). Inte heller i Claude Code för Terminal (`~/.local/bin/claude` och `~/.local/share/claude`), i skrivbordsappens egen Claude Code (`~/Library/Application Support/Claude/claude-code`) eller i appen (`/Applications/Claude.app`) (granskning 13, P4 a). Inte heller någonstans i hela `~/Library/Application Support/Claude`, där också skrivbordsappens egna inställningar ligger (Hugos svar 2026-10-28 efter granskning 13, punkt 3). Inte heller i en fil som heter `.ugrep`, i någon mapp, som är inställningsfilen för det program som `grep` kör i agentens skal (granskning 16, G7). Läget "auto" går att använda, och skills kan inte köra skalkommandon. |
 | `requirements.txt` (listan över paket) | `/Library/Application Support/ClaudeCode/vera/venv` (skapas, kopieras inte) | **Projektets Python med pytest**, som testsviten körs med. Den låg förut i mappen `.venv` i projektet, som du äger, och då stoppade PATH-regeln testsviten. Nu ligger den där bara systemet kan ändra den (Hugos beslut 2026-10-28 om vakten, beslut 1). |
 
 Inställningarna börjar gälla så fort filen finns, i terminalen och i skrivbordsappen. Därför kopieras
@@ -170,11 +170,10 @@ De låsta inställningarna innehåller också `"requiredMinimumVersion": "2.1.29
 Code inte startar alls efter installationen (Hugos beslut 2026-10-28). Kontrollen här behövs ändå,
 eftersom inställningarna inte gäller förrän de är installerade.
 
-Två inställningar har ingen lägsta version i dokumentationen: `disableSkillShellExecution` (skills kör
-inga skalkommandon) och `disableAutoMode` (läget "auto" går inte att använda). Sidorna
-**code.claude.com/docs/en/settings-reference**, **/skills** och **/permissions** nämner ingen version för
-dem, kontrollerat 2026-10-28. Lägsta version är alltså **inte bekräftat** (Hugos beslut 2026-10-28: byggs
-in ändå). Kontrollen efter installationen, steg 1, visar att läget "auto" saknas.
+En inställning har ingen lägsta version i dokumentationen: `disableSkillShellExecution` (skills kör inga
+skalkommandon). Sidorna **code.claude.com/docs/en/settings-reference**, **/skills** och **/permissions** nämner
+ingen version för den, kontrollerat 2026-10-28. Lägsta version är alltså **inte bekräftat** (Hugos beslut
+2026-10-28: byggs in ändå). `disableAutoMode` är borttagen (Hugos beslut 2026-10-29).
 
 ## Steg 2: kontrollera mapparna ovanför (före installationen)
 
@@ -569,11 +568,10 @@ shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-set
 - Jämför de tre summorna, tecken för tecken, med dem som den oberoende granskningen har skrivit upp
   (Hugos beslut 2026-10-28). `requirements.txt` är listan över paket som installeras i steg 9 (granskning
   15, S6, Hugos beslut 2026-10-28). **Är någon summa olika: stoppa och fråga.** Kopiera ingenting.
-- Summorna ska vara exakt de här (byggsessionen 2026-10-28, efter Hugos beslut efter granskning 19: nya summor för
-  vakten och inställningarna efter J1, `requirements.txt` oförändrad). Den oberoende granskningen ska skriva upp
-  samma summor. Skiljer granskningens summor från dessa: stoppa och fråga.
+- Summorna ska vara exakt de här (2026-10-28 efter granskning 19, och 2026-10-29 för inställningarna). Den
+  oberoende granskningen ska skriva upp samma summor. Skiljer granskningens summor från dessa: stoppa och fråga.
   - `sparr/kommandosparr.py`: `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d`
-  - `sparr/managed-settings.json`: `ab34081665b9052c1ff7c35a1b3a983107fc6a763f1f1aab6476523109cb80b0`
+  - `sparr/managed-settings.json`: `149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2`
   - `requirements.txt`: `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a`
 
 ## Steg 6: skapa mapparna och låt systemet äga dem
@@ -783,8 +781,8 @@ Stoppa och fråga.**
 6. **Bara verktygen på listan i SPEC 7.1 fungerar** (granskning 12, P4, Hugos beslut 2026-10-28). Andra
    verktyg, till exempel webbsökning, appens webbläsare och kopplingar till andra tjänster, stoppas av
    vakten. Behövs ett verktyg till blir det en ny version av vakten.
-7. **Läget "auto" går inte att välja** (granskning 12, P6). Claude Code frågar dig före varje kommando
-   som inte är förgodkänt.
+7. **Läget "auto" går att välja** (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Auto
+   tillåts igen", med villkoren). Vakten körs ändå före varje verktyg.
 8. **Agenten kan inte skriva i projektets mapp `.claude`, i `.mcp.json` eller i `.venv`** (Hugos beslut
    2026-10-28, 5). Inställningar och kopplingar för projektet skriver du eller Casper själva. Agenten kan
    inte heller skriva i `~/Library/Application Support/Claude`, där skrivbordsappens egna inställningar
@@ -808,6 +806,11 @@ Stoppa och fråga.**
     - Samma sak gäller `~/.zshenv`, `~/.zprofile` och `~/.zlogin`, en rad som lägger till ett alias eller
       en funktion, och en rad med `eval`, `compinit`, `autoload`, `fpath` eller `ZDOTDIR` (granskning 14, R1
       och R2, Hugos beslut 2026-10-28). Gör efteråt kontrollen med skriptet i steg 4 g igen.
+
+## Byte av inställningsfil
+
+Ny granskad `managed-settings.json`: kör steg 5 och 10–13 (svara `y` när steg 10 frågar), sedan kontrollen
+steg 1, 2, 3, 9.
 
 ## Caspers dator
 
@@ -851,7 +854,8 @@ Om något steg inte blir som det står: **stoppa, skriv upp vad som hände, och 
 görs. Steg 1–7 ska vara klara innan uppgift 4 körs. Steg 9 görs direkt efter steg 7 och ska också vara
 klart innan uppgift 4 körs (Hugos svar 2026-10-28, punkt 3). Steg 8 krävs inte för installationen eller för
 uppgift 4, men ska vara gjort före läget "auto", före körningar utan att Hugo tittar, före första hela
-körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28, 8).
+körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28, 8). Steg 8 är gjort på Hugos
+dator (175db51), ännu inte på Caspers.
 
 1. **De låsta inställningarna gäller.** Raden **Setting sources** visas inte i skrivbordsappen, så den läses
    i Terminal (Hugos svar 2026-10-28, punkt 3): kör `cd ~/VERA/agent` och sedan `~/.local/bin/claude` (hela
@@ -863,9 +867,8 @@ körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28,
    installationen, till exempel inställningar som styrs från claude.ai: stoppa och fråga (Hugos svar
    2026-10-28, punkt 3). Avsluta med `/exit`. Läs också i skrivbordsappens `/status`
    raden **Claude Code**: versionen ska vara
-   2.1.295 eller senare. Läget "auto" ska inte gå att välja: i terminalens Claude Code, tryck Shift+Tab
-   några gånger, och "auto" ska inte komma upp (code.claude.com/docs/en/settings-reference,
-   `disableAutoMode`).
+   2.1.295 eller senare. Läget "auto" ska gå att välja (Hugos beslut 2026-10-29): i terminalens Claude Code,
+   tryck Shift+Tab några gånger, och "auto" ska komma upp.
 
    **Skalet, igen efter installationen** (Hugos beslut 2026-10-28, granskning 13, P1 a, och efter
    granskning 15). Öppna ett nytt Terminal-fönster (Cmd+N) och kör, ett i taget, samma två kommandon som i

@@ -1545,10 +1545,14 @@ def test_installningarna_stanger_av_skalkommandon_i_skills():
     assert _installningar()["disableSkillShellExecution"] is True
 
 
-def test_installningarna_stanger_av_laget_auto():
-    # Granskning 12, P6 (Hugos beslut 2026-10-28, 4). Under permissions, värdet "disable"
-    # (code.claude.com/docs/en/settings-reference, "disableAutoMode / permissions.disableAutoMode").
-    assert _installningar()["permissions"]["disableAutoMode"] == "disable"
+def test_installningarna_tillater_laget_auto_men_inte_att_hoppa_over_behorigheter():
+    # Hugos beslut 2026-10-29 (GRANSKNING.md, "Beslut 2026-10-29 – Auto tillåts igen"), som vänder P6 från
+    # granskning 12: nyckeln disableAutoMode ska inte finnas, varken under permissions eller överst. Läget
+    # "hoppa över alla behörigheter" är fortfarande avstängt.
+    installningar = _installningar()
+    assert "disableAutoMode" not in installningar["permissions"]
+    assert "disableAutoMode" not in installningar
+    assert installningar["permissions"]["disableBypassPermissionsMode"] == "disable"
 
 
 # Hugos beslut 2026-10-28, 5 (granskning 12, beslut b). Mapparna i PATH är granskarens förslag för de
