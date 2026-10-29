@@ -1,15 +1,16 @@
 # PROGRESS – Veras bokföringsagent
 
 Uppdaterad 2026-10-29. Specifikation: `SPEC.md`. Byggordning: `DESIGN-regelbok.md` avsnitt 7.
-Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29). Steg 12 är delvis klart: vakten installerades på Hugos dator 2026-10-28, Caspers dator återstår. Nästa steg är spärrtestet i en ny session.
+Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29). Steg 12 är delvis klart: vakten installerades på Hugos dator 2026-10-28, Caspers dator återstår. Spärrtestet är klart och grönt (2026-10-29). Nästa steg: installationen på Caspers dator, därefter Q3 + Q4 + Q2.
 
 Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **4 076 passed**, 0 misslyckade (körd 2026-10-28 i projektet med `.venv/bin/python`, efter
-rättelsen av J1 efter granskning 19).
+Testsviten: **4 076 passed**, 0 misslyckade (körd senast i spärrtestet 2026-10-29). Sedan installationen
+2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
+borttagen.
 
 **Regler tills vakten är installerad** (Hugos beslut 2026-10-28 efter granskning 15, ändrade 2026-10-28 kväll):
 
@@ -498,19 +499,11 @@ fattade och byggda, se avsnittet ovan.)
    gröna redan före abd0745. G6: Claude Codes `grep` hoppar över filer i `.gitignore` och binära filer, vilket
    inte står i SPEC 7.1. G7: inget förbud för `.ugrep`, och skyddet bygger på hur Claude Codes funktion ser ut
    i dag. **Hugos beslut 2026-10-28: G2, G3, G4, G6 och G7 är rättade** (se "Läge 2026-10-28, efter rättelserna
-   efter granskning 16"). **Kvar:** G1 (en session provkör steg 4 h med Hugos OK, före installationen; provkörd 2026-10-28 i läget
-   auto: Claude Codes inbyggda kontroll stoppade kommandot innan det kördes, se `GRANSKNING.md`, "Provkörning av
-   steg 4 h 2026-10-28"; **provkörd igen 2026-10-28 i läget Manual: kommandot gick igenom och svaret var exakt
-   de elva raderna**, se `GRANSKNING.md`, "Provkörning av steg 4 h i läget Manual 2026-10-28"; läget byttes från
-   auto i samma session, inte i en ny; om G1 räknas som stängd är Hugos eller Caspers beslut), G5
-   (bara en anmärkning om gamla tester), och tre saker från rättelserna: ~~(a) om Claude Codes förbud
-   `Edit(//**/.ugrep)` också gäller `.UGREP` (stora bokstäver) är inte bekräftat, och samma fråga gäller de andra
-   förbuden,~~ (b) vakten ser bara namnen i kommandot, inte innehållet i en mapp som kopieras eller ett arkiv som
+   efter granskning 16"). **G1 och H6 räknas som stängda** (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Hugos
+   beslut 2026-10-29 (efter spärrtestet)"). **Kvar:** G5 (bara en anmärkning om gamla tester), och två saker från
+   rättelserna: (b) vakten ser bara namnen i kommandot, inte innehållet i en mapp som kopieras eller ett arkiv som
    packas upp, men det hamnar bara i den tillfälliga mappen, där `ugrep` inte letar, och (c) granskningens förslag
-   att visa `typeset -f grep` i steg 4 h ingick inte i beslutet och är inte gjort. **(a) är byggt i vakten efter
-   granskning 17 (H6), och stängt i spärrtestet 2026-10-29:** vakten stoppade `.UGREP`, `.GIT` och `.Git/HOOKS` på
-   riktigt (`GRANSKNING.md`, "Spärrtest 2026-10-29"). Om Claude Codes egna förbud gör samma sak går inte att se så
-   länge vakten är installerad, eftersom vakten stoppar först.
+   att visa `typeset -f grep` i steg 4 h ingick inte i beslutet och är inte gjort.
 10. **De låga fynden i granskning 17 som inte är rättade** (Hugos beslut 2026-10-28, efter granskning 17).
     **H4:** G4-testet (`test_g4_det_riktiga_skriptet_skriver_ok_i_ett_rent_fall`) läser riktiga systemfiler och
     blir rött av datorns läge, inte av koden. Förslag: ett felmeddelande som säger det, och en egen markering

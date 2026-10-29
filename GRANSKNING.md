@@ -6995,3 +6995,13 @@ Inga andra avsteg.
 **Kommandon:** `git status` (först och sist), `grep -n` (också `-i`, `-e`), `cat` på provfilen i scratchpad, `ls; ls`,
 `date`, `ls /.vol`, pytest-kommandot i SPEC 7.1, `git add` och `git commit -F` med meddelandet i en fil i
 scratchpad. Verktyg: Read, Write, Edit, AskUserQuestion, Agent, och appens verktyg för plan och slutruta.
+
+## Hugos beslut 2026-10-29 (efter spärrtestet)
+
+Skrivet in på Hugos uppdrag i chatten 2026-10-29.
+
+- **H6 räknas som stängd.** Skyddet är vakten, som stoppade skrivningar i `.git` oavsett stora och små bokstäver
+  (prov 11–14). Claude Codes egna förbud är inte prövade för sig. Om vakten tas bort eller byts ut ska H6 prövas
+  igen.
+- **G1 räknas som stängd.** Steg 4 h gav exakt de elva raderna både vid provkörningen och vid installationen.
+- **Prov 17:** Hugo har själv sett "Stoppat av vakten" för `date` i underagentens verktygsruta.
