@@ -27,7 +27,7 @@ Status: ✅ klart · 🔶 pågår · ⬜ inte påbörjat
 - **Uppdaterad:** 2026-10-29
 - **Pågående steg:** 22 – Uppgift 4, flöde a, b och e (byggd och granskad, P1 och P2 kvar); 12 – Ny version av inställningsfilen utan `disableAutoMode`, väntar på att Hugo installerar om (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Auto tillåts igen")
 - **Senast avslutade steg:** 13 – Kontrollen efter installationen, med provet med en vakt som fallerar (2026-10-29, `GRANSKNING.md`, "Steg 8, provet med en vakt som fallerar, 2026-10-29")
-- **Nästa steg:** Hugo installerar den nya inställningsfilen (INSTALLERA.md, "Byte av inställningsfil": steg 10–13, sedan kontrollen steg 1, 2, 3 och 9). Hugo eller Casper svarar på de 7 frågorna i granskning 22 (`GRANSKNING.md`). Därefter rättelser av P1 och P2 i en egen session, och Öppet 26. Steg 15 (sandlådan) ska vara klar före steg 23 (uppgift 5)
+- **Nästa steg:** Hugo installerar den nya inställningsfilen (INSTALLERA.md, "Byte av inställningsfil": steg 5, steg 10–13, sedan kontrollen steg 1, 2, 3 och 9), utan en ny granskning före (Hugos beslut 2026-10-29, "Installera direkt"). Hugo eller Casper svarar på de 7 frågorna i granskning 22 (`GRANSKNING.md`). Därefter rättelser av P1 och P2 i en egen session, och Öppet 26. Steg 15 (sandlådan) ska vara klar före steg 23 (uppgift 5)
 - **Opushat:** ja, e4d8cd7 och commitarna efter den (`main` på GitHub står vid d127c3e)
 
 ---

@@ -7611,8 +7611,12 @@ inställningsfilen):
     12 ska summan vara den nya. Starta nya sessioner och gör kontrollen efter installationen, steg 1, 2, 3 och 9, igen.
     I steg 1 ska "auto" komma upp när man trycker Shift+Tab. Kommer det inte upp gäller den gamla filen: stoppa och fråga.
   - **Granskning före bytet:** "Efteråt" punkt 10 och SPEC 7.1 säger att en ny version av inställningsfilen granskas
-    oberoende innan den installeras. Avsnittet "Byte av inställningsfil" säger därför "granskad". Om bytet får göras
-    utan en ny granskning, eftersom ändringen bara tar bort en rad, är ett beslut för Hugo eller Casper.
+    oberoende innan den installeras. Avsnittet "Byte av inställningsfil" säger därför "granskad".
+    **Hugos beslut 2026-10-29 (i chatten, "Installera direkt"): bytet av inställningsfilen i 7deaadb, där bara raden
+    `disableAutoMode` är borttagen, installeras utan en ny oberoende granskning.** Undantaget gäller bara den här
+    filen (summan `149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2`). Regeln i "Efteråt" punkt 10
+    och SPEC 7.1 gäller som förut för andra ändringar. Nästa oberoende granskning tittar på ändringen i efterhand,
+    tillsammans med villkor 3 i beslutet ovan.
   - **Caspers dator:** provet i steg 8 ska vara gjort före läget "auto" (Hugos beslut 2026-10-28, 8). Det är gjort på
     Hugos dator, inte på Caspers. Texten före kontrollen säger det.
 - **SPEC.md 7.1** är inte ändrad. Den säger inte att läget "auto" är avstängt, bara att provet i steg 8 ska vara

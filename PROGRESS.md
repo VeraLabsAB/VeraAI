@@ -46,6 +46,9 @@ Steg i byggplanen: 12 (ny version av inställningsfilen, pågår tills Hugo har 
 - **Gäller först efter ominstallationen.** Inget installerades i den här sessionen. Tills Hugo har gjort om steg 10–13
   och kontrollen steg 1, 2, 3 och 9 gäller den installerade filen, där Auto är avstängt. Casper installerar den nya
   filen i steg 14.
+- **Ingen ny granskning före bytet** (Hugos beslut 2026-10-29 i chatten, "Installera direkt"): filen i 7deaadb
+  installeras utan en ny oberoende granskning. Undantaget gäller bara den filen. Nästa oberoende granskning tittar på
+  ändringen i efterhand (`GRANSKNING.md`, "Beslut 2026-10-29 – Auto tillåts igen").
 - **Testsviten:** 4 312 passed, 0 röda (ett test ersatt av ett annat), med kommandot i SPEC 7.1.
 - **Opushat:** e4d8cd7 och commitarna efter den, och den här.
 
