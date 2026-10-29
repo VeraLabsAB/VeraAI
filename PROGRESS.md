@@ -1,7 +1,8 @@
 # PROGRESS – Veras bokföringsagent
 
-Uppdaterad 2026-10-28. Specifikation: `SPEC.md`. Byggordning: `DESIGN-regelbok.md` avsnitt 7.
+Uppdaterad 2026-10-29. Specifikation: `SPEC.md`. Byggordning: `DESIGN-regelbok.md` avsnitt 7.
 Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29). Steg 12 är delvis klart: vakten installerades på Hugos dator 2026-10-28, Caspers dator återstår. Nästa steg är spärrtestet i en ny session.
+
 Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
@@ -463,9 +464,10 @@ fattade och byggda, se avsnittet ovan.)
    byggda** efter Hugos beslut 2026-10-28 (5cb9080, 08a3370, c066188). **PATH-regeln, förprovet för
    `onFailure` och P7 är byggda** efter Hugos beslut 2026-10-28 (`GRANSKNING.md`, "Beslut 2026-10-28:
    PATH-regel, förprov för onFailure, P7"). Kvar: P1 (omvägarna), att lägsta version för
-   `disableSkillShellExecution` och `disableAutoMode` inte är bekräftad i dokumentationen, och **beslutet om
+   `disableSkillShellExecution` och `disableAutoMode` inte är bekräftad i dokumentationen, och ~~**beslutet om
    testsviten**: PATH-regeln stoppar båda pytest-kommandona efter installationen, eftersom
-   `.venv/bin/python` ligger i projektet.
+   `.venv/bin/python` ligger i projektet~~ (stängt: testsviten går med Python på den nya platsen, 4 076 gröna i
+   spärrtestet 2026-10-29).
    Kontrollsummorna i granskning 12 gäller inte längre, eftersom vakten och inställningarna är ändrade.
    Provet med en vakt som fallerar visar att en **saknad** vakt stoppar (Python ger kod 2), men prövar inte
    `onFailure` i sig (INSTALLERA.md, steg 8).
@@ -501,12 +503,14 @@ fattade och byggda, se avsnittet ovan.)
    steg 4 h 2026-10-28"; **provkörd igen 2026-10-28 i läget Manual: kommandot gick igenom och svaret var exakt
    de elva raderna**, se `GRANSKNING.md`, "Provkörning av steg 4 h i läget Manual 2026-10-28"; läget byttes från
    auto i samma session, inte i en ny; om G1 räknas som stängd är Hugos eller Caspers beslut), G5
-   (bara en anmärkning om gamla tester), och tre saker från rättelserna: (a) om Claude Codes förbud
+   (bara en anmärkning om gamla tester), och tre saker från rättelserna: ~~(a) om Claude Codes förbud
    `Edit(//**/.ugrep)` också gäller `.UGREP` (stora bokstäver) är inte bekräftat, och samma fråga gäller de andra
-   förbuden, (b) vakten ser bara namnen i kommandot, inte innehållet i en mapp som kopieras eller ett arkiv som
+   förbuden,~~ (b) vakten ser bara namnen i kommandot, inte innehållet i en mapp som kopieras eller ett arkiv som
    packas upp, men det hamnar bara i den tillfälliga mappen, där `ugrep` inte letar, och (c) granskningens förslag
    att visa `typeset -f grep` i steg 4 h ingick inte i beslutet och är inte gjort. **(a) är byggt i vakten efter
-   granskning 17 (H6)**, men Claude Codes egna förbud är fortfarande inte prövade.
+   granskning 17 (H6), och stängt i spärrtestet 2026-10-29:** vakten stoppade `.UGREP`, `.GIT` och `.Git/HOOKS` på
+   riktigt (`GRANSKNING.md`, "Spärrtest 2026-10-29"). Om Claude Codes egna förbud gör samma sak går inte att se så
+   länge vakten är installerad, eftersom vakten stoppar först.
 10. **De låga fynden i granskning 17 som inte är rättade** (Hugos beslut 2026-10-28, efter granskning 17).
     **H4:** G4-testet (`test_g4_det_riktiga_skriptet_skriver_ok_i_ett_rent_fall`) läser riktiga systemfiler och
     blir rött av datorns läge, inte av koden. Förslag: ett felmeddelande som säger det, och en egen markering
@@ -519,7 +523,7 @@ fattade och byggda, se avsnittet ovan.)
     - **I2:** kontrollskriptet godtar en uppgift som heter `com.apple.provenance` plus en tabb, som om den hette exakt `com.apple.provenance`.
     - **I3:** H6 byggdes på den undanlagda versionen, inte om från början, och den andra stash-posten (kl. 20.18) saknar ett nedskrivet OK (historiken står i `GRANSKNING.md`).
     - **I4:** vakten ser inte hårda länkar: Write till en fil i projektet som är ett andra namn på `~/.zshrc` släpps igenom (till sandlådan).
-    - **I5:** Agent-verktyget med `isolation: "worktree"` får Claude Code att skriva i `.git` utan att vakten tittar (tas med i spärrtestet).
+    - **I5:** Agent-verktyget med `isolation: "worktree"` får Claude Code att skriva i `.git` utan att vakten tittar (inte prövad i spärrtestet 2026-10-29, Hugos besked i chatten: står kvar under Öppet).
     - **I6:** INSTALLERA.md steg 2 säger "den fjärde raden" om `No such file or directory`, men `ls` skriver den raden först.
     - **I7:** INSTALLERA.md steg 13: `ditto` och `cp` tar med alla uppgifter, inte bara `com.apple.provenance`, så installationen kan stoppa i onödan.
     - **I8:** regeln om prov och test: SPEC 7.1 har ett undantag som CLAUDE.md saknar, och "läsa riktiga systemfiler" är otydligt.
@@ -541,6 +545,9 @@ fattade och byggda, se avsnittet ovan.)
     - **K5:** steg 2 b säger inte var andra omgången börjar, och första raden visar en relativ sökväg som kan
       förväxlas med regeln för andra omgången.
 15. Caspers dator: om ~/.local/bin läggs i PATH ska den stå sist, annars stoppar vakten git. Efter en ändring i ~/.zshrc måste Claude-appen avslutas helt med Cmd+Q, annars behåller den den gamla PATH (lärdom 2026-10-29).
+16. **Kontrollen efter installationen, steg 8 (provet med en vakt som fallerar), är inte gjord** på Hugos dator
+    (Hugos besked i chatten 2026-10-29, `GRANSKNING.md`, "Spärrtest 2026-10-29"). Krävs före läget auto, före
+    första hela körningen på riktiga underlag och före första kund.
 
 ## Nästa steg i byggordningen
 
