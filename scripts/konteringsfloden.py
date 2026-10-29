@@ -27,6 +27,11 @@ Flöde a, leverantörsfaktura, med faktureringsmetoden (DESIGN-regelbok.md avsni
      leverantörsskulderna i debet och bankkontot (rollen bank) i kredit. En obetald faktura har bara
      verifikation 1 och står bland matchningens oavstämda underlag.
 
+Flöde b, kvitto betalat från bankkontot (DESIGN avsnitt 4b): en verifikation när matchningen har parat
+ihop kvittot med en bankrad, på datumet för 'kvitto'. Kostnaden och momsen per momsrad i debet, som i
+flöde a, och bankkontot i kredit. Ett kvitto utan bankrad får inget förslag än: det väntar och står
+bland matchningens oavstämda underlag.
+
 Kontrollerna för varje underlag, innan något förslag görs:
 
   Regeln: regelboken ger regeln för underlagets typ och motpart på underlagets datum. Ingen regel
@@ -104,8 +109,9 @@ _KRAVER_BEDOMNING = "kräver mänsklig bedömning"
 # Nivån som ärenden från K5 och K8 bär direkt (B2).
 _NIVA_D = "D"
 
-# Typen av underlag i flöde a (las_underlag.TYPER).
+# Typerna av underlag i flöde a och b (las_underlag.TYPER).
 _LEVERANTORSFAKTURA = "leverantorsfaktura"
+_KVITTO = "kvitto"
 # Värdena i 'verifikationsdatum' som är underlagets eget datum (las_regelbok.VERIFIKATIONSDATUM). Alla
 # andra värden är namnet på ett fält i bankraden.
 _UNDERLAGETS_DATUM = ("fakturadatum", "kvittodatum")
@@ -376,9 +382,29 @@ def _leverantorsfaktura(underlag, regel, konton, bankrad, korning):
     return forslag, []
 
 
+def _kvitto(underlag, regel, konton, bankrad, korning):
+    """Flöde b: kvittot, när matchningen har parat ihop det med en bankrad. Returnerar (förslag, ärenden)."""
+    if bankrad is None:
+        return [], []
+    id_, kontoplan, bokforing = underlag["id"], korning.kontoplan, korning.bokforing
+    val = bokforing["verifikationsdatum"][_KVITTO]
+    datum = _verifikationens_datum(val, underlag, bankrad)
+    arende = _regeln_pa(underlag, regel, datum, korning, bankrad, "Kvittot")
+    if arende is not None:
+        return [], [arende]
+    return [_skapa(
+        "F-KVITTO-" + id_, datum, "Kvitto " + underlag["fakturanummer"] + ", underlag " + id_,
+        _kostnad_och_moms(underlag, konton, kontoplan, datum)
+        + [_rad(kontoplan.rollens_konto(_BANK, datum), 0, -bankrad[_BELOPPSFALT], _bankradens(bankrad["id"]))],
+        regel, korning, "Regeln " + regel["id"] + " i regelboken. Kvittot är betalt från bankkontot: matchningen har"
+        " parat ihop det med bankraden med radnummer " + str(bankrad["radnr"]) + " (samma belopp och motpart, inom"
+        " tidsfönstret). Verifikationen får " + val + _antaget(bokforing) + ".",
+        underlag=[id_], bankrader=[bankrad["id"]])], []
+
+
 # Flödet för varje typ av underlag (las_underlag.TYPER). Ett underlag av en typ som saknas här får
 # kontrollerna men inget förslag.
-_FLODEN = {_LEVERANTORSFAKTURA: _leverantorsfaktura}
+_FLODEN = {_LEVERANTORSFAKTURA: _leverantorsfaktura, _KVITTO: _kvitto}
 
 
 def kontera_period(regelbok, kontoplan, momssatser, underlagsperiod, bankperiod, bedomningsdatum):

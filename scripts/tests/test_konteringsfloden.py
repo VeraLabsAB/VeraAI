@@ -153,11 +153,14 @@ def test_varje_betald_faktura_med_regel_har_fakturan_och_betalningen(korning):
 
 
 def test_summan_av_ingaende_moms_stammer_med_underlagens_moms(korning):
-    # Underlagen som ska bokföras med sin moms: varje faktura som inte har något ärende. Räknat ur
-    # underlagen och ärendena, inte ur förslagen.
+    # Underlagen som ska bokföras med sin moms: varje faktura och varje kvitto med en bankrad som inte har
+    # något ärende. Räknat ur underlagen, matchningen och ärendena, inte ur förslagen.
+    matchade = {post["underlag"]["id"] for post in korning.resultat.matchning.matchningar}
     med_arende = {arende["underlag"] for arende in korning.resultat.arenden}
     bokforda = [underlag for underlag in korning.underlagsperiod.underlag if underlag["id"] not in med_arende
-                and underlag["typ"] == "leverantorsfaktura"]
+                and (underlag["typ"] == "leverantorsfaktura" or (underlag["typ"] == "kvitto"
+                                                                 and underlag["id"] in matchade))]
+    assert any(underlag["typ"] == "kvitto" for underlag in bokforda)  # skydd: kvittona prövas också
     vantat = sum(rad["moms_ore"] for underlag in bokforda for rad in underlag["moms"])
     ingaende = korning.kontoplan.rollens_konto("ingaende_moms", "2025-01-01")
     i_forslagen = sum(rad["debet_ore"] - rad["kredit_ore"] for forslag in korning.resultat.forslag
@@ -279,6 +282,116 @@ def test_k5_satsen_passar_flera_varugrupper_med_samma_konto(tmp_path):
     korning = konfiguration_med_tva_grupper_med_samma_sats(tmp_path, samma_konto=True)
     assert korning.arenden_for("SYNT-U-2025-003") == []
     assert raderna(korning.forslag_for("SYNT-U-2025-003")[0])[0][0] == "4010"
+
+
+# --- Flöde b: kvitton och K8 (DESIGN 4b och 6) ---
+
+def regelbok_med(tmp_path, andring):
+    """En kopia av testbutikens regelbok med andring gjord, som fil i tmp_path."""
+    regelbok = json.loads((TESTBUTIKEN / "regelbok.json").read_text(encoding="utf-8"))
+    andring(regelbok)
+    fil = tmp_path / "regelbok.json"
+    fil.write_text(json.dumps(regelbok, ensure_ascii=False), encoding="utf-8")
+    return fil
+
+
+def regel_for_forbrukning(regelbok):
+    # BUTIK-FORBRUKNING har ingen regel i testbutikens regelbok. Regeln här finns bara i testet, för att
+    # visa exemplet i DESIGN 4b. Kontot är förbrukningsmaterialet ur DESIGN 4b.
+    regelbok["regler"].append({"id": "R-BUTIK-FORBRUKNING", "galler": {"kalla": "underlag", "typ": "kvitto",
+                                                                       "motpart": "BUTIK-FORBRUKNING"},
+                               "kontering": {"ovrigt": "5460"}, "villkor": {"giltig_fran": "2025-01-01"}, "niva": "B"})
+
+
+def test_015_ger_exakt_verifikationen_i_design_4b(tmp_path):
+    korning = Korning(regelbok=regelbok_med(tmp_path, regel_for_forbrukning))
+    kvittot, = korning.forslag_for("SYNT-U-2025-015")
+    bankraden = korning.bankrad(2, 50)
+    assert kvittot.forslag_id == "F-KVITTO-SYNT-U-2025-015"
+    # Kvittodatum (D14), inte transaktionsdagen eller bankens bokföringsdag.
+    assert kvittot.verifikation["datum"] == "2025-02-10"
+    assert raderna(kvittot) == [
+        ("5460", 19760, 0, [("underlag", "underlag_ore")]),
+        ("2641", 4940, 0, [("underlag", "moms_ore")]),
+        ("1940", 0, 24700, [("bankrad", "belopp_ore")]),
+    ]
+    assert [post["id"] for post in kvittot.kopplingar["bankrader"]] == [bankraden["id"]]
+    assert kvittot.kopplingar["regel"]["id"] == "R-BUTIK-FORBRUKNING"
+
+
+@pytest.mark.parametrize("val, datum", [("transaktionsdag", "2025-02-10"), ("bokforingsdag", "2025-02-11")])
+def test_kvittots_datum_foljer_regelbokens_val(tmp_path, val, datum):
+    # Bankraden för 015 har transaktionsdagen 2025-02-10 och bokföringsdagen 2025-02-11.
+    def andring(regelbok):
+        regel_for_forbrukning(regelbok)
+        regelbok["bokforing"]["verifikationsdatum"]["kvitto"] = val
+    kvittot, = Korning(regelbok=regelbok_med(tmp_path, andring)).forslag_for("SYNT-U-2025-015")
+    assert kvittot.verifikation["datum"] == datum
+
+
+def test_015_utan_regel_ar_en_ny_motpart(korning):
+    # I testbutikens regelbok har BUTIK-FORBRUKNING ingen regel. Vera gissar inget konto.
+    arende, = korning.arenden_for("SYNT-U-2025-015")
+    assert arende["typ"] == "ny motpart" and korning.forslag_for("SYNT-U-2025-015") == []
+
+
+def test_kvitto_med_bankrad_far_ett_forslag(korning):
+    # BUTIK-STAD 2025-01-22, betalt med bank_2025-01.csv radnummer 81 (212,00 kr).
+    bankraden = korning.bankrad(1, 81)
+    kvitton = [forslag for forslag in korning.resultat.forslag if forslag.forslag_id.startswith("F-KVITTO-")
+               and forslag.kopplingar["bankrader"][0]["id"] == bankraden["id"]]
+    kvittot, = kvitton
+    assert kvittot.verifikation["datum"] == "2025-01-22" and kvittot.kopplingar["regel"]["id"] == "R-BUTIK-STAD"
+    assert [(konto, debet, kredit) for konto, debet, kredit, _ in raderna(kvittot)][-1] == ("1940", 0, 21200)
+    assert sum(rad["debet_ore"] for rad in kvittot.verifikation["rader"]) == 21200
+
+
+def test_kvitto_utan_bankrad_far_inget_forslag_och_inget_arende(korning):
+    # Mars har ingen bankperiod här (K1), så kvittona från mars med en regel väntar på sin bankrad.
+    vantande = [underlag for underlag in korning.underlagsperiod.underlag
+                if underlag["typ"] == "kvitto" and underlag["datum"] >= "2025-03-01"
+                and korning.regelbok.regel_for_underlag("kvitto", underlag["motpart"], underlag["datum"])
+                and not korning.arenden_for(underlag["id"])]
+    assert vantande
+    oavstamda = {post["id"] for post in korning.resultat.matchning.oavstamda_underlag}
+    for underlag in vantande:
+        assert korning.forslag_for(underlag["id"]) == [] and underlag["id"] in oavstamda
+
+
+def test_028_blir_k8_niva_d_och_far_inget_forslag(korning):
+    assert korning.forslag_for("SYNT-U-2025-028") == []
+    arende, = korning.arenden_for("SYNT-U-2025-028")
+    assert arende["kontroll"] == "K8" and arende["typ"] == "avdragsbegränsat"
+    # B2: nivå D direkt, och märkningen "kräver mänsklig bedömning".
+    assert arende["niva"] == "D" and arende["kraver_mansklig_bedomning"] is True
+    assert arende["regel"] == "R-RESTAURANG-1"
+    # 2025-03-16 är en söndag, då butiken har stängt (regelbokens oppettider).
+    assert arende["flaggor"] == (STANGD_DAG,)
+    # Vera föreslår ingen fördelning mellan avdragsgill och icke avdragsgill del: inget belopp i ärendet.
+    assert "föreslår inte hur stor del" in arende["text"]
+    utan_namn = arende["text"].replace(arende["regel"], "").replace("K8", "")
+    assert not any(tecken.isdigit() for tecken in utan_namn), utan_namn
+
+
+def test_k8_sager_vilken_bankrad_det_galler_och_flaggar_inte_en_oppen_dag(tmp_path):
+    # Med R-BUTIK-STAD avdragsbegränsad blir kvittot 2025-01-22 (en onsdag) ett K8-ärende med sin bankrad.
+    def andring(regelbok):
+        [regel for regel in regelbok["regler"] if regel["id"] == "R-BUTIK-STAD"][0]["villkor"]["avdragsbegransad"] = True
+    korning = Korning(regelbok=regelbok_med(tmp_path, andring))
+    bankraden = korning.bankrad(1, 81)
+    arende, = [arende for arende in korning.resultat.arenden if arende["bankrader"] == (bankraden["id"],)]
+    assert (arende["kontroll"], arende["niva"], arende["flaggor"]) == ("K8", "D", ())
+    assert not [forslag for forslag in korning.resultat.forslag
+                if bankraden["id"] in [post["id"] for post in forslag.kopplingar["bankrader"]]]
+
+
+def test_004_ar_en_dublett_och_far_inget_forslag(korning):
+    # K4 tar bort dubbletten redan i underlagsperioden, där den är ett ärende (DESIGN 4a).
+    assert "SYNT-U-2025-004" not in [underlag["id"] for underlag in korning.underlagsperiod.underlag]
+    assert "SYNT-U-2025-004" in str(korning.underlagsperiod.arenden)
+    assert korning.forslag_for("SYNT-U-2025-004") == [] and korning.arenden_for("SYNT-U-2025-004") == []
+    # Originalet SYNT-U-2025-003 bokförs en gång.
+    assert len(korning.forslag_for("SYNT-U-2025-003")) == 2
 
 
 # --- Regeln och K7 ---
