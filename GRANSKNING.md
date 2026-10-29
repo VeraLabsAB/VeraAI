@@ -7362,3 +7362,178 @@ konton som redan finns: BUTIK-FORBRUKNING på 5460 (DESIGN 4b) och LEV-TILLBEHOR
 Nivåerna: "B, hyran D" (sessionens förslag, valt av Hugo). Byggt därför: `R-BUTIK-FORBRUKNING` (kvitto, `ovrigt` på
 5460, nivå B) och `R-LEV-TILLBEHOR` (leverantörsfaktura, `ovrigt` på 4010, nivå B). HYRESVARD, LEV-EL och LEV-TELE
 får inga regler än och blir fortsatt "ny motpart". Beslut f är alltså byggt till en del, resten står under Öppet.
+
+## Granskning 12 (av d127c3e) (2026-10-29)
+
+Oberoende granskning i en ny session som inte har sett bygget. Granskaren ändrade ingen kod och skrev bara i den här
+filen. Granskade commits: `6aba32d..d127c3e`, alltså 933711a, baec52b, 4269f76, f6ed99e, e4cc538, 21438dd, 48e7ed3,
+ded669d, 5753890 och d127c3e. Varje commit lästes med `git show`. Lästes också: CLAUDE.md, SPEC.md, DESIGN-regelbok.md
+(avsnitt 4, 5 och 7), BYGGPLAN.md (via commitarna), PROGRESS.md (Klart, Öppet och Nästa steg) och den här filen
+(granskning 11 och 21, "Beslut 2026-10-29 – inför uppgift 4" och "Beslut efter uppgift 4").
+
+**Namnet:** rubriken "Granskning 12" finns redan (vakten, Q1, 2026-10-28), och P-numren nedan finns också i granskning
+10 och i den första granskning 12. Rubriken är den som uppdraget gav. Hänvisa därför alltid till den här som
+"granskning 12 (av d127c3e)", se P8.
+
+### Viktigt först
+
+- **Inget i commitarna kan bokföra något.** `scripts/konteringsfloden.py` importerar bara `datetime`, `types`, `typing`
+  och kärnans egna moduler (`belopp`, `konteringsforslag`, `las_kontoplan`, `las_momssatser`, `las_regelbok`,
+  `matcha_bank`). Den öppnar inga filer, skriver inget och anropar inget annat program. Ingen SIE-fil, ingen Fortnox.
+  Ett förslag har inget fält för bokfört eller godkänt.
+- **En regel för pengar ut utan `flode` blir aldrig ett förslag.** Bekräftat både i koden och med ett eget prov.
+- **Två fynd bör rättas (P1 och P2)**, inget blockerande. Båda gäller skydd som är svagare än texten säger, inte en
+  väg till bokföring utan godkännande: allt som kommer ut är förslag som en människa måste godkänna.
+
+### Fynd
+
+**P1 – Testet i `test_inga_genvagar.py` hindrar inte annan kärnkod från att hoppa över K5, K7 och K8 (bör rättas).**
+Testet förbjuder alla namn med understreck i `konteringsfloden.py` (till exempel `_k5` och `_leverantorsfaktura`). Det
+fungerar: en påhittad kärnfil i en kopia som hämtar `_leverantorsfaktura` gör testet rött ("genvag_a.py:3 hämtar
+_leverantorsfaktura från konteringsfloden"). Men `skapa_konteringsforslag` är offentlig, och testet godtar uttryckligen
+att annan kärnkod anropar den (`test_i1_kontoplanen_och_momsfilen_las_pa_ratt_satt_slapps_igenom`, fallet
+"konteringsforslag"). `skapa_konteringsforslag` kör K2 och ursprungskontrollen, men inte K5, K7 eller K8. En annan
+kärnfil kan alltså bygga förslag ur underlag direkt, och testet är grönt. Prövat i en kopia: en ny kärnfil som anropar
+`skapa_konteringsforslag` direkt gav **inget** larm i testet, och ett prov med testbutikens riktiga filer fick fram ett
+godkänt `Konteringsforslag` för SYNT-U-2025-019 (som ska vara K5, nivå D) och för SYNT-U-2025-028 (som ska vara K8,
+nivå D). SPEC 7 säger att förslag ur underlag och bankrader "görs bara av `kontera_period`" och att "ett test slår larm
+om någon annan kod använder" genvägarna. Det stämmer för byggstenarna, men inte för `skapa_konteringsforslag`. I dag
+anropar ingen annan kärnfil den (bara `konteringsfloden.py`, kontrollerat med `grep`), så inget är fel nu. Risken
+kommer i uppgift 5, då en ny modul för Z-rapporterna ska anropa `skapa_konteringsforslag`.
+*Förslag:* ett test som säger vilka kärnfiler som får anropa `skapa_konteringsforslag` (i dag bara
+`konteringsfloden.py`, och i uppgift 5 den nya modulen, tillagd med flit), eller att K5, K7 och K8 flyttas in i
+`skapa_konteringsforslag` för förslag med underlag. Bör vara gjort före uppgift 5.
+
+**P2 – Ett par med K4a, K4b eller K4c får förslag för båda underlagen, och K4-ärendet saknas i resultatet (bör
+rättas).** När två underlag är en möjlig dublett (K4c) eller har samma fakturanummer med annat belopp eller datum (K4a,
+K4b) behåller `las_underlagsperiod` båda och lägger ärendet i `Underlagsperiod.arenden`. `kontera_period` går igenom
+`underlagsperiod.underlag` men läser aldrig `underlagsperiod.arenden` (ingen kärnfil gör det, kontrollerat med `grep`).
+Prövat i en kopia med en kopia av SYNT-U-2025-003 (nytt id, annat fakturanummer, alltså K4c, och sedan annat datum,
+alltså K4b): båda fick förslaget `F-FAKTURA-…`, alltså två leverantörsskulder för vad som kan vara samma faktura. I
+`Konteringsresultat` syns bara matchningens ärende "tvetydig" för bankraden, inte skälet "möjlig dublett av
+SYNT-U-2025-003". Godkänns båda blir skulden dubbel. Det kräver ett godkännande, så det är inte bokföring utan
+godkännande, men godkännaren ser inte varningen i resultatet från flödena. DESIGN avsnitt 5 säger att K4a–K4c ska ge
+nivå C, men nivåerna byggs i uppgift 6, och fram till dess finns ingen markering alls. Testdatan för 2025-Q1 har inget
+sådant par, så testerna fångar det inte. *Förslag:* `kontera_period` tar med underlagsperiodens ärenden i resultatet
+och märker underlagen i dem "kräver mänsklig bedömning", eller ger dem inget förslag. Vilket av de två är ett beslut
+(Beslut som behövs, punkt 3).
+
+**P3 – Q2-avtrycket med översättningen av namnet är en godtagbar lagning (notering).** `test_beslut_q2.py` byter
+`bankens-avgifter` tillbaka till `bankavgift` innan avtrycket räknas. Prövat i en kopia: utan översättningen blir
+testet rött (nytt avtryck `7d5ded21…`), med den grönt. Lagningen är bättre än att räkna om avtrycket: det gamla
+avtrycket räknades med koden före Q2 (f61eb4e), och ett nytt avtryck skulle räknas med dagens kod och därmed inte
+längre visa att inget har ändrats sedan före Q2. Översättningen är ett enda exakt namn, och eftersom `bankavgift` nu
+är ett reserverat ord kan ingen regel heta så, så översättningen kan inte dölja en annan regel. Det enda som saknas är
+att den står någonstans utanför testet. *Förslag:* en rad i PROGRESS.md (Klart, ded669d) om att avtrycket räknas med
+det gamla namnet, och gärna en kontroll i testet att varje gammalt namn i `_NAMNBYTEN` är ett reserverat ord.
+
+**P4 – Spärren i `test_karnan_ar_generell.py` är inte svagare (notering).** Sökningarna efter företagsnamn, konton,
+momssatser, regelbökernas namn och bankfilernas texter är oförändrade i hela intervallet (`git diff 6aba32d d127c3e`).
+Ändringarna är: (a) `konteringsfloden.py` läggs till bland filerna som får ha underlagets egna nyckelord som text
+("datum", "moms", "momssats", i 4269f76, före besluten), med ett test som visar att bara de orden släpps igenom, (b)
+skyddslistorna har det nya regelnamnet, och (c) ett nytt test att inget företags namn är ett reserverat ord. Det
+reserverade ordet stoppas både i `las_matchningsformat` (regelns `namn`) och i `las_regelbok` (regelns `id`). Prövat i
+en kopia med `bankavgift`, `BANKAVGIFT`, `Bank Avgift`, ett nollbreddsmellanslag inne i ordet, ett hårt mellanslag
+sist och ordet med breda tecken (`ｂａｎｋａｖｇｉｆｔ`): alla stoppas. `bank-avgift` och `bankens-avgifter` godtas,
+som README säger.
+
+**P5 – Kärnan håller sig generell (notering).** Inga företagsnamn, konton eller belopp i de ändrade kärnfilerna
+(`grep` efter testbutikens namn, motparter, `6570`, `4010`, `1940` och `25000` i `konteringsfloden.py`,
+`las_regelbok.py` och `las_matchningsformat.py` gav bara kärnans egna nyckelnamn). Gränser, konton och datumval läses
+ur regelboken och matchningsformatet. Ordet `bankavgift` står i kärnan som flödets namn, efter Hugos beslut.
+
+**P6 – "Rött före" stämmer för ded669d (notering).** Testfilen `test_beslut_efter_uppgift_4.py` från ded669d kördes
+mot en kopia av 48e7ed3: **22 röda och 4 gröna av 26**, precis som commit-meddelandet säger. De fyra gröna är skydd
+(regel för pengar in utan `flode`, och tre namn som bara liknar det reserverade ordet), som ska vara gröna före. De
+röda är röda av rätt skäl, inte av ett importfel: till exempel gav den gamla koden ett förslag på 125 kr för en regel
+utan `flode`, och ett regel-id `bankavgift` stoppades inte.
+
+**P7 – `flode` prövas inte mot matchningsregelns riktning (notering).** `las_regelbok` godtar `"flode": "bankavgift"`
+i en regel för bankrader vars regel i `matchning.json` gäller pengar in (bara kontot `kostnad` krävs). I flödet blir
+sådana rader ärendet "oklar post" utan förslag, alltså den säkra riktningen, men utan nivå. *Förslag:* att
+`las_regelbok` stoppar `flode` på en regel för pengar in, när Öppet 28 avgörs.
+
+**P8 – Namnet på granskningen (notering, dokumentation).** "Granskning 12" och P1–P7 används redan i den här filen.
+Senaste granskningen hette 21, så den här kunde heta 22. *Förslag:* Hugo eller Casper bestämmer om den ska döpas om
+(som Q8 till Q9 efter granskning 21), annars skrivs den alltid "granskning 12 (av d127c3e)".
+
+### Svar på uppdragets frågor
+
+1. **Bokföring utan godkännande, och spärrarna.** Inget kan bokföras. Ingen spärr har blivit svagare: genvägstestet
+   täcker nu också flödenas byggstenar (prövat, rött), och spärren i `test_karnan_ar_generell.py` är oförändrad (P4).
+   Men två skydd är svagare än det som står: P1 (SPEC 7 lovar mer än testet håller) och P2 (K4-ärendena följer inte
+   med). En regel för pengar ut utan `flode` blir aldrig ett förslag: prövat i en kopia där `flode` togs bort ur
+   `R-BANK-AVGIFT`, vilket gav noll förslag för bankrader och fyra ärenden "regeln saknar flöde", alla nivå D och
+   "kräver mänsklig bedömning". Andra värden på `flode` (`Bankavgift`, `bankavgift ` med mellanslag, `BANKAVGIFT`,
+   tom text, `None`, `1`, `True` och en lista) och `flode` i en regel för underlag stoppar regelboken.
+2. **Q2-avtrycket:** godtagbar lagning, se P3. Avtrycket bör inte räknas om.
+3. **Kärnan är generell**, se P5.
+4. **"Rött före" är trovärdigt**, se P6.
+5. **Öppet 27 (ska reserverade ord stoppa alla namn i konfigurationen?):** granskarens bedömning är **ja, men bara
+   exakta namn efter normaliseringen, som i dag**. I dag händer inget fel i drift om en motpart heter `bankavgift`:
+   kärnan jämför bara ordet med regelns `flode`. Felet syns först när testet i `test_karnan_ar_generell.py` blir rött,
+   alltså när någon kör testsviten efter att ha lagt till företaget. Om samma kontroll görs i `las_regelbok` för
+   motparter, kassaregister, ägare och närstående, och i kassaformatet för betalsätt, kommer felet direkt när filen
+   läses, med en tydlig text. Det kostar lite, eftersom listan bara har ett ord och bara exakta namn stoppas
+   ("Bankavgift AB" godtas). Beslutet är Hugos eller Caspers.
+   **Öppet 28 (de tre valen):** granskarens bedömning är att alla tre är rimliga och kan bekräftas.
+   - *Nivå D på "regeln saknar flöde":* rimligt. Det är den säkra riktningen, samma som D13 säger om "allt annat från
+     banken", och nivåsteget får bara höja (B2).
+   - *`flode` bara i regler för bankrader:* rimligt. Flöde a och b väljs av underlagets typ. En nyckel till för
+     underlag skulle ge två sätt att välja flöde, som kan säga emot varandra. Se också P7 om riktningen.
+   - *`bankavgift` kräver exakt kontot `kostnad`:* rimligt. Flödet bokför bara kostnaden mot banken. Fler konton i
+     regeln skulle antingen inte användas eller göra det oklart vilket som gäller, och det är just en sådan dold regel
+     som beslut c ville bort från.
+
+### Övrigt som lästes och inte gav något fynd
+
+- 933711a, baec52b, 21438dd, 48e7ed3 och d127c3e är bara dokumentation. Besluten B1–B3, D13 och D14 och besluten a–f
+  står ordagrant i den här filen. 933711a ändrar CLAUDE.md (regeln om att repot är privat), som Hugos beslut om Q7
+  säger ("Ny regel").
+- Ändringarna i `foretag/` (nyckeln `bokforing` i 4269f76, `flode` och namnbytet i ded669d, två nya regler i 5753890)
+  har Hugos OK eller beslut, med ord och datum i den här filen. Nivåerna B för de nya reglerna är sessionens förslag,
+  valt av Hugo.
+- Teständringarna i ded669d i de gamla testfilerna är bara namnbytet `bankavgift` → `bankens-avgifter`. Inga
+  påståenden togs bort. I 5753890 ersätts testregeln för DESIGN 4b av testbutikens regel, och testerna som hade
+  regelns nummer inskrivet räknar det nu (de prövar fortfarande samma sak).
+- K17 (Öppet 23) är inte byggd. Underlagets fakturanummer går in i verifikationens text och i ärendenas text. Det är
+  bara data, men rapportsteget bör visa det som data (inte prövat här).
+
+### Testsviten
+
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`:
+**4 304 passed**, 0 misslyckade, samma antal som i PROGRESS.md.
+
+### Kommandon i den här granskningen
+
+`git log` (med `--oneline`, `--stat` och `--format`), `git show` (per commit och per fil), `git diff 6aba32d d127c3e`
+för en fil, `git status`, `git archive --format=tar -o` (två kopior till scratchpad: d127c3e och 48e7ed3), `mkdir -p`
+och `tar -x -f … -C` i scratchpad, `cp -R` (en testfil mellan kopiorna i scratchpad), `grep` (bara sökande tillägg),
+`wc -l`, `cat` av ett syntetiskt underlag, pytest mot testfiler i kopiorna (med `-q`, `--tb`, `-rA` och `-k`) och
+hela sviten, `git add GRANSKNING.md` och `git commit -F` med meddelandet i en fil i scratchpad. Provfilerna
+(`genvag_a.py`, `genvag_b.py`, `test_granskare_prov12.py` och `test_granskare_prov12_k4.py`) skrevs med
+fil-verktyget, bara i kopian i scratchpad. En rad i kopians `test_beslut_q2.py` ändrades för provet i P3 och ställdes
+sedan tillbaka.
+
+**Avsteg:** vakten stoppade sju kommandon som granskaren själv skrev i strid med SPEC 7.1, alla bara läsande: ett
+`cd … &&` (`&` och `&&`), ett `git log 6aba32d^..` (`^` utan citattecken), två `grep` med `|` i mönstret, två `grep`
+med `\` i mönstret och ett `--include=*.py` utan citattecken. De gjordes om ett kommando i taget, med flera `-e` eller
+`-F` och citattecken.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **P1:** ska ett test säga vilka kärnfiler som får anropa `skapa_konteringsforslag`, eller ska K5, K7 och K8 flyttas
+   in i `skapa_konteringsforslag`? Före uppgift 5.
+2. **P1:** tills det är gjort, ska SPEC 7 säga att testet bara täcker flödenas byggstenar?
+3. **P2:** ska ett underlag med K4a, K4b eller K4c få ett förslag märkt "kräver mänsklig bedömning" (och nivå C i
+   uppgift 6, som DESIGN 5 säger), eller inget förslag alls (som K5 och K8)? Och ska underlagsperiodens ärenden följa
+   med i `Konteringsresultat`?
+4. **Öppet 27:** ska reserverade ord stoppa alla namn i konfigurationen (granskarens förslag: ja, bara exakta namn)?
+5. **Öppet 28:** bekräftas de tre valen? Ska `flode` dessutom stoppas på en regel för pengar in (P7)?
+6. **P3:** ska PROGRESS.md få en rad om att Q2-avtrycket räknas med det gamla namnet?
+7. **P8:** ska den här granskningen döpas om till 22?
+
+STATUS: gult
+KAN JAG GÅ VIDARE: ja, med P1 och P2 rättade eller beslutade före uppgift 5. Inget kan bokföras och ingen spärr har
+blivit svagare, men två skydd täcker mindre än texten säger.
+NÄSTA STEG: Hugo eller Casper svarar på 1–7. Därefter rättelser av P1 och P2 i en egen session, och Öppet 26.
