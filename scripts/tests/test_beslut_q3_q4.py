@@ -11,6 +11,7 @@ Ingen av rättelserna ändrar hur något fungerar. Allt skrivs i testets tillfä
 
 import ast
 import itertools
+import re
 import sys
 from pathlib import Path
 
@@ -107,3 +108,17 @@ def test_q3_varje_agarnamn_som_regelboken_godtar_hittas_i_en_bankrad(tmp_path, k
                     repr(namn), text)
     # Provet prövar något åt båda hållen.
     assert godtagna > 500 and utan_bokstaver > 50, (godtagna, utan_bokstaver)
+
+
+# --- Q4: kommentaren överst i las_regelbok.py stämmer med SPEC 11 ---
+
+def test_q4_kommentaren_om_agarlistan_namner_undantagen_i_spec_11():
+    beskrivning = " ".join(ast.get_docstring(_tradet(REGELBOK_KOD)).split())
+    # Stycket om agare_och_narstaende, fram till beskrivningen av en regel.
+    stycket = beskrivning.split("agare_och_narstaende lista med motparter", 1)[1].split("En regel har exakt", 1)[0]
+    for text in ("dolt tecken", "trasig JSON", "före listan", "egen text"):
+        assert text in stycket, text
+    # SPEC 11 säger samma sak.
+    spec = " ".join((AGENT / "SPEC.md").read_text(encoding="utf-8").split())
+    assert re.search(r"Ett dolt tecken eller trasig JSON någonstans i filen, och ett annat fel i filen som hittas"
+                     r" före listan, stoppar också regelboken", spec)

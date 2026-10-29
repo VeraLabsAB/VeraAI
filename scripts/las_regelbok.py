@@ -27,8 +27,12 @@ Filen ska ha exakt nycklarna i REGELBOK_NYCKLAR, och får ha nycklarna i REGELBO
               lista med motparter som är ägare eller närstående (K7, Hugos beslut 2026-10-26).
               Varje motpart är text och får stå en gång: två motparter som blir samma efter
               normaliseringen (normalisering.py) räknas som samma och stoppar filen. Listan krävs och
-              ska ha minst en motpart: en saknad, tom eller oläsbar lista stoppar hela körningen, med
-              ett fel som säger det (Hugos beslut 2026-10-27). En motpart utan bokstäver och siffror,
+              ska ha minst en motpart: en saknad, tom eller oläsbar lista stoppar hela körningen (Hugos
+              beslut 2026-10-27). När felet ligger i själva listan säger felet att hela körningen
+              stoppas. Ett dolt tecken eller trasig JSON någonstans i filen, och ett annat fel i filen
+              som hittas före listan, stoppar också regelboken och därmed hela körningen, men med det
+              felets egen text (SPEC 11, granskning 10, P2, och granskning 11, Q4, Hugos beslut
+              2026-10-29). En motpart utan bokstäver och siffror,
               till exempel "-", "." eller "_ .", räknas som tom och stoppar också hela körningen, eftersom
               den blir tom när den delas i ord som i star_som_hela_ord och aldrig kan kännas igen i en
               bankrad (granskning 10, P1, Hugos beslut 2026-10-28). Uppslaget ar_agare_eller_narstaende
