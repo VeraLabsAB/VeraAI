@@ -1,7 +1,7 @@
 # PROGRESS – Veras bokföringsagent
 
 Uppdaterad 2026-10-29. Specifikation: `SPEC.md`. Byggordning: `DESIGN-regelbok.md` avsnitt 7.
-Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12 är klart: vakten installerades på Hugos dator 2026-10-28. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4", och **D13 och D14** under "D13 och D14 beslutade" (baec52b). **Uppgift 4 är byggd** 2026-10-29 (4269f76, f6ed99e och e4cc538): flöde a, b och e med K5 och K8 i `scripts/konteringsfloden.py`, och den nya nyckeln `bokforing` i regelboken (Hugos OK i chatten 2026-10-29). Inte oberoende granskad och inte pushad. **Hugos beslut efter uppgift 4 (a–f)** står i `GRANSKNING.md`, "Beslut efter uppgift 4 (2026-10-29)" (48e7ed3), och är byggda 2026-10-29 i ded669d (c: nyckeln `flode`, reserverade namn och regeln `bankens-avgifter`) och 5753890 (f och e). Inte pushade. Nästa steg: se "Nästa steg i byggordningen". Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
+Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12 är klart: vakten installerades på Hugos dator 2026-10-28. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4", och **D13 och D14** under "D13 och D14 beslutade" (baec52b). **Uppgift 4 är byggd** 2026-10-29 (4269f76, f6ed99e och e4cc538): flöde a, b och e med K5 och K8 i `scripts/konteringsfloden.py`, och den nya nyckeln `bokforing` i regelboken (Hugos OK i chatten 2026-10-29). Granskad i granskning 22 (e4d8cd7), gult: P1 och P2 kvar, 7 frågor väntar på Hugo. Pushad (`main` på GitHub står vid d127c3e). **Hugos beslut efter uppgift 4 (a–f)** står i `GRANSKNING.md`, "Beslut efter uppgift 4 (2026-10-29)" (48e7ed3), och är byggda 2026-10-29 i ded669d (c: nyckeln `flode`, reserverade namn och regeln `bankens-avgifter`) och 5753890 (f och e). Inte pushade. Nästa steg: se "Nästa steg i byggordningen". Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
 
 Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 
@@ -23,6 +23,22 @@ borttagen.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-10-29, efter granskning 22 av uppgift 4
+
+Steg i byggplanen: 22 (pågår) och 13 (pågår)
+
+- **Granskning 22** (av d127c3e, skriven i e4d8cd7) är gjord i en ny session som inte sett bygget: **gult**. Inget
+  kan bokföras och ingen spärr har blivit svagare. **P1 och P2** bör rättas eller beslutas före uppgift 5 (steg
+  23). 7 frågor väntar på Hugo eller Casper (`GRANSKNING.md`, "Granskning 22 (av d127c3e)", "Beslut som behövs").
+- **Namnet:** granskningen hette "Granskning 12" i e4d8cd7, men granskning 12 fanns redan (vakten, Q1). Rubriken är
+  rättad till 22 enligt uppdraget i chatten 2026-10-29, som P8 föreslog.
+- **BYGGPLAN.md och PROGRESS.md är ihopkopplade:** avsnittet "Läge nu" överst i BYGGPLAN.md, en Status-kolumn i
+  tabellerna för fas C–H, tre nya regler i CLAUDE.md ("Så arbetar vi") och raden STEG I BYGGPLANEN i
+  slutrapportrutan. Testet `scripts/tests/test_byggplan_progress.py` kräver att "Läge nu" och det här avsnittet
+  stämmer, och att inga två granskningar har samma nummer. Testet undantar exakt rubriken "Granskning 11 – plan för
+  Q1", som är en plan skriven i samma session som granskning 11, inte en egen granskning.
+- **Opushat:** e4d8cd7 och commitarna efter den. Uppgift 4 och besluten efter den är pushade (d127c3e).
 
 ## Läge 2026-10-28, efter rättelsen av J1 (granskning 19)
 

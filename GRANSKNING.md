@@ -7363,7 +7363,9 @@ Nivåerna: "B, hyran D" (sessionens förslag, valt av Hugo). Byggt därför: `R-
 5460, nivå B) och `R-LEV-TILLBEHOR` (leverantörsfaktura, `ovrigt` på 4010, nivå B). HYRESVARD, LEV-EL och LEV-TELE
 får inga regler än och blir fortsatt "ny motpart". Beslut f är alltså byggt till en del, resten står under Öppet.
 
-## Granskning 12 (av d127c3e) (2026-10-29)
+## Granskning 22 (av d127c3e) (2026-10-29)
+
+Hette Granskning 12 i commit e4d8cd7, rättat till 22.
 
 Oberoende granskning i en ny session som inte har sett bygget. Granskaren ändrade ingen kod och skrev bara i den här
 filen. Granskade commits: `6aba32d..d127c3e`, alltså 933711a, baec52b, 4269f76, f6ed99e, e4cc538, 21438dd, 48e7ed3,
