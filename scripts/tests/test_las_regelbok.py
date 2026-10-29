@@ -196,7 +196,7 @@ def las_testbutikens_regelbok(fil=REGELBOK_FIL):
 def test_testforetagets_fil_laddas():
     regelbok = las_testbutikens_regelbok()
     assert regelbok.foretag == "syntet-testbutik" and regelbok.version == 1
-    assert len(regelbok.regler) == 10
+    assert len(regelbok.regler) == 12
     # Hugos beslut D18 och D19: A-gräns 20 000 kr, B-gräns 40 000 kr, 3 godkännanden, K9 3 / 300 % / 33 %.
     assert regelbok.granser == {"a_hogst_ore": 2000000, "b_hogst_ore": 4000000}
     assert regelbok.k9 == {"minst_historik": 3, "hogst_procent_av_median": 300, "lagst_procent_av_median": 33}
@@ -221,8 +221,8 @@ def test_testforetagets_fil_laddas():
     assert regelbok.ar_agare_eller_narstaende("LEV-TE") is False
 
 
-def test_testforetagets_fil_har_exakt_vardena_i_design_och_fyra_tillagg():
-    # Inga nya värden har hittats på: filen är exemplet i DESIGN-regelbok.md avsnitt 1, med fyra
+def test_testforetagets_fil_har_exakt_vardena_i_design_och_sex_tillagg():
+    # Inga nya värden har hittats på: filen är exemplet i DESIGN-regelbok.md avsnitt 1, med sex
     # tillägg som Hugo har godkänt och som alla kommer från redan bestämda värden:
     # - 'oppettider' (Hugos beslut D21), med testbutikens stängda dagar ur testdata/README.md,
     # - gränsen för bankavgiften, som är en regel för pengar ut och därför måste ha
@@ -230,8 +230,21 @@ def test_testforetagets_fil_har_exakt_vardena_i_design_och_fyra_tillagg():
     # - 'agare_och_narstaende' (Hugos beslut 2026-10-26), med det syntetiska värdet AGARE-1 ur
     #   DESIGN-regelbok.md avsnitt 1 och testforetag/FIKTIVT_FORETAG.md,
     # - 'bokforing' (Hugos OK i chatten 2026-10-29, i sessionen för uppgift 4), med valen i B3, D1 och D14:
-    #   faktureringsmetoden, fakturadatum, kvittodatum och transaktionsdagen, märkta antagna.
+    #   faktureringsmetoden, fakturadatum, kvittodatum och transaktionsdagen, märkta antagna,
+    # - R-BUTIK-FORBRUKNING och R-LEV-TILLBEHOR (Hugos beslut 2026-10-29, f), nivå B: förbrukningsmaterialet
+    #   5460 ur DESIGN 4b, och 4010, kontot för tillbehören i R-LEV-KAFFE. Båda med varugruppen 'ovrigt'.
     design = json_block_i_design("regler")
+    nya = [regel_ for regel_ in json.loads(REGELBOK_FIL.read_text(encoding="utf-8"))["regler"]
+           if regel_["id"] in ("R-BUTIK-FORBRUKNING", "R-LEV-TILLBEHOR")]
+    assert [(r["galler"], r["kontering"], r["villkor"], r["niva"]) for r in nya] == [
+        ({"kalla": "underlag", "typ": "kvitto", "motpart": "BUTIK-FORBRUKNING"}, {"ovrigt": "5460"},
+         {"giltig_fran": "2025-01-01"}, "B"),
+        ({"kalla": "underlag", "typ": "leverantorsfaktura", "motpart": "LEV-TILLBEHOR"}, {"ovrigt": "4010"},
+         {"giltig_fran": "2025-01-01"}, "B")]
+    efter = [regel_["id"] for regel_ in design["regler"]].index("R-RESTAURANG-1") + 1
+    design["regler"][efter:efter] = nya
+    assert "5460 Förbrukningsmaterial" in (AGENT / "DESIGN-regelbok.md").read_text(encoding="utf-8")
+    assert [r for r in design["regler"] if r["id"] == "R-LEV-KAFFE"][0]["kontering"]["ovrigt"] == "4010"
     design["oppettider"] = {"stangda_veckodagar": ["sondag"], "stangda_datum": ["2025-01-01", "2025-01-06"]}
     design["agare_och_narstaende"] = ["AGARE-1"]
     bokforing_ = json.loads(REGELBOK_FIL.read_text(encoding="utf-8"))["bokforing"]
@@ -1145,6 +1158,10 @@ def regelbok_fran_testbutiken_med(tmp_path, *nya_regler, agare=None):
     return fil
 
 
+# Numret som en regel får när den läggs sist i testbutikens regelbok (regelbok_fran_testbutiken_med).
+NY_REGEL = "regel nummer " + str(len(json.loads(REGELBOK_FIL.read_text(encoding="utf-8"))["regler"]) + 1)
+
+
 def leverantorsregel(id_, motpart, konto="4010", niva="A"):
     return {"id": id_, "galler": {"kalla": "underlag", "typ": "leverantorsfaktura", "motpart": motpart},
             "kontering": {"livsmedel": konto}, "villkor": {"giltig_fran": "2025-01-01"}, "niva": niva}
@@ -1161,15 +1178,15 @@ def test_m5_regel_for_agaren_med_forvaxlingstecken_stoppar_filen(tmp_path, motpa
     with pytest.raises(RegelbokFel) as fel:
         las_testbutikens_regelbok(fil)
     meddelande = str(fel.value)
-    assert "'motpart' i 'galler' i regel nummer 11 (R-AGARE-X)" in meddelande and tecken in meddelande, meddelande
+    assert "'motpart' i 'galler' i " + NY_REGEL + " (R-AGARE-X)" in meddelande and tecken in meddelande, meddelande
 
 
 def test_m5_p12_tva_regler_som_ser_likadana_ut_stoppar_filen(tmp_path):
     # P12: en andra regel med id R-LEV-TЕ och motparten LEV-TЕ (kyrilliskt Е sist), konto 6071, bredvid
     # den vanliga R-LEV-TE. Förut godtogs den. Nu stoppas både id:t och motparten var för sig.
-    for id_, motpart, vad in (("R-LEV-T" + KYRILLISKT_E, "LEV-T" + KYRILLISKT_E, "'id' i regel nummer 11"),
-                              ("R-LEV-TE-2", "LEV-T" + KYRILLISKT_E, "'motpart' i 'galler' i regel nummer 11"),
-                              ("R-LEV-T" + KYRILLISKT_E, "LEV-TE-2", "'id' i regel nummer 11")):
+    for id_, motpart, vad in (("R-LEV-T" + KYRILLISKT_E, "LEV-T" + KYRILLISKT_E, "'id' i " + NY_REGEL),
+                              ("R-LEV-TE-2", "LEV-T" + KYRILLISKT_E, "'motpart' i 'galler' i " + NY_REGEL),
+                              ("R-LEV-T" + KYRILLISKT_E, "LEV-TE-2", "'id' i " + NY_REGEL)):
         fil = regelbok_fran_testbutiken_med(tmp_path, leverantorsregel(id_, motpart, konto="6071"))
         with pytest.raises(RegelbokFel) as fel:
             las_testbutikens_regelbok(fil)
@@ -1247,7 +1264,7 @@ def test_m5_latinska_namn_godtas(tmp_path, konfiguration):
 
 def test_m5_testbutikens_regelbok_godtas_fortfarande():
     # Skydd: testbutikens regelbok har bara latinska namn och vanliga id.
-    assert len(las_testbutikens_regelbok().regler) == 10
+    assert len(las_testbutikens_regelbok().regler) == 12
 
 
 # --- Granskning 7, M6: en egen variant av kontoplanen eller momsfilen ---
@@ -1452,7 +1469,7 @@ N2_PROV = {
 @pytest.mark.parametrize("motpart, tecken", N2_PROV.values(), ids=N2_PROV.keys())
 def test_n2_regel_for_agaren_med_tecken_som_inte_ar_tillatet_stoppar_filen(tmp_path, motpart, tecken):
     for nya_regler, agare, vad in (([leverantorsregel("R-AGARE-X", motpart)], None,
-                                    "'motpart' i 'galler' i regel nummer 11 (R-AGARE-X)"),
+                                    "'motpart' i 'galler' i " + NY_REGEL + " (R-AGARE-X)"),
                                    ([], ["AGARE-1", motpart], "motpart nummer 2 i 'agare_och_narstaende'")):
         with pytest.raises(RegelbokFel) as fel:
             las_testbutikens_regelbok(regelbok_fran_testbutiken_med(tmp_path, *nya_regler, agare=agare))

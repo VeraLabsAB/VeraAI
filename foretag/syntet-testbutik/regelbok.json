@@ -61,6 +61,22 @@
       "niva": "D"
     },
     {
+      "id": "R-BUTIK-FORBRUKNING",
+      "galler": {"kalla": "underlag", "typ": "kvitto", "motpart": "BUTIK-FORBRUKNING"},
+      "kontering": {"ovrigt": "5460"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "B",
+      "anteckning": "Förbrukningsmaterial, kontot ur DESIGN-regelbok.md avsnitt 4b (Hugos beslut 2026-10-29, f)."
+    },
+    {
+      "id": "R-LEV-TILLBEHOR",
+      "galler": {"kalla": "underlag", "typ": "leverantorsfaktura", "motpart": "LEV-TILLBEHOR"},
+      "kontering": {"ovrigt": "4010"},
+      "villkor": {"giltig_fran": "2025-01-01"},
+      "niva": "B",
+      "anteckning": "Porslin och tillbehör, samma konto som tillbehören i R-LEV-KAFFE (Hugos beslut 2026-10-29, f)."
+    },
+    {
       "id": "R-Z-TB-KASSA-1",
       "galler": {"kalla": "z_rapport", "kassaregister": "TB-KASSA-1"},
       "kontering": {

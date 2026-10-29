@@ -7349,3 +7349,16 @@ ordet. Hugos svar, ordagrant:
 - **Inte sagt i besluten:** vilka konton och vilken nivå reglerna för HYRESVARD, LEV-TELE, LEV-TILLBEHOR och LEV-EL
   ska ha. Kontoplanen har inga konton för hyra, el och telefon, och B3 säger "de BAS-konton som redan finns i
   kontoplanen". Frågan ställs i sessionen innan reglerna läggs in (byggstegets punkt 3).
+
+**Konton och nivåer för f (Hugos besked i chatten 2026-10-29, samma session).** Sessionen föreslog att bara använda
+konton som redan finns: BUTIK-FORBRUKNING på 5460 (DESIGN 4b) och LEV-TILLBEHOR på 4010 (som tillbehören i
+`R-LEV-KAFFE`), och nivå B för nya regler och D för hyran. Hugos svar, ordagrant:
+
+    Lägg till i PROGRESS.md under Öppet: kontona 5010 Lokalhyra, 5020 El för
+    belysning och 6210 Telekommunikation ska läggas till i testbutikens kontoplan
+    i ett eget steg, med ny titt på B3:s D2. När HYRESVARD, LEV-EL och LEV-TELE
+    sedan får regler ska HYRESVARD ha nivå D (D10 och D11 öppna).
+
+Nivåerna: "B, hyran D" (sessionens förslag, valt av Hugo). Byggt därför: `R-BUTIK-FORBRUKNING` (kvitto, `ovrigt` på
+5460, nivå B) och `R-LEV-TILLBEHOR` (leverantörsfaktura, `ovrigt` på 4010, nivå B). HYRESVARD, LEV-EL och LEV-TELE
+får inga regler än och blir fortsatt "ny motpart". Beslut f är alltså byggt till en del, resten står under Öppet.

@@ -294,16 +294,9 @@ def regelbok_med(tmp_path, andring):
     return fil
 
 
-def regel_for_forbrukning(regelbok):
-    # BUTIK-FORBRUKNING har ingen regel i testbutikens regelbok. Regeln här finns bara i testet, för att
-    # visa exemplet i DESIGN 4b. Kontot är förbrukningsmaterialet ur DESIGN 4b.
-    regelbok["regler"].append({"id": "R-BUTIK-FORBRUKNING", "galler": {"kalla": "underlag", "typ": "kvitto",
-                                                                       "motpart": "BUTIK-FORBRUKNING"},
-                               "kontering": {"ovrigt": "5460"}, "villkor": {"giltig_fran": "2025-01-01"}, "niva": "B"})
-
-
-def test_015_ger_exakt_verifikationen_i_design_4b(tmp_path):
-    korning = Korning(regelbok=regelbok_med(tmp_path, regel_for_forbrukning))
+def test_015_ger_exakt_verifikationen_i_design_4b(korning):
+    # Med testbutikens egen regel R-BUTIK-FORBRUKNING, utan någon regel som bara finns i testet (Hugos
+    # beslut 2026-10-29, f).
     kvittot, = korning.forslag_for("SYNT-U-2025-015")
     bankraden = korning.bankrad(2, 50)
     assert kvittot.forslag_id == "F-KVITTO-SYNT-U-2025-015"
@@ -322,16 +315,32 @@ def test_015_ger_exakt_verifikationen_i_design_4b(tmp_path):
 def test_kvittots_datum_foljer_regelbokens_val(tmp_path, val, datum):
     # Bankraden för 015 har transaktionsdagen 2025-02-10 och bokföringsdagen 2025-02-11.
     def andring(regelbok):
-        regel_for_forbrukning(regelbok)
         regelbok["bokforing"]["verifikationsdatum"]["kvitto"] = val
     kvittot, = Korning(regelbok=regelbok_med(tmp_path, andring)).forslag_for("SYNT-U-2025-015")
     assert kvittot.verifikation["datum"] == datum
 
 
-def test_015_utan_regel_ar_en_ny_motpart(korning):
-    # I testbutikens regelbok har BUTIK-FORBRUKNING ingen regel. Vera gissar inget konto.
-    arende, = korning.arenden_for("SYNT-U-2025-015")
-    assert arende["typ"] == "ny motpart" and korning.forslag_for("SYNT-U-2025-015") == []
+def test_015_har_regeln_i_testbutikens_regelbok_och_inget_arende(korning):
+    # Ärendet "ny motpart" för 015 är borta: regeln står i testbutikens regelbok, inte bara i testet.
+    assert korning.arenden_for("SYNT-U-2025-015") == []
+    assert korning.regelbok.regel_for_underlag("kvitto", "BUTIK-FORBRUKNING", "2025-02-10")["id"] == (
+        "R-BUTIK-FORBRUKNING")
+
+
+def test_lev_tillbehor_far_faktura_och_betalning_pa_4010(korning):
+    # R-LEV-TILLBEHOR (Hugos beslut 2026-10-29, f): SYNT-U-2025-008, fakturan från januari.
+    forslag = korning.forslag_for("SYNT-U-2025-008")
+    assert [f.forslag_id for f in forslag] == ["F-FAKTURA-SYNT-U-2025-008", "F-BETALNING-SYNT-U-2025-008"]
+    assert raderna(forslag[0])[0][0] == "4010" and forslag[0].kopplingar["regel"]["id"] == "R-LEV-TILLBEHOR"
+    assert korning.arenden_for("SYNT-U-2025-008") == []
+
+
+# LEV-TELE (001), LEV-EL (002) och HYRESVARD (021).
+@pytest.mark.parametrize("id_", ["SYNT-U-2025-001", "SYNT-U-2025-002", "SYNT-U-2025-021"])
+def test_hyresvard_el_och_tele_ar_fortfarande_nya_motparter(korning, id_):
+    # Kontona för hyra, el och telefon finns inte i kontoplanen än (PROGRESS.md, Öppet). Vera gissar inget.
+    arende, = korning.arenden_for(id_)
+    assert arende["typ"] == "ny motpart" and korning.forslag_for(id_) == []
 
 
 def test_kvitto_med_bankrad_far_ett_forslag(korning):

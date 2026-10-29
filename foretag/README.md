@@ -217,9 +217,13 @@ Dessutom stoppas filen om:
 - `hogst_belopp_ore` 25000 (250 kr) i `R-BANK-AVGIFT`. Bankavgiften är pengar ut och måste därför ha en gräns. Värdet är gränsen i `matchning.json` som Hugo bestämde 2026-10-25,
 - `agare_och_narstaende` med `AGARE-1`, det syntetiska värdet ur DESIGN-regelbok.md avsnitt 1 och `testforetag/FIKTIVT_FORETAG.md` (Ägare 1, en påhittad person). Testbutiken har ingen regel för ägaren än.
 
-Ett godkändes 2026-10-29 (Hugos OK i chatten, i sessionen för uppgift 4):
+Tre godkändes 2026-10-29:
 
-- `bokforing`, med valen som är **antagna** för testföretaget (B3, D1 och D14): faktureringsmetoden, leverantörsfakturan på fakturadatum, betalningen och bankrader utan underlag på transaktionsdagen och kvittot på kvittodatum.
+- `bokforing` (Hugos OK i chatten, i sessionen för uppgift 4), med valen som är **antagna** för testföretaget (B3, D1 och D14): faktureringsmetoden, leverantörsfakturan på fakturadatum, betalningen och bankrader utan underlag på transaktionsdagen och kvittot på kvittodatum,
+- `R-BUTIK-FORBRUKNING` (Hugos beslut efter uppgift 4, f): kvitton från BUTIK-FORBRUKNING, varugruppen `ovrigt` på 5460 Förbrukningsmaterial (kontot i DESIGN-regelbok.md avsnitt 4b), nivå B,
+- `R-LEV-TILLBEHOR` (samma beslut): leverantörsfakturor från LEV-TILLBEHOR, `ovrigt` på 4010 Inköp av varor (samma konto som tillbehören i `R-LEV-KAFFE`), nivå B.
+
+HYRESVARD, LEV-EL och LEV-TELE har inga regler än, eftersom kontoplanen saknar konton för hyra, el och telefon. Deras underlag blir "ny motpart". Kontona läggs till i ett eget steg (PROGRESS.md, Öppet), och då får HYRESVARD nivå D (Hugos besked 2026-10-29).
 
 Gränserna är Hugos beslut D18 och D19: A-gräns 20 000 kr (`2000000` öre), B-gräns 40 000 kr (`4000000` öre), 3 godkännanden innan nivå A, och K9 med 3 / 300 % / 33 %. Konton och varugrupper är SYNTETISKA och inte verifierade av en redovisningskonsult (D1–D16).
 
@@ -242,4 +246,4 @@ Det här i konfigurationen används av förslaget:
 
 Förslaget får också kontrollsumman för varje fil det bygger på: underlagets, bankfilens och Z-filens. Summorna kommer från inläsningen, aldrig från den som skapar förslaget. Förslaget går inte att ändra efteråt och har **inget fält för att vara bokfört eller godkänt**. Det bokförs aldrig i det här steget.
 
-Vilka konton ett flöde ska använda (till exempel leverantörsfakturan eller Z-rapporten) bestäms inte här. Det byggs i nästa steg, och kräver Hugos eller konsultens val (DESIGN-regelbok.md avsnitt 4 och 8).
+Förslagen för leverantörsfakturor, kvitton och bankens avgifter (flöde a, b och e) görs av `kontera_period` i `scripts/konteringsfloden.py`, med regelbokens konton, `bokforing` och `flode`. Flödena för kassan, kortinlösen, Swish och kontanter (c och d) är inte byggda. Kontona och valen kräver Hugos eller konsultens beslut (DESIGN-regelbok.md avsnitt 4 och 8).
