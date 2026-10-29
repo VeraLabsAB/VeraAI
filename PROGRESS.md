@@ -37,7 +37,8 @@ Steg i byggplanen: 22 (pågår) och 13 (pågår)
   tabellerna för fas C–H, tre nya regler i CLAUDE.md ("Så arbetar vi") och raden STEG I BYGGPLANEN i
   slutrapportrutan. Testet `scripts/tests/test_byggplan_progress.py` kräver att "Läge nu" och det här avsnittet
   stämmer, och att inga två granskningar har samma nummer. Testet undantar exakt rubriken "Granskning 11 – plan för
-  Q1", som är en plan skriven i samma session som granskning 11, inte en egen granskning.
+  Q1", som är en plan skriven i samma session som granskning 11, inte en egen granskning (Hugos beslut i chatten
+  2026-10-29: rubriken räknas som en del av granskning 11, och undantaget står kvar).
 - **Testsviten:** 4 312 passed (före: 4 304). Det nya testet är rött mot en kopia av e4d8cd7 i scratchpad (7 av 8;
   det åttonde är skyddet att undantaget för planen finns kvar, som ska vara grönt före) och grönt efter.
 - **Opushat:** e4d8cd7 och commitarna efter den. Uppgift 4 och besluten efter den är pushade (d127c3e).

@@ -27,8 +27,8 @@ TABELLRAD = re.compile(r"^\| (\d+) \|", re.ASCII)
 GRANSKNINGSRUBRIK = re.compile(r"^## Granskning (\d+)(?!\d)", re.ASCII)
 
 # "Granskning 11 – plan för Q1" är en plan som granskaren skrev i samma session som granskning 11,
-# inte en egen granskning (GRANSKNING.md, första stycket under rubriken). Bara exakt den här rubriken
-# undantas, så en ny granskning med numret 11 gör ändå testet rött.
+# inte en egen granskning (GRANSKNING.md, första stycket under rubriken, och Hugos beslut i chatten
+# 2026-10-29). Bara exakt den här rubriken undantas, så en ny granskning med numret 11 gör ändå testet rött.
 DELAR_AV_EN_GRANSKNING = {"## Granskning 11 – plan för Q1 (2026-10-28)"}
 
 
