@@ -1,14 +1,14 @@
 # PROGRESS – Veras bokföringsagent
 
 Uppdaterad 2026-10-29. Specifikation: `SPEC.md`. Byggordning: `DESIGN-regelbok.md` avsnitt 7.
-Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29). Steg 12 är delvis klart: vakten installerades på Hugos dator 2026-10-28, Caspers dator återstår. Spärrtestet är klart och grönt (2026-10-29). **Q2, Q3 och Q4 är byggda** (Q2: 3e3c18c och d7d38e0, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4) och väntar på **en gemensam oberoende granskning**. Nästa steg: den granskningen, i en ny session som inte har sett bygget. Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
+Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29). Steg 12 är delvis klart: vakten installerades på Hugos dator 2026-10-28, Caspers dator återstår. Spärrtestet är klart och grönt (2026-10-29). **Q2, Q2b, Q3 och Q4 är byggda** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4) och väntar på **en gemensam oberoende granskning**. Nästa steg: den granskningen, i en ny session som inte har sett bygget. Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
 
 Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **4 103 passed**, 0 misslyckade (körd senast efter Q2 2026-10-29: 4 080 från förut och 23 nya i
+Testsviten: **4 192 passed**, 0 misslyckade (körd senast efter Q2b 2026-10-29: 4 103 från förut och 89 nya i
 `scripts/tests/test_beslut_q2.py`). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
 borttagen.
@@ -431,6 +431,7 @@ fattade och byggda, se avsnittet ovan.)
 | Efter granskning 12 (Hugos beslut 2026-10-28): lista över tillåtna verktyg i vakten och SPEC 7.1 (P4), skills utan skalkommandon (P3), förbud för filen `.git` (P5), läget "auto" avstängt (P6), nya skrivförbud (beslut b), provet med en vakt som fallerar i INSTALLERA.md (P2, beslut a). **Inte granskad och inte installerad** | 5cb9080, 08a3370, c066188 |
 | Granskning 11, Q3 och Q4 (Hugos beslut 2026-10-29): `sokform_for_namn` i `normalisering.py` för både sökningen och regelboken, och kommentaren överst i `las_regelbok.py` som SPEC 11. **Inte granskad** (granskas tillsammans med Q2) | bd851ba, 2bc9762 |
 | Granskning 11, Q2 (Hugos beslut 2026-10-29): ägaren känns igen utan accenter, bara i ägaruppslaget. Ny funktion `star_som_hela_ord_utan_accenter` i `normalisering.py`, som bara regelbokens ägaruppslag använder (bankraderna och kontrollen av `matchning.json`). `normalisera_for_jamforelse`, `sokform_for_namn` och `star_som_hela_ord` är oförändrade. SPEC 11, Ö5 och Ö13 uppdaterade. **Inte granskad** (granskas tillsammans med Q3 och Q4) | 3e3c18c, d7d38e0 |
+| Granskning 11, Q2b (Hugos beslut 2026-10-29): accenter spelar ingen roll i någon ägarkontroll. `ar_agare_eller_narstaende` och kontrollen att en regel för ägarens underlag har nivå D använder den nya funktionen `normalisera_utan_accenter` i `normalisering.py`, som tar bort accenterna på samma sätt som `star_som_hela_ord_utan_accenter`. Dublettkontrollen i ägarlistan och kontrollen av tvetydiga regler är oförändrade. SPEC 11 och Ö13 uppdaterade. **Inte granskad** (granskas tillsammans med Q2, Q3 och Q4) | 1dcf769 |
 
 ## Öppet
 
@@ -439,9 +440,9 @@ fattade och byggda, se avsnittet ovan.)
    (en ägarrad med ett skiljetecken intill namnet matchas aldrig mot sitt underlag, säker riktning) och P4
    (nivåsteget ska använda märkningen, uppgift 6). Listan över ägare och närstående ligger där agenten kan
    skriva, till spärrsteget (Hugos beslut i chatten 2026-10-27). 16000a8 och 10bfe0f är oberoende granskade
-   i granskning 11 (P1 stängd, fynd Q1–Q8). Öppen därifrån: Q7. Q2, Q3 och Q4 är byggda (Q2: 3e3c18c och
-   d7d38e0, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4) och väntar på en gemensam oberoende
-   granskning.
+   i granskning 11 (P1 stängd, fynd Q1–Q8). Öppen därifrån: Q7. Q2, Q2b, Q3 och Q4 är byggda (Q2: 3e3c18c och
+   d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4) och väntar på en gemensam
+   oberoende granskning.
 2. **N2, vilka tecken ett namn i regelboken får ha.** I dag får ett namn bara ha a–z med eller utan accent,
    0–9, mellanslag, bindestreck, understreck och punkt. Öppen fråga till Hugo eller Casper: ska fler tecken
    få finnas, till exempel `&` (som i "Café Ölund & Söner AB"), `/`, `,`, `'` och parenteser, och bokstäver
@@ -551,6 +552,9 @@ fattade och byggda, se avsnittet ovan.)
 16. **Kontrollen efter installationen, steg 8 (provet med en vakt som fallerar), är inte gjord** på Hugos dator
     (Hugos besked i chatten 2026-10-29, `GRANSKNING.md`, "Spärrtest 2026-10-29"). Krävs före läget auto, före
     första hela körningen på riktiga underlag och före första kund.
+17. **Q8: matchningen mot motparter har en egen kopia av `star_som_hela_ord`** (`_star_som_hela_ord` i
+    `scripts/matcha_bank.py`). Hugos beslut 2026-10-29 (`GRANSKNING.md`, "Hugos beslut 2026-10-29 om Q2–Q4"):
+    den ska samlas på ett ställe, som i Q3, senare. Ägarkontrollerna rörs inte. **Öppen, inte byggd.**
 
 ## Nästa steg i byggordningen
 
@@ -560,10 +564,11 @@ fattade och byggda, se avsnittet ovan.)
    granskning 18 i 0c7cdcb och 43e2371 och J1 efter granskning 19 i ab305c7, 4bcbabe och ad85b8e.
    **Klart:** granskning 20 (a9ad2ab, beslut i 2da1172), provkörningen av steg 4 h (40df48e och 567692b),
    installationen på Hugos dator och spärrtestet (818f87d, beslut i 61a6d5d). Caspers dator: se Öppet,
-   punkt 15. **Q2, Q3 och Q4 är byggda** (Q2: 3e3c18c och d7d38e0, Q3: bd851ba, Q4: 2bc9762,
-   `GRANSKNING.md`, "Hugos beslut 2026-10-29 om Q2–Q4"). Q3 och Q4 ändrar inte hur något fungerar. Q2 gör att
-   ägaren känns igen när banken skriver namnet utan accenter, bara i ägaruppslaget.
-   **Nästa steg:** en gemensam oberoende granskning av Q2–Q4 i en ny session, före uppgift 4.
+   punkt 15. **Q2, Q2b, Q3 och Q4 är byggda** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4:
+   2bc9762, `GRANSKNING.md`, "Hugos beslut 2026-10-29 om Q2–Q4"). Q3 och Q4 ändrar inte hur något fungerar. Q2
+   gör att ägaren känns igen när banken skriver namnet utan accenter, och Q2b gör samma sak i underlagen och i
+   kontrollen att en regel för ägaren har nivå D.
+   **Nästa steg:** en gemensam oberoende granskning av Q2, Q2b, Q3 och Q4 i en ny session, före uppgift 4.
 2. **Uppgift 4**: flöde a, b och e (leverantörsfakturor, kvitton och bankavgifter) med K5 och K8.
 3. Uppgift 5: Z-rapporter, kortinlösen, Swish och kontantinsättningar (och M9 från granskning 7).
 4. Uppgift 6: nivåerna A–D och K9, med nivå D för ägarens bankrader. Därefter en oberoende granskning.
