@@ -7025,3 +7025,206 @@ Skrivet in på Hugos uppdrag i chatten 2026-10-29. Fynden står i granskning 11 
   `sokform_for_namn` och `star_som_hela_ord` får inte ändras.
 - **Q8 (senare):** matchningen mot motparter har en egen kopia av `star_som_hela_ord`. Den ska samlas på ett
   ställe, som i Q3. Rör inte ägare. Läggs under Öppet.
+
+## Granskning 21 – Q2, Q2b, Q3 och Q4 (3a2d4f6 till dcf3078) (2026-10-29)
+
+Oberoende granskning i en ny session som inte har sett bygget. Granskaren har inte rättat någon kod. Sessionen
+började och slutade med `git status`. Inga sudo-kommandon, inget pushat. Alla kopior och provfiler låg i
+scratchpad-mappen (`scratchpad/g21/`).
+
+### Viktigt först
+
+- **Inget allvarligt och inget på nivån medel.** Tre låga fynd (L1–L3): två om dokumentationen och en öppen fråga
+  om bokstäver som Unicode inte delar upp (till exempel ø och æ).
+- **Ändringarna gör bara ägarkontrollerna strängare.** Ägaren känns igen i fler fall, aldrig i färre (prövat i
+  drygt 4,6 miljoner fall, punkt 4). Inget kan bokföras utan godkännande, och ingen spärr har blivit svagare.
+- **Testsviten:** 4 192 passed, 0 misslyckade.
+
+### Vad som lästes
+
+CLAUDE.md, PROGRESS.md, SPEC.md (7.1, 11, Ö5 och Ö13), "Hugos beslut 2026-10-29 om Q2–Q4" och fynden Q2–Q4. Fynden
+står i **"Granskning 11 – 16000a8 och 10bfe0f"** (Q2, Q3 och Q4 under "Fynd"). Avsnittet "Granskning 11 – plan för
+Q1", som uppdraget pekade på, handlar bara om Q1 och har inga delar om Q2–Q4.
+
+### Punkt 1: varje commit
+
+| Commit | Filer | Stämmer med meddelandet och uppdraget? |
+|---|---|---|
+| bd851ba (Q3) | `las_regelbok.py`, `normalisering.py`, `test_beslut_q3_q4.py` | Ja. Ny offentlig `sokform_for_namn`, som `star_som_hela_ord` och regelboken använder. `_ord_i` används inte längre i `las_regelbok.py` |
+| 2bc9762 (Q4) | `las_regelbok.py` (bara beskrivningen överst), `test_beslut_q3_q4.py` | Ja. **Bara text:** koden utan beskrivningar är exakt lika före och efter (prov med Pythons `ast`, som läser koden som ett träd) |
+| f61eb4e | `GRANSKNING.md`, `PROGRESS.md` | Ja. Hugos beslut inskrivet. Bara text |
+| 3e3c18c (Q2) | `normalisering.py` (nya `_utan_accenter` och `star_som_hela_ord_utan_accenter`), `las_regelbok.py` (två anrop byts), `test_beslut_q2.py` | Ja. Bara ägaruppslaget för bankrader och kontrollen av `matchning.json` |
+| d7d38e0 | `SPEC.md` (statusraden, 11, Ö5 och Ö13) | Ja. Bara text |
+| 9fd164f | `PROGRESS.md` | Ja. Bara text |
+| 1dcf769 (Q2b) | `normalisering.py` (ny `normalisera_utan_accenter`), `las_regelbok.py` (två jämförelser byts), `test_beslut_q2.py`, `GRANSKNING.md` (Q2b och Q8 i beslutet) | Ja. Bara `ar_agare_eller_narstaende` och nivå D-kontrollen |
+| dcf3078 | `SPEC.md`, `PROGRESS.md` | Ja. Bara text |
+
+**Det som gick utöver uppdraget är bara text.** Statusraden i SPEC.md fick en mening per commit, och beskrivningarna
+(kommentarerna i början av filer och funktioner, så kallade docstrings) i `las_regelbok.py` och `normalisering.py`
+fick nya meningar. Prov: när beskrivningarna räknas bort har bara fem funktioner i `las_regelbok.py` ändrad kod
+sedan 3a2d4f6, nämligen `_kontrollera_agare_och_narstaende` (Q3), `_ingen_matchningsregel_for_agare` och
+`ar_bankrad_mot_agare_eller_narstaende` (Q2), och `_kontrollera_agarregel` och `ar_agare_eller_narstaende` (Q2b). Inga
+andra kodfiler än `las_regelbok.py` och `normalisering.py` är ändrade, och inget i `sparr/`. Statusraden säger
+"Ändras bara efter Hugos OK". Om OK gavs för själva SPEC-texten kan granskaren inte se (ett OK gäller bara i
+chatten), se "Beslut som behövs".
+
+### Punkt 2: orörda funktioner
+
+- `normalisera_for_jamforelse` och `_ord_i` är exakt lika som i 3a2d4f6, och `sokform_for_namn` och
+  `star_som_hela_ord` exakt lika som i bd851ba (`diff` mellan rena kopior, och samma prov med `ast`).
+- `star_som_hela_ord` ger **samma svar som före Q3** i 1 597 014 par av namn och text (49 256 av dem sanna). Namnen
+  och texterna byggdes av 17 tecken, bland annat å, é, ø, ß, ı, İ, ǘ, ett fristående ¨, en kombinerande accent, ett
+  nollbreddstecken och `/`. Den gamla funktionen lästes in ur en ren kopia av 3a2d4f6. `sokform_for_namn` ger samma
+  form som den gamla raden i alla fall.
+
+### Punkt 3: röda före
+
+De nya testfilerna från dcf3078 kördes mot rena kopior av versionen före varje rättelse (`git archive`, `tar`).
+
+| Rättelse | Kopia | Utfall | Röda test (urval) |
+|---|---|---|---|
+| Q3 | 3a2d4f6 | 2 röda, skyddstestet grönt | `test_q3_las_regelbok_anvander_inte_ord_i`, `test_q3_star_som_hela_ord_och_las_regelbok_anvander_samma_sokform_for_namn` (bara två nya test för Q3 finns, båda röda) |
+| Q4 | bd851ba | 1 rött, Q3-testen gröna | `test_q4_kommentaren_om_agarlistan_namner_undantagen_i_spec_11` (det enda testet för Q4) |
+| Q2 | f61eb4e | 18 röda för Q2 (plus de 73 för Q2b), 21 skyddstest gröna | `test_q2_agaren_kanns_igen_utan_accenter` (alla 12 fall, bland annat "Åsa Öberg" mot "UTTAG ASA OBERG" och "Asa Oberg" mot "UTTAG ÅSA ÖBERG"), `test_q2_matchningen_marker_raden_och_undantaget_galler_inte` (regeln "uttag" undantog raden), `test_q2_en_matchningsregel_som_namner_agaren_utan_accenter_stoppar_regelboken` (4 fall, regelboken stoppades inte), `test_q2_uppslaget_utan_accenter_hittar_aldrig_farre_an_forut` (funktionen fanns inte) |
+| Q2b | 9fd164f | 73 röda, 39 gröna (Q2-testen och 16 skyddstest) | `test_q2b_ar_agare_eller_narstaende_bortser_fran_accenter` (12 fall), `test_q2b_galler_aven_narstaende_langre_ned_i_listan` (12), `test_q2b_ett_fristaende_accenttecken_i_underlaget`, `test_q2b_regel_for_agaren_utan_accenter_ska_ha_niva_d` (36), `test_q2b_regel_for_narstaende_utan_accenter_ska_ha_niva_d` (12) |
+
+Antalen stämmer med commit-meddelandena (Q2: 18 röda och 5 skyddstest, Q2b: 89 nya, 73 röda och 16 skyddstest).
+Felen är riktiga påståenden som inte håller (till exempel `AssertionError: ('Åsa Öberg', 'UTTAG ASA OBERG', '')`), inte
+fel i testfilen.
+
+### Punkt 4: egna prov
+
+- **Fyra tecken.** Alla 11 110 namn av 1–4 av de tio tecknen i Q3-testet (a, Å, é, 0, -, ., _, mellanslag,
+  tankstreck och e med en kombinerande accent). **8 500 godtas** av regelboken, och vart och ett pekas ut i
+  "UTTAG namn", "UTTAG namn/LAN", "UTTAG (namn)" och "TILL:namn", både i beskrivningen och i referensen, och
+  `ar_agare_eller_narstaende(namn)` är sant. **500 stoppas** för att de saknar bokstäver och siffror, och de hittas
+  aldrig, varken med den gamla eller den nya sökningen. **2 110 stoppas av andra skäl**: exakt antalet namn som
+  börjar eller slutar med mellanslag. Inga undantag.
+- **Aldrig färre, bankrader och `matchning.json`.** Alla 20 460 tecken i Unicode där accenter, uppdelning eller stora
+  och små bokstäver kan spela roll (kombinerande tecken, fristående accenttecken, osynliga tecken, mellanslag, och
+  tecken som ändras av uppdelningen eller av små bokstäver), insatta på tio sätt i en bankrad, mot tio godtagna
+  ägarnamn: 2 046 000 fall. Den gamla sökningen (3a2d4f6) hittade ägaren i 1 107 fall, den nya i 16 326. **Inget fall
+  där den gamla hittade ägaren och den nya inte gör det.**
+- **Aldrig färre, underlag och nivå D.** Samma tecken i nio motparter mot 14 namn: 2 577 960 fall. **Inget fall där
+  den gamla jämförelsen säger "samma" och den nya inte gör det.**
+
+### Punkt 5: accenter
+
+**Hur:** `_utan_accenter` gör två saker. (1) Unicodes uppdelning NFKD delar en bokstav med accent i bokstaven och
+accenten för sig ("Å" blir "A" och en ring), och byter ut ett fristående accenttecken (till exempel "¨") mot ett
+mellanslag och en accent. (2) Alla kombinerande tecken (Unicode-kategori M, alltså accenter och liknande som sitter
+på bokstaven före) tas bort. Sedan görs samma jämförelse som förut. Bokstäver som Unicode inte delar upp ändras inte.
+
+"Före" är 3a2d4f6. "Bankrad" är ägaren med accent mot en bankrad utan, och omvänt. "Underlag" är nivå D-kontrollen
+och `ar_agare_eller_narstaende`.
+
+| Tecken | Blir | Får stå i ägarlistan | Bankrad | Underlag | Jämfört med före Q2 |
+|---|---|---|---|---|---|
+| Å, Ä, Ö, é, ü, ñ, ç, š, ő | A, A, O, e, u, n, c, s, o | ja | känns igen åt båda hållen | känns igen | bättre |
+| ǘ, ǖ, ệ, ẫ, ṏ (flera accenter) | u, u, e, a, o | ja | känns igen | känns igen | bättre |
+| a med punkt under och cirkumflex (två kombinerande) | a | ja | känns igen | känns igen | bättre |
+| e med två akuta accenter | e | nej (stoppas av N2) | känns igen | känns igen | bättre |
+| İ (I med prick) | I | ja | känns igen | känns igen | bättre |
+| A¨, A˚, e´ (fristående accent) | bokstaven och ett mellanslag | nej | känns igen (orden sätts ihop) | känns igen | bättre |
+| ß, ẞ | oförändrade | nej | kändes igen redan förut ("ß" räknas som "ss") | samma | lika |
+| ø, Ø, æ, Æ, ł, Ł, đ, ð, þ, œ | oförändrade | nej | känns inte igen ("UTTAG KØR" pekas inte ut för "Kor") | känns inte igen | lika (se L3) |
+| ı (i utan prick), ŉ | oförändrade (ŉ blir ʼn) | nej | känns inte igen | känns inte igen | lika |
+
+Inget tecken känns igen sämre än före Q2.
+
+### Punkt 6: ägarkontrollerna
+
+Varje ställe i `scripts/` (utom testerna) som använder ägarlistan, funnet med `grep`:
+
+| Ställe | Bortser från accenter? |
+|---|---|
+| `_kontrollera_agare_och_narstaende`, dublettkontrollen | Nej, enligt Hugos beslut (Q2b) |
+| `_kontrollera_agare_och_narstaende`, stoppet för namn utan bokstäver och siffror (P1) | Nej (`sokform_for_namn`), men det prövar bara att namnet har en bokstav eller siffra. Bokstäver och siffror tas aldrig bort av `_utan_accenter`, så inget godtaget namn blir tomt i uppslaget (provet med fyra tecken) |
+| `_ingen_matchningsregel_for_agare` | Ja (Q2) |
+| `_kontrollera_agarregel`, nivå D | Ja (Q2b) |
+| `Regelbok.ar_bankrad_mot_agare_eller_narstaende`, och därmed `matchningsregel_for_bankrad`, `matcha_bank.py` (rad 336) och `konteringsforslag.py` (rad 741) | Ja (Q2) |
+| `Regelbok.ar_agare_eller_narstaende` | Ja (Q2b). **Anropas inte av någon kärnkod i dag**, bara av testerna. Den är till för nivåsteget (uppgift 6). I drift i dag är Q2b alltså bara nivå D-kontrollen |
+| `Regelbok.agare_och_narstaende` (ger listan) | Används inte av någon kärnkod |
+
+**Inget ställe är missat.** Kontrollen av tvetydiga regler och `regel_for_underlag` (vilken regel som passar ett
+underlag) bryr sig om accenter, men de är inte ägarkontroller. En regel för "Åsa Öberg" passar alltså inte ett underlag
+från "Asa Oberg", och då blir det inget konteringsförslag, vilket är den säkra riktningen.
+
+### Punkt 7: motparter och K4
+
+- **Testbutikens fingeravtryck** räknades med testets egen funktion i en ren kopia av 3a2d4f6:
+  `5e77f8abb81158b04cef80541c9d890a9b5b804d085d1cf726ff67bfe9d54efd` för både 2025-03-31 och 2025-04-30. **Samma
+  värde som i testet**, och samma i en ren kopia av dcf3078.
+- **Matchningen mot motparter och K4** med 16 par av motparter som bara skiljer sig i accenter eller stavning
+  ("LEV-Ä"/"LEV-A", "Café AB"/"CAFE AB", "Åsa Öberg"/"ASA OBERG", "Ølund"/"OLUND", "Straße"/"STRASSE", "İSTANBUL" och
+  flera): exakt samma utfall i 3a2d4f6 och dcf3078 (kontrollsummor över alla utfall: matchningen
+  `e63d3ff12f18ebd38b0d26f04e9f06be3f70fd18610bb85595a57e3446ccbce5`, K4
+  `06f99fa3f3eb05e39b773cd29c0ae48b1e17d5fde082032b2e3e5f2400edf31c`, lika i båda).
+- `matcha_bank.py`, `las_underlag.py` och `konteringsforslag.py` är inte ändrade sedan 3a2d4f6 (`git diff --stat`).
+- Sidoiakttagelse, inte ny: i matchningen mot motparter passar "Ölund" inte "O¨LUND" (fristående accent), fast N4
+  säger att de ska jämföras lika. Så var det också före. Det hör till Q8 (matchningens egen kopia av
+  `star_som_hela_ord`), och kan tas med när Q8 byggs.
+
+### Punkt 8: kärnan
+
+Inget namn eller annat värde från ett företags regelbok finns i kärnan, varken i kod eller kommentarer. De nya
+exemplen i kommentarerna ("Åsa Öberg", "Asa Oberg", "René", "ASA OBERG", "NAMN-7") finns inte i `foretag/` eller
+`testforetag/`, och testbutikens ägare `AGARE-1` står inte i kärnans kod. `test_karnan_ar_generell.py` är grön.
+
+### Punkt 9: bokföring utan godkännande, och spärrarna
+
+**Nej.** Allt som ändrats gör att fler bankrader pekas ut som ägarens (de kräver då underlag och mänsklig bedömning),
+att fler regler för underlag måste ha nivå D och att fler regler i `matchning.json` stoppar regelboken. Det är den
+säkra riktningen. Inget i koden kan bokföra, och inget i `sparr/` eller de låsta inställningarna är ändrat.
+
+### Punkt 10: SPEC.md och PROGRESS.md
+
+Stämmer med koden: SPEC 11 (Q2 och Q2b), Ö5 och Ö13 säger samma sak som koden, och PROGRESS.md har rätt commits,
+Q8 under Öppet (punkt 17) och 4 192 test. Annan dokumentation är inte uppdaterad, se L1. Namnet Q8, se L2.
+
+### Punkt 11: testsviten
+
+`4192 passed in 59.24s`, körd med projektets Python på den nya platsen. Väntat: 4 192.
+
+### Fynd
+
+**L1 – DESIGN-regelbok.md och foretag/README.md säger inte att ägarkontrollerna bortser från accenter (låg,
+dokumentation).** DESIGN-regelbok.md avsnitt 2 (stycket om `ar_bankrad_mot_agare_eller_narstaende`) säger "efter
+normaliseringen", och avsnitt 8 punkt 1 och `foretag/README.md` (raden om `agare_och_narstaende`) säger att
+motparterna jämförs "efter samma normalisering som i K4", med `ar_agare_eller_narstaende` i samma mening. Efter Q2 och
+Q2b gäller det bara dublettkontrollen i listan. *Bör göras:* en mening i båda filerna om Q2 och Q2b, i en egen commit.
+
+**L2 – Namnet Q8 används för två olika saker (låg, dokumentation).** I granskning 11 är Q8 "Namnet 'Anna Nilsson' i ett
+test (ingen åtgärd)". I "Hugos beslut 2026-10-29 om Q2–Q4" och i PROGRESS.md, Öppet punkt 17, är Q8 matchningens egen
+kopia av `star_som_hela_ord`. *Bör göras:* ge det nya ett eget namn (till exempel "Q9" eller "Q8 (beslut 2026-10-29)")
+i PROGRESS.md och i beslutet, efter Hugos eller Caspers OK.
+
+**L3 – Bokstäver som Unicode inte delar upp, till exempel ø, æ, ł och đ, känns inte igen utan "accent" (låg, öppen
+fråga, lika som före Q2).** En ägare som bara kan skrivas "Soren Lokke" i listan (N2 stoppar ø) pekas inte ut i
+"UTTAG SØREN LØKKE", och omvänt. Det är den osäkra riktningen, men inte sämre än förut, och svenska bankers sätt att
+skriva namn är okänt (Ö5). Ö5 och Ö13 nämner bara "AA" och "OE" som exempel på andra stavningar. *Bör göras:* lägg
+ø, æ, ł, đ och liknande som exempel i Ö5, så att frågan tas med när riktiga bankfiler finns. Ingen kodändring nu.
+
+### Kommandon i den här granskningen
+
+`git status` (två gånger), `git log` (med `--stat`, `--format` och `--oneline`), `git show`, `git diff --stat`,
+`git archive --format=tar -o` (fem kopior till scratchpad), `mkdir -p` och `tar -x -f … -C` i scratchpad, `cp -R`
+(testfiler och provfiler mellan kopiorna i scratchpad), `diff` mellan kopiorna, `ls`, `grep` (bara sökande tillägg),
+pytest mot testfiler i kopiorna (med `-q`, `--tb`, `-rA`, `-rP` och `-k`) och hela sviten, `git add GRANSKNING.md` och
+`git commit -F` med meddelandet i en fil i scratchpad. Provfilerna skrevs med fil-verktyget i kopiorna.
+
+**Avsteg:** vakten stoppade fyra kommandon som granskaren själv skrev i strid med SPEC 7.1, alla bara läsande:
+`cd … && git status && git log …` (`cd` och `&&`), två `grep` med `\|` i mönstret (omvänt snedstreck) och ett
+`grep -E` med `|` i mönstret (lodstreck). De gjordes om ett kommando i taget, med flera `-e` i stället för `|`.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **L1:** ska DESIGN-regelbok.md och foretag/README.md få en mening om Q2 och Q2b?
+2. **L2:** vilket namn ska den nya Q8 ha?
+3. **L3:** ska ø, æ, ł, đ och liknande läggas in som exempel i Ö5?
+4. **SPEC-texten:** statusraden säger "Ändras bara efter Hugos OK". Om Hugo eller Casper inte redan har godkänt
+   texterna i d7d38e0 och dcf3078 i chatten: läs och godkänn dem.
+
+STATUS: grönt
+KAN JAG GÅ VIDARE: ja. Inget allvarligt och inget medel. Tre låga fynd (L1–L3) går till Öppet.
+NÄSTA STEG: Hugo eller Casper svarar på 1–4. Därefter uppgift 4.
