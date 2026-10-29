@@ -7023,8 +7023,11 @@ Skrivet in på Hugos uppdrag i chatten 2026-10-29. Fynden står i granskning 11 
 - **Q2b: ja.** `ar_agare_eller_narstaende` och kontrollen att en regel för ägarens underlag har nivå D ska också
   bortse från accenter. Samma jämförelse som i dag, bara utan accenter på båda sidor. `normalisera_for_jamforelse`,
   `sokform_for_namn` och `star_som_hela_ord` får inte ändras.
-- **Q8 (senare):** matchningen mot motparter har en egen kopia av `star_som_hela_ord`. Den ska samlas på ett
+- **Q9 (senare):** matchningen mot motparter har en egen kopia av `star_som_hela_ord`. Den ska samlas på ett
   ställe, som i Q3. Rör inte ägare. Läggs under Öppet.
+- **Namnbyte (granskning 21, L2), på Hugos uppdrag i chatten 2026-10-29:** punkten ovan hette först Q8. Den
+  döptes om till Q9, eftersom Q8 redan är namnet på fyndet om "Anna Nilsson" i ett test i granskning 11. Q8 i
+  granskning 11 är orörd.
 
 ## Granskning 21 – Q2, Q2b, Q3 och Q4 (3a2d4f6 till dcf3078) (2026-10-29)
 
@@ -7056,7 +7059,7 @@ Q1", som uppdraget pekade på, handlar bara om Q1 och har inga delar om Q2–Q4.
 | 3e3c18c (Q2) | `normalisering.py` (nya `_utan_accenter` och `star_som_hela_ord_utan_accenter`), `las_regelbok.py` (två anrop byts), `test_beslut_q2.py` | Ja. Bara ägaruppslaget för bankrader och kontrollen av `matchning.json` |
 | d7d38e0 | `SPEC.md` (statusraden, 11, Ö5 och Ö13) | Ja. Bara text |
 | 9fd164f | `PROGRESS.md` | Ja. Bara text |
-| 1dcf769 (Q2b) | `normalisering.py` (ny `normalisera_utan_accenter`), `las_regelbok.py` (två jämförelser byts), `test_beslut_q2.py`, `GRANSKNING.md` (Q2b och Q8 i beslutet) | Ja. Bara `ar_agare_eller_narstaende` och nivå D-kontrollen |
+| 1dcf769 (Q2b) | `normalisering.py` (ny `normalisera_utan_accenter`), `las_regelbok.py` (två jämförelser byts), `test_beslut_q2.py`, `GRANSKNING.md` (Q2b och Q9 i beslutet) | Ja. Bara `ar_agare_eller_narstaende` och nivå D-kontrollen |
 | dcf3078 | `SPEC.md`, `PROGRESS.md` | Ja. Bara text |
 
 **Det som gick utöver uppdraget är bara text.** Statusraden i SPEC.md fick en mening per commit, och beskrivningarna
@@ -7162,8 +7165,8 @@ från "Asa Oberg", och då blir det inget konteringsförslag, vilket är den sä
   `06f99fa3f3eb05e39b773cd29c0ae48b1e17d5fde082032b2e3e5f2400edf31c`, lika i båda).
 - `matcha_bank.py`, `las_underlag.py` och `konteringsforslag.py` är inte ändrade sedan 3a2d4f6 (`git diff --stat`).
 - Sidoiakttagelse, inte ny: i matchningen mot motparter passar "Ölund" inte "O¨LUND" (fristående accent), fast N4
-  säger att de ska jämföras lika. Så var det också före. Det hör till Q8 (matchningens egen kopia av
-  `star_som_hela_ord`), och kan tas med när Q8 byggs.
+  säger att de ska jämföras lika. Så var det också före. Det hör till Q9 (matchningens egen kopia av
+  `star_som_hela_ord`), och kan tas med när Q9 byggs.
 
 ### Punkt 8: kärnan
 
@@ -7180,7 +7183,7 @@ säkra riktningen. Inget i koden kan bokföra, och inget i `sparr/` eller de lå
 ### Punkt 10: SPEC.md och PROGRESS.md
 
 Stämmer med koden: SPEC 11 (Q2 och Q2b), Ö5 och Ö13 säger samma sak som koden, och PROGRESS.md har rätt commits,
-Q8 under Öppet (punkt 17) och 4 192 test. Annan dokumentation är inte uppdaterad, se L1. Namnet Q8, se L2.
+Q9 under Öppet (punkt 17) och 4 192 test. Annan dokumentation är inte uppdaterad, se L1. Namnet Q9 (först Q8), se L2.
 
 ### Punkt 11: testsviten
 

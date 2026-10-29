@@ -72,7 +72,8 @@ godkännaren ser vilken regel som användes (SPEC avsnitt 4, steg 4).
 ### Regler för regelboken som helhet
 
 - Motparten jämförs efter samma **normalisering** som i K4 och matchningen (`normalisering.py`): stora
-  och små bokstäver, blanksteg och osynliga tecken räknas inte.
+  och små bokstäver, blanksteg och osynliga tecken räknas inte. Undantaget är ägarkontrollerna, som
+  dessutom bortser från accenter (Q2 och Q2b, se "Ägartransaktioner" nedan).
 - **Förväxlingstecken stoppar regelboken** (granskning 7, M5, och granskning 8, N2). En motpart, ett
   kassaregister och en ägare eller närstående får bara ha bokstäverna a–z med eller utan accent (även å, ä,
   ö och é), siffrorna 0–9, mellanslag, bindestreck (alla sorter, som räknas som "-"), understreck och
@@ -212,15 +213,21 @@ Några saker att lägga märke till:
 - `godkand` och `version` är till för människor och för loggen. Det som skyddar är kontrollsumman.
 - Ägartransaktioner (K7) har ingen regel som kan ge annat än D. En regel med motparten `AGARE-1` får bara
   ha nivå D, annars stoppas regelboken. Vilka motparter som är ägare eller närstående står i nyckeln
-  `agare_och_narstaende`, en lista med motparter (för testbutiken `["AGARE-1"]`). Motparterna
-  jämförs efter samma normalisering som ovan (Hugos beslut 2026-10-26, avsnitt 8). Listan krävs och ska
+  `agare_och_narstaende`, en lista med motparter (för testbutiken `["AGARE-1"]`). Dublettkontrollen i
+  listan jämför motparterna efter samma normalisering som ovan (Hugos beslut 2026-10-26, avsnitt 8), och
+  bryr sig alltså om accenter: "Åsa Öberg" och "Asa Oberg" får båda stå där. **Ägarkontrollerna bortser
+  från accenter** (Hugos beslut 2026-10-29, granskning 11, Q2 och Q2b): uppslaget för bankrader nedan,
+  kontrollen att ingen regel i `matchning.json` nämner en ägare, uppslaget `ar_agare_eller_narstaende` och
+  kontrollen att en regel för en ägare har nivå D. "Åsa Öberg" i listan känns alltså igen i "UTTAG ASA
+  OBERG", och en regel för "Asa Oberg" måste ha nivå D. K4 och matchningen mot motparter bryr sig
+  fortfarande om accenter. Listan krävs och ska
   ha minst en motpart: en saknad, tom eller oläsbar lista stoppar hela körningen (Hugos beslut
   2026-10-27). En motpart utan bokstäver och siffror, till exempel `-` eller `.`, räknas som tom och
   stoppar också hela körningen (Hugos beslut 2026-10-28, granskning 10, P1).
 - **Bankrader mot en ägare eller närstående** ska aldrig få lägre nivå än D, inte heller när en regel i
   `matchning.json` undantar raden från underlag (granskning 7, M7). Uppslaget
   `ar_bankrad_mot_agare_eller_narstaende` pekar ut en bankrad där en motpart i `agare_och_narstaende`
-  står som hela ord i beskrivningen eller referensen, efter normaliseringen. Orden delas vid allt som inte
+  står som hela ord i beskrivningen eller referensen, efter normaliseringen och utan accenter (Q2). Orden delas vid allt som inte
   är en bokstav, en siffra eller ett kombinerande tecken, så att `UTTAG AGARE-1/LAN` och `TILL:AGARE-1`
   pekas ut (granskning 8, N3). En sådan rad passar aldrig en regel i `matchning.json`
   (`matchningsregel_for_bankrad`), så ett förslag för den med en regel för bankrader stoppas, och en regel
@@ -827,7 +834,11 @@ konfigurationen.
    **Ersatt i en del:** att nyckeln är valfri och att listan får vara tom gäller inte längre. Hugos beslut
    2026-10-27 (SPEC avsnitt 11): en saknad, tom eller oläsbar lista stoppar hela körningen, byggt i commit
    dd0e1cf. Hugos beslut 2026-10-28 (granskning 10, P1): en motpart utan bokstäver och siffror räknas som
-   tom och stoppar också hela körningen, byggt i commit 16000a8.
+   tom och stoppar också hela körningen, byggt i commit 16000a8. **Ändrat i en del:** att motparterna
+   jämförs som i K4 gäller nu bara dublettkontrollen i listan. Hugos beslut 2026-10-29 (granskning 11, Q2
+   och Q2b): ägarkontrollerna, bland dem `ar_agare_eller_narstaende` och kontrollen av nivå D, bortser
+   också från accenter, byggt i commit 3e3c18c och 1dcf769. K4 och matchningen mot motparter bryr sig
+   fortfarande om accenter.
 2. **Öppettider.** `oppettider` har `stangda_veckodagar` och `stangda_datum`. Datumen är hela datum
    (ÅÅÅÅ-MM-DD). Det finns ingen återkommande dag utan år, så en helgdag skrivs in för varje år.
 3. **Testbutikens regelbok.** De två tilläggen till exemplet i avsnitt 1 är godkända: `oppettider` och
