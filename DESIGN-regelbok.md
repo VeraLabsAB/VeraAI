@@ -801,6 +801,19 @@ FIKTIVT_FORETAG.md (Ö-T) står det.
 | D15 | **Vad en verifikation måste innehålla** enligt bokföringslagen, och om Veras förslag plus underlaget och bankraden räcker, när den importeras som SIE-fil till kundens program |
 | D16 | **Kreditnotor** (Ö8, Ö-T21): hur bokförs de och kopplas till originalfakturan? Formatet för dem bestämmer Hugo, bokföringen kräver en expert |
 
+**Antaget för testföretaget (Hugos beslut 2026-10-29), D1, D2, D4, D13 och D14.** Valen är påhittade, gäller bara
+Syntet Testbutik AB och är fortfarande öppna frågor för riktiga företag. Hela texten står i SPEC avsnitt 11 och i
+`GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4":
+
+- **D1:** faktureringsmetoden. **D2:** de BAS-konton som redan finns i kontoplanen. **D4:** momsen i öre exakt som
+  på underlaget, ingen avrundning per verifikation.
+- **D13 (Hugos beslut i chatten 2026-10-29):** bankrader som regelboken pekar ut som rena bankavgifter konteras
+  utan moms, med bankraden som underlag tills Ö11. Allt annat från banken (terminalhyra, bankfack med mera) kräver
+  faktura. Saknas den blir det ett ärende med nivå D, inget förslag.
+- **D14:** leverantörsfaktura på fakturadatum och betalningen på bankens datum, kvitto på kvittodatum, bankavgift
+  på bankens datum. "Bankens datum" är transaktionsdagen, inte bankens bokföringsdag (Hugos beslut i chatten
+  2026-10-29).
+
 ### Hugo kan bestämma själv
 
 De här är produkt- och riskval, inte skatteregler. Hugo bestämmer, och svaren skrivs i SPEC eller i

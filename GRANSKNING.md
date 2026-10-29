@@ -7291,3 +7291,17 @@ B3. Påhittade val för Syntet Testbutik, märkta "antaget" i testföretagets
   (och betalningen på bankens datum, som i B3), kvitto på kvittodatum, bankavgift på bankens datum.
 - Anmärkning från sessionen: "bankens datum" säger inte om det är transaktionsdagen eller bankens bokföringsdag.
   Bankfilen har båda (DESIGN-regelbok.md avsnitt 4b). Enligt B3 stannar byggsessionen och frågar.
+
+**D13 och D14 beslutade (Hugos beslut i chatten 2026-10-29, i sessionen för uppgift 4, före koden).** Ordagrant:
+
+    D13, antaget för testföretaget: bankrader som regelboken pekar ut som
+    rena bankavgifter konteras utan moms, med bankraden som underlag tills
+    Ö11. Allt annat från banken (terminalhyra, bankfack m.m.) kräver faktura;
+    saknas den blir det ett ärende med nivå D, inget förslag.
+    D14-förtydligande: "bankens datum" betyder transaktionsdagen, inte
+    bankens bokföringsdag.
+
+- **D13 är inte längre öppen för testföretaget.** Som D1, D2, D4 och D14 är valet påhittat, gäller bara Syntet
+  Testbutik AB och är fortfarande en öppen fråga för riktiga företag (DESIGN-regelbok.md avsnitt 8).
+- **D14 gäller nu transaktionsdagen** där B3 och tillägget ovan säger "bankens datum": betalningen av en
+  leverantörsfaktura och bankavgiften. Anmärkningen ovan om att det inte var sagt är besvarad.
