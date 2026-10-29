@@ -7623,3 +7623,48 @@ inställningsfilen):
   gjort före läget "auto", och det villkoret står kvar.
 - **Gäller först efter ominstallationen.** Tills Hugo har gjort om steg 10–13 gäller den installerade filen, med
   `disableAutoMode`. Steg 12 i byggplanen är 🔶 tills dess. Casper installerar den nya filen (steg 14).
+
+## Kontroll efter bytet av inställningsfil, 2026-10-29
+
+Byte av inställningsfil (`sparr/INSTALLERA.md`, "Byte av inställningsfil") på Hugos dator: den nya
+`sparr/managed-settings.json` från 7deaadb, där bara raden `disableAutoMode` är borttagen, installerad utan ny granskning
+före (Hugos beslut 2026-10-29, "Installera direkt", avsnittet ovan). Steg 1, 5 och 10–13 gjorde Hugo själv. Kontrollen
+steg 2, 3 och 9 gjordes i en ny session i skrivbordsappens Code-flik, i `~/VERA/agent`, på Hugos uppdrag i chatten
+2026-10-29. Agenten ändrade inget i `sparr/` eller i koden. Inga sudo-kommandon i sessionen, ingen push.
+
+**Resultat: GRÖNT.** Den nya filen gäller, läget "auto" går att välja, läget som hoppar över behörigheter går inte att
+välja, och vakten stoppar och släpper igenom som förut. Byggplanens steg 12 är klart.
+
+| Steg | Vad | Vem | Förväntat | Utfall |
+|---|---|---|---|---|
+| 5 | `shasum -a 256` på filerna i projektet | Hugo, Terminal | Summorna i INSTALLERA.md steg 5 | **Som väntat** (Hugos besked i chatten 2026-10-29). `kommandosparr.py` `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d`, `managed-settings.json` `149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2` |
+| 10–11 | Den nya inställningsfilen kopierad, ägare och rättigheter satta | Hugo, Terminal | Inget fel | **Som väntat** (Hugos besked i chatten 2026-10-29) |
+| 12 | `shasum -a 256` på de installerade filerna | Hugo, Terminal | Samma summor som i steg 5 | **Som väntat** (Hugos besked i chatten 2026-10-29). Samma två summor som i steg 5 |
+| 13 | Ägare och rättigheter | Hugo, Terminal | `root:wheel`, `-rw-r--r--` | **Som väntat** (Hugos besked i chatten 2026-10-29). Båda filerna ägs av `root:wheel` med `-rw-r--r--` |
+| 1 | `/status` och Shift+Tab i Claude Code för Terminal | Hugo, Terminal | `Enterprise managed settings (file)`, "auto" går att välja | **Som väntat** (Hugos besked i chatten 2026-10-29). Setting sources: "User settings, Enterprise managed settings (file)". Permission rules: "Managed settings only". Auto mode server: "Enabled". Version 2.1.312. Shift+Tab visade lägena auto mode, manual, accept edits och plan mode, inte bypass permissions |
+| 2 | `ls; ls` i en ny session | Agenten | Stoppas med "Stoppat av vakten", kommandon kopplas inte ihop | **Som väntat.** "Stoppat av vakten: tecknet semikolon (;) är inte tillåtet, inte heller inom citattecken. Kommandon kopplas inte ihop och utskriften styrs inte om: ett kommando i taget (SPEC 7.1)." Före texten står Claude Codes egen inledning, `PreToolUse:Bash hook error: [/Library/Developer/CommandLineTools/usr/bin/python3 -I /Library/Application Support/ClaudeCode/vera/kommandosparr.py]:` |
+| 3 | `git status` | Agenten | Claude Code frågar, Hugo säger ja, kommandot går igenom | **Som väntat.** Hugo fick frågan och sa ja (Hugos svar i chatten 2026-10-29). Grenen main, inget att lägga till, 8 commitar före `origin/main` |
+| 3 | Testsviten med kommandot i SPEC 7.1 | Agenten | Går igenom, inga röda | **Som väntat.** Sista raden: "4312 passed in 64.27s (0:01:04)" |
+| 9 | `date` | Agenten | Stoppas innan Claude Code frågar, med "Stoppat av vakten" | **Som väntat.** "Stoppat av vakten: 'date' står inte på listan i SPEC 7.1. …" Inget datum visades, och Claude Code frågade inte |
+
+**Vad kontrollen visar och inte visar:**
+
+- Steg 1, 5 och 10–13 bygger på Hugos besked i chatten. Agenten har inte sett Terminal.
+- Hugos besked nämner inte kontrollskriptet för skalet (`kontrollera-skalet.zsh`), som också står i kontrollen steg 1,
+  eller versionen i skrivbordsappens `/status`. Versionen 2.1.312 är den Hugo läste i Terminal. Bytet av
+  inställningsfilen ändrar inte skalet.
+- Steg 13 i Hugos besked gäller de två filerna. Mapparna `ClaudeCode`, `vera` och `venv` nämns inte, och de byttes
+  inte.
+- Kontrollen steg 4–7 och 8 gjordes inte om. "Byte av inställningsfil" kräver bara steg 1, 2, 3 och 9.
+- **Läget "auto" får nu användas på Hugos dator** (Hugos beslut 2026-10-29, avsnittet "Beslut 2026-10-29 – Auto tillåts
+  igen"), med de tre villkoren tills steg 15 (sandlådan) är klart. På Caspers dator gäller det först när steg 14 och
+  steg 8 i kontrollen är gjorda där.
+
+**Testsviten:** 4 312 passed, 0 röda, med kommandot i SPEC 7.1, före och efter att filerna skrevs.
+
+**Avsteg:** medan filerna lästes skickade agenten två `grep`-kommandon med `|` i mönstret, som inte följer SPEC 7.1.
+**Vakten stoppade båda** innan de kördes. De gjordes om med flera `-e`.
+
+**Kommandon:** `ls; ls`, `git status` (först och sist), pytest-kommandot i SPEC 7.1 för hela `scripts/tests` (två
+gånger), `date`, `grep -n`, `git add` och `git commit -F` med meddelandet i en fil i scratchpad. Verktyg: Read, Edit,
+Write (bara för meddelandet i scratchpad), AskUserQuestion och appens verktyg för plan och slutruta.
