@@ -7305,3 +7305,47 @@ B3. Påhittade val för Syntet Testbutik, märkta "antaget" i testföretagets
   Testbutik AB och är fortfarande en öppen fråga för riktiga företag (DESIGN-regelbok.md avsnitt 8).
 - **D14 gäller nu transaktionsdagen** där B3 och tillägget ovan säger "bankens datum": betalningen av en
   leverantörsfaktura och bankavgiften. Anmärkningen ovan om att det inte var sagt är besvarad.
+
+## Beslut efter uppgift 4 (2026-10-29)
+
+Hugos beslut 2026-10-29, fattade i chatten i sessionen efter uppgift 4. De svarar på besluten a–f i slutrapporten för
+uppgift 4 (PROGRESS.md, Öppet 21–25). Ordagrant:
+
+    a. JA. Ett underlag från en ägare blir alltid ett K7-ärende utan förslag.
+    b. JA. "Ny motpart" får ingen nivå nu; nivån sätts i uppgift 6.
+    c. ÄNDRAS. En bankrad ska INTE räknas till flöde e (bankavgift) för att regeln
+       råkar bara ha kontot "kostnad". Det är en dold regel. I stället ska regeln i
+       regelboken säga det uttryckligen med en ny nyckel "flode" med värdet
+       "bankavgift". Krav:
+       - las_regelbok kontrollerar nyckeln: tillåtna värden är en fast lista
+         (just nu bara "bankavgift"); annat värde stoppar regelboken.
+       - Kärnan väljer aldrig flöde e utan nyckeln. En regel för pengar ut som
+         saknar nyckeln och inte passar något annat flöde ger inget förslag utan
+         ett ärende som säger att regeln saknar flöde. Gissa aldrig.
+       - R-BANK-AVGIFT i foretag/syntet-testbutik/regelbok.json får nyckeln.
+    d. JA. "Över gräns" ger nivå D för alla regler för pengar ut.
+    e. JA. SPEC 7 får nämna kontera_period. Hugos OK är givet här.
+    f. JA. Lägg in regler för BUTIK-FORBRUKNING, HYRESVARD, LEV-TELE, LEV-TILLBEHOR
+       och LEV-EL i foretag/syntet-testbutik/regelbok.json, så att DESIGN 4b:s
+       exempel ger exakt verifikation utan en regel som bara finns i testet.
+       Ta bort den testregeln.
+
+    Hugos OK gäller nu även foretag/: uppdatera foretag/README.md så att den
+    beskriver nyckeln "bokforing" och nyckeln "flode". Öppet 21 kan stängas.
+
+**Namnbytet och de reserverade orden (Hugos beslut i chatten 2026-10-29, samma session, före koden).** Sessionen
+såg att beslut c krockar med en spärr: `test_karnan_ar_generell.py` stoppar ordet `bankavgift` var som helst i
+kärnan, eftersom det är namnet på en regel i testbutikens `matchning.json`, och kärnans fasta lista måste ha just det
+ordet. Hugos svar, ordagrant:
+
+    Byt namn på regeln. Lägg dessutom till i foretag/README.md en lista över
+    reserverade ord som en regel i matchning.json eller regelbok.json inte får
+    heta (just nu: "bankavgift"), och ett test i las_regelbok/las_matchning som
+    stoppar en regel med ett reserverat namn. Då kan krocken inte uppstå igen
+    hos ett nytt företag.
+
+- Spärren i `test_karnan_ar_generell.py` ändras alltså inte. Regeln i testbutikens `matchning.json` byter namn, och
+  `R-BANK-AVGIFT` pekar på det nya namnet.
+- **Inte sagt i besluten:** vilka konton och vilken nivå reglerna för HYRESVARD, LEV-TELE, LEV-TILLBEHOR och LEV-EL
+  ska ha. Kontoplanen har inga konton för hyra, el och telefon, och B3 säger "de BAS-konton som redan finns i
+  kontoplanen". Frågan ställs i sessionen innan reglerna läggs in (byggstegets punkt 3).

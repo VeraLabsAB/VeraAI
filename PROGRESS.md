@@ -574,25 +574,22 @@ fattade och byggda, se avsnittet ovan.)
     regelbokens `R-BANK-AVGIFT`) blir ett ärende med nivå D. Andra bankrader från banken utan underlag
     (terminalhyra, bankfack med mera) blir som förut matchningens K3-ärende "saknat underlag", utan nivå. **De ska
     få nivå D i uppgift 6.** Kärnan kan inte se att en sådan rad kommer från banken utan en ny nyckel.
-21. **`bokforing` i regelboken är inte beskriven i `foretag/README.md`** (uppgift 4). Hugos OK gällde bara nyckeln i
-    testföretagets `regelbok.json`, inga andra ändringar i `foretag/`. Beskrivningen står i `scripts/las_regelbok.py`.
-    README ska få den när Hugo eller Casper säger till.
-22. **Val i uppgift 4 som väntar på bekräftelse** (gjorda i byggsessionen 2026-10-29, inte av en människa):
-    (a) ett underlag från en ägare eller närstående blir alltid ett ärende K7, "kräver mänsklig bedömning", och får
-    inget förslag (SPEC K7, samma som ägarens bankrader i matchningen). Nivån sätts i uppgift 6. (b) "ny motpart"
-    blir ett ärende utan nivå (DESIGN 5 säger C, nivån sätts i uppgift 6). (c) En bankrad utan underlag hör till
-    flöde e när dess regel i regelboken bara har kontot `kostnad`. Andra regler för bankrader är flöde d (uppgift 5).
-    (d) Över gräns i matchningen ger nivå D för alla regler för pengar ut, inte bara för bankavgiften, eftersom
-    kärnan inte får ha regelns namn. I testbutiken är bankavgiften den enda sådana regeln. BESLUTSFATTARE SAKNAS.
+21. ~~**`bokforing` i regelboken är inte beskriven i `foretag/README.md`** (uppgift 4).~~ **Stängd** (Hugos beslut
+    2026-10-29, `GRANSKNING.md`, "Beslut efter uppgift 4 (2026-10-29)"): Hugos OK gäller nu också `foretag/`, och
+    README beskriver `bokforing` och `flode`.
+22. ~~**Val i uppgift 4 som väntar på bekräftelse** (a–d).~~ **Stängd** (Hugos beslut 2026-10-29, samma ställe): (a)
+    ja, ett underlag från en ägare blir alltid ett K7-ärende utan förslag. (b) ja, "ny motpart" får ingen nivå nu.
+    (c) **ändrad**: flöde e väljs bara när regeln har nyckeln `flode` med ett värde ur kärnans fasta lista, aldrig för
+    att regeln bara har kontot `kostnad`. En regel för pengar ut utan nyckeln blir ett ärende. Regeln `bankavgift` i
+    testbutikens `matchning.json` byter namn, och ett reserverat ord stoppar en regel som heter så (Hugos beslut i
+    chatten samma dag). (d) ja, "över gräns" ger nivå D för alla regler för pengar ut.
 23. **K17 är inte byggd** (Ö10). Ett underlag med text som försöker styra agenten får i dag ett förslag som andra
     underlag. Texten används bara som data, och förslaget kräver alltid godkännande. Byggs i rapportsteget.
-24. **SPEC 7 nämner inte `kontera_period`.** Listan över de enda funktionerna per källa (SPEC 7) bör få flödena:
-    förslag ur underlag och bankrader görs bara av `kontera_period`, som alltid kör matchningen, K5, K7 och K8 och
-    skapar förslagen med `skapa_konteringsforslag`. SPEC ändras bara efter Hugos OK.
-25. **Exemplet i DESIGN 4b (SYNT-U-2025-015, BUTIK-FORBRUKNING) blir en ny motpart** i testbutiken, eftersom
-    regelboken saknar en regel för motparten. Flödet ger exakt exemplets verifikation med en regel som bara finns i
-    testet (`test_015_ger_exakt_verifikationen_i_design_4b`). Om regeln ska in i testbutikens regelbok bestämmer
-    Hugo eller Casper. Samma sak för de andra motparterna utan regel: HYRESVARD, LEV-TELE, LEV-TILLBEHOR och LEV-EL.
+24. ~~**SPEC 7 nämner inte `kontera_period`.**~~ **Stängd** (Hugos beslut 2026-10-29, beslut e): SPEC 7 får nämna
+    `kontera_period`.
+25. ~~**Exemplet i DESIGN 4b (SYNT-U-2025-015, BUTIK-FORBRUKNING) blir en ny motpart.**~~ **Stängd** (Hugos beslut
+    2026-10-29, beslut f): testbutikens regelbok får regler för BUTIK-FORBRUKNING, HYRESVARD, LEV-TELE, LEV-TILLBEHOR
+    och LEV-EL, och regeln som bara fanns i testet tas bort.
 
 ## Nästa steg i byggordningen
 
