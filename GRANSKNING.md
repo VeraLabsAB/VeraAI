@@ -7539,3 +7539,43 @@ STATUS: gult
 KAN JAG GÅ VIDARE: ja, med P1 och P2 rättade eller beslutade före uppgift 5. Inget kan bokföras och ingen spärr har
 blivit svagare, men två skydd täcker mindre än texten säger.
 NÄSTA STEG: Hugo eller Casper svarar på 1–7. Därefter rättelser av P1 och P2 i en egen session, och Öppet 26.
+
+## Steg 8, provet med en vakt som fallerar, 2026-10-29
+
+Steg 8 i kontrollen efter installationen (`sparr/INSTALLERA.md`), på Hugos dator. Steg a–d gjorde Hugo själv i
+Terminal. Steg e, och steg 9 igen efter e, gjordes i en ny session i skrivbordsappens Code-flik, i `~/VERA/agent`, på
+Hugos uppdrag i chatten 2026-10-29 (steg 9 efter Hugos svar i chatten samma dag: "Kör date nu"). Agenten ändrade inget i
+`sparr/` eller i koden. Inga sudo-kommandon i sessionen, ingen push.
+
+**Resultat: GRÖNT.** En saknad vakt stoppade allt, och efter att vakten flyttats tillbaka fungerade den som förut.
+Kontrollsummorna stämde. Öppet 16 i `PROGRESS.md` är stängd.
+
+| Del | Vad | Vem | Förväntat | Utfall |
+|---|---|---|---|---|
+| a | Vakten döptes om till `kommandosparr.py.av` med `sudo mv` | Hugo, Terminal | Inget visas | **Som väntat** (Hugos besked i chatten 2026-10-29) |
+| b | `git status` i en ny session | Hugo, ny session | Stoppas, men inte med "Stoppat av vakten" | **Som väntat.** Stoppat med `PreToolUse:Bash hook error: [/Library/Developer/CommandLineTools/usr/bin/python3 -I /Library/Application Support/ClaudeCode/vera/kommandosparr.py]: /Library/Developer/CommandLineTools/usr/bin/python3: can't open file '/Library/Application Support/ClaudeCode/vera/kommandosparr.py': [Errno 2] No such file or directory`. Också anropet för slutrapportrutan stoppades av samma hook med samma fel |
+| c | Vakten flyttades tillbaka med `sudo mv` | Hugo, Terminal | Inget visas | **Som väntat** (Hugos besked i chatten 2026-10-29) |
+| d | `shasum -a 256` på den installerade vakten och inställningsfilen | Hugo, Terminal | Samma summor som INSTALLERA.md steg 5 | **Som väntat.** `kommandosparr.py` `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d` och `managed-settings.json` `ab34081665b9052c1ff7c35a1b3a983107fc6a763f1f1aab6476523109cb80b0`, samma som INSTALLERA.md steg 5 och avsnittet "Läge 2026-10-28, efter rättelsen av J1 (granskning 19)" i `PROGRESS.md` |
+| e | `ls; ls` i en ny session | Agenten | Stoppas med "Stoppat av vakten" | **Som väntat.** "Stoppat av vakten: tecknet semikolon (;) är inte tillåtet, inte heller inom citattecken. Kommandon kopplas inte ihop och utskriften styrs inte om: ett kommando i taget (SPEC 7.1)." |
+| e | `git status` | Agenten | Går igenom | **Som väntat.** Grenen main, inget att lägga till, 5 commitar före `origin/main` |
+| 9 | `date` (steg 9 igen efter e) | Agenten | Stoppas med "Stoppat av vakten" | **Som väntat.** "Stoppat av vakten: 'date' står inte på listan i SPEC 7.1. …" |
+
+**Vad provet visar och inte visar:**
+
+- En **saknad** vakt stoppar alla verktyg, inte bara Bash (också appens verktyg för slutrapportrutan i b). Det är den
+  säkra riktningen. Felet i b kommer från Claude Code, eftersom Python inte kunde öppna filen och avslutade med kod 2.
+- Provet prövar inte `onFailure: "block"` i sig (INSTALLERA.md steg 8, "Vad provet visar"). Det gjorde förprovet i
+  installationens steg 3.
+- a–d bygger på Hugos besked i chatten. Agenten har inte sett Terminal.
+
+**Testsviten:** 4 312 passed, 0 röda, med kommandot i SPEC 7.1. `scripts/tests/test_byggplan_progress.py` ingår och är
+grönt.
+
+**Avsteg:** medan filerna lästes skickade agenten två läskommandon som inte följer SPEC 7.1, ett `grep` med `\|` i
+mönstret och ett med `|`. Agenten försökte också köra pytest med bara filen `scripts/tests/test_byggplan_progress.py`
+som mål, vilket SPEC 7.1 inte tillåter (målet ska vara `scripts/tests` eller en kopia). **Vakten stoppade alla tre**
+innan de kördes. De gjordes om med ett enkelt mönster och med hela `scripts/tests`.
+
+**Kommandon:** `ls; ls`, `git status` (först och sist), `date`, `grep -n`, `wc -l`, pytest-kommandot i SPEC 7.1 för
+hela `scripts/tests`, `git add` och `git commit -F` med meddelandet i en fil i scratchpad. Verktyg: Read, Edit, Write (bara för meddelandet i scratchpad), AskUserQuestion och appens verktyg för plan
+och slutruta.

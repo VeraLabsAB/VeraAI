@@ -25,8 +25,8 @@ Status: ✅ klart · 🔶 pågår · ⬜ inte påbörjat
 ## Läge nu
 
 - **Uppdaterad:** 2026-10-29
-- **Pågående steg:** 22 – Uppgift 4, flöde a, b och e (byggd och granskad, P1 och P2 kvar); 13 – Kontrollen efter installationen (kvar: provet med en vakt som fallerar)
-- **Senast avslutade steg:** 21 – Q7, pusha som det är (6aba32d)
+- **Pågående steg:** 22 – Uppgift 4, flöde a, b och e (byggd och granskad, P1 och P2 kvar)
+- **Senast avslutade steg:** 13 – Kontrollen efter installationen, med provet med en vakt som fallerar (2026-10-29, `GRANSKNING.md`, "Steg 8, provet med en vakt som fallerar, 2026-10-29")
 - **Nästa steg:** Hugo eller Casper svarar på de 7 frågorna i granskning 22 (`GRANSKNING.md`). Därefter rättelser av P1 och P2 i en egen session, och Öppet 26. Steg 15 (sandlådan) ska vara klar före steg 23 (uppgift 5)
 - **Opushat:** ja, e4d8cd7 och commitarna efter den (`main` på GitHub står vid d127c3e)
 
@@ -72,7 +72,7 @@ Status: ✅ klart · 🔶 pågår · ⬜ inte påbörjat
 | # | Steg | Status | Klart när | Beror på |
 |---|---|---|---|---|
 | 12 | **Hugo installerar vakten** enligt `sparr/INSTALLERA.md` | ✅ | `/status` visar `Enterprise managed settings (file)` och vakten stoppar `date` i skrivbordsappen. Gjort på Hugos dator 2026-10-28 (`GRANSKNING.md`, "Installation på Hugos dator 2026-10-28"). Caspers dator är steg 14 | 11 |
-| 13 | Kontrollen efter installationen, i en ny session (sist i INSTALLERA.md), inklusive provet med en vakt som fallerar | 🔶 | Alla steg i kontrollen visar väntat svar. Steg 1–7 och 9 gjorda vid installationen, och spärrtestet 2026-10-29 är grönt. **Kvar: steg 8, provet med en vakt som fallerar** (PROGRESS.md, Öppet 16) | 12 |
+| 13 | Kontrollen efter installationen, i en ny session (sist i INSTALLERA.md), inklusive provet med en vakt som fallerar | ✅ 2026-10-29 | Alla steg i kontrollen visar väntat svar. Steg 1–7 och 9 gjorda vid installationen, och spärrtestet 2026-10-29 är grönt. Steg 8 (provet med en vakt som fallerar) och steg 9 igen efter det är gjorda och gröna 2026-10-29, med samma kontrollsummor (`GRANSKNING.md`, "Steg 8, provet med en vakt som fallerar, 2026-10-29", PROGRESS.md, Öppet 16 stängd) | 12 |
 | 14 | Samma installation och kontroll på Caspers dator (`/Library/Python` kontrolleras för hand först, K1 granskning 20) | ⬜ | Samma resultat som steg 13. Planerad till helgen vecka 44 (PROGRESS.md, Öppet 15) | 13 |
 | 15 | **Sandlådan** (Öppet 4 och 8): skrivning bara i tillåtna mappar, förbud för appen, appens Claude Code och `~/.local/share/claude`, täcker `trap`, `hash` och `builtin`. Ska vara klar före steg 23 (uppgift 5), eller före första körningen på riktiga underlag om den kommer först (Hugos beslut 2026-10-28 och 2026-10-29, B1) | ⬜ | Spärrtest: en egen testfil som försöker skriva utanför projektet stoppas | 13 |
 | 16 | Bash-vägen prövas i skrivbordsappen (Öppet 7) | ⬜ | Beslut skrivet: bash eller zsh | 15 |

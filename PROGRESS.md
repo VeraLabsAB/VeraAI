@@ -1,7 +1,7 @@
 # PROGRESS – Veras bokföringsagent
 
 Uppdaterad 2026-10-29. Specifikation: `SPEC.md`. Byggordning: `DESIGN-regelbok.md` avsnitt 7.
-Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12 är klart: vakten installerades på Hugos dator 2026-10-28. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4", och **D13 och D14** under "D13 och D14 beslutade" (baec52b). **Uppgift 4 är byggd** 2026-10-29 (4269f76, f6ed99e och e4cc538): flöde a, b och e med K5 och K8 i `scripts/konteringsfloden.py`, och den nya nyckeln `bokforing` i regelboken (Hugos OK i chatten 2026-10-29). Granskad i granskning 22 (e4d8cd7), gult: P1 och P2 kvar, 7 frågor väntar på Hugo. Pushad (`main` på GitHub står vid d127c3e). **Hugos beslut efter uppgift 4 (a–f)** står i `GRANSKNING.md`, "Beslut efter uppgift 4 (2026-10-29)" (48e7ed3), och är byggda 2026-10-29 i ded669d (c: nyckeln `flode`, reserverade namn och regeln `bankens-avgifter`) och 5753890 (f och e). Inte pushade. Nästa steg: se "Nästa steg i byggordningen". Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
+Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12 är klart: vakten installerades på Hugos dator 2026-10-28. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Steg 13 är klart**: provet med en vakt som fallerar (steg 8 i kontrollen) är gjort och grönt 2026-10-29. **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4", och **D13 och D14** under "D13 och D14 beslutade" (baec52b). **Uppgift 4 är byggd** 2026-10-29 (4269f76, f6ed99e och e4cc538): flöde a, b och e med K5 och K8 i `scripts/konteringsfloden.py`, och den nya nyckeln `bokforing` i regelboken (Hugos OK i chatten 2026-10-29). Granskad i granskning 22 (e4d8cd7), gult: P1 och P2 kvar, 7 frågor väntar på Hugo. Pushad (`main` på GitHub står vid d127c3e). **Hugos beslut efter uppgift 4 (a–f)** står i `GRANSKNING.md`, "Beslut efter uppgift 4 (2026-10-29)" (48e7ed3), och är byggda 2026-10-29 i ded669d (c: nyckeln `flode`, reserverade namn och regeln `bankens-avgifter`) och 5753890 (f och e). Inte pushade. Nästa steg: se "Nästa steg i byggordningen". Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
 
 Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 
@@ -23,6 +23,28 @@ borttagen.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-10-29, efter steg 8 i kontrollen
+
+Steg i byggplanen: 13 (klart)
+
+- **Steg 8 i kontrollen efter installationen**, provet med en vakt som fallerar, är gjort på Hugos dator och
+  **grönt** (`GRANSKNING.md`, "Steg 8, provet med en vakt som fallerar, 2026-10-29"). Hugo gjorde a–d själv i
+  Terminal (Hugos besked i chatten 2026-10-29): med vakten undanflyttad stoppades `git status`, och också anropet för
+  slutrapportrutan, med Claude Codes fel `can't open file … No such file or directory`. Vakten flyttades tillbaka, och
+  kontrollsummorna stämde med INSTALLERA.md steg 5. Steg e gjordes i en ny session: `ls; ls` stoppades med "Stoppat av
+  vakten", `git status` gick igenom. Steg 9 igen efter e (`date`) stoppades med "Stoppat av vakten" (Hugos svar i
+  chatten 2026-10-29: "Kör date nu").
+- **Steg 13 i byggplanen är klart.** Öppet 16 är stängd.
+- **Vad det ändrar:** provet var ett av villkoren i B1 (Claude Code i det läge som frågar tills provet är gjort) och i
+  Öppet 16 (före läget auto, före första hela körningen på riktiga underlag och före första kund). Det villkoret är
+  nu uppfyllt. Inget annat ändras av det: läget auto är fortfarande avstängt i de låsta inställningarna, och sandlådan
+  (steg 15) ska fortfarande vara klar före uppgift 5 och före första körningen på riktiga underlag.
+- **Pågående steg** är nu bara 22 (uppgift 4, P1 och P2 kvar).
+- **Testsviten:** 4 312 passed, 0 röda (oförändrat), med kommandot i SPEC 7.1. Testet
+  `scripts/tests/test_byggplan_progress.py` ingår och är grönt. Vakten tillåter bara hela `scripts/tests` som mål,
+  inte en enskild fil.
+- **Opushat:** e4d8cd7 och commitarna efter den, och den här.
 
 ## Läge 2026-10-29, efter granskning 22 av uppgift 4
 
@@ -577,9 +599,11 @@ fattade och byggda, se avsnittet ovan.)
     efter pushen (Q7 stängd 2026-10-29). Han kör inga sessioner i projektet före installationen. Lärdom 2026-10-29: om ~/.local/bin läggs i
     PATH ska den stå sist, annars stoppar vakten git. Efter en ändring i ~/.zshrc måste Claude-appen avslutas helt
     med Cmd+Q, annars behåller den den gamla PATH.
-16. **Kontrollen efter installationen, steg 8 (provet med en vakt som fallerar), är inte gjord** på Hugos dator
+16. ~~**Kontrollen efter installationen, steg 8 (provet med en vakt som fallerar), är inte gjord** på Hugos dator
     (Hugos besked i chatten 2026-10-29, `GRANSKNING.md`, "Spärrtest 2026-10-29"). Krävs före läget auto, före
-    första hela körningen på riktiga underlag och före första kund.
+    första hela körningen på riktiga underlag och före första kund.~~ **Stängd** 2026-10-29: provet är gjort och
+    grönt, med samma kontrollsummor (se "Läge 2026-10-29, efter steg 8 i kontrollen" och `GRANSKNING.md`, "Steg 8,
+    provet med en vakt som fallerar, 2026-10-29").
 17. **Q9: matchningen mot motparter har en egen kopia av `star_som_hela_ord`** (`_star_som_hela_ord` i
     `scripts/matcha_bank.py`). Hugos beslut 2026-10-29 (`GRANSKNING.md`, "Hugos beslut 2026-10-29 om Q2–Q4"):
     den ska samlas på ett ställe, som i Q3, senare. Ägarkontrollerna rörs inte. Döpt om efter granskning 21 (L2),
