@@ -1,15 +1,15 @@
 # PROGRESS – Veras bokföringsagent
 
 Uppdaterad 2026-10-29. Specifikation: `SPEC.md`. Byggordning: `DESIGN-regelbok.md` avsnitt 7.
-Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12 är klart: vakten installerades på Hugos dator 2026-10-28. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4". Nästa steg: uppgift 4 i en ny session (se "Nästa steg i byggordningen"). Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
+Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12 är klart: vakten installerades på Hugos dator 2026-10-28. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4", och **D13 och D14** under "D13 och D14 beslutade" (baec52b). **Uppgift 4 är byggd** 2026-10-29 (4269f76, f6ed99e och e4cc538): flöde a, b och e med K5 och K8 i `scripts/konteringsfloden.py`, och den nya nyckeln `bokforing` i regelboken (Hugos OK i chatten 2026-10-29). Inte oberoende granskad och inte pushad. Nästa steg: se "Nästa steg i byggordningen". Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
 
 Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **4 192 passed**, 0 misslyckade (körd senast 2026-10-29 efter dokumentationen efter granskning 21,
-samma antal som efter Q2b: 4 103 från förut och 89 nya i `scripts/tests/test_beslut_q2.py`). Sedan installationen
+Testsviten: **4 273 passed**, 0 misslyckade (körd senast 2026-10-29 efter uppgift 4: 4 192 från förut och 81 nya,
+de flesta i `scripts/tests/test_konteringsfloden.py` och `scripts/tests/test_las_regelbok.py`). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
 borttagen.
 
@@ -433,6 +433,10 @@ fattade och byggda, se avsnittet ovan.)
 | Granskning 11, Q2 (Hugos beslut 2026-10-29): ägaren känns igen utan accenter, bara i ägaruppslaget. Ny funktion `star_som_hela_ord_utan_accenter` i `normalisering.py`, som bara regelbokens ägaruppslag använder (bankraderna och kontrollen av `matchning.json`). `normalisera_for_jamforelse`, `sokform_for_namn` och `star_som_hela_ord` är oförändrade. SPEC 11, Ö5 och Ö13 uppdaterade. Granskad i granskning 21 | 3e3c18c, d7d38e0 |
 | Granskning 11, Q2b (Hugos beslut 2026-10-29): accenter spelar ingen roll i någon ägarkontroll. `ar_agare_eller_narstaende` och kontrollen att en regel för ägarens underlag har nivå D använder den nya funktionen `normalisera_utan_accenter` i `normalisering.py`, som tar bort accenterna på samma sätt som `star_som_hela_ord_utan_accenter`. Dublettkontrollen i ägarlistan och kontrollen av tvetydiga regler är oförändrade. SPEC 11 och Ö13 uppdaterade. Granskad i granskning 21 | 1dcf769 |
 | Granskning 21 av Q2, Q2b, Q3 och Q4 (3a2d4f6 till dcf3078): grön, inget allvarligt och inget medel. Tre låga fynd: L1 (DESIGN-regelbok.md och `foretag/README.md` om accenter) och L2 (matchningens egen kopia av `star_som_hela_ord` heter nu Q9) rättade i dokumentationen, L3 (ø, æ, ł och đ) som exempel i SPEC Ö5. Hugo godkände SPEC-texterna i d7d38e0 och dcf3078 i chatten 2026-10-29 | 3bbcbe4, och dokumentationen efter den |
+| D13 och D14 beslutade för testföretaget (Hugos beslut i chatten 2026-10-29): bankavgifter utan moms med bankraden som underlag tills Ö11, allt annat från banken kräver faktura, och "bankens datum" är transaktionsdagen. Bara dokumentation | baec52b |
+| Uppgift 4, del 1: flöde a (leverantörsfakturor) med K5, K7 och K8 i `scripts/konteringsfloden.py` (`kontera_period`), och nyckeln `bokforing` i regelboken (metod, verifikationsdatum och "antaget", Hugos OK i chatten 2026-10-29). Ärenden från K5 och K8 har nivå D och "kräver mänsklig bedömning" direkt (B2) | 4269f76 |
+| Uppgift 4, del 2: flöde b (kvitton). SYNT-U-2025-028 blir K8, nivå D, SYNT-U-2025-004 får inget förslag | f6ed99e |
+| Uppgift 4, del 3: flöde e (bankavgifter) enligt D13. En avgift över gränsen blir ett ärende med nivå D | e4cc538 |
 | Granskning 11, Q7 (Hugos beslut 2026-10-29): pusha som det är. Historiken skrivs inte om, och ingen tagg byts eller pushas. Repot på GitHub är privat och får inte göras publikt utan en ny genomgång av hela historiken först. `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd". Bara dokumentation | commiten "Q7 stängd: pusha som det är, repot förblir privat" |
 
 ## Öppet
@@ -563,7 +567,32 @@ fattade och byggda, se avsnittet ovan.)
     separat accenttecken. Så var det också före Q2. Tas med när Q9 byggs. **Öppen, inte byggd.**
 19. **`Regelbok.ar_agare_eller_narstaende` anropas inte av någon kärnkod än** (granskning 21, punkt 6), bara av
     testerna. Den är till för nivåsteget (uppgift 6). Q2b gäller alltså i drift i dag bara kontrollen att en
-    regel för en ägare har nivå D.
+    regel för en ägare har nivå D. **Ändrat i uppgift 4:** `kontera_period` använder den nu (K7 för underlag,
+    se punkt 22).
+20. **D13:s "allt annat från banken" täcks i dag av K3** (Hugos beslut i chatten 2026-10-29). En bankrad som passar
+    en regel för bankrader utan underlag och är över gränsen (250 kr för testbutiken, i `matchning.json` och i
+    regelbokens `R-BANK-AVGIFT`) blir ett ärende med nivå D. Andra bankrader från banken utan underlag
+    (terminalhyra, bankfack med mera) blir som förut matchningens K3-ärende "saknat underlag", utan nivå. **De ska
+    få nivå D i uppgift 6.** Kärnan kan inte se att en sådan rad kommer från banken utan en ny nyckel.
+21. **`bokforing` i regelboken är inte beskriven i `foretag/README.md`** (uppgift 4). Hugos OK gällde bara nyckeln i
+    testföretagets `regelbok.json`, inga andra ändringar i `foretag/`. Beskrivningen står i `scripts/las_regelbok.py`.
+    README ska få den när Hugo eller Casper säger till.
+22. **Val i uppgift 4 som väntar på bekräftelse** (gjorda i byggsessionen 2026-10-29, inte av en människa):
+    (a) ett underlag från en ägare eller närstående blir alltid ett ärende K7, "kräver mänsklig bedömning", och får
+    inget förslag (SPEC K7, samma som ägarens bankrader i matchningen). Nivån sätts i uppgift 6. (b) "ny motpart"
+    blir ett ärende utan nivå (DESIGN 5 säger C, nivån sätts i uppgift 6). (c) En bankrad utan underlag hör till
+    flöde e när dess regel i regelboken bara har kontot `kostnad`. Andra regler för bankrader är flöde d (uppgift 5).
+    (d) Över gräns i matchningen ger nivå D för alla regler för pengar ut, inte bara för bankavgiften, eftersom
+    kärnan inte får ha regelns namn. I testbutiken är bankavgiften den enda sådana regeln. BESLUTSFATTARE SAKNAS.
+23. **K17 är inte byggd** (Ö10). Ett underlag med text som försöker styra agenten får i dag ett förslag som andra
+    underlag. Texten används bara som data, och förslaget kräver alltid godkännande. Byggs i rapportsteget.
+24. **SPEC 7 nämner inte `kontera_period`.** Listan över de enda funktionerna per källa (SPEC 7) bör få flödena:
+    förslag ur underlag och bankrader görs bara av `kontera_period`, som alltid kör matchningen, K5, K7 och K8 och
+    skapar förslagen med `skapa_konteringsforslag`. SPEC ändras bara efter Hugos OK.
+25. **Exemplet i DESIGN 4b (SYNT-U-2025-015, BUTIK-FORBRUKNING) blir en ny motpart** i testbutiken, eftersom
+    regelboken saknar en regel för motparten. Flödet ger exakt exemplets verifikation med en regel som bara finns i
+    testet (`test_015_ger_exakt_verifikationen_i_design_4b`). Om regeln ska in i testbutikens regelbok bestämmer
+    Hugo eller Casper. Samma sak för de andra motparterna utan regel: HYRESVARD, LEV-TELE, LEV-TILLBEHOR och LEV-EL.
 
 ## Nästa steg i byggordningen
 
@@ -580,7 +609,10 @@ fattade och byggda, se avsnittet ovan.)
    dokumentationen rättad efter den.
 2. **Push till GitHub.** Klar 2026-10-29: `main` är i fas med GitHub vid 6aba32d. Q7 är stängd (Hugos beslut
    2026-10-29): pusha som det är.
-3. **Nästa steg: uppgift 4 i en ny session**: flöde a, b och e (leverantörsfakturor, kvitton och bankavgifter)
+3. **Uppgift 4 är byggd** (4269f76, f6ed99e och e4cc538, 2026-10-29): flöde a, b och e med K5 och K8, och
+   testerna i DESIGN 7 rad 4 är gröna. Besluten i Öppet, punkt 20–25, väntar på Hugo eller Casper. Inte
+   pushad. DESIGN 7 säger oberoende granskning efter uppgift 3 och 6, inte efter 4. Det som var förutsättningarna:
+   flöde a, b och e (leverantörsfakturor, kvitton och bankavgifter)
    med K5 och K8 (BYGGPLAN steg 22). Förutsättningar, Hugos beslut 2026-10-29 (`GRANSKNING.md`, "Beslut
    2026-10-29 – inför uppgift 4"):
    - **B1:** uppgift 4 byggs nu, på syntetisk data, med vakten installerad och Claude Code i det läge som frågar
@@ -594,8 +626,9 @@ fattade och byggda, se avsnittet ovan.)
      som på underlaget utan avrundning per verifikation, och D14 leverantörsfaktura på fakturadatum och
      betalningen på bankens datum, kvitto på kvittodatum, bankavgift på bankens datum (Hugos besked i chatten
      2026-10-29). Valen gäller bara testföretaget. Strider ett val mot DESIGN stannar byggsessionen och frågar.
-   - **Öppet före start:** D13 (moms på bankavgifter, och om bankraden räcker som underlag) är inte beslutad.
-     Om "bankens datum" är transaktionsdagen eller bankens bokföringsdag är inte sagt.
+   - ~~**Öppet före start:** D13 (moms på bankavgifter, och om bankraden räcker som underlag) är inte beslutad.
+     Om "bankens datum" är transaktionsdagen eller bankens bokföringsdag är inte sagt.~~ Beslutat i chatten
+     2026-10-29 (baec52b): D13 antagen för testföretaget, och "bankens datum" är transaktionsdagen.
 4. Uppgift 5: Z-rapporter, kortinlösen, Swish och kontantinsättningar (och M9 från granskning 7). Kräver
    sandlådan (BYGGPLAN steg 15).
 5. Uppgift 6: nivåerna A–D och K9, med nivå D för ägarens bankrader. Därefter en oberoende granskning.

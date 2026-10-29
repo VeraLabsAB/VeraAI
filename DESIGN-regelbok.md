@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil), uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) och uppgift 3 (konteringsförslaget med K2 och ursprungskontrollen) i avsnitt 7 är byggda, och granskning 7:s M1 och M2 är rättade (täckningen och ingående och utgående moms, avsnitt 3), liksom M3 och en del av M4 (regeln ska passa förslaget, och kontrollsummor för regelbok, kontoplan, momsfil och matchningsformat, avsnitt 3), och M5–M8 och M10–M12 (förväxlingstecken och ägarens bankrader i avsnitt 1, en roll per konto i avsnitt 2, och bankradernas nyckelnamn i avsnitt 3). M9 hör till uppgift 5. Efter granskning 8 är N1–N4 och N7 rättade (dolda tecken enligt Unicodes lista, vilka tecken ett namn får ha och ägarens bankrader, avsnitt 1), och exemplet i avsnitt 3 har kodens nyckelnamn för bankrader (M11, Hugos OK 2026-10-27). Hugos beslut efter uppgift 2 och 3 och efter granskning 7 och 8 står i avsnitt 8. Ändrar inget i SPEC.md |
+| Status | **Godkänt av Hugo 2026-10-26 (design). D1–D16 är öppna och väntar på redovisningskonsult**. Uppgift 1 (läsa kontoplan och momsfil), uppgift 2 (läsa regelboken, med tillägget för ägare och närstående) och uppgift 3 (konteringsförslaget med K2 och ursprungskontrollen) i avsnitt 7 är byggda, och granskning 7:s M1 och M2 är rättade (täckningen och ingående och utgående moms, avsnitt 3), liksom M3 och en del av M4 (regeln ska passa förslaget, och kontrollsummor för regelbok, kontoplan, momsfil och matchningsformat, avsnitt 3), och M5–M8 och M10–M12 (förväxlingstecken och ägarens bankrader i avsnitt 1, en roll per konto i avsnitt 2, och bankradernas nyckelnamn i avsnitt 3). M9 hör till uppgift 5. Efter granskning 8 är N1–N4 och N7 rättade (dolda tecken enligt Unicodes lista, vilka tecken ett namn får ha och ägarens bankrader, avsnitt 1), och exemplet i avsnitt 3 har kodens nyckelnamn för bankrader (M11, Hugos OK 2026-10-27). Hugos beslut efter uppgift 2 och 3 och efter granskning 7 och 8 står i avsnitt 8. Uppgift 4 (flöde a, b och e med K5 och K8, `scripts/konteringsfloden.py`) är byggd 2026-10-29 i 4269f76, f6ed99e och e4cc538, med de antagna valen i avsnitt 8. Ändrar inget i SPEC.md |
 | Gäller | Steg 4 i arbetsflödet (SPEC avsnitt 4): kontera enligt företagets regelbok, och kontrollerna K2, K5, K8 och K9 |
 | Exempel | Bara Syntet Testbutik AB och testdatan för 2025-Q1. **Allt är SYNTETISKT** |
 
@@ -813,6 +813,11 @@ Syntet Testbutik AB och är fortfarande öppna frågor för riktiga företag. He
 - **D14:** leverantörsfaktura på fakturadatum och betalningen på bankens datum, kvitto på kvittodatum, bankavgift
   på bankens datum. "Bankens datum" är transaktionsdagen, inte bankens bokföringsdag (Hugos beslut i chatten
   2026-10-29).
+- **Var valen står** (Hugos OK i chatten 2026-10-29, i sessionen för uppgift 4): D1 och D14 står i regelbokens nya
+  nyckel `bokforing` (metod, verifikationsdatum och "antaget": true), som `las_regelbok` läser och kontrollerar.
+  Saknas nyckeln stoppas regelboken, och inget val görs åt företaget. D4 kräver ingen nyckel: momsen tas
+  oförändrad ur underlaget. Gränsen för bankavgifter i D13 står redan i `matchning.json` och i regeln
+  `R-BANK-AVGIFT` (250 kr).
 
 ### Hugo kan bestämma själv
 
