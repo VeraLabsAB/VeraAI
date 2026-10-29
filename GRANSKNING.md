@@ -7231,3 +7231,27 @@ pytest mot testfiler i kopiorna (med `-q`, `--tb`, `-rA`, `-rP` och `-k`) och he
 STATUS: grönt
 KAN JAG GÅ VIDARE: ja. Inget allvarligt och inget medel. Tre låga fynd (L1–L3) går till Öppet.
 NÄSTA STEG: Hugo eller Casper svarar på 1–4. Därefter uppgift 4.
+
+## Beslut 2026-10-29 – Q7 stängd
+
+Hugos beslut 2026-10-29, fattat i chatten med mentorn och skrivet in på Hugos uppdrag i chatten samma dag. Fyndet
+står i granskning 11 (Q7, och fråga 5 under "Beslut som behövs"). Beslutet svarar också på frågan i granskning 9
+(beslut 5) om commitarna ska pushas först när det är rättat.
+
+- **Q7 stängs med beslutet "pusha som det är".** Historiken skrivs inte om. Commit `d8efa3a` ligger kvar som den är.
+- **Ingen tagg.** Taggen `v0-shop-and-go` finns inte i repot (`git log --oneline --decorate --tags --no-walk` visar
+  ingen tagg 2026-10-29). Namnet står bara som text i den gamla PROGRESS.md i `d8efa3a`, så det finns ingen tagg att
+  byta namn på eller pusha.
+- **Skäl:**
+  - En läsgenomgång 2026-10-29 visade att inga riktiga underlag från testföretaget någonsin spårats i git. Alla
+    filer under `testdata/` är syntetiska.
+  - Commit `d8efa3a` har ett neutralt meddelande ("Create PROGRESS.md").
+  - Namnet står redan i pushade commits (`CLAUDE.md` och `.gitignore`, se granskning 11, punkt 8).
+  - En omskrivning skulle ge 82 commits nya id, göra cirka 350 hänvisningar i dokumenten felaktiga och kräva
+    kommandon utanför SPEC 7.1, för noll vinst. (Anmärkning från sessionen som skrev in beslutet: `git status` och
+    `git log --oneline origin/main..HEAD` visar 2026-10-29 att 83 commits inte är pushade, `d8efa3a` till
+    `42e5c9d`, och alla 83 skulle få nya id. Skillnaden ändrar inte beslutet.)
+- **Villkor:** repot på GitHub är privat (kontrollerat av Hugo 2026-10-29).
+- **Ny regel:** repot får inte göras publikt utan en ny genomgång av hela historiken först.
+- **Push:** `git push` står inte på kommandolistan i SPEC 7.1, så vakten stoppar det i en session. Pushen görs inte
+  av den här sessionen.

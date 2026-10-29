@@ -68,7 +68,7 @@ Status: ✅ klart · 🔶 pågår · ⬜ inte påbörjat
 | 18 | Nästa version av vakten: `-I -S` (K1) och tom `cwd` (K3) från granskning 20 | ⬜ | Tester gröna, ny granskning | 17 |
 | 19 | Spärrtest i en ny session | ⬜ | Alla spärrtester blockeras och syns i loggen | 15–18 |
 | 20 | Q3 + Q4 + Q2: gemensam ordindelning, kommentaren i `las_regelbok.py`, ägarnamn utan accenter | ⬜ | Tester gröna | 19 |
-| 21 | Q7: byt namn på commit d8efa3a och taggen `v0-shop-and-go` till neutrala namn | ⬜ | Inget i historiken nämner Shop and Go. Krävs före första push | 20 |
+| 21 | Q7: pusha som det är (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Historiken skrivs inte om, och ingen tagg byts eller pushas (taggen `v0-shop-and-go` finns inte i repot) | ✅ | Repot på GitHub är privat (kontrollerat av Hugo 2026-10-29). Repot får inte göras publikt utan en ny genomgång av hela historiken först | 20 |
 
 ---
 
