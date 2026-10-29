@@ -39,7 +39,8 @@ underlagen (las_underlag.py) och regelboken (las_regelbok.py) prövar dem på sa
 star_som_hela_ord säger om ett namn står som hela ord i en text, efter normaliseringen för
 jämförelser, till exempel om en ägare står i en bankrad (las_regelbok.py, M7). Orden delas vid
 allt som inte är en bokstav, en siffra eller ett kombinerande tecken, så att ett skiljetecken
-intill namnet inte döljer det (N3, granskning 8).
+intill namnet inte döljer det (N3, granskning 8). sokform_for_namn ger namnet i den form som
+star_som_hela_ord söker efter, och regelboken använder samma funktion (granskning 11, Q3).
 """
 
 import unicodedata
@@ -162,18 +163,30 @@ def _ord_i(text):
     return ord_ + [nu] if nu else ord_
 
 
+def sokform_for_namn(namn):
+    """Namnet i den form som star_som_hela_ord söker efter: orden ihopsatta och normaliserade för jämförelser.
+
+    Namnet delas i ord som i _ord_i, orden sätts ihop och normaliseras med normalisera_for_jamforelse. Ett
+    namn utan bokstäver och siffror, till exempel "-" eller "_ .", blir tomt och står aldrig i en text.
+    Regelboken (las_regelbok.py) använder samma funktion för att stoppa ett sådant namn i listan över
+    ägare och närstående, så att det som regelboken godtar också kan hittas (granskning 11, Q3, Hugos
+    beslut 2026-10-29).
+    """
+    return normalisera_for_jamforelse("".join(_ord_i(namn)))
+
+
 def star_som_hela_ord(namn, text):
     """True om namnet står i texten som ett eller flera hela ord i följd, efter normaliseringen för jämförelser.
 
     Både namnet och texten delas i ord vid allt som inte är en bokstav, en siffra eller ett
     kombinerande tecken (_ord_i), så att ett skiljetecken intill namnet inte döljer det (N3, granskning
     8). Ord i följd i texten sätts ihop och normaliseras tillsammans med normalisera_for_jamforelse
-    (N4), och jämförs med namnets ord ihopsatta. "Namn-7" står alltså i "UTTAG NAMN-7", i
+    (N4), och jämförs med namnets sökform (sokform_for_namn). "Namn-7" står alltså i "UTTAG NAMN-7", i
     "UTTAG namn–7", i "UTTAG NAMN -7", i "UTTAG NAMN 7", i "UTTAG NAMN-7/LAN" och i "UTTAG (NAMN-7)",
     men inte i "UTTAG NAMN-77", "UTTAG NAMN-7X" eller "UTTAGNAMN-7". Ett namn som blir tomt efter
     normaliseringen står aldrig i en text.
     """
-    sokt = normalisera_for_jamforelse("".join(_ord_i(namn)))
+    sokt = sokform_for_namn(namn)
     if not sokt:
         return False
     ord_ = _ord_i(text)

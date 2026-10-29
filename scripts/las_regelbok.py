@@ -136,7 +136,7 @@ from las_matchningsformat import (
 from las_momssatser import Momssatser, MomssatsFel
 from las_underlag import HELTAL_HOGST_SIFFROR, TYPER
 from normalisering import (
-    _ord_i, andra_skriftsystem, blandat_ord, normalisera_for_jamforelse, star_som_hela_ord, tecken_med_namn,
+    andra_skriftsystem, blandat_ord, normalisera_for_jamforelse, sokform_for_namn, star_som_hela_ord, tecken_med_namn,
 )
 
 REGELBOK_NYCKLAR = ("foretag", "version", "godkand", "granser", "k9", "oppettider", "agare_och_narstaende", "regler")
@@ -353,9 +353,10 @@ def _kontrollera_oppettider(oppettider, var):
 def _kontrollera_agare_och_narstaende(agare, var):
     """Motparterna som är ägare eller närstående (K7). Minst en, och varje motpart en gång, efter normaliseringen.
 
-    En motpart utan bokstäver och siffror, till exempel "-" eller ".", blir tom när den delas i ord som i
-    star_som_hela_ord, och står därför aldrig i en bankrad. Den räknas som tom och stoppar filen
-    (granskning 10, P1, Hugos beslut 2026-10-28).
+    En motpart utan bokstäver och siffror, till exempel "-" eller ".", får en tom sökform
+    (normalisering.sokform_for_namn, samma som star_som_hela_ord söker efter), och står därför aldrig i en
+    bankrad. Den räknas som tom och stoppar filen (granskning 10, P1, Hugos beslut 2026-10-28, och
+    granskning 11, Q3).
     """
     vad = "'agare_och_narstaende'"
     if not _lista(agare, vad, var):
@@ -364,7 +365,7 @@ def _kontrollera_agare_och_narstaende(agare, var):
     for nummer, motpart in enumerate(agare, start=1):
         ny = _text_i_json(motpart, "motpart nummer " + str(nummer) + " i " + vad, var, _REGELBOK)
         _inga_forvaxlingstecken(ny, "motpart nummer " + str(nummer) + " i " + vad, var)
-        if not normalisera_for_jamforelse("".join(_ord_i(ny))):
+        if not sokform_for_namn(ny):
             raise RegelbokFel(
                 var + ": motpart nummer " + str(nummer) + " i listan över ägare och närstående ('agare_och_narstaende')"
                 " är " + repr(ny) + ", som saknar bokstäver och siffror och därför aldrig kan kännas igen i en"
