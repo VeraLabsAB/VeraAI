@@ -537,22 +537,25 @@ fattade och byggda, se avsnittet ovan.)
       nästa version av vakten.**
     - **K5:** steg 2 b säger inte var andra omgången börjar, och första raden visar en relativ sökväg som kan
       förväxlas med regeln för andra omgången.
-15. Caspers dator: om ~/.local/bin läggs i PATH ska den stå sist, annars stoppar vakten git. Efter en ändring i ~/.zshrc måste Claude-appen avslutas helt med Cmd+Q, annars behåller den den gamla PATH (lärdom 2026-10-29).
+15. Caspers dator: installation i helgen (vecka 44). Han har inte projektet. De fem filerna (kommandosparr.py,
+    managed-settings.json, kontrollera-skalet.zsh, requirements.txt, INSTALLERA.md) skickas med AirDrop, och han
+    kontrollerar kontrollsummorna i INSTALLERA.md innan han skriver sitt lösenord. Projektet får han från GitHub
+    efter Q7. Han kör inga sessioner i projektet före installationen. Lärdom 2026-10-29: om ~/.local/bin läggs i
+    PATH ska den stå sist, annars stoppar vakten git. Efter en ändring i ~/.zshrc måste Claude-appen avslutas helt
+    med Cmd+Q, annars behåller den den gamla PATH.
 16. **Kontrollen efter installationen, steg 8 (provet med en vakt som fallerar), är inte gjord** på Hugos dator
     (Hugos besked i chatten 2026-10-29, `GRANSKNING.md`, "Spärrtest 2026-10-29"). Krävs före läget auto, före
     första hela körningen på riktiga underlag och före första kund.
 
 ## Nästa steg i byggordningen
 
-1. **Vakten för kommandolistan (granskning 11, Q1).** Byggsessionen är klar (f21a3a1, 773e919 och
-   6686166), och fynden i granskning 12 är byggda (5cb9080, 08a3370, c066188). Rättelserna efter granskning
-   16 är gjorda (1dbedb1 till 58daf69), efter granskning 17 (653f0a4 till 235eab6), I1 efter granskning 18
-   (0c7cdcb och 43e2371) och J1 efter granskning 19 (ab305c7, 4bcbabe och ad85b8e). Kvar: **oberoende
-   granskning 20 i en ny session, som bara gäller J1-ändringen**, med kontrollsummor, sedan provkörs steg 4 h i en session med Hugos OK (G1), sedan kontrollerar
-   Hugo versionen och installerar enligt `sparr/INSTALLERA.md`, och
-   därefter kontrollen efter installationen i en ny session (sist i `sparr/INSTALLERA.md`). Caspers dator
-   får samma installation och samma kontroll. Före
-   uppgift 4 (Hugos beslut 2026-10-28).
+1. **Q3 + Q4 + Q2 (granskning 11).** Vakten för kommandolistan (granskning 11, Q1) är klar på Hugos dator.
+   Byggd i f21a3a1, 773e919 och 6686166, fynden i granskning 12 i 5cb9080, 08a3370 och c066188, rättelserna
+   efter granskning 16 i 1dbedb1 till 58daf69, efter granskning 17 i 653f0a4 till 235eab6, I1 efter
+   granskning 18 i 0c7cdcb och 43e2371 och J1 efter granskning 19 i ab305c7, 4bcbabe och ad85b8e.
+   **Klart:** granskning 20 (a9ad2ab, beslut i 2da1172), provkörningen av steg 4 h (40df48e och 567692b),
+   installationen på Hugos dator och spärrtestet (818f87d, beslut i 61a6d5d). Caspers dator: se Öppet,
+   punkt 15. **Nästa steg:** Q3, Q4 och Q2 från granskning 11 (`GRANSKNING.md`, "Fynd"), före uppgift 4.
 2. **Uppgift 4**: flöde a, b och e (leverantörsfakturor, kvitton och bankavgifter) med K5 och K8.
 3. Uppgift 5: Z-rapporter, kortinlösen, Swish och kontantinsättningar (och M9 från granskning 7).
 4. Uppgift 6: nivåerna A–D och K9, med nivå D för ägarens bankrader. Därefter en oberoende granskning.
