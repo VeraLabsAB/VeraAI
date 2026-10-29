@@ -41,6 +41,10 @@ jämförelser, till exempel om en ägare står i en bankrad (las_regelbok.py, M7
 allt som inte är en bokstav, en siffra eller ett kombinerande tecken, så att ett skiljetecken
 intill namnet inte döljer det (N3, granskning 8). sokform_for_namn ger namnet i den form som
 star_som_hela_ord söker efter, och regelboken använder samma funktion (granskning 11, Q3).
+star_som_hela_ord_utan_accenter gör samma sak, men accenter räknas inte, så att "Åsa Öberg" står i
+"UTTAG ASA OBERG" och omvänt. Den används bara av ägaruppslaget i regelboken (granskning 11, Q2, Hugos
+beslut 2026-10-29). Allt annat, till exempel K4 och matchningen mot motparter, bryr sig fortfarande om
+accenter.
 """
 
 import unicodedata
@@ -200,3 +204,27 @@ def star_som_hela_ord(namn, text):
             if len(sammansatt) > len(sokt):
                 break
     return False
+
+
+def _utan_accenter(text):
+    """Texten utan accenter: uppdelad med Unicodes NFKD och utan kombinerande tecken (kategori M).
+
+    "Å" blir "A", "é" blir "e", och en bokstav med ett separat accenttecken blir bokstaven. NFKD gör
+    också ett fristående accenttecken (till exempel U+00A8, "¨") till ett mellanslag och en kombinerande
+    accent, så att det försvinner på samma sätt. Andra stavningar, till exempel "AA" för "Å" eller "OE"
+    för "Ö", ändras inte (Ö5).
+    """
+    return "".join(tecken for tecken in unicodedata.normalize("NFKD", text)
+                   if not unicodedata.category(tecken).startswith("M"))
+
+
+def star_som_hela_ord_utan_accenter(namn, text):
+    """Som star_som_hela_ord, men accenter räknas inte: "Åsa Öberg" står i "UTTAG ASA OBERG", och omvänt.
+
+    Bara för ägaruppslaget i regelboken (las_regelbok.py, granskning 11, Q2, Hugos beslut 2026-10-29).
+    Accenterna tas bort från både namnet och texten, och sedan söks namnet med star_som_hela_ord. Allt
+    annat i star_som_hela_ord gäller som förut: namnet ska stå som hela ord, så "NAMN-7" står inte i
+    "UTTAG NAMN-77". En ägare med minst en bokstav eller siffra i namnet känns alltså igen i fler bankrader,
+    aldrig i färre. Ett namn utan bokstäver och siffror stoppas redan av regelboken.
+    """
+    return star_som_hela_ord(_utan_accenter(namn), _utan_accenter(text))

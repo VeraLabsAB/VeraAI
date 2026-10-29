@@ -37,7 +37,8 @@ Filen ska ha exakt nycklarna i REGELBOK_NYCKLAR, och får ha nycklarna i REGELBO
               den blir tom när den delas i ord som i star_som_hela_ord och aldrig kan kännas igen i en
               bankrad (granskning 10, P1, Hugos beslut 2026-10-28). Uppslaget ar_agare_eller_narstaende
               säger om en motpart står i listan, och ar_bankrad_mot_agare_eller_narstaende om en
-              motpart i listan står i en bankrad (M7, N3), så att nivåsteget kan använda det. En
+              motpart i listan står i en bankrad (M7, N3), utan hänsyn till accenter (Q2, Hugos
+              beslut 2026-10-29), så att nivåsteget kan använda det. En
               sådan bankrad passar aldrig en regel i matchningsformatet (matchningsregel_for_bankrad)
 
 En regel har exakt nycklarna i REGEL_NYCKLAR, och får ha nycklarna i REGEL_VALFRIA_NYCKLAR:
@@ -95,8 +96,8 @@ Regler för regelboken som helhet:
   kontoplanen och momsfilen, där ett konto bara har siffrorna 0–9 och en varugrupp bara a–z, siffror
   och understreck.
 - Ingen regel i matchningsformatet får ha en ägare eller närstående (efter normaliseringen, som hela
-  ord) i referens_borjar_med eller beskrivning_borjar_med (N3, granskning 8). En sådan regel skulle
-  undanta ägarens bankrader från underlag (K7).
+  ord och utan hänsyn till accenter) i referens_borjar_med eller beskrivning_borjar_med (N3, granskning
+  8, och Q2, granskning 11). En sådan regel skulle undanta ägarens bankrader från underlag (K7).
 
 Hela filen stoppas vid minsta fel med ett RegelbokFel: okänd eller saknad nyckel, fel typ (till
 exempel ett decimaltal i ett belopp), ett tomt värde, ett dolt tecken någonstans i filen (även i
@@ -140,7 +141,8 @@ from las_matchningsformat import (
 from las_momssatser import Momssatser, MomssatsFel
 from las_underlag import HELTAL_HOGST_SIFFROR, TYPER
 from normalisering import (
-    andra_skriftsystem, blandat_ord, normalisera_for_jamforelse, sokform_for_namn, star_som_hela_ord, tecken_med_namn,
+    andra_skriftsystem, blandat_ord, normalisera_for_jamforelse, sokform_for_namn, star_som_hela_ord_utan_accenter,
+    tecken_med_namn,
 )
 
 REGELBOK_NYCKLAR = ("foretag", "version", "godkand", "granser", "k9", "oppettider", "agare_och_narstaende", "regler")
@@ -669,15 +671,16 @@ def _ingen_matchningsregel_for_agare(matchningsregler, agare, var):
     """Ingen regel i matchningsformatet får ha en ägare eller närstående i sin text (K7, N3, granskning 8).
 
     En sådan regel skulle undanta ägarens bankrader från underlag. Namnet söks som hela ord i regelns
-    referens_borjar_med och beskrivning_borjar_med, på samma sätt som i en bankrad
-    (normalisering.star_som_hela_ord). En regel vars text bara börjar som ett namn (till exempel
+    referens_borjar_med och beskrivning_borjar_med, på samma sätt som i en bankrad och utan hänsyn till
+    accenter (normalisering.star_som_hela_ord_utan_accenter, Q2), så att en regel med "ASA OBERG" stoppas
+    när "Åsa Öberg" står i listan. En regel vars text bara börjar som ett namn (till exempel
     "UTTAG NAMN" för motparten "NAMN-7") stoppas inte här. Den undantar ändå aldrig en bankrad mot en ägare, eftersom
     Regelbok.matchningsregel_for_bankrad inte ger någon regel för en sådan rad.
     """
     for regel in matchningsregler:
         for nyckel in MONSTER_NYCKLAR:
             for namn in agare:
-                if nyckel in regel and star_som_hela_ord(namn, regel[nyckel]):
+                if nyckel in regel and star_som_hela_ord_utan_accenter(namn, regel[nyckel]):
                     raise RegelbokFel(
                         var + ": i regeln " + repr(regel["namn"]) + " i matchningsformatet är " + repr(nyckel) + " "
                         + repr(regel[nyckel]) + ", där " + repr(namn) + " i 'agare_och_narstaende' står. En regel i"
@@ -862,8 +865,11 @@ class Regelbok:
         """True om en motpart i 'agare_och_narstaende' står i bankradens beskrivning eller referens (K7, M7).
 
         rad är en bankrad från las_bankfil (en dict eller en MappingProxyType med beskrivning och
-        referens). Motparten ska stå som ett eller flera hela ord, efter normaliseringen för jämförelser
-        (normalisering.star_som_hela_ord). Orden delas vid allt som inte är en bokstav, en siffra eller ett
+        referens). Motparten ska stå som ett eller flera hela ord, efter normaliseringen för jämförelser och
+        utan hänsyn till accenter (normalisering.star_som_hela_ord_utan_accenter, granskning 11, Q2, Hugos
+        beslut 2026-10-29), så att "Åsa Öberg" pekas ut i "UTTAG ASA OBERG" och "Asa Oberg" i "UTTAG ÅSA
+        ÖBERG". Andra stavningar, till exempel "AA" för "Å", känns inte igen (Ö5). Orden delas vid allt som
+        inte är en bokstav, en siffra eller ett
         kombinerande tecken, så att till exempel motparten "NAMN-7" pekas ut i "UTTAG NAMN-7/LAN" och i
         "TILL:NAMN-7" (N3, granskning 8). Uppslaget gäller alla bankrader, även de som en regel i matchningsformatet skulle
         undanta från underlag, så att till exempel ett uttag till ägaren pekas ut oavsett vilken regel det
@@ -881,7 +887,7 @@ class Regelbok:
                 raise RegelbokFel("Uppslaget i regelboken: bankradens " + repr(nyckel) + " ska vara text, inte "
                                   + _json_typ(rad.get(nyckel)) + ".")
             texter.append(rad[nyckel])
-        return any(star_som_hela_ord(namn, text) for namn in agare for text in texter)
+        return any(star_som_hela_ord_utan_accenter(namn, text) for namn in agare for text in texter)
 
     def _regel_for(self, galler, datum):
         """Regeln som gäller samma sak på datumet, som en ny kopia, eller None om ingen regel passar."""
