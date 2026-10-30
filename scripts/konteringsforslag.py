@@ -155,6 +155,14 @@ K5, K7 och K8, efter ursprunget, för varje underlag som förslaget bygger på (
   Momsfilen ska vara den som regelboken kontrollerades mot (samma kontrollsumma, prövas i K2 punkt 1).
   Ett förslag med underlag men utan momsfil stoppas, eftersom K5 då inte kan köras.
 
+  Underlagets egen regel ska dessutom vara förslagets regel i 'kopplingar' (Öppet 31, granskning 24,
+  P5, Hugos beslut 2026-10-30). Prövas efter K5, K7 och K8, för varje underlag. Annars prövar
+  ursprungskontrollen punkt 8 kontona mot förslagets regel, och underlagets kostnad kan hamna på
+  den regelns konto fast K5 godtog satsen mot underlagets egen regel (granskarens prov: ett underlag
+  under en regel för bankrader, med kostnaden på bankregelns konto). Flödena bygger alltid med
+  underlagets egen regel, så de berörs inte. Ett förslag med underlag som har olika regler kräver
+  ett nytt beslut.
+
 Kopplingarna i förslaget får kontrollsummorna för regelboken, kontoplanen, momsfilen och
 matchningsformatet, och kontrollsumman för varje fil förslaget bygger på (underlaget, bankfilen och
 Z-filen). Summorna kommer från inläsningen, aldrig från indata: de som står i indata jämförs bara (K2).
@@ -1020,7 +1028,9 @@ def _kontrollera_underlagen(kopplingar, regelbok, momssatser, kallorna):
     Returnerar kontrollerna som klarats. Körs efter ursprungskontrollen, som har visat att varje
     underlag finns. Regeln är den regelboken ger underlaget på underlagets datum, som i flödena, inte
     förslagets regel: den kan gälla bankrader eller Z-rapporter när ett underlag står bland raderna
-    (granskning 23, P1, Hugos beslut 2026-10-30). Ett underlag utan regel stoppar förslaget.
+    (granskning 23, P1, Hugos beslut 2026-10-30). Ett underlag utan regel stoppar förslaget. Sist
+    ska underlagets egen regel vara förslagets regel i kopplingarna, annars stoppas förslaget
+    (Öppet 31, granskning 24, P5, Hugos beslut 2026-10-30): kontona prövades mot förslagets regel.
     """
     underlagen = [post["id"] for post in kopplingar["underlag"]]
     if not underlagen:
@@ -1041,6 +1051,13 @@ def _kontrollera_underlagen(kopplingar, regelbok, momssatser, kallorna):
             fynd = kontroll.fynd[0]
             raise _fel(fynd.kontroll, "underlaget " + repr(id_) + ", " + fynd.typ + ": " + fynd.text + " Det ska vara"
                        " ett ärende, inte ett förslag.")
+        if regel["id"] != kopplingar["regel"]["id"]:
+            raise _fel(_URSPRUNG, "underlaget " + repr(id_) + " (" + underlag["typ"] + " från "
+                       + repr(underlag["motpart"]) + ") har regeln " + repr(regel["id"]) + " i regelboken på sitt datum "
+                       + underlag["datum"] + ", men förslagets regel i 'kopplingar' är " + repr(kopplingar["regel"]["id"])
+                       + ". Ett förslag med underlag byggs bara med underlagets egen regel: annars prövas kontona mot en"
+                       " annan regel, och underlagets kostnad kan hamna på fel konto (Öppet 31, Hugos beslut"
+                       " 2026-10-30).")
     return {_K5: "ok", _K7: "ok", _K8: "ok"}
 
 
