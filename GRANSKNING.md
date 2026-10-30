@@ -8166,3 +8166,46 @@ KAN JAG GÅ VIDARE: ja. Inget blockerande, inget kan bokföras och ingen spärr 
 uppgift 5, efter Hugos beslut.
 NÄSTA STEG: Hugo eller Casper svarar på 1–4. Nästa session sätter steg 22 som klart i BYGGPLAN.md och PROGRESS.md,
 sedan Öppet 26 och Öppet 31 som egna steg före uppgift 5. Steg 15 (sandlådan) ska vara klar före steg 23.
+
+## Hugos beslut 2026-10-30 om granskning 24
+
+Hugos beslut 2026-10-30, skrivna i chatten i sessionen som rättade Öppet 31 och stängde steg 22. De svarar på "Beslut
+som behövs" 1–4 i granskning 24 (av aecccdf, ovan). Ordagrant:
+
+    DINA BESLUT (fattade av ägaren 2026-10-30):
+    1. Öppet 31: skapa_konteringsforslag stoppar ett förslag när förslagets
+       regel inte är underlagets egen regel (uppslagen på underlagets
+       datum). Granskarens prov i granskning 24 (underlag 003 under
+       bankregeln med kostnaden på 6570) ska stoppas. Stäng Öppet 31.
+    2. Öppet 30: märkningen vid K4c som text i motiveringen räcker till
+       uppgift 6. Skriv "avgjort, eget fält byggs i uppgift 6" och stäng.
+    3. Steg 22 är klart efter granskning 24. Sätt ✅ i BYGGPLAN.md och
+       uppdatera "Läge nu". Skriv i PROGRESS.md att steg 22 är granskat i
+       granskning 23 och 24 och klart.
+    4. Ny regel i CLAUDE.md under granskningar: en granskningssession
+       uppdaterar statusraderna i PROGRESS.md och BYGGPLAN.md i samma
+       commit som granskningen. Om ett uppdrag säger "ändra ingen annan
+       fil" gäller ändå CLAUDE.md. Skriv in det.
+
+Uppdraget sa också: tester först, granskarens prov från granskning 24 som test och ett test som visar att flödena a,
+b och e fortfarande går igenom, "rött före" mot 6dfcdcd på det sätt SPEC 7.1 tillåter med kommandona i PROGRESS.md
+(P7), inget i kärnan utöver detta och inget företagsspecifikt i `scripts/`, hela sviten med antal före och efter, två
+commits (Öppet 31 med kod och test, sedan dokumentationen) och ingen push.
+
+**Byggt 2026-10-30** (PROGRESS.md, "Läge 2026-10-30, Öppet 31 rättad och steg 22 klart"), inte granskat:
+
+- **1 (Öppet 31), bbb183a:** `_kontrollera_underlagen` i `scripts/konteringsforslag.py` prövar, efter K5, K7 och K8
+  och för varje underlag, att underlagets egen regel (den regelboken ger underlaget på underlagets datum) är
+  förslagets regel i `kopplingar`. Annars stoppas förslaget med kontrollen `ursprung` och båda reglerna i felet.
+  Granskarens prov (003 under `R-BANK-AVGIFT` med kostnaden på 6570 och bankrad 117 som avgift) stoppas nu, med
+  testbutikens momsfil och med prov B:s momsfil. Prov B från granskning 23 (019 och 028) stoppas som förut av K5
+  respektive K8, eftersom den nya kontrollen prövas efter dem. SPEC 7 säger vad som gäller. Öppet 31 stängd.
+- **2 (Öppet 30):** stängd i PROGRESS.md med texten "avgjort, eget fält byggs i uppgift 6". Ingen kod.
+- **3 (steg 22):** ✅ i BYGGPLAN.md, "Läge nu" uppdaterad, och PROGRESS.md säger att steg 22 är granskat i granskning
+  23 och 24 och klart.
+- **4 (CLAUDE.md):** regeln står under "Så arbetar vi" med den gamla regeln från 2026-10-29 ihopskriven.
+- **Rött före:** `scripts/tests/test_beslut_granskning_24.py` mot en kopia av 6dfcdcd i scratchpad: **4 röda och 6
+  gröna (skydd) av 10**. Röda: granskarens prov med båda momsfilerna och feltexten ("DID NOT RAISE": kopian skapade
+  förslaget), och dokumentationstestet (SPEC saknade Öppet 31). Gröna: prov B stoppas av K5 och K8, ett förslag under
+  underlagets egen regel godtas, och flöde a, b och e går igenom med underlagets egen regel. Kommandona står i
+  PROGRESS.md. Hela sviten efter rättelsen: **4 385 passed** (före: 4 375), 0 röda.
