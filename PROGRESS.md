@@ -50,8 +50,12 @@ Steg i byggplanen: 91 (klart)
   `test_granskare_prov26.py` (bara i scratchpad): **25 passed** mot kopian av d1ab489 och **8 failed, 16 passed** mot
   kopian av 7c1f148 (24 tester där), med de fyra LUCKA-proven gröna i båda.
 - **Testsviten:** 4 399 passed, 0 röda, med kommandot i SPEC 7.1 (i bakgrunden, 73 sekunder).
-- **Opushat:** d5b2fba, 269d641, 13126d2, 35afa8b, aecccdf, 6dfcdcd, bbb183a, 277ca90, 7c1f148, c479915, d1ab489 och
-  den här commiten. `main` på GitHub står på 7d8cae9.
+- **Hugos beslut 2026-10-30 om granskning 26** (i chatten, efter commiten 994bcdf, ordagrant i `GRANSKNING.md`):
+  "Ja, i samma steg": Öppet 33 och Öppet 34 byggs i ett steg före uppgift 5. Inskrivet i den här filen (Öppet 33, 34
+  och "Nästa steg" punkt 3), BYGGPLAN.md ("Läge nu") och `GRANSKNING.md` i en egen commit. Inte byggt; bygget är en
+  egen session (CLAUDE.md, en uppgift per session).
+- **Opushat:** d5b2fba, 269d641, 13126d2, 35afa8b, aecccdf, 6dfcdcd, bbb183a, 277ca90, 7c1f148, c479915, d1ab489,
+  994bcdf (granskning 26) och beslutscommiten efter den. `main` på GitHub står på 7d8cae9.
 
 ## Läge 2026-10-30, Öppet 32 rättad
 
@@ -1105,7 +1109,8 @@ fattade och byggda, se avsnittet ovan.)
     flödena. Flödena bygger momsraden ur kontoplanens roll `ingaende_moms`, så de berörs inte. **Byggs som eget steg
     efter Öppet 32, inte i commiten för Öppet 32** (Hugos beslut 2026-10-30 om byggsessionen för Öppet 32, a,
     `GRANSKNING.md`). Inget stegnummer i BYGGPLAN.md än. **Öppen, inte byggd.** Granskning 26 (H7) bekräftar att
-    momsen på kostnadskontot godtas i dag.
+    momsen på kostnadskontot godtas i dag. **Byggs i samma steg som Öppet 34** (Hugos beslut 2026-10-30 om granskning
+    26, `GRANSKNING.md`, "Hugos beslut 2026-10-30 om granskning 26").
 34. **Kostnaden räknad ur `belopp_ore` i stället för `underlag_ore` går förbi Öppet 32, för ett förslag byggt förbi
     flödena** (granskning 26, M1, nivå medel). `_kontrollera_kostnadsraderna` prövar bara rader som har underlagets
     `underlag_ore` som källa. En kostnadsrad räknad som `skillnad` av underlagets `belopp_ore` och `moms_ore` har samma
@@ -1117,7 +1122,9 @@ fattade och byggda, se avsnittet ovan.)
     räknas med `lika` och bara stå på leverantörsskulderna, och `underlag_ore` och `moms_ore` får inte räknas med
     `skillnad`; alternativt kräv flödenas form rakt av (stänger också Öppet 33). Bör byggas före uppgift 5, gärna i
     samma steg som Öppet 33. Docstringen i `konteringsforslag.py` om momsraden ("inte beslutat") rättas samtidigt
-    (granskning 26, L1). BESLUTSFATTARE SAKNAS.
+    (granskning 26, L1). **Avgjort** (Hugos beslut 2026-10-30 om granskning 26, "Ja, i samma steg", `GRANSKNING.md`):
+    byggs i samma steg som Öppet 33, före uppgift 5, med granskarens förslag till regel om inget annat sägs i
+    uppdraget. **Inte byggd.**
 
 ## Nästa steg i byggordningen
 
@@ -1144,8 +1151,9 @@ fattade och byggda, se avsnittet ovan.)
    2026-10-30 om granskning 25, beslut 2). **Öppet 32 (granskning 25, P7) rättad 2026-10-30** efter Hugos beslut om
    granskning 25 (beslut 1) och committad som steg 91 i BYGGPLAN.md, **granskad i granskning 26** (gult: byggd som
    beslutet säger, ett hål kvar i samma familj som Öppet 34). Kvar, som egna steg: Öppet 33 (momsraden, inget
-   stegnummer än), Öppet 34 (granskning 26, M1, väntar på beslut, gärna i samma steg som Öppet 33) och steg 92, Öppet
-   26 (konton för hyra, el och telefon) (Hugos beslut 2026-10-30 om byggsessionen för Öppet 32, a och b). Pushad till 7d8cae9. DESIGN 7 säger oberoende granskning efter uppgift 3 och 6, inte efter 4. Det som var förutsättningarna:
+   stegnummer än) och Öppet 34 (granskning 26, M1) **i samma steg** (Hugos beslut 2026-10-30 om granskning 26), och
+   steg 92, Öppet 26 (konton för hyra, el och telefon) (Hugos beslut 2026-10-30 om byggsessionen för Öppet 32, a och
+   b). Pushad till 7d8cae9. DESIGN 7 säger oberoende granskning efter uppgift 3 och 6, inte efter 4. Det som var förutsättningarna:
    flöde a, b och e (leverantörsfakturor, kvitton och bankavgifter)
    med K5 och K8 (BYGGPLAN steg 22). Förutsättningar, Hugos beslut 2026-10-29 (`GRANSKNING.md`, "Beslut
    2026-10-29 – inför uppgift 4"):

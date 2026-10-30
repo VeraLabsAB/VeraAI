@@ -8716,3 +8716,20 @@ Caspers beslut, tillsammans med Öppet 33.
 BESLUT SOM BEHÖVS: 1–3 ovan.
 NÄSTA STEG: Hugo eller Casper svarar på 1–3. Sedan Öppet 33 och Öppet 34 (gärna i ett steg) och steg 92 (Öppet 26)
 före uppgift 5. Steg 15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
+
+## Hugos beslut 2026-10-30 om granskning 26
+
+Hugos beslut 2026-10-30, skrivet i chatten i granskningssessionen, som svar på frågan "Ska Öppet 34 byggas tillsammans
+med Öppet 33 före uppgift 5?" (granskning 26, "Beslut som behövs", punkt 1). Ordagrant:
+
+    "Ja, i samma steg"
+
+**Vad det betyder:** Öppet 33 (momsraden låses till kontot för ingående moms, beslut a om byggsessionen för Öppet 32)
+och Öppet 34 (granskning 26, M1: kostnaden räknad ur `belopp_ore` går förbi Öppet 32) byggs i ett och samma steg före
+uppgift 5 (steg 23). Vilken regel som ska stänga Öppet 34 är inte sagt i beslutet: granskarens förslag står i
+granskning 26, P2 och "Beslut som behövs" 1 (en rad med ett underlags `belopp_ore` som källa bara med `lika` och bara
+på leverantörsskulderna, och `underlag_ore` och `moms_ore` aldrig med `skillnad`; alternativet är flödenas form rakt
+av). Byggsessionen följer förslaget om Hugo eller Casper inte säger annat i uppdraget. Punkt 2 (steg 91 räknas som
+granskat och klart) och punkt 3 (docstringen om momsraden, L1, rättas i samma steg) är inte uttryckligen besvarade;
+granskarens bedömning (ja på båda) gäller tills Hugo eller Casper säger annat. **Inte byggt.** Stegnummer sätts av
+byggsessionen (nästa lediga efter 92 är 93, Hugos beslut 2026-10-30 om byggsessionen för Öppet 32, b).
