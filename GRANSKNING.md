@@ -7721,3 +7721,191 @@ eget prov i P1).
 - **7:** raden "Opushat" i BYGGPLAN.md är rättad.
 - **Rött före:** `scripts/tests/test_beslut_granskning_22.py` mot en kopia av 7d8cae9 i scratchpad: 32 röda, 2 gröna
   (skydd) av 34. Hela sviten efter rättelsen: 4 353 passed, 0 röda.
+
+## Granskning 23 (av d5b2fba) (2026-10-30)
+
+Oberoende granskning i en ny session som inte har sett rättelsesessionen. Granskaren ändrade ingen kod och skrev bara
+i den här filen. Granskat: `git diff 7d8cae9 d5b2fba` (en commit, 20 filer). Lästes också: CLAUDE.md, SPEC.md (hela,
+särskilt 7, 7.1 och 11), BYGGPLAN.md ("Läge nu" och steg 22 via diffen), PROGRESS.md ("Läge 2026-10-30" och Öppet
+27–29), och här granskning 22 och "Hugos beslut 2026-10-30 om granskning 22".
+
+### Viktigt först
+
+- **Inget kan bokföras utan godkännande.** Inget i commiten skriver filer, anropar andra program eller ger ett förslag
+  ett fält för bokfört eller godkänt. Ingen spärr har blivit svagare (P8).
+- **P1 och P2 i granskning 22 är i stort sett rättade, men P1 har en lucka (P1 nedan, bör rättas).** K5 och K8 prövas
+  mot förslagets regel, inte mot underlagets egen. Med en momsfil som har en varugrupp som heter `kostnad` gav ett
+  eget prov ett godkänt förslag för SYNT-U-2025-028 (K8) och SYNT-U-2025-019 (K5) under bankregeln `R-BANK-AVGIFT`,
+  med "K5: ok" och "K8: ok". Flödena gör inte så, så det gäller bara kod som anropar `skapa_konteringsforslag` direkt,
+  alltså risken i uppgift 5. Bör rättas före uppgift 5.
+- **Avsteget (punkt 5):** exakt vilket kommando rättelsesessionen körde står inte i git-loggen, PROGRESS.md eller här.
+  Det som går att visa är att resultatet bara kan fås på ett sätt som SPEC 7.1 uttryckligen tillåter, och att samma
+  sätt gick igenom vakten i den här granskningen med samma utfall. Granskarens bedömning: inom SPEC 7.1, ingen väg
+  runt vakten. Men kommandona borde ha skrivits ner (P7).
+
+### Fynd
+
+**P1 – K5 och K8 prövas mot förslagets regel, inte underlagets (bör rättas, före uppgift 5).**
+`_kontrollera_underlagen` (`scripts/konteringsforslag.py`) tar regeln ur förslagets `kopplingar` och kör
+`kontrollera_underlag` med den på varje underlag. Ursprungskontrollen punkt 8 (`_kontrollera_regeln`) visar bara att
+regeln är källans egen för den sorts källa som regeln gäller: för en regel för bankrader prövas bankraderna, inte
+underlagen. Ett förslag med en regel för bankrader kan alltså ha ett underlag i sina rader, och då prövas K5 mot
+bankregelns kontering och K8 mot bankregelns villkor. Med testbutikens momsfil stoppas det ändå, eftersom `kostnad`
+inte är en varugrupp (men med ett `KeyError`, se P2). **Prov (fil i kopian):** momsfilen fick en varugrupp `kostnad`
+med 12 %, och ett förslag byggdes för hand med `R-BANK-AVGIFT`: underlagets kostnad på 6570, momsen på kontot för
+ingående moms, beloppet på leverantörsskulder, och bankrad 117 som avgift mot banken. Resultatet blev ett
+`Konteringsforslag` med `{'K2': 'ok', 'ursprung': 'ok', 'K5': 'ok', 'K7': 'ok', 'K8': 'ok'}` för både
+SYNT-U-2025-028 (ska vara K8, nivå D) och SYNT-U-2025-019 (ska vara K5, nivå D). K7 påverkas inte, eftersom den
+prövar underlagets motpart och inte regeln. Varugruppens namn är tillåtet i dag (a–z och understreck), och
+`motkonto`, `avgift` och `kostnad` är inte reserverade ord. Det kräver alltså både ett ovanligt namn i ett företags
+momsfil och kärnkod som bygger förslag förbi flödena. Det är inte bokföring utan godkännande, men det motsäger
+Hugos beslut 1 ("så att ingen kod kan få ett förslag utan att kontrollerna körts" är formellt sant, men de körs mot
+fel regel), SPEC 7 ("ett underlag som någon av dem flaggar kan inte bli ett förslag, oavsett vilken kod som bygger
+förslaget") och kommentaren i `konteringsforslag.py` ("som ursprungskontrollen punkt 8 redan har visat är den regel
+regelboken ger underlaget"), som inte stämmer för regler för bankrader och Z-rapporter.
+*Förslag:* `_kontrollera_underlagen` slår upp varje underlags egen regel med `Regelbok.regel_for_underlag` (på
+underlagets datum, som flödena) och kör K5, K7 och K8 med den, och stoppar förslaget om underlaget inte har någon
+regel. Alternativt stoppas ett förslag med underlag vars regel inte gäller underlag. Med ett test som bygger provet
+ovan.
+
+**P2 – Ett förslag med underlag och en regel utan varugrupper stoppas med `KeyError` (notering).** Samma prov med
+testbutikens egen momsfil: `_visa_grupper` slår upp `satser['kostnad']` och kraschar med `KeyError`, i stället för
+ett `KonteringsforslagFel` med kontrollen K5. Inget förslag skapas, så det är den säkra riktningen. Försvinner med
+rättelsen i P1. I flödena händer det inte: `las_regelbok` kräver att varje varugrupp i en regel för underlag har en
+sats varje dag regeln gäller.
+
+**P3 – Öppet 27: de sex modulerna stoppar exakt träff, men två namn i regelboken prövas inte (notering).** Lästes:
+`las_bank` (kolumnnamn), `las_kassa` (kolumnnamn, postnamn, betalsätt, kassaregister), `las_kontoplan` (kontonamn),
+`las_momssatser` (varugrupper), `las_matchningsformat` (regelns `namn`) och `las_regelbok` (regel-id, `motpart` och
+`kassaregister` i `galler`, ägare och närstående). Alla anropar `inget_reserverat_namn`, som jämför hela namnet efter
+`normalisera_for_jamforelse`, alltså bara exakt träff. Testerna i `test_beslut_granskning_22.py` prövar `Bankavgift`,
+`BANKAVGIFT` och `bank avgift` (stoppas) och `Bankavgift AB`, `bankavgifter`, `bank-avgift` och `Bankavgiften`
+(godtas) i alla sex. Två namn i regelboken prövas inte, båda godtogs i ett prov: **betalsätten i en Z-regels
+`kontering`** (`"Bankavgift"` som betalsätt i `R-Z-TB-KASSA-1`) och **företagets namn** (`"foretag": "Bankavgift"`).
+SPEC 7 och README räknar uppriktigt upp vilka namn som prövas, och de två står inte där, men Hugos beslut 4 säger
+"alla namn i konfigurationen". Betalsättet i regelboken kan aldrig passa ett postnamn i kassaformatet, eftersom
+kassaformatet stoppar ordet. Vad som händer med företagets namn efteråt (till exempel i `test_karnan_ar_generell.py`)
+är inte prövat. *Förslag:* Hugo eller Casper avgör om de två ska läggas till.
+
+**P4 – Öppet 28 är byggt som beslutet säger (notering).** `_kontrollera_bankradsregel` stoppar `flode` när regeln i
+`matchning.json` inte gäller pengar ut, före den tidiga returen för pengar in. Testet
+`test_o28_flode_pa_en_regel_for_pengar_in_stoppar_regelboken` prövar det med `R-BANK-SWISH`, och skyddet
+`test_o28_flode_pa_en_regel_for_pengar_ut_godtas_som_forut` är grönt både före och efter. Skyddet i flödet för pengar
+in står kvar, med en kommentar om att det inte nås.
+
+**P5 – P2 i granskning 22 är rättad (notering).** `kontera_period` lägger först in ett ärende för varje post i
+`Underlagsperiod.arenden`, utan villkor, och hoppar sedan över varje flaggat underlag innan regeln, K5, K7 och K8
+prövas. `las_underlag.py` lägger bara K4-ärenden där (K4, K4a, K4b, "K4a och K4b" och K4c), så ingen annan sorts
+ärende tas för ett K4-ärende. En dublett (K4) som redan är borttagen får sitt ärende utan bankrad och regel. Ett
+flaggat underlag är fortfarande med i matchningen och kan därför göra originalets bankrad tvetydig, så att originalet
+inte får något förslag för betalningen. Det är den säkra riktningen.
+
+**P6 – "Rött före" stämmer (notering).** Se punkt 4 nedan: 32 röda och 2 gröna av 34, med de röda skäl som PROGRESS.md
+räknar upp. Nio av de 32 är röda för att gränssnittet saknades (åtta `TypeError` för parametern `momssatser` och ett
+`ImportError` för `kontrollera_underlag`), inte för att koden gjorde fel. Det beteende som P1 gäller visas av
+`test_p1_granskarens_prov_ett_forslag_utan_momsfil_for_019_stoppas` ("DID NOT RAISE" före) och P2 av bland annat
+`test_p2_ett_k4_flaggat_underlag_far_bara_k4_arendet` (`['K5']` före, `['K4c']` efter). PROGRESS.md säger det öppet.
+
+**P7 – Rättelsesessionen skrev inte ner sina kommandon (bör rättas, arbetssätt).** Varken commit-meddelandet,
+PROGRESS.md eller avsnittet "Hugos beslut 2026-10-30 om granskning 22" säger vilka kommandon som kördes, bara att
+testfilen "kördes mot en kopia av 7d8cae9 i scratchpad". Granskningarna har ett avsnitt "Kommandon i den här
+granskningen", men byggsessioner har det inte alltid. Det gör det omöjligt att i efterhand avgöra exakt vad som kördes
+(punkt 5). *Förslag:* en byggsession som kör något mot en kopia skriver kommandona i sin post i PROGRESS.md.
+
+**P8 – Ingen spärr är svagare (notering).** `test_karnan_ar_generell.py`: bara importen av `RESERVERADE_NAMN` är
+flyttad. `test_inga_genvagar.py`: `_k5` är flyttad från flödena till förslaget och förbjuden där, `_kontrollera_underlagen`,
+`_k4_arende` och `_underlagets_arenden` är förbjudna, och ett nytt test läser koden. `test_konteringsforslag.py` och
+`test_konteringsfloden.py` kräver nu fler kontroller än förut ("K5", "K7" och "K8" i `kontroller`), och testet för 004
+kräver nu K4-ärendet i stället för inget ärende, som beslut 3 säger.
+
+**P9 – PROGRESS.md och BYGGPLAN.md är inte uppdaterade efter den här granskningen (notering).** CLAUDE.md säger att en
+granskningssession också uppdaterar PROGRESS.md och "Läge nu" i BYGGPLAN.md (Hugos beslut 2026-10-29). Uppdraget till
+den här granskningen sa "Ändra ingen annan fil", och granskaren följde uppdraget. Båda filerna säger därför fortfarande
+"inte granskade". *Förslag:* nästa session skriver in granskning 23 där.
+
+### Svar på uppdragets frågor
+
+1. **P1.** K5, K7 och K8 ligger i `skapa_konteringsforslag` och kan inte hoppas över: `_kontrollera_underlagen` körs
+   utan villkor efter ursprungskontrollen, ursprungskontrollen kräver att varje underlag som en rad använder står i
+   `kopplingar` (och omvänt), utan momsfil stoppas ett förslag med underlag, och ett `Konteringsforslag` kan bara
+   skapas med `_FORSLAGSNYCKEL` inne i modulen. Ingen annan kärnfil anropar `skapa_konteringsforslag` (bara
+   `konteringsfloden.py`). Den andra vägen som finns är P1 ovan: kontrollerna körs, men mot fel regel. SPEC 7:s text
+   om genvägstestet är ärlig (den säger att testet inte stoppar anrop till de offentliga funktionerna och inte kan
+   bevisa att ingen genväg finns), men meningen "oavsett vilken kod som bygger förslaget" lovar mer än koden håller,
+   se P1.
+2. **P2.** Ja: ett K4-flaggat underlag får inget förslag och inga andra ärenden, och varje K4-ärende följer med i
+   resultatet från `kontera_period` (P5).
+3. **Öppet 27 och 28.** Alla sex inläsningsmoduler stoppar reserverade ord vid exakt träff och bara exakt (P3, med två
+   namn i regelboken som inte prövas). `flode` stoppas på regler för pengar in (P4).
+4. **Rött före.** Testfilen kopierades med `cp -R` in i en kopia av 7d8cae9 i scratchpad (gjord med `git archive` och
+   `tar -x`), och pytest kördes mot den enda filen i kopian, med kommandot i SPEC 7.1 och `-q --tb=line -rA`:
+   **32 failed, 2 passed**. De två gröna är `test_o27_bara_exakt_traff_stoppas_inte_delstrang` och
+   `test_o28_flode_pa_en_regel_for_pengar_ut_godtas_som_forut`, alltså skydden. Vakten släppte igenom alla kommandon.
+5. **Avsteget.** Exakt kommando går inte att ta reda på ur git-loggen, GRANSKNING.md eller PROGRESS.md (P7).
+   Granskaren letade inte i rättelsesessionens egen logg: den ligger utanför projektmappen, och CLAUDE.md säger att
+   bara filer i projektet får läsas. Det som går att visa:
+   - Testfilen finns inte i 7d8cae9, och den hämtar kärnan från sin egen plats (`Path(__file__).parents[2] /
+     "scripts"`, först i `sys.path`). Ett körresultat mot den gamla koden kan därför bara fås med filen inne i en
+     kopia av 7d8cae9. Att köra projektets egen fil, med en miljövariabel eller ett annat pytest-tillägg, hade gett
+     den nya koden och 34 gröna, inte 32 röda.
+   - SPEC 7.1 tillåter just det: andra raden i tabellen ("I stället för hela mappen får en testfil i kopian anges"),
+     `cp -R` till en tillfällig mapp, och "Provfiler i kopian". Att köra en enda testfil är alltså inget avsteg.
+   - Granskaren gjorde samma sak, och vakten släppte igenom det. Utfallet blev detsamma som rättelsesessionen
+     skrev, med samma skäl för de röda.
+
+   Bedömning: **inom SPEC 7.1, ingen väg runt vakten**, så långt det går att avgöra. Säker blir det bara om Hugo eller
+   Casper själv tittar i rättelsesessionens logg. Det som brister är att kommandona inte står någonstans (P7).
+6. **Företagsspecifikt i `scripts/`.** Inget. `grep` efter `syntet`, `testbutik`, `SYNT-`, `R-BANK`, `R-LEV` och
+   `AGARE-1` (utan tester) gav bara ordet "SYNTETISK" som exempel på ett statusfält i två gamla kommentarer, och
+   `grep -w` efter testbutikens konton och belopp (6570, 4010, 1940, 2440, 2640, 5460, 25000, 12500, 1661856 och
+   1493800) gav inget. Ordet `bankavgift` står i kärnan som flödets namn och det reserverade ordet, efter Hugos beslut.
+   `test_karnan_ar_generell.py` är grön.
+7. **Öppet 29, granskarens bedömning.** Det beror på vilken K4-kontroll det är:
+   - **K4a (samma fakturanummer, olika belopp) och K4b (olika datum): stoppa båda.** Två underlag med samma
+     fakturanummer och olika uppgifter kan inte båda vara rätt, och vilket som är rätt vet bara en människa. Att det
+     med lägst id får sitt förslag är ett godtyckligt val: id säger inget om vilket som stämmer. I automatiskt läge med
+     samlat godkännande kan originalets förslag godkännas innan någon har svarat på ärendet, och då kan fel belopp
+     eller fel datum bli bokfört.
+   - **K4c (möjlig dublett): bara det flaggade, som i dag.** Två olika fakturor kan ha samma belopp och datum, och det
+     som ska hindras är att samma faktura bokförs två gånger. Det gör stoppet av det flaggade. Men originalets förslag
+     bör märkas så att godkännaren ser kopplingen till ärendet (nivå C, rad för rad, som DESIGN 5 säger för K4a–K4c),
+     och det kan göras i nivåsteget.
+
+   Beslutet är Hugos eller Caspers.
+
+### Testsviten
+
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`:
+**4 353 passed**, 0 misslyckade, samma antal som i PROGRESS.md.
+
+### Kommandon i den här granskningen
+
+`git show` (commiten, med `--stat`, `--format=` och per fil), `git diff 7d8cae9 d5b2fba` per fil, `git log
+--format=%H%n%B -n 3`, `grep` (bara sökande tillägg: `-n`, `-i`, `-r`, `-w`, `-e`, `-A`, `-B`, `-E`,
+`--exclude-dir=`), `ls`, `cat` av SYNT-U-2025-028.json och testbutikens momsfil, `mkdir -p` (två mappar i
+scratchpad), `git archive --format=tar -o` (d5b2fba och 7d8cae9 till scratchpad), `tar -x -f … -C` (in i de två
+mapparna), `cp -R` (testfilen från projektet till kopian av 7d8cae9), pytest mot en testfil i en kopia (med `-q`,
+`--tb=line`, `--tb=short` och `-rA`) och hela sviten, `git add GRANSKNING.md` och `git commit -F` med meddelandet i en
+fil i scratchpad. Provfilen `test_granskare_prov23.py` skrevs med fil-verktyget, bara i kopian av d5b2fba i
+scratchpad. Inget i projektet ändrades utom den här filen.
+
+**Avsteg:** vakten stoppade fem kommandon som granskaren skrev i strid med SPEC 7.1, alla bara läsande: ett `cd … &&`
+(`&`), ett `git -C`, två `grep` med `\` i mönstret och ett `grep` med `|` i mönstret. De gjordes om ett kommando i
+taget, med flera `-e`. Uppdraget sa "Ändra ingen annan fil", vilket går före CLAUDE.md:s regel om att en granskning
+också uppdaterar PROGRESS.md och BYGGPLAN.md (P9).
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **P1:** ska K5, K7 och K8 köras mot varje underlags egen regel (granskarens förslag), eller ska ett förslag med
+   underlag och en regel som inte gäller underlag stoppas? Före uppgift 5.
+2. **P3:** ska betalsätten i regelbokens Z-regler och företagets namn (`foretag`) också prövas mot de reserverade
+   orden?
+3. **Öppet 29:** bara det flaggade underlaget, eller båda i paret? Granskarens bedömning: båda vid K4a och K4b, bara
+   det flaggade vid K4c (punkt 7).
+4. **P7:** ska byggsessioner skriva sina kommandon i PROGRESS.md?
+5. **P9:** PROGRESS.md och "Läge nu" i BYGGPLAN.md ska få granskning 23 i en egen session. Räknas steg 22 som klart
+   när P1 är rättad, eller efter en ny granskning?
+
+STATUS: gult
+KAN JAG GÅ VIDARE: ja, men P1 bör rättas före uppgift 5. Inget kan bokföras och ingen spärr är svagare.
+NÄSTA STEG: Hugo eller Casper svarar på 1–5. Därefter rättelsen av P1 i en egen session, och Öppet 26.
