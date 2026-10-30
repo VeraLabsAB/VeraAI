@@ -976,12 +976,16 @@ def test_tackningen_godtar_samma_del_i_debet_och_kredit(kallor):
     assert skapa(kallor, kortinlosen(kallor))
 
 
-def test_tackningen_godtar_underlaget_som_skillnad_mellan_beloppet_och_momsen(kallor):
-    # Kostnaden räknad som 'belopp_ore' minus momsen: underlaget används ändå helt, en gång per sida.
+def test_tackningen_godtar_men_oppet_34_stoppar_underlaget_som_skillnad_mellan_beloppet_och_momsen(kallor):
+    # Kostnaden räknad som 'belopp_ore' minus momsen: underlaget används ändå helt, en gång per sida, så täckningen
+    # godtar. Men raden har inte 'underlag_ore' som källa, så kontrollen av kostnadsraden (Öppet 32) ser den inte.
+    # Därför stoppas den av Öppet 34 (granskning 26, M1, Hugos beslut 2026-10-30 om granskning 26): 'belopp_ore'
+    # räknas bara med 'lika'. Före steg 93 godtogs förslaget här.
     data = fakturan()
     rader(data)[0]["ursprung"] = {"berakning": "skillnad",
                                   "fran": [underlag(U3, "belopp_ore"), underlag(U3, "moms_ore", 12)]}
-    assert skapa(kallor, data)
+    text = stoppas(kallor, data, "ursprung", "rad 1 (konto 4010) räknas med 'skillnad'", "'belopp_ore'", "Öppet 34")
+    assert "används" not in text  # inte täckningen
 
 
 def test_tackningen_godtar_totalsumman_mot_betalsatten(kallor):

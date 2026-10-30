@@ -164,14 +164,37 @@ K5, K7 och K8, efter ursprunget, för varje underlag som förslaget bygger på (
   ett nytt beslut.
 
   Kostnadsraden står på det konto K5 ger (Öppet 32, granskning 25, P7, Hugos beslut 2026-10-30).
-  Prövas sist, för varje underlag: varje rad som har underlagets 'underlag_ore' för en momssats som
-  källa ska stå på det konto kontrollera_underlag räknar fram för satsen ('konton'). Annat konto
-  stoppar förslaget, också ett annat konto i regeln och ett konto med en roll i kontoplanen (till
-  exempel leverantörsskulderna). Annars godtar ursprungskontrollen punkt 8 varje konto som står i
-  regeln eller har en roll, och kostnaden kan hamna på fel konto fast K5 och Öppet 31 godtog
-  förslaget (granskarens prov: en regel med två konton och kontona bytta, och kostnaden på
-  leverantörsskulderna). Flödena bygger kostnadsraderna ur samma 'konton', så de berörs inte. Var
-  momsraden ('moms_ore') får stå är inte beslutat.
+  Prövas efter Öppet 31, för varje underlag: varje rad som har underlagets 'underlag_ore' för en
+  momssats som källa ska stå på det konto kontrollera_underlag räknar fram för satsen ('konton').
+  Annat konto stoppar förslaget, också ett annat konto i regeln och ett konto med en roll i
+  kontoplanen (till exempel leverantörsskulderna). Annars godtar ursprungskontrollen punkt 8 varje
+  konto som står i regeln eller har en roll, och kostnaden kan hamna på fel konto fast K5 och
+  Öppet 31 godtog förslaget (granskarens prov: en regel med två konton och kontona bytta, och
+  kostnaden på leverantörsskulderna). Flödena bygger kostnadsraderna ur samma 'konton', så de
+  berörs inte.
+
+  Beloppet och sätten att räkna (Öppet 34, granskning 26, M1, Hugos beslut 2026-10-30 om
+  granskning 26). Prövas efter Öppet 32, för varje underlag: en rad som har underlagets
+  'belopp_ore' som källa räknas bara med 'lika' och står bara på leverantörsskulderna (rollen
+  leverantorsskulder i kontoplanen), och underlagets 'belopp_ore' står på högst en rad i
+  förslaget, så att hela beloppet bokförs en gång, som fakturan (kredit) eller betalningen
+  (debet). 'underlag_ore' och 'moms_ore' räknas bara med 'lika' eller 'summa', aldrig med
+  'skillnad'. Annars kan kostnaden räknas som 'belopp_ore' minus momsen och hamna på vilket konto
+  som helst utan att Öppet 32 ser den, eftersom raden då inte har 'underlag_ore' som källa
+  (granskarens prov: kostnaden på leverantörsskulderna, kontona bytta inom regeln, hela beloppet
+  med moms på kostnadskontot utan momsrad, och hela beloppet på leverantörsskulderna på båda
+  sidorna, alla godtagna med alla kontroller gröna). Flödena bygger fakturan med 'belopp_ore' en
+  gång i kredit på leverantörsskulderna och betalningen med 'belopp_ore' en gång i debet, alltid
+  med 'lika', så de berörs inte. Prövas före Öppet 33, så att en rad som räknas fel får felet om
+  beräkningen, inte om kontot.
+
+  Momsraden står på kontot för ingående moms (Öppet 33, granskning 25, P7, Hugos beslut
+  2026-10-30 om byggsessionen för Öppet 32, a). Prövas sist, för varje underlag: varje rad som har
+  underlagets 'moms_ore' som källa ska stå på kontot för ingående moms (rollen ingaende_moms i
+  kontoplanen). Annat konto stoppar förslaget. Punkt 5 säger bara vad en rad på ett momskonto får
+  ha som källa, inte att momsen från ett underlag måste stå på ett momskonto, så utan den här
+  kontrollen godtogs momsen på kostnadskontot (granskning 26, H7). Flödena bygger momsraden ur
+  kontoplanens roll, så de berörs inte.
 
 Kopplingarna i förslaget får kontrollsummorna för regelboken, kontoplanen, momsfilen och
 matchningsformatet, och kontrollsumman för varje fil förslaget bygger på (underlaget, bankfilen och
@@ -245,9 +268,11 @@ _UTGAENDE_MOMS = "utgaende_moms_per_sats"
 _MOMSPOST = "moms_per_sats"
 _FORSALJNINGSPOST = "forsaljning_per_sats"
 _TOTALSUMMA = "totalsumma"
-# Fälten i en momsrad: beloppet utan moms och momsen.
+# Fälten i en momsrad: beloppet utan moms och momsen. Och underlagets belopp att betala.
 _UNDERLAGSFALT = "underlag_ore"
 _MOMSFALT = "moms_ore"
+_BELOPPSFALT = "belopp_ore"
+_LEVERANTORSSKULDER = "leverantorsskulder"
 # Sidorna i täckningen.
 _SIDOR = ("debet", "kredit")
 _DELARNA = ("Ett underlags 'belopp_ore' räknas som alla dess momsraders '" + _UNDERLAGSFALT + "' och '" + _MOMSFALT
@@ -1058,7 +1083,85 @@ def _kontrollera_kostnadsraderna(id_, underlag, regel, konton, rader):
                        " granskning 25, P7, Hugos beslut 2026-10-30).")
 
 
-def _kontrollera_underlagen(kopplingar, rader, regelbok, momssatser, kallorna):
+def _rollens_konto(kontoplan, roll, datum):
+    """Kontot med rollen i ett felmeddelande, eller bara rollen om inget konto gäller på datumet."""
+    try:
+        return "kontot " + kontoplan.rollens_konto(roll, datum) + " (rollen " + repr(roll) + " i kontoplanen)"
+    except KontoplanFel:
+        return "kontot med rollen " + repr(roll) + " i kontoplanen"
+
+
+def _underlagets_kallor(id_, rader):
+    """(radnummer, raden, källan) för varje källa på raderna som pekar på underlaget id_."""
+    return [(nummer, rad, kalla) for nummer, rad in enumerate(rader, start=1) for kalla in rad["ursprung"]["fran"]
+            if kalla["kalla"] == "underlag" and kalla["id"] == id_]
+
+
+def _kontrollera_beloppsraderna(id_, kontoplan, verifikation):
+    """Öppet 34: underlagets 'belopp_ore' bara med 'lika', bara på leverantörsskulderna och på högst en rad, och
+    'underlag_ore' och 'moms_ore' aldrig med 'skillnad'.
+
+    Annars kan kostnaden räknas som 'belopp_ore' minus momsen, utan 'underlag_ore' som källa, och då ser
+    Öppet 32 den inte (granskning 26, M1, Hugos beslut 2026-10-30 om granskning 26). Flödena bygger
+    fakturan och betalningen med 'belopp_ore' en gång, med 'lika', på leverantörsskulderna.
+    """
+    datum, rader = verifikation["datum"], verifikation["rader"]
+    beloppsrader = []
+    for nummer, rad, kalla in _underlagets_kallor(id_, rader):
+        vad = "rad " + str(nummer) + " (konto " + rad["konto"] + ")"
+        berakning, falt = rad["ursprung"]["berakning"], kalla["falt"]
+        if falt != _BELOPPSFALT:
+            if berakning == "skillnad":
+                raise _fel(_URSPRUNG, vad + " räknas med 'skillnad' och har underlaget " + repr(id_) + ", momsraden med"
+                           " satsen " + str(kalla["momssats"]) + " %, " + repr(falt) + " som källa. Beloppet utan moms"
+                           " ('" + _UNDERLAGSFALT + "') och momsen ('" + _MOMSFALT + "') i ett underlag räknas bara med"
+                           " 'lika' eller 'summa', aldrig med 'skillnad': en rad som räknas som en skillnad ur ett"
+                           " underlag kan bokföra något annat än det underlaget säger (Öppet 34, granskning 26, M1,"
+                           " Hugos beslut 2026-10-30 om granskning 26).")
+            continue
+        if berakning != "lika":
+            raise _fel(_URSPRUNG, vad + " räknas med " + repr(berakning) + " och har underlaget " + repr(id_) + ", '"
+                       + _BELOPPSFALT + "' som källa. Hela beloppet att betala i ett underlag räknas bara med 'lika',"
+                       " på en egen rad: annars kan kostnaden räknas som beloppet minus momsen och hamna på vilket"
+                       " konto som helst utan att kontrollen av kostnadsraden ser den (Öppet 34, granskning 26, M1,"
+                       " Hugos beslut 2026-10-30 om granskning 26).")
+        if (_LEVERANTORSSKULDER, None) not in kontoplan.kontots_roller(rad["konto"]):
+            raise _fel(_URSPRUNG, vad + " har underlaget " + repr(id_) + ", '" + _BELOPPSFALT + "' som källa, men står"
+                       " på kontot " + rad["konto"] + ", som inte är leverantörsskulderna. Hela beloppet att betala i"
+                       " ett underlag står bara på " + _rollens_konto(kontoplan, _LEVERANTORSSKULDER, datum)
+                       + ": kostnaden bokförs ur momsradernas '" + _UNDERLAGSFALT + "' på det konto K5 ger och momsen ur"
+                       " '" + _MOMSFALT + "' på kontot för ingående moms (Öppet 34, granskning 26, M1, Hugos beslut"
+                       " 2026-10-30 om granskning 26).")
+        beloppsrader.append(nummer)
+    if len(beloppsrader) > 1:
+        raise _fel(_URSPRUNG, _visa_rader(beloppsrader) + " har alla underlaget " + repr(id_) + ", '" + _BELOPPSFALT
+                   + "' som källa. Hela beloppet att betala i ett underlag står på högst en rad i ett förslag, så att"
+                   " det bokförs en gång: som fakturan (i kredit på leverantörsskulderna) eller som betalningen (i"
+                   " debet), aldrig på båda sidorna i samma verifikation (Öppet 34, granskning 26, M1, Hugos beslut"
+                   " 2026-10-30 om granskning 26).")
+
+
+def _kontrollera_momsraderna(id_, kontoplan, verifikation):
+    """Öppet 33: varje rad med underlagets 'moms_ore' som källa står på kontot för ingående moms.
+
+    Punkt 5 i ursprungskontrollen säger bara vad en rad på ett momskonto får ha som källa, inte att
+    momsen från ett underlag måste stå på ett momskonto, så utan den här kontrollen godtogs momsen
+    på kostnadskontot (granskning 26, H7, Hugos beslut 2026-10-30 om byggsessionen för Öppet 32, a).
+    Flödena bygger momsraden ur kontoplanens roll, så de berörs inte.
+    """
+    datum, rader = verifikation["datum"], verifikation["rader"]
+    for nummer, rad, kalla in _underlagets_kallor(id_, rader):
+        if kalla["falt"] != _MOMSFALT or (_INGAENDE_MOMS, None) in kontoplan.kontots_roller(rad["konto"]):
+            continue
+        raise _fel(_URSPRUNG, "rad " + str(nummer) + " (konto " + rad["konto"] + ") har momsen från underlaget "
+                   + repr(id_) + " för momssatsen " + str(kalla["momssats"]) + " % ('" + _MOMSFALT + "') som källa,"
+                   " men står på kontot " + rad["konto"] + ", som inte är kontot för ingående moms. Momsen från ett"
+                   " underlag bokförs alltid på " + _rollens_konto(kontoplan, _INGAENDE_MOMS, datum) + ", också när"
+                   " ett annat konto står i regeln eller har en roll i kontoplanen (Öppet 33, granskning 25, P7, Hugos"
+                   " beslut 2026-10-30 om byggsessionen för Öppet 32, a).")
+
+
+def _kontrollera_underlagen(kopplingar, verifikation, regelbok, kontoplan, momssatser, kallorna):
     """K5, K7 och K8 på varje underlag i de kontrollerade kopplingarna, mot underlagets egen regel.
 
     Returnerar kontrollerna som klarats. Körs efter ursprungskontrollen, som har visat att varje
@@ -1067,9 +1170,13 @@ def _kontrollera_underlagen(kopplingar, rader, regelbok, momssatser, kallorna):
     (granskning 23, P1, Hugos beslut 2026-10-30). Ett underlag utan regel stoppar förslaget. Sedan
     ska underlagets egen regel vara förslagets regel i kopplingarna, annars stoppas förslaget
     (Öppet 31, granskning 24, P5, Hugos beslut 2026-10-30): kontona prövades mot förslagets regel.
-    Sist ska varje kostnadsrad från underlaget i rader (verifikationens rader) stå på det konto K5
-    ger för momssatsen, annars stoppas förslaget (Öppet 32, granskning 25, P7, Hugos beslut
-    2026-10-30): punkt 8 godtar varje konto i regeln eller med en roll.
+    Sedan ska varje kostnadsrad från underlaget i verifikationens rader stå på det konto K5 ger för
+    momssatsen, annars stoppas förslaget (Öppet 32, granskning 25, P7, Hugos beslut 2026-10-30):
+    punkt 8 godtar varje konto i regeln eller med en roll. Sedan räknas underlagets 'belopp_ore'
+    bara med 'lika', bara på leverantörsskulderna och bara på en rad, och 'underlag_ore' och
+    'moms_ore' aldrig med 'skillnad' (Öppet 34, granskning 26, M1, Hugos beslut 2026-10-30 om
+    granskning 26). Sist står varje momsrad från underlaget på kontot för ingående moms (Öppet 33,
+    Hugos beslut 2026-10-30 om byggsessionen för Öppet 32, a).
     """
     underlagen = [post["id"] for post in kopplingar["underlag"]]
     if not underlagen:
@@ -1077,6 +1184,7 @@ def _kontrollera_underlagen(kopplingar, rader, regelbok, momssatser, kallorna):
     if momssatser is None:
         raise _fel(_INDATA, "förslaget bygger på ett underlag, men fick ingen momsfil. K5 kan inte köras utan"
                    " momsfilen från las_momssatser, så förslaget skapas inte.")
+    rader = verifikation["rader"]
     for id_ in underlagen:
         underlag = kallorna.underlag[id_]
         regel = regelbok.regel_for_underlag(underlag["typ"], underlag["motpart"], underlag["datum"])
@@ -1098,6 +1206,8 @@ def _kontrollera_underlagen(kopplingar, rader, regelbok, momssatser, kallorna):
                        " annan regel, och underlagets kostnad kan hamna på fel konto (Öppet 31, Hugos beslut"
                        " 2026-10-30).")
         _kontrollera_kostnadsraderna(id_, underlag, regel, kontroll.konton, rader)
+        _kontrollera_beloppsraderna(id_, kontoplan, verifikation)
+        _kontrollera_momsraderna(id_, kontoplan, verifikation)
     return {_K5: "ok", _K7: "ok", _K8: "ok"}
 
 
@@ -1212,7 +1322,7 @@ def skapa_konteringsforslag(forslag, regelbok, kontoplan, momssatser=None, under
     kallorna = _kallorna(underlagsperiod, bankperiod, kassaperiod)
     kopplingar = _kontrollera_ursprung(nytt, regelbok, kontoplan, kallorna)
     kontroller = {_K2: "ok", _URSPRUNG: "ok"}
-    kontroller.update(_kontrollera_underlagen(kopplingar, nytt["verifikation"]["rader"], regelbok, momssatser,
+    kontroller.update(_kontrollera_underlagen(kopplingar, nytt["verifikation"], regelbok, kontoplan, momssatser,
                                               kallorna))
     return Konteringsforslag(_FORSLAGSNYCKEL, {
         "forslag_id": nytt["forslag_id"],
