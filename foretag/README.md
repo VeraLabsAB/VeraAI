@@ -93,7 +93,7 @@ Några ord är **kärnans egna namn**, till exempel på ett flöde, och får dä
 - `kontoplan.json`: kontonamnen,
 - `momssatser.json`: varugrupperna,
 - `matchning.json`: reglernas `namn`,
-- `regelbok.json`: reglernas `id`, motparter och kassaregister i `galler`, och ägare och närstående.
+- `regelbok.json`: reglernas `id`, motparter och kassaregister i `galler`, ägare och närstående, betalsätten i en Z-regels `kontering`, och företagets namn (`foretag`). De två sista efter Hugos beslut 2026-10-30 om granskning 23 (P3).
 
 Reserverade ord i dag:
 
@@ -208,7 +208,7 @@ Dessutom stoppas filen om:
 - en regels `hogst_belopp_ore` är högre än företagets `b_hogst_ore`. **En regel kan bara skärpa företagets gränser, aldrig höja dem** (Hugos beslut D20),
 - en regel för `bankrad` har nivå `A`. Bankrader utan underlag blir aldrig nivå A (D20),
 - `flode` har ett annat värde än de byggda, finns i en regel som inte gäller `bankrad`, står i en regel vars `kontering` inte är exakt det flödet bokför på, eller står i en regel för `bankrad` som pekar på en regel för pengar in i `matchning.json` (Hugos beslut 2026-10-30, Öppet 28),
-- en regels `id`, en motpart eller ett kassaregister i `galler`, eller en ägare eller närstående är ett reserverat ord (se "Reserverade namn" under `matchning.json`),
+- en regels `id`, en motpart eller ett kassaregister i `galler`, en ägare eller närstående, ett betalsätt i en Z-regels `kontering` eller företagets namn (`foretag`) är ett reserverat ord (se "Reserverade namn" under `matchning.json`),
 - en regel för `underlag` vars motpart står i `agare_och_narstaende` (efter normaliseringen och utan accenter, Q2b) har en annan nivå än `D`. **En regel för ägare och närstående har alltid nivå D** (K7, Hugos beslut 2026-10-26),
 - samma motpart står två gånger i `agare_och_narstaende`, eller en motpart där är tom, inte text eller saknar bokstäver och siffror. Då stoppas hela körningen, liksom när listan saknas eller är tom.
 

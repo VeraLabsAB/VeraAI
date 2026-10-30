@@ -65,8 +65,18 @@ Kontrollerna för varje underlag, innan något förslag görs:
      typ, och underlagets bankrad och regel om de finns. En dublett (K4) står inte i perioden och har
      därför varken bankrad eller regel. Nivån sätts i nivåsteget (DESIGN avsnitt 5 säger C), så ärendet
      har varken nivå eller märkningen "kräver mänsklig bedömning". Det underlag som flaggan jämför med
-     (underlaget med lägst id) rörs inte: det får sitt förslag som vanligt, som när K4 behåller
-     originalet. Svaret på ärendet går sedan genom samma kontroller som ett nytt förslag (SPEC 4).
+     (originalet, underlaget med lägst id) behandlas efter kontrollen (Hugos beslut 2026-10-30 om
+     granskning 23, Öppet 29):
+       K4a och K4b (samma fakturanummer, olika belopp eller datum): BÅDA underlagen i paret stoppas.
+          Två underlag med samma fakturanummer och olika uppgifter kan inte båda vara rätt, och bara en
+          människa vet vilket. Originalet får ett eget ärende med samma kontroll och typ, som pekar på
+          det flaggade underlaget, och inget förslag, varken för underlaget eller för betalningen.
+       K4c (möjlig dublett): bara det flaggade underlaget stoppas. Originalet får sitt förslag, och
+          förslagets motivering märks med K4c-ärendet (det flaggade underlagets id, MARKNING_K4C), så att
+          den som godkänner ser kopplingen. Ett ärende har inget eget id: det pekas ut av kontrollen och
+          underlagets id.
+       K4 (dublett): dubletten är redan borttagen ur perioden, och originalet får sitt förslag som förut.
+     Svaret på ett ärende går sedan genom samma kontroller som ett nytt förslag (SPEC 4).
   Regeln: regelboken ger regeln för underlagets typ och motpart på underlagets datum. Ingen regel
      betyder en ny motpart: ett ärende, "ny motpart", och Vera gissar inget konto.
   K7, K5 och K8 körs av konteringsforslag.kontrollera_underlag, samma kod som skapa_konteringsforslag
@@ -123,6 +133,15 @@ ARENDE_NYCKLAR = ("kontroll", "typ", "text", "niva", "kraver_mansklig_bedomning"
                   "flaggor")
 # Flaggan i ett ärende från K8 när underlaget är daterat en dag då företaget har stängt (DESIGN avsnitt 6).
 STANGD_DAG = "köpt en dag då företaget har stängt"
+# Början på märkningen i motiveringen för originalets förslag när K4c har flaggat ett annat underlag som möjlig
+# dublett av det (Hugos beslut 2026-10-30 om granskning 23, Öppet 29).
+MARKNING_K4C = "Märkning K4c"
+# K4-kontrollerna i underlagsperioden (las_underlag.py) som stoppar båda underlagen i paret (Öppet 29). Skiljer
+# både beloppet och datumet är kontrollen "K4a och K4b".
+_K4A = "K4a"
+_K4B = "K4b"
+_K4C = "K4c"
+_STOPPAR_BADA = (_K4A, _K4B, _K4A + " och " + _K4B)
 
 # Ärendenas kontroller och typer. "över gräns" är samma typ som matchningens (matcha_bank.py). K5, K7 och
 # K8 heter som i fynden från konteringsforslag.kontrollera_underlag.
@@ -185,6 +204,7 @@ class _Korning(NamedTuple):
     bankperiod: object
     bokforing: object   # regelbokens 'bokforing'
     oppettider: object  # regelbokens 'oppettider'
+    k4c_markeringar: object  # {originalets id: [id för underlag som K4c har flaggat som möjlig dublett av det]}
 
 
 def _frys(varde):
@@ -245,15 +265,41 @@ def _stangd_dag(datum, oppettider):
     return veckodag in oppettider["stangda_veckodagar"] or datum in oppettider["stangda_datum"]
 
 
-def _k4_arende(k4, underlag, bankrad, regelbok):
-    """Ärendet i resultatet för ett ärende k4 från underlagsperiodens K4 (P2). underlag är None för en dublett."""
+def _underlagets_regel_id(underlag, regelbok):
+    """Regelns id för underlaget på dess datum, eller None (också när underlag är None, en borttagen dublett)."""
     regel = None if underlag is None else regelbok.regel_for_underlag(underlag["typ"], underlag["motpart"],
                                                                       underlag["datum"])
+    return None if regel is None else regel["id"]
+
+
+def _k4_arende(k4, underlag, bankrad, regelbok):
+    """Ärendet i resultatet för ett ärende k4 från underlagsperiodens K4 (P2). underlag är None för en dublett."""
+    bada = " Inget förslag görs för något av de två underlagen." if k4["kontroll"] in _STOPPAR_BADA else ""
     return _arende(k4["kontroll"], k4["text"], "Underlaget är flaggat av kontrollen " + k4["kontroll"]
                    + " i underlagsperioden: " + k4["text"] + ". Inget förslag görs, varken för underlaget eller för"
-                   " dess betalning. En människa avgör om det är samma underlag som " + repr(k4["jamfort_med"])
-                   + " eller ett annat.", k4["id"], [] if bankrad is None else [bankrad["id"]],
-                   None if regel is None else regel["id"])
+                   " dess betalning." + bada + " En människa avgör om det är samma underlag som "
+                   + repr(k4["jamfort_med"]) + " eller ett annat.", k4["id"], [] if bankrad is None else [bankrad["id"]],
+                   _underlagets_regel_id(underlag, regelbok))
+
+
+def _k4_arende_for_originalet(k4, original, bankrad, regelbok):
+    """Ärendet för originalet i ett par som K4a eller K4b har flaggat: båda stoppas (Öppet 29)."""
+    return _arende(k4["kontroll"], k4["text"], "Underlaget " + repr(k4["id"]) + " är flaggat av kontrollen "
+                   + k4["kontroll"] + " i underlagsperioden mot det här underlaget: " + k4["text"] + ". Inget förslag"
+                   " görs för något av de två underlagen, varken för underlaget eller för dess betalning, eftersom"
+                   " båda inte kan vara rätt och bara en människa kan avgöra vilket som stämmer.", original["id"],
+                   [] if bankrad is None else [bankrad["id"]], _underlagets_regel_id(original, regelbok))
+
+
+def _markning_k4c(underlag, korning):
+    """Texten som läggs till motiveringen när K4c har flaggat andra underlag som möjliga dubbletter av underlag."""
+    flaggade = [id_ for original in underlag for id_ in korning.k4c_markeringar.get(original, [])]
+    if not flaggade:
+        return ""
+    return (" " + MARKNING_K4C + ": " + ("underlaget " if len(flaggade) == 1 else "underlagen ")
+            + ", ".join(map(repr, flaggade)) + " är flaggat i underlagsperioden som möjlig dublett av det här"
+            " förslagets underlag och har ett eget ärende (K4c) utan förslag. Den som godkänner bör se förslaget och"
+            " ärendet tillsammans.")
 
 
 def _underlagets_arenden(underlag, regel, korning, bankrader):
@@ -309,7 +355,7 @@ def _skapa(forslag_id, datum, text, rader, regel, korning, motivering, underlag=
                                  "kontoplanens_kontrollsumma": kontoplan.kontrollsumma,
                                  "momsfilens_kontrollsumma": mot["momssatser"],
                                  "matchningsformatets_kontrollsumma": mot["matchningsformat"]}},
-        "motivering": motivering,
+        "motivering": motivering + _markning_k4c(underlag, korning),
     }
     return skapa_konteringsforslag(forslag, regelbok, kontoplan, korning.momssatser, korning.underlagsperiod,
                                    korning.bankperiod)
@@ -459,15 +505,23 @@ def kontera_period(regelbok, kontoplan, momssatser, underlagsperiod, bankperiod,
     bokforing, oppettider = _kontrollera_indata(regelbok, kontoplan, momssatser)
     # matcha_period kontrollerar bankperioden, underlagsperioden, regelboken och bedömningsdatumet.
     matchning = matcha_period(bankperiod, underlagsperiod, regelbok, bedomningsdatum)
-    korning = _Korning(regelbok, kontoplan, momssatser, underlagsperiod, bankperiod, bokforing, oppettider)
     bankrad_for = {post["underlag"]["id"]: post["bankrad"] for post in matchning.matchningar}
     forslag, arenden = [], []
-    # K4 (P2): underlagsperiodens ärenden följer med, och de flaggade underlagen får inget förslag.
+    # K4 (P2): underlagsperiodens ärenden följer med, och de flaggade underlagen får inget förslag. Öppet 29: vid
+    # K4a och K4b stoppas också originalet, med ett eget ärende, och vid K4c märks originalets förslag.
     i_perioden = {underlag["id"]: underlag for underlag in underlagsperiod.underlag}
-    flaggade = set()
+    flaggade, k4c_markeringar = set(), {}
     for k4 in underlagsperiod.arenden:
         flaggade.add(k4["id"])
         arenden.append(_k4_arende(k4, i_perioden.get(k4["id"]), bankrad_for.get(k4["id"]), regelbok))
+        original = k4["jamfort_med"]
+        if k4["kontroll"] in _STOPPAR_BADA:
+            flaggade.add(original)
+            arenden.append(_k4_arende_for_originalet(k4, i_perioden[original], bankrad_for.get(original), regelbok))
+        elif k4["kontroll"] == _K4C:
+            k4c_markeringar.setdefault(original, []).append(k4["id"])
+    korning = _Korning(regelbok, kontoplan, momssatser, underlagsperiod, bankperiod, bokforing, oppettider,
+                       k4c_markeringar)
     for underlag in underlagsperiod.underlag:
         if underlag["id"] in flaggade:
             continue

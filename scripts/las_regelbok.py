@@ -90,10 +90,11 @@ En regel har exakt nycklarna i REGEL_NYCKLAR, och får ha nycklarna i REGEL_VALF
               konteringen (FLODETS_KONTERING)
   anteckning  fri text för människor. Används inte av koden
 
-Ett regel-id, en motpart, ett kassaregister och en ägare eller närstående får inte heta som ett
-reserverat ord (reserverade_namn.RESERVERADE_NAMN, efter normaliseringen, bara vid exakt träff), lika
-lite som en regel i matchningsformatet. Orden är kärnans egna namn på flöden (Hugos beslut 2026-10-29,
-efter uppgift 4, och 2026-10-30, Öppet 27).
+Ett regel-id, en motpart, ett kassaregister, en ägare eller närstående, ett betalsätt i en Z-regels
+kontering och företagets namn (foretag) får inte heta som ett reserverat ord
+(reserverade_namn.RESERVERADE_NAMN, efter normaliseringen, bara vid exakt träff), lika lite som en regel
+i matchningsformatet. Orden är kärnans egna namn på flöden (Hugos beslut 2026-10-29, efter uppgift 4,
+2026-10-30, Öppet 27, och 2026-10-30 om granskning 23, P3, för betalsätten och företagets namn).
 
 Regler för regelboken som helhet:
 
@@ -588,6 +589,8 @@ def _kontrollera_kontering(kontering, kalla, vad, konton, momssatser, villkor, v
         nya_betalsatt = {}
         for namn, konto in betalsatt.items():
             _text_i_json(namn, "betalsättet " + repr(namn) + " i " + vad, var, _REGELBOK)
+            # Betalsätten prövas också mot de reserverade orden (granskning 23, P3, Hugos beslut 2026-10-30).
+            inget_reserverat_namn(namn, "betalsättet " + repr(namn) + " i " + vad, var, RegelbokFel)
             nya_betalsatt[namn] = _kontrollera_konto(konto, "betalsättet " + repr(namn) + " i " + vad, konton,
                                                      villkor, var)
         return {"forsaljning": _konto_per_varugrupp(kontering["forsaljning"], "'forsaljning' i " + vad, konton,
@@ -818,7 +821,9 @@ def _kontrollera_regelbok(data, kontoplan, momssatser, matchningsformat, var):
         raise RegelbokFel(str(fel) + " " + _UTAN_AGARLISTA) from None
     _ingen_matchningsregel_for_agare(matchningslistan, agare, var)
     return {
-        "foretag": _text_i_json(data["foretag"], "'foretag'", var, _REGELBOK),
+        # Företagets namn prövas också mot de reserverade orden (granskning 23, P3, Hugos beslut 2026-10-30).
+        "foretag": inget_reserverat_namn(_text_i_json(data["foretag"], "'foretag'", var, _REGELBOK), "'foretag'", var,
+                                         RegelbokFel),
         "version": _heltal_i_json(data["version"], "'version'", 1, _HOGSTA_TAL, var, _REGELBOK),
         "godkand": _kontrollera_godkand(data["godkand"], var),
         "granser": granser,

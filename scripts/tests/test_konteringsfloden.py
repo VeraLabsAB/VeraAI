@@ -246,7 +246,10 @@ def test_k5_moms_som_inte_stammer_med_satsen(tmp_path):
 def test_k5_moms_inom_toleransen_godtas(tmp_path):
     # Ett öre från satsen är inom momsfilens tolerans (D4: momsen tas exakt som på underlaget). Beloppet
     # att betala ökas med samma öre, så att underlaget går ihop (K13). Då passar det inte längre bankraden.
-    mapp = underlagsmapp(tmp_path, SYNT_U_2025_003=satt_moms(moms_ore=179257, belopp_ore=1673057))
+    # 004 är en dublett av 003 och ändras likadant, så att den förblir en dublett (K4). Annars blir den K4a
+    # (samma fakturanummer, olika belopp), och då stoppas båda (Öppet 29, Hugos beslut 2026-10-30 om granskning 23).
+    andring = satt_moms(moms_ore=179257, belopp_ore=1673057)
+    mapp = underlagsmapp(tmp_path, SYNT_U_2025_003=andring, SYNT_U_2025_004=andring)
     korning = Korning(underlag=mapp)
     assert korning.arenden_for("SYNT-U-2025-003") == []
     fakturan = korning.forslag_for("SYNT-U-2025-003")[0]

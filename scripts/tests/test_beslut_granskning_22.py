@@ -4,7 +4,8 @@
   underlag utan att de har körts. Flödena anropar dem inte för sig: de frågar kontrollera_underlag (samma kod) för
   att göra ärenden, och förslaget kör kontrollerna igen.
 - P2: ett underlag som K4 (dubbletter: K4, K4a, K4b eller K4c) har flaggat får inget förslag alls, och K4-ärendet
-  följer med i resultatet från kontera_period.
+  följer med i resultatet från kontera_period. Vad som händer med det underlag flaggan jämför med avgjordes i
+  Öppet 29 (Hugos beslut 2026-10-30 om granskning 23, test_beslut_granskning_23.py).
 - Öppet 27: reserverade ord stoppar alla namn i konfigurationen, men bara vid exakt träff (efter normaliseringen),
   inte som delsträng.
 - Öppet 28: 'flode' stoppas på en regel för pengar in.
@@ -274,8 +275,14 @@ def test_p2_ett_underlag_som_k4_flaggar_far_inget_forslag_och_arendet_foljer_med
     # Nivån sätts i nivåsteget (DESIGN 5 säger C), och märkningen är inte den för nivå D.
     assert arende["niva"] is None and arende["kraver_mansklig_bedomning"] is False
     assert tuple(arende) == ARENDE_NYCKLAR
-    # Originalet får sitt förslag för fakturan. (Betalningen beror på om matchningen blir tvetydig.)
-    assert [forslag.forslag_id for forslag in korning.forslag_for("SYNT-U-2025-003")][0] == "F-FAKTURA-SYNT-U-2025-003"
+    # Originalet (Hugos beslut 2026-10-30 om granskning 23, Öppet 29): vid K4c får det sitt förslag för fakturan,
+    # märkt med K4c-ärendet. Vid K4a och K4b stoppas båda underlagen i paret, och originalet får ett eget ärende.
+    # (Betalningen beror på om matchningen blir tvetydig.) Testerna i test_beslut_granskning_23.py prövar detaljerna.
+    originalets = [forslag.forslag_id for forslag in korning.forslag_for("SYNT-U-2025-003")]
+    if kontroll == "K4c":
+        assert originalets[0] == "F-FAKTURA-SYNT-U-2025-003"
+    else:
+        assert originalets == [] and [post["kontroll"] for post in korning.arenden_for("SYNT-U-2025-003")] == [kontroll]
 
 
 def test_p2_dubbletten_004_har_sitt_k4_arende_i_resultatet(korning):

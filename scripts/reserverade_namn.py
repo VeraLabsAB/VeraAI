@@ -12,7 +12,9 @@ som en del av ett längre namn. Namnen som prövas:
 - kontoplan.json: kontonamnen,
 - momssatser.json: varugrupperna,
 - matchning.json: reglernas namn,
-- regelbok.json: regel-id, motparter, kassaregister och ägare och närstående.
+- regelbok.json: regel-id, motparter, kassaregister, ägare och närstående, betalsätten i en Z-regels
+  kontering och företagets namn (foretag). De två sista efter Hugos beslut 2026-10-30 om granskning 23
+  (P3).
 
 Namnet jämförs efter normaliseringen för jämförelser (normalisering.normalisera_for_jamforelse):
 stora och små bokstäver, blanksteg och vilken sorts bindestreck det är räknas inte. "Bankavgift",
