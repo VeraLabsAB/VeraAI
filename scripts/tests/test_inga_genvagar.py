@@ -26,15 +26,22 @@ En genväg är en funktion som läser en fil men hoppar över en kontroll:
   höjer företagets gränser). _REGELBOKSNYCKEL skapar en Regelbok med vilket innehåll och vilken
   kontrollsumma som helst, och dess inre (_regelboken, _kontrollsumma) är det som uppslagen läser,
 - konteringsforslag: alla namn i modulen som börjar med understreck är byggstenar. _kontrollera_k2,
-  _kontrollera_ursprung och de andra delkontrollerna gör var sin del av kontrollerna och hoppar över
-  resten. _FORSLAGSNYCKEL skapar ett Konteringsforslag med vilket innehåll som helst, och _FORSLAGEN
-  är innehållet i alla förslag.
+  _kontrollera_ursprung, _kontrollera_underlagen, _k5 och de andra delkontrollerna gör var sin del av
+  kontrollerna och hoppar över resten. _FORSLAGSNYCKEL skapar ett Konteringsforslag med vilket innehåll
+  som helst, och _FORSLAGEN är innehållet i alla förslag.
 
 All annan kod ska läsa filer med las_bankfil, las_kassafil, las_kassaperiod,
 las_underlagsperiod, las_kontoplan, las_momssatser och las_regelbok, som alltid kör alla kontroller, summera med summa_per_momssats, som bara
 tar emot en Kassaperiod, matcha med matcha_period, som bara tar emot en Bankperiod och en Regelbok, och skapa förslag med
-skapa_konteringsforslag, som alltid kör K2 och ursprungskontrollen. Bara inläsningsmodulerna själva (UNDANTAGNA) och testerna får använda
-genvägarna. En ny inläsningsmodul måste läggas till i UNDANTAGNA med flit. las_matchningsformat.py,
+skapa_konteringsforslag, som alltid kör K2, ursprungskontrollen och, för underlag, K5, K7 och K8 (Hugos beslut 2026-10-30, granskning 22,
+P1). Bara inläsningsmodulerna själva (UNDANTAGNA) och testerna får använda genvägarna.
+
+Vad det här testet täcker, och inte (granskning 22, P1): det stoppar kärnkod som använder en byggsten (ett
+namn med understreck) eller en genväg i modulerna ovan, och det kontrollerar att skapa_konteringsforslag
+anropar kontrollen för underlag (test_skapa_konteringsforslag_kor_k5_k7_k8, en läsning av koden). Det
+stoppar inte att annan kärnkod anropar de offentliga funktionerna, till exempel skapa_konteringsforslag
+eller kontrollera_underlag: det är meningen, och skyddet är att skapa_konteringsforslag själv kör alla
+kontroller. Det kan inte bevisa att ingen genväg finns (se sist i den här texten). En ny inläsningsmodul måste läggas till i UNDANTAGNA med flit. las_matchningsformat.py,
 las_kontoplan.py, las_momssatser.py och las_regelbok.py läser JSON-format med de gemensamma skydden och är därför
 inläsningsmoduler. matcha_bank.py och konteringsforslag.py
 läser inga filer och är inte undantagna: förbudet gäller dem som alla andra kärnfiler.
@@ -64,8 +71,9 @@ SKYDDSMODUL = "inlasning_skydd"
 INLASNINGSMODULER = ("las_bank", "las_kassa", "las_underlag", "las_matchningsformat", "las_kontoplan", "las_momssatser",
                      "las_regelbok")
 # Kärnmoduler som inte läser filer men har egna byggstenar: alla deras namn som börjar med understreck.
-# konteringsfloden: _k5, _leverantorsfaktura och de andra byggstenarna gör var sin del av flödena. Ensamma
-# hoppar de över kontrollerna (till exempel K5 och K8 före förslaget), så bara kontera_period får användas.
+# konteringsfloden: _underlagets_arenden, _leverantorsfaktura och de andra byggstenarna gör var sin del av
+# flödena. Ensamma hoppar de över ärendena (till exempel K4 och K5 före förslaget), så bara kontera_period
+# får användas. Själva kontrollerna K5, K7 och K8 ligger i konteringsforslag (_k5 och kontrollera_underlag).
 FORSLAGSMODUL = "konteringsforslag"
 FLODESMODUL = "konteringsfloden"
 MODULER_MED_BYGGSTENAR = INLASNINGSMODULER + (FORSLAGSMODUL, FLODESMODUL)
@@ -257,7 +265,8 @@ def test_i1_de_forbjudna_namnen_hittas():
                  "_kontrollera_perioder", "_KONTOPLAN", "_MOMSSATSER", "_REGELBOKSNYCKEL", "_regelboken",
                  "_kontrollsumma", "_REGELBOK", "_las_jsonfil", "_tolka_json", "_kontrollera_regelbok",
                  "_kontrollera_regelboksregel", "_konfigurationen", "_FORSLAGSNYCKEL", "_FORSLAGEN", "_kontrollera_k2",
-                 "_kontrollera_ursprung", "_kontrollera_formen", "_sla_upp", "_innehallet"]:
+                 "_kontrollera_ursprung", "_kontrollera_formen", "_sla_upp", "_innehallet", "_kontrollera_underlagen",
+                 "_k5"]:
         assert namn in forbjudna, namn
     # Det som annan kod ska använda är inte förbjudet.
     for namn in ["las_bankfil", "las_kassafil", "las_kassaperiod", "Kassaperiod", "ladda_bankformat",
@@ -273,7 +282,8 @@ def test_i1_de_forbjudna_namnen_hittas():
                  "granser", "oppettider", "REGELBOK_NYCKLAR", "KALLOR", "NIVAER", "agare_och_narstaende",
                  "ar_agare_eller_narstaende", "kontots_roller", "skapa_konteringsforslag", "Konteringsforslag",
                  "KonteringsforslagFel", "verifikation", "kopplingar", "motivering", "kontroller", "forslag_id",
-                 "FORSLAG_NYCKLAR", "BERAKNINGAR"]:
+                 "FORSLAG_NYCKLAR", "BERAKNINGAR", "kontrollera_underlag", "Underlagskontroll", "Underlagsfynd",
+                 "reserverat_namn", "inget_reserverat_namn", "RESERVERADE_NAMN"]:
         assert namn not in forbjudna, namn
 
 
@@ -720,8 +730,33 @@ def test_konteringsforslagets_alla_byggstenar_ar_forbjudna():
     assert len(privata) > 20
     assert {namn for namn in privata if namn.startswith("_kontrollera_")} >= {
         "_kontrollera_k2", "_kontrollera_ursprung", "_kontrollera_formen", "_kontrollera_kopplingar",
-        "_kontrollera_momskonto", "_kontrollera_bankkonto", "_kontrollera_indatans_typer"}
+        "_kontrollera_momskonto", "_kontrollera_bankkonto", "_kontrollera_indatans_typer", "_kontrollera_underlagen"}
+    assert "_k5" in privata
     assert privata <= forbjudna_namn()
+
+
+def anropade_namn(funktion):
+    """Namnen på funktionerna som funktionen (en ast.FunctionDef) anropar direkt."""
+    return {nod.func.id for nod in ast.walk(funktion) if isinstance(nod, ast.Call) and isinstance(nod.func, ast.Name)}
+
+
+def test_skapa_konteringsforslag_kor_k5_k7_k8():
+    # P1 (granskning 22, Hugos beslut 2026-10-30): K5, K7 och K8 ligger i skapa_konteringsforslag. Testet läser
+    # koden: skapa_konteringsforslag anropar _kontrollera_underlagen, som anropar kontrollera_underlag, som anropar
+    # _k5 och regelbokens ägaruppslag. Tas ett anrop bort blir testet rött. Att kontrollerna gör rätt visar
+    # test_beslut_granskning_22.py och test_konteringsfloden.py när koden körs.
+    trad = ast.parse((SCRIPTS / "konteringsforslag.py").read_text(encoding="utf-8"))
+    funktioner = {nod.name: nod for nod in trad.body if isinstance(nod, ast.FunctionDef)}
+    assert "_kontrollera_underlagen" in anropade_namn(funktioner["skapa_konteringsforslag"])
+    assert "kontrollera_underlag" in anropade_namn(funktioner["_kontrollera_underlagen"])
+    assert "_k5" in anropade_namn(funktioner["kontrollera_underlag"])
+    assert "ar_agare_eller_narstaende" in {nod.attr for nod in ast.walk(funktioner["kontrollera_underlag"])
+                                           if isinstance(nod, ast.Attribute)}
+    # Flödena skapar förslag bara med skapa_konteringsforslag och frågar kontrollen med kontrollera_underlag.
+    floden = ast.parse((SCRIPTS / "konteringsfloden.py").read_text(encoding="utf-8"))
+    anrop = {nod.func.id for nod in ast.walk(floden) if isinstance(nod, ast.Call) and isinstance(nod.func, ast.Name)}
+    assert {"skapa_konteringsforslag", "kontrollera_underlag"} <= anrop
+    assert "_k5" not in toppnamn(SCRIPTS / "konteringsfloden.py")
 
 
 def test_konteringsforslaget_omfattas_av_skyddet():
@@ -753,9 +788,11 @@ def test_kontrollen_hittar_alias_for_konteringsforslagets_byggstenar(projekt):
     "bok = las_regelbok('r.json', None, None, None)\nregel = bok.regel_for_underlag('kvitto', 'x', '2025-01-01')\n"
     "summa = bok.kontrollsumma\ngranser = (bok.granser, bok.k9, bok.oppettider, bok.regler)\n",
     "from konteringsforslag import skapa_konteringsforslag, Konteringsforslag, KonteringsforslagFel, KALLOR\n"
-    "f = skapa_konteringsforslag({}, None, None, None, None, None)\nv = (f.verifikation, f.kopplingar, f.kontroller)\n"
+    "f = skapa_konteringsforslag({}, None, None, None, None, None, None)\nv = (f.verifikation, f.kopplingar, f.kontroller)\n"
     "ok = type(f) is Konteringsforslag\nroller = None.kontots_roller('1')\n",
-], ids=["kontoplan", "momssatser", "regelbok", "konteringsforslag"])
+    "from konteringsforslag import kontrollera_underlag, Underlagskontroll\n"
+    "k = kontrollera_underlag({}, {}, None, None)\nfynd = (k.konton, k.fynd)\n",
+], ids=["kontoplan", "momssatser", "regelbok", "konteringsforslag", "kontrollera_underlag"])
 def test_i1_kontoplanen_och_momsfilen_las_pa_ratt_satt_slapps_igenom(projekt, kod):
     (projekt / "rapport.py").write_text(kod, encoding="utf-8")
     assert genvagar_i(projekt) == []
@@ -779,7 +816,7 @@ def test_flodena_omfattas_av_skyddet():
 
 def test_flodenas_alla_byggstenar_ar_forbjudna():
     privata = {namn for namn in toppnamn(SCRIPTS / "konteringsfloden.py") if namn.startswith("_")}
-    assert {"_k5", "_underlagets_arenden", "_leverantorsfaktura", "_skapa", "_Korning"} <= privata
+    assert {"_k4_arende", "_underlagets_arenden", "_leverantorsfaktura", "_skapa", "_Korning"} <= privata
     assert privata <= forbjudna_namn()
     for namn in ["kontera_period", "Konteringsresultat", "KonteringsflodeFel", "ARENDE_NYCKLAR", "STANGD_DAG",
                  "bokforing", "METODER", "VERIFIKATIONSDATUM"]:
@@ -787,7 +824,10 @@ def test_flodenas_alla_byggstenar_ar_forbjudna():
 
 
 FLODENAS_GENVAGSKOD = {
-    "k5_utan_flodet": "from konteringsfloden import _k5\n",
+    "k5_utan_forslaget": "from konteringsforslag import _k5\n",
+    "k5_k7_k8_hoppas_over_i_forslaget": "from konteringsforslag import _kontrollera_underlagen\n",
+    "k4_arendet_utan_flodet": "from konteringsfloden import _k4_arende\n",
+    "underlagets_arenden_utan_flodet": "from konteringsfloden import _underlagets_arenden\n",
     "flodet_utan_k5_och_k8": "import konteringsfloden\nf = konteringsfloden._leverantorsfaktura(None, None, {}, None, None)\n",
     "flodet_via_tabellen": "import konteringsfloden as k\nf = k._FLODEN\n",
     "flodet_getattr": "import konteringsfloden\nf = getattr(konteringsfloden, '_leverantors' + 'faktura')\n",

@@ -64,7 +64,8 @@ class Kallor:
         return rad["id"]
 
     def perioder(self):
-        return {"underlagsperiod": self.underlagsperiod, "bankperiod": self.bankperiod,
+        """Perioderna, och momsfilen, som skapa_konteringsforslag behöver för K5 på förslag med underlag (P1)."""
+        return {"momssatser": self.momssatser, "underlagsperiod": self.underlagsperiod, "bankperiod": self.bankperiod,
                 "kassaperiod": self.kassaperiod}
 
 
@@ -73,8 +74,11 @@ def kallor():
     return Kallor()
 
 
+KONTROLLER_MED_UNDERLAG = {"K2": "ok", "ursprung": "ok", "K5": "ok", "K7": "ok", "K8": "ok"}
+
+
 def skapa(kallor, forslag, **perioder):
-    """skapa_konteringsforslag med testbutikens regelbok och kontoplan och alla tre perioderna, om inget annat anges."""
+    """skapa_konteringsforslag med testbutikens regelbok, kontoplan, momsfil och alla tre perioderna, om inget annat anges."""
     allt = {**kallor.perioder(), **perioder}
     return skapa_konteringsforslag(forslag, kallor.regelbok, kallor.kontoplan, **allt)
 
@@ -197,7 +201,8 @@ def test_4a_fakturan(kallor):
                   "momsfilens_kontrollsumma": sha256(TESTBUTIKEN / "momssatser.json"),
                   "matchningsformatets_kontrollsumma": sha256(TESTBUTIKEN / "matchning.json")},
     }
-    assert resultat.kontroller == {"K2": "ok", "ursprung": "ok"}
+    # Ett förslag med underlag har också klarat K5, K7 och K8 (P1, granskning 22).
+    assert resultat.kontroller == KONTROLLER_MED_UNDERLAG
     assert resultat.forslag_id == "F-TEST-0001" and resultat.motivering == "Byggt för hand i ett test."
 
 
@@ -246,9 +251,11 @@ def test_summa_av_flera_bankrader(kallor):
 
 
 def test_period_som_inte_anvands_far_vara_none(kallor):
-    assert skapa(kallor, fakturan(), bankperiod=None, kassaperiod=None).kontroller == {"K2": "ok", "ursprung": "ok"}
-    assert skapa(kallor, z_1001(), underlagsperiod=None, bankperiod=None)
-    assert skapa(kallor, bankavgiften(kallor), underlagsperiod=None, kassaperiod=None)
+    assert skapa(kallor, fakturan(), bankperiod=None, kassaperiod=None).kontroller == KONTROLLER_MED_UNDERLAG
+    # Utan underlag behövs ingen momsfil, och K5, K7 och K8 körs inte (P1).
+    for data in (skapa(kallor, z_1001(), momssatser=None, underlagsperiod=None, bankperiod=None),
+                 skapa(kallor, bankavgiften(kallor), momssatser=None, underlagsperiod=None, kassaperiod=None)):
+        assert data.kontroller == {"K2": "ok", "ursprung": "ok"}
 
 
 def test_en_bankperiod_for_en_manad_godtas(kallor):
@@ -284,7 +291,7 @@ def test_forslaget_kan_inte_andras(kallor):
     resultat.kontroller["K2"] = "ändrat"
     assert resultat.verifikation["rader"][0]["debet_ore"] == 1493800
     assert resultat.kopplingar["regel"]["regelbokens_kontrollsumma"] == kallor.regelbok.kontrollsumma
-    assert resultat.kontroller == {"K2": "ok", "ursprung": "ok"}
+    assert resultat.kontroller == KONTROLLER_MED_UNDERLAG
 
 
 def test_ett_forslag_kan_inte_fyllas_med_nytt_innehall(kallor):
@@ -805,6 +812,7 @@ def test_negativ_post_i_z_rapporten_stoppas(kallor, tmp_path):
     ("regelbok", None, "regelboken ska komma från las_regelbok, inte vara NoneType"),
     ("regelbok", {}, "regelboken ska komma från las_regelbok, inte vara dict"),
     ("kontoplan", "kontoplan.json", "kontoplanen ska komma från las_kontoplan, inte vara str"),
+    ("momssatser", [], "momsfilen ska komma från las_momssatser, inte vara list"),
     ("underlagsperiod", [], "underlagsperioden ska komma från las_underlagsperiod (eller vara None), inte vara list"),
     ("bankperiod", "bank", "bankperioden ska komma från las_bankfil eller sla_ihop_bankperioder"),
     ("kassaperiod", {}, "kassaperioden ska komma från las_kassaperiod (eller vara None), inte vara dict"),
@@ -818,8 +826,11 @@ def test_indata_som_inte_kommer_fran_inlasningen_stoppas(kallor, namn, varde, te
 
 def test_perioderna_kan_inte_byta_plats(kallor):
     with pytest.raises(KonteringsforslagFel, match="underlagsperioden ska komma från las_underlagsperiod"):
-        skapa_konteringsforslag(fakturan(), kallor.regelbok, kallor.kontoplan, kallor.bankperiod,
+        skapa_konteringsforslag(fakturan(), kallor.regelbok, kallor.kontoplan, kallor.momssatser, kallor.bankperiod,
                                 kallor.underlagsperiod, kallor.kassaperiod)
+    with pytest.raises(KonteringsforslagFel, match="momsfilen ska komma från las_momssatser, inte vara Underlagsperiod"):
+        skapa_konteringsforslag(fakturan(), kallor.regelbok, kallor.kontoplan, kallor.underlagsperiod,
+                                kallor.bankperiod, kallor.kassaperiod)
     with pytest.raises(KonteringsforslagFel, match="regelboken ska komma från las_regelbok, inte vara Kontoplan"):
         skapa_konteringsforslag(fakturan(), kallor.kontoplan, kallor.regelbok)
 
@@ -1275,6 +1286,7 @@ def test_m6_egen_variant_av_kontoplanen_stoppas(kallor):
 @pytest.mark.parametrize("namn, text", [
     ("regelbok", "regelboken är tom eller trasig: den har inte skapats av las_regelbok."),
     ("kontoplan", "kontoplanen är tom eller trasig: den har inte skapats av las_kontoplan."),
+    ("momssatser", "momsfilen är tom eller trasig: den har inte skapats av las_momssatser."),
     ("underlagsperiod", "underlagsperioden är tom eller trasig: den har inte skapats av las_underlagsperiod."),
     ("bankperiod", "bankperioden är tom eller trasig: den har inte skapats av las_bankfil eller sla_ihop_bankperioder."),
     ("kassaperiod", "kassaperioden är tom eller trasig: den har inte skapats av las_kassaperiod."),

@@ -80,16 +80,20 @@ En regel har exakt nycklarna i REGEL_NYCKLAR, och får ha nycklarna i REGEL_VALF
                 avdragsbegransad  true eller false. true betyder att posten alltid blir ett ärende
                                   på nivå D (K8)
   niva        den lägsta nivån ett förslag med regeln kan få, en av NIVAER
-  flode       valfritt, och bara för en regel för bankrader: vilket flöde regeln hör till, ett av
-              FLODEN (Hugos beslut 2026-10-29, efter uppgift 4, c). Ett annat värde stoppar filen.
-              Kärnan väljer aldrig ett flöde utan nyckeln, till exempel för att regeln bara har
-              kontot kostnad. Flödet bankavgift bokför bara kostnaden mot banken, så en sådan regel
-              ska ha exakt kontot kostnad i konteringen (FLODETS_KONTERING)
+  flode       valfritt, och bara för en regel för bankrader med pengar ut: vilket flöde regeln hör
+              till, ett av FLODEN (Hugos beslut 2026-10-29, efter uppgift 4, c, bekräftat 2026-10-30,
+              Öppet 28). Ett annat värde stoppar filen, liksom nyckeln i en regel för underlag eller
+              Z-rapporter, eller i en regel för bankrader vars regel i matchning.json gäller pengar in
+              (Hugos beslut 2026-10-30, Öppet 28, granskning 22, P7). Kärnan väljer aldrig ett flöde
+              utan nyckeln, till exempel för att regeln bara har kontot kostnad. Flödet bankavgift
+              bokför bara kostnaden mot banken, så en sådan regel ska ha exakt kontot kostnad i
+              konteringen (FLODETS_KONTERING)
   anteckning  fri text för människor. Används inte av koden
 
-Ett regel-id får inte heta som ett reserverat ord (las_matchningsformat.RESERVERADE_NAMN, efter
-normaliseringen), lika lite som en regel i matchningsformatet. Orden är kärnans egna namn på flöden
-(Hugos beslut 2026-10-29, efter uppgift 4).
+Ett regel-id, en motpart, ett kassaregister och en ägare eller närstående får inte heta som ett
+reserverat ord (reserverade_namn.RESERVERADE_NAMN, efter normaliseringen, bara vid exakt träff), lika
+lite som en regel i matchningsformatet. Orden är kärnans egna namn på flöden (Hugos beslut 2026-10-29,
+efter uppgift 4, och 2026-10-30, Öppet 27).
 
 Regler för regelboken som helhet:
 
@@ -155,7 +159,6 @@ from inlasning_skydd import (
 from las_kontoplan import Kontoplan
 from las_matchningsformat import (
     MONSTER_NYCKLAR, Matchningsformat, MatchningsformatFel, kontrollera_matchningsformat, matchningsregel_for_bankrad,
-    reserverat_namn,
 )
 from las_momssatser import Momssatser, MomssatsFel
 from las_underlag import HELTAL_HOGST_SIFFROR, TYPER
@@ -163,6 +166,7 @@ from normalisering import (
     andra_skriftsystem, blandat_ord, normalisera_for_jamforelse, normalisera_utan_accenter, sokform_for_namn,
     star_som_hela_ord_utan_accenter, tecken_med_namn,
 )
+from reserverade_namn import inget_reserverat_namn
 
 REGELBOK_NYCKLAR = ("foretag", "version", "godkand", "granser", "k9", "oppettider", "bokforing", "agare_och_narstaende",
                     "regler")
@@ -439,6 +443,7 @@ def _kontrollera_agare_och_narstaende(agare, var):
     for nummer, motpart in enumerate(agare, start=1):
         ny = _text_i_json(motpart, "motpart nummer " + str(nummer) + " i " + vad, var, _REGELBOK)
         _inga_forvaxlingstecken(ny, "motpart nummer " + str(nummer) + " i " + vad, var)
+        inget_reserverat_namn(ny, "motpart nummer " + str(nummer) + " i " + vad, var, RegelbokFel)
         if not sokform_for_namn(ny):
             raise RegelbokFel(
                 var + ": motpart nummer " + str(nummer) + " i listan över ägare och närstående ('agare_och_narstaende')"
@@ -472,6 +477,7 @@ def _kontrollera_galler(galler, vad, var):
         nytt[nyckel] = _text_i_json(galler[nyckel], repr(nyckel) + " i 'galler' i " + vad, var, _REGELBOK)
         if nyckel in _NAMN_I_GALLER:
             _inga_forvaxlingstecken(nytt[nyckel], repr(nyckel) + " i 'galler' i " + vad, var)
+            inget_reserverat_namn(nytt[nyckel], repr(nyckel) + " i 'galler' i " + vad, var, RegelbokFel)
     if "typ" in nytt and nytt["typ"] not in TYPER:
         raise RegelbokFel(
             var + ": 'typ' i 'galler' i " + vad + " ska vara en av " + ", ".join(map(repr, TYPER)) + ", inte "
@@ -610,6 +616,13 @@ def _kontrollera_bankradsregel(regel, vad, matchningsregler, var):
         )
     matchningsregel = matchningsregler[namn]
     if matchningsregel["riktning"] != "ut":
+        if "flode" in regel:
+            # Öppet 28 (granskning 22, P7, Hugos beslut 2026-10-30): flödena gäller bara pengar ut.
+            raise RegelbokFel(
+                var + ": " + vad + " har 'flode', men pekar på regeln " + repr(namn) + " i matchningsformatet, som"
+                " gäller pengar in. Flödena gäller bara pengar ut, så 'flode' får inte stå i en regel för pengar in."
+                " Ta bort nyckeln."
+            )
         return
     if "hogst_belopp_ore" not in regel["villkor"]:
         raise RegelbokFel(
@@ -665,12 +678,7 @@ def _kontrollera_regelboksregel(regel, nummer, granser, agare, konton, momssatse
     _objekt(regel, vad, var)
     _kontrollera_nycklar(regel, REGEL_NYCKLAR, REGEL_VALFRIA_NYCKLAR, var + ", " + vad + ",", _REGELBOK)
     nytt = {"id": _regel_id(_text_i_json(regel["id"], "'id' i " + vad, var, _REGELBOK), "'id' i " + vad, var)}
-    if reserverat_namn(nytt["id"]) is not None:
-        raise RegelbokFel(
-            var + ": 'id' i " + vad + " är " + repr(nytt["id"]) + ", som är det reserverade ordet "
-            + repr(reserverat_namn(nytt["id"])) + ". Det är kärnans eget namn på ett flöde, och en regel får inte heta"
-            " så. Ge regeln ett annat id."
-        )
+    inget_reserverat_namn(nytt["id"], "'id' i " + vad, var, RegelbokFel)
     vad = vad + " (" + nytt["id"] + ")"
     nytt["galler"] = _kontrollera_galler(regel["galler"], vad, var)
     nytt["villkor"] = _kontrollera_villkor(regel["villkor"], vad, granser, var)

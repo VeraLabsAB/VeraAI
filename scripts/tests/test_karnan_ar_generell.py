@@ -477,13 +477,13 @@ def test_regelbockerna_har_namn_att_soka_efter():
 
 
 def test_inget_foretag_har_ett_reserverat_namn():
-    # Kärnans egna namn på flöden (las_matchningsformat.RESERVERADE_NAMN) står i kärnan. Därför får inget
+    # Kärnans egna namn på flöden (reserverade_namn.RESERVERADE_NAMN) står i kärnan. Därför får inget
     # företags namn vara ett av dem, annars slår testerna här larm på kärnans eget ord (Hugos beslut
-    # 2026-10-29, efter uppgift 4). las_matchningsformat och las_regelbok stoppar en regel med ett sådant namn.
-    # Bankradernas textmönster (till exempel "BANK AVGIFT") är inga namn och prövas med exakta stora och små
-    # bokstäver ovan, så de tas inte med här.
-    from las_matchningsformat import RESERVERADE_NAMN
+    # 2026-10-29, efter uppgift 4). Inläsningsmodulerna stoppar varje namn i konfigurationen som är ett sådant
+    # ord (Hugos beslut 2026-10-30, Öppet 27). Bankradernas textmönster (till exempel "BANK AVGIFT") är inga
+    # namn och prövas med exakta stora och små bokstäver ovan, så de tas inte med här.
     from normalisering import normalisera_for_jamforelse
+    from reserverade_namn import RESERVERADE_NAMN
 
     regelnamn = [regel["namn"] for fil in sorted(FORETAG.glob("*/matchning.json"))
                  for regel in json.loads(fil.read_text(encoding="utf-8"))["kraver_inte_underlag"]]

@@ -56,6 +56,7 @@ from inlasning_skydd import (
     _text_i_json, _tolka_json,
 )
 from las_underlag import HELTAL_HOGST_SIFFROR
+from reserverade_namn import inget_reserverat_namn
 
 MOMSSATSER_NYCKLAR = ("status", "varugrupper", "moms_tolerans_ore_per_rad")
 MOMSSATSER_VALFRIA_NYCKLAR = ("anteckning",)
@@ -150,6 +151,8 @@ def _kontrollera_momssatser(data, var):
                 var + ": varugruppen " + repr(namn) + " har ett ogiltigt namn. Ett varugruppsnamn får bara ha små"
                 " bokstäverna a–z, siffror och understreck, och ska börja med en bokstav."
             )
+        # En varugrupp får inte heta som ett reserverat ord (Hugos beslut 2026-10-30, Öppet 27).
+        inget_reserverat_namn(namn, "varugruppens namn", var, MomssatsFel)
         varugrupper[namn] = _kontrollera_perioder(perioder, namn, var)
     tolerans = _heltal_i_json(data["moms_tolerans_ore_per_rad"], "'moms_tolerans_ore_per_rad'", 0,
                               10 ** HELTAL_HOGST_SIFFROR - 1, var, _MOMSSATSER)

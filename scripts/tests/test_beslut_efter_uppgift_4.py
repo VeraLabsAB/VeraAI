@@ -187,18 +187,19 @@ def test_regel_i_regelboken_med_ett_reserverat_id_stoppas(tmp_path, regel_id):
 
 
 def test_varje_flode_ar_ett_reserverat_namn():
-    # Kärnans namn på ett flöde får aldrig vara ett namn som ett företag kan ge en regel.
-    import las_matchningsformat
+    # Kärnans namn på ett flöde får aldrig vara ett namn som ett företag kan ge en regel. Listan ligger i
+    # reserverade_namn.py sedan Öppet 27 (Hugos beslut 2026-10-30).
     import las_regelbok
+    import reserverade_namn
 
     assert las_regelbok.FLODEN == (FLODET,)
-    assert set(las_regelbok.FLODEN) <= set(las_matchningsformat.RESERVERADE_NAMN)
+    assert set(las_regelbok.FLODEN) <= set(reserverade_namn.RESERVERADE_NAMN)
 
 
 def test_readme_listar_de_reserverade_namnen():
-    import las_matchningsformat
+    import reserverade_namn
 
     readme = (AGENT / "foretag" / "README.md").read_text(encoding="utf-8")
     avsnitt = readme.split("### Reserverade namn", 1)[1].split("\n## ", 1)[0]
-    for namn in las_matchningsformat.RESERVERADE_NAMN:
+    for namn in reserverade_namn.RESERVERADE_NAMN:
         assert "`" + namn + "`" in avsnitt, namn

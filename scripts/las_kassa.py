@@ -24,7 +24,9 @@ heltal i öre, aldrig flyttal.
 Ett Z-nummer får ha högst ZNUMMER_HOGST_SIFFROR siffror (H1). Kassaregistret måste finnas i
 kassaformatets lista "kassaregister". Namnen jämförs efter normalisera_kassaregister, så stora och
 små bokstäver, blanksteg och osynliga tecken räknas inte (H2).
-Till skillnad från bankfilen ska rubrikraden vara filens första rad.
+Till skillnad från bankfilen ska rubrikraden vara filens första rad. Inget namn i kassaformatet
+(kolumnnamn, postnamn, betalsätt eller kassaregister) får vara ett av kärnans reserverade ord
+(reserverade_namn.py, exakt träff efter normaliseringen, Hugos beslut 2026-10-30, Öppet 27).
 
 Varje Z-fil kontrolleras internt varje gång den läses (Z-kontroll a–e):
 
@@ -63,6 +65,7 @@ from inlasning_skydd import (
     _tolka_datum, _tolka_ore,
 )
 from las_bank import kronor
+from reserverade_namn import inget_reserverat_namn
 
 # Uppgifterna som kärnan behöver ur varje rad. Kassaformatet anger vad kolumnen för varje
 # uppgift heter i Z-filen.
@@ -181,7 +184,9 @@ def _kontrollera_kassaformat(data, var):
 
     _kontrollera_nycklar(data["kolumner"], KOLUMN_NYCKLAR, (), var + ", 'kolumner',", KASSAFIL)
     kolumner = {
-        nyckel: _kontrollera_namn(data["kolumner"][nyckel], "kolumnnamnet för " + repr(nyckel), var, KASSAFIL)
+        nyckel: inget_reserverat_namn(
+            _kontrollera_namn(data["kolumner"][nyckel], "kolumnnamnet för " + repr(nyckel), var, KASSAFIL),
+            "kolumnnamnet för " + repr(nyckel), var, KassafilFel)
         for nyckel in KOLUMN_NYCKLAR
     }
     _inga_dubbla_kolumnnamn(kolumner, var, KASSAFIL)
@@ -195,12 +200,15 @@ def _kontrollera_kassaformat(data, var):
             if not isinstance(lista, list) or not lista:
                 raise KassafilFel(var + ": 'betalsatt' under 'poster' ska vara en lista med minst ett postnamn.")
             poster[posttyp] = [
-                _kontrollera_namn(namn, "postnamnet för betalsätt nummer " + str(nummer), var, KASSAFIL)
+                inget_reserverat_namn(
+                    _kontrollera_namn(namn, "postnamnet för betalsätt nummer " + str(nummer), var, KASSAFIL),
+                    "postnamnet för betalsätt nummer " + str(nummer), var, KassafilFel)
                 for nummer, namn in enumerate(lista, start=1)
             ]
         else:
-            poster[posttyp] = _kontrollera_namn(data["poster"][posttyp], "postnamnet för " + repr(posttyp), var,
-                                               KASSAFIL)
+            poster[posttyp] = inget_reserverat_namn(
+                _kontrollera_namn(data["poster"][posttyp], "postnamnet för " + repr(posttyp), var, KASSAFIL),
+                "postnamnet för " + repr(posttyp), var, KassafilFel)
     alla_postnamn = [poster[posttyp] for posttyp in POSTTYPER if posttyp != "betalsatt"] + poster["betalsatt"]
     for namn in alla_postnamn:
         if alla_postnamn.count(namn) > 1:
@@ -219,7 +227,8 @@ def _kontrollera_kassaformat(data, var):
     if not isinstance(lista, list) or not lista:
         raise KassafilFel(var + ": 'kassaregister' ska vara en lista med minst ett kassaregister.")
     kassaregister = [
-        _kontrollera_namn(namn, "kassaregister nummer " + str(nummer), var, KASSAFIL)
+        inget_reserverat_namn(_kontrollera_namn(namn, "kassaregister nummer " + str(nummer), var, KASSAFIL),
+                              "kassaregister nummer " + str(nummer), var, KassafilFel)
         for nummer, namn in enumerate(lista, start=1)
     ]
     sedda = {}  # normaliserat namn -> namnet

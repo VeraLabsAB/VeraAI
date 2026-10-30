@@ -86,13 +86,20 @@ För Syntet Testbutik har regeln `bankens-avgifter` gränsen 25000 öre (250 kr)
 
 ### Reserverade namn
 
-Några ord är **kärnans egna namn**, till exempel på ett flöde, och får därför stå i kärnans kod. Kärnan får aldrig innehålla ett företags egna namn (SPEC 2, testet `test_karnan_ar_generell.py`). Därför får **ingen regel i `matchning.json` (`namn`) eller i `regelbok.json` (`id`) heta som ett reserverat ord** (Hugos beslut 2026-10-29, efter uppgift 4). Då kan ett företags namn aldrig krocka med kärnans ord.
+Några ord är **kärnans egna namn**, till exempel på ett flöde, och får därför stå i kärnans kod. Kärnan får aldrig innehålla ett företags egna namn (SPEC 2, testet `test_karnan_ar_generell.py`). Därför får **inget namn i konfigurationen vara ett reserverat ord** (Hugos beslut 2026-10-29, efter uppgift 4, för regelnamn och regel-id, och Hugos beslut 2026-10-30 om granskning 22, Öppet 27, för alla namn). Då kan ett företags namn aldrig krocka med kärnans ord. Namnen som prövas:
+
+- `bankformat.json`: kolumnnamnen,
+- `kassaformat.json`: kolumnnamnen, postnamnen (även betalsätten) och kassaregistren,
+- `kontoplan.json`: kontonamnen,
+- `momssatser.json`: varugrupperna,
+- `matchning.json`: reglernas `namn`,
+- `regelbok.json`: reglernas `id`, motparter och kassaregister i `galler`, och ägare och närstående.
 
 Reserverade ord i dag:
 
 - `bankavgift`: flödet för bankens avgifter (nyckeln `flode` i regelboken, se nedan).
 
-Namnet jämförs efter samma normalisering som regel-id: stora och små bokstäver och blanksteg räknas inte, så `Bankavgift`, `BANKAVGIFT` och `bank avgift` stoppas också. Ett namn som bara liknar ordet, till exempel `bank-avgift` eller `bankens-avgifter`, godtas. En regel med ett reserverat namn stoppar hela filen (`las_matchningsformat` och `las_regelbok`). Listan står i koden som `RESERVERADE_NAMN` i `scripts/las_matchningsformat.py`, och ett test kontrollerar att den här listan har samma ord.
+Namnet jämförs efter samma normalisering som regel-id, och **bara en exakt träff stoppar**: stora och små bokstäver och blanksteg räknas inte, så `Bankavgift`, `BANKAVGIFT` och `bank avgift` stoppas också. Ett namn som bara innehåller eller liknar ordet godtas, till exempel `Bankavgift AB`, `bankavgifter`, `bank-avgift` eller `bankens-avgifter`. Ett reserverat ord stoppar hela filen med ett tydligt fel när den läses. Listan står i koden som `RESERVERADE_NAMN` i `scripts/reserverade_namn.py`, som alla inläsningsmoduler använder, och ett test kontrollerar att den här listan har samma ord.
 
 Saknas en nyckel, finns en okänd nyckel eller är ett värde fel, stoppas inläsningen med ett tydligt fel (`MatchningsformatFel`).
 
@@ -188,7 +195,7 @@ En regel:
 | `kontering` | Ja | Kontona. För `underlag`: ett konto per varugrupp, till exempel `{"livsmedel": "4010"}`. För `z_rapport`: `forsaljning` (ett konto per varugrupp) och `betalsatt` (ett konto per betalsätt, med postnamnet i kassaformatet). För `bankrad`: en eller flera av `motkonto`, `avgift` och `kostnad` |
 | `villkor` | Ja | `giltig_fran` (krävs), och valfritt `giltig_till` (eller `null`, tills vidare), `hogst_belopp_ore` (regelns egen gräns i öre) och `avdragsbegransad` (`true` eller `false`, K8) |
 | `niva` | Ja | Den lägsta nivån ett förslag med regeln kan få: `A`, `B`, `C` eller `D` |
-| `flode` | Nej | Bara för `bankrad`: vilket flöde regeln hör till (Hugos beslut 2026-10-29, efter uppgift 4, c). I dag finns bara `bankavgift`: bankraden bokförs som en avgift, med kontot `kostnad` i debet och bankkontot i kredit, utan moms och med bankraden som underlag (D13). En sådan regel ska ha exakt `kostnad` i `kontering`. **Kärnan väljer aldrig ett flöde utan nyckeln**: en regel för pengar ut utan `flode` ger inget förslag, utan ett ärende (nivå D, "regeln saknar flöde"). Regler för pengar in (kortinlösen, Swish och kontanter) har ingen `flode` och hör till flöde d (uppgift 5) |
+| `flode` | Nej | Bara för `bankrad` med pengar ut: vilket flöde regeln hör till (Hugos beslut 2026-10-29, efter uppgift 4, c, bekräftat 2026-10-30, Öppet 28). I dag finns bara `bankavgift`: bankraden bokförs som en avgift, med kontot `kostnad` i debet och bankkontot i kredit, utan moms och med bankraden som underlag (D13). En sådan regel ska ha exakt `kostnad` i `kontering`. **Kärnan väljer aldrig ett flöde utan nyckeln**: en regel för pengar ut utan `flode` ger inget förslag, utan ett ärende (nivå D, "regeln saknar flöde"). Regler för pengar in (kortinlösen, Swish och kontanter) får inte ha `flode` (Hugos beslut 2026-10-30, Öppet 28) och hör till flöde d (uppgift 5) |
 | `anteckning` | Nej | Fri text för människor |
 
 Dessutom stoppas filen om:
@@ -200,8 +207,8 @@ Dessutom stoppas filen om:
 - en regel för bankrader med **pengar ut** saknar `hogst_belopp_ore`, eller har en högre gräns än regeln i `matchning.json`,
 - en regels `hogst_belopp_ore` är högre än företagets `b_hogst_ore`. **En regel kan bara skärpa företagets gränser, aldrig höja dem** (Hugos beslut D20),
 - en regel för `bankrad` har nivå `A`. Bankrader utan underlag blir aldrig nivå A (D20),
-- `flode` har ett annat värde än de byggda, finns i en regel som inte gäller `bankrad`, eller står i en regel vars `kontering` inte är exakt det flödet bokför på,
-- en regels `id` är ett reserverat ord (se "Reserverade namn" under `matchning.json`),
+- `flode` har ett annat värde än de byggda, finns i en regel som inte gäller `bankrad`, står i en regel vars `kontering` inte är exakt det flödet bokför på, eller står i en regel för `bankrad` som pekar på en regel för pengar in i `matchning.json` (Hugos beslut 2026-10-30, Öppet 28),
+- en regels `id`, en motpart eller ett kassaregister i `galler`, eller en ägare eller närstående är ett reserverat ord (se "Reserverade namn" under `matchning.json`),
 - en regel för `underlag` vars motpart står i `agare_och_narstaende` (efter normaliseringen och utan accenter, Q2b) har en annan nivå än `D`. **En regel för ägare och närstående har alltid nivå D** (K7, Hugos beslut 2026-10-26),
 - samma motpart står två gånger i `agare_och_narstaende`, eller en motpart där är tom, inte text eller saknar bokstäver och siffror. Då stoppas hela körningen, liksom när listan saknas eller är tom.
 
@@ -231,7 +238,7 @@ Regelboken ligger där agenten kan skriva. Tills spärrsteget flyttar den till e
 
 ## Konteringsförslaget och konfigurationen
 
-Ett **konteringsförslag** är en verifikation som Vera föreslår men som ännu inte är bokförd (DESIGN-regelbok.md avsnitt 3). Det är ingen fil här, utan skapas av kärnan med `skapa_konteringsforslag` i `scripts/konteringsforslag.py`. Funktionen läser ingen fil själv. Den tar emot regelboken (`las_regelbok`), kontoplanen (`las_kontoplan`) och perioderna med underlag, bankrader och Z-rapporter, och kör alltid två kontroller. Allt som inte går ihop stoppar förslaget med ett tydligt fel, och inget förslag skapas.
+Ett **konteringsförslag** är en verifikation som Vera föreslår men som ännu inte är bokförd (DESIGN-regelbok.md avsnitt 3). Det är ingen fil här, utan skapas av kärnan med `skapa_konteringsforslag` i `scripts/konteringsforslag.py`. Funktionen läser ingen fil själv. Den tar emot regelboken (`las_regelbok`), kontoplanen (`las_kontoplan`), momsfilen (`las_momssatser`) och perioderna med underlag, bankrader och Z-rapporter, och kör alltid K2 och ursprungskontrollen, och för ett förslag som bygger på underlag också K5, K7 och K8 (Hugos beslut 2026-10-30 om granskning 22, P1): ett underlag med fel moms, från en ägare eller med en avdragsbegränsad regel kan inte bli ett förslag, oavsett vilken kod som bygger det. Allt som inte går ihop stoppar förslaget med ett tydligt fel, och inget förslag skapas.
 
 - **K2 (debet = kredit):** minst två rader, varje belopp ett heltal i öre (aldrig decimaltal, `True` eller `False`, och aldrig negativt), exakt ett av debet och kredit på varje rad, summan av debet lika med summan av kredit, och varje konto finns i kontoplanen och gäller på verifikationens datum.
 - **Ursprunget:** varje rad säger var beloppet kommer ifrån (ett värde i ett underlag, en bankrad eller en post i en Z-rapport) och hur det räknas (`lika`, `summa` eller `skillnad`). Kärnan räknar själv om beloppet ur källorna, och det ska bli exakt radens belopp. Så kan ingen enskild siffra komma från modellen. Ingen avrundning görs: det är bara addition och subtraktion av heltal.
@@ -246,4 +253,4 @@ Det här i konfigurationen används av förslaget:
 
 Förslaget får också kontrollsumman för varje fil det bygger på: underlagets, bankfilens och Z-filens. Summorna kommer från inläsningen, aldrig från den som skapar förslaget. Förslaget går inte att ändra efteråt och har **inget fält för att vara bokfört eller godkänt**. Det bokförs aldrig i det här steget.
 
-Förslagen för leverantörsfakturor, kvitton och bankens avgifter (flöde a, b och e) görs av `kontera_period` i `scripts/konteringsfloden.py`, med regelbokens konton, `bokforing` och `flode`. Flödena för kassan, kortinlösen, Swish och kontanter (c och d) är inte byggda. Kontona och valen kräver Hugos eller konsultens beslut (DESIGN-regelbok.md avsnitt 4 och 8).
+Förslagen för leverantörsfakturor, kvitton och bankens avgifter (flöde a, b och e) görs av `kontera_period` i `scripts/konteringsfloden.py`, med regelbokens konton, `bokforing` och `flode`. Ett underlag som K5, K7 eller K8 flaggar blir ett ärende i stället för ett förslag, och det gäller också ett underlag som K4 (dubbletter: dublett, samma fakturanummer med annat belopp eller datum, eller möjlig dublett) har flaggat när underlagen lästes: det får inget förslag alls, och K4-ärendet följer med i resultatet (Hugos beslut 2026-10-30 om granskning 22, P2). Flödena för kassan, kortinlösen, Swish och kontanter (c och d) är inte byggda. Kontona och valen kräver Hugos eller konsultens beslut (DESIGN-regelbok.md avsnitt 4 och 8).

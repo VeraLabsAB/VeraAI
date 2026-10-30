@@ -6,18 +6,26 @@ inget fält för att vara bokfört eller godkänt, och inget här skriver till k
 eller till en SIE-fil. Det sker först efter godkännande (SPEC avsnitt 4, steg 9).
 
 skapa_konteringsforslag är den enda offentliga funktionen som skapar ett förslag. Den tar emot
-förslaget som ett objekt (se nedan), regelboken från las_regelbok, kontoplanen från las_kontoplan och
-perioderna från las_underlagsperiod, las_bankfil (eller sla_ihop_bankperioder) och las_kassaperiod,
-och kör alltid alla kontroller. En period som förslaget inte behöver får vara None. Bara om allt
-stämmer returneras ett Konteringsforslag, som inte går att ändra och bara kan skapas där. Annars
-stoppas förslaget med ett KonteringsforslagFel, och inget förslag skapas. Det är ett fel i kärnan,
-inte ett ärende: det betyder att koden som räknade fram förslaget har räknat fel.
+förslaget som ett objekt (se nedan), regelboken från las_regelbok, kontoplanen från las_kontoplan,
+momsfilen från las_momssatser och perioderna från las_underlagsperiod, las_bankfil (eller
+sla_ihop_bankperioder) och las_kassaperiod, och kör alltid alla kontroller. En period som förslaget
+inte behöver får vara None, och momsfilen får vara None bara när förslaget inte bygger på något
+underlag. Bara om allt stämmer returneras ett Konteringsforslag, som inte går att ändra och bara kan
+skapas där. Annars stoppas förslaget med ett KonteringsforslagFel, och inget förslag skapas. Det är
+ett fel i kärnan, inte ett ärende: det betyder att koden som räknade fram förslaget har räknat fel,
+eller har byggt ett förslag där det skulle ha blivit ett ärende.
 
 Ingen siffra i förslaget får komma från modellen. Därför bär varje rad sitt ursprung, och kontrollen
 räknar själv om varje belopp ur källorna. Alla belopp är heltal i öre. Ingen avrundning görs någonstans:
 de tre sätten att räkna (lika, summa och skillnad) är bara addition och subtraktion av heltal, så
-beloppen går alltid jämnt ut. Om momsen stämmer med momssatsen för datumet är kontrollen K5, som
-byggs i nästa steg (DESIGN avsnitt 7, uppgift 4).
+beloppen går alltid jämnt ut.
+
+K5, K7 och K8 för underlag (Hugos beslut 2026-10-30, granskning 22, P1) ligger också här, i
+kontrollera_underlag, så att ingen kod kan få ett förslag för ett underlag utan att de har körts:
+skapa_konteringsforslag kör dem på varje underlag i kopplingarna, efter K2 och ursprungskontrollen.
+Flödena (konteringsfloden.py) anropar kontrollera_underlag före förslaget, för att göra ett ärende i
+stället för ett förslag, och förslaget kontrollerar sedan samma sak igen. Ett förslag som stoppas av
+K5, K7 eller K8 är alltså ett fel i kärnan: koden borde ha gjort ett ärende. Se "K5, K7 och K8" nedan.
 
 Förslaget som objekt har exakt nycklarna i FORSLAG_NYCKLAR:
 
@@ -122,9 +130,32 @@ orelaterade underlag). b stoppar ett underlag där en del saknas, till exempel m
 används där 0 gånger. Samma del får stå en gång i debet och en gång i kredit (till exempel bankraden
 på både bankkontot och kostnaden i 4e).
 
+K5, K7 och K8, efter ursprunget, för varje underlag som förslaget bygger på (kontrollera_underlag):
+
+  K7: ett underlag från en ägare eller närstående (Regelbok.ar_agare_eller_narstaende) blir alltid
+      ett ärende (SPEC K7), aldrig ett förslag. Prövas först: då prövas inte K5 och K8.
+  K5 (DESIGN avsnitt 6), för varje momsrad i underlaget:
+      1. satsen finns: minst en varugrupp i momsfilen har satsen på underlagets datum,
+      2. satsen passar regeln: satsen är satsen för minst en av varugrupperna i regelns kontering på
+         datumet, och alla sådana varugrupper har samma konto. Annars vet kärnan inte vilket konto
+         raden ska till,
+      3. momsen stämmer med satsen: abs(moms_ore × 100 − underlag_ore × sats) är högst momsfilens
+         tolerans × 100. Bara heltal.
+      Annars ett fynd, "fel momssats" (1 och 2) eller "moms stämmer inte med satsen" (3), med satsen
+      i underlaget och satserna som momsfilen och regeln väntar sig.
+  K8 (DESIGN avsnitt 6): regelns villkor säger avdragsbegransad. Då ett fynd, "avdragsbegränsat", som
+      bara säger vilken regel det gäller, aldrig hur stor del som får dras av.
+
+  Regeln är förslagets regel i 'kopplingar', som ursprungskontrollen punkt 8 redan har visat är den
+  regel regelboken ger underlaget. Momsfilen ska vara den som regelboken kontrollerades mot (samma
+  kontrollsumma, prövas i K2 punkt 1). Ett förslag med underlag men utan momsfil stoppas, eftersom K5
+  då inte kan köras.
+
 Kopplingarna i förslaget får kontrollsummorna för regelboken, kontoplanen, momsfilen och
 matchningsformatet, och kontrollsumman för varje fil förslaget bygger på (underlaget, bankfilen och
 Z-filen). Summorna kommer från inläsningen, aldrig från indata: de som står i indata jämförs bara (K2).
+Förslagets 'kontroller' säger vilka kontroller det har klarat: K2 och ursprunget för alla förslag, och
+K5, K7 och K8 för förslag som bygger på underlag.
 """
 
 import datetime as dt
@@ -137,6 +168,7 @@ from typing import NamedTuple
 from las_bank import Bankperiod, kronor
 from las_kassa import Kassaperiod
 from las_kontoplan import Kontoplan, KontoplanFel
+from las_momssatser import Momssatser, MomssatsFel
 from las_regelbok import Regelbok
 from las_underlag import HELTAL_HOGST_SIFFROR, Underlagsperiod
 from normalisering import normalisera_for_jamforelse
@@ -170,10 +202,18 @@ BANKRADENS_FALT = ("belopp_ore",)
 # Det största beloppet på en rad, som för talen i underlagen.
 _HOGSTA_BELOPP = 10 ** HELTAL_HOGST_SIFFROR - 1
 
-# Kontrollernas namn i felen.
+# Kontrollernas namn i felen och i fynden.
 _INDATA = "indata"
 _K2 = "K2"
 _URSPRUNG = "ursprung"
+_K5 = "K5"
+_K7 = "K7"
+_K8 = "K8"
+# Typerna i fynden från kontrollera_underlag. Flödena använder dem som ärendets typ.
+_FEL_SATS = "fel momssats"
+_FEL_MOMS = "moms stämmer inte med satsen"
+_KRAVER_BEDOMNING = "kräver mänsklig bedömning"
+_AVDRAGSBEGRANSAT = "avdragsbegränsat"
 
 # Rollerna i kontoplanen som kontrollerna känner igen (las_kontoplan.ROLLER), och kassans post för moms
 # (las_kassa.POSTTYPER).
@@ -339,13 +379,16 @@ def _kontrollera_formen(forslag):
     return forslag
 
 
-def _kontrollera_indatans_typer(regelbok, kontoplan, underlagsperiod, bankperiod, kassaperiod):
-    """Regelboken, kontoplanen och perioderna ska komma från de enda tillåtna inläsningsfunktionerna."""
+def _kontrollera_indatans_typer(regelbok, kontoplan, momssatser, underlagsperiod, bankperiod, kassaperiod):
+    """Regelboken, kontoplanen, momsfilen och perioderna ska komma från de enda tillåtna inläsningsfunktionerna."""
     # type() i stället för isinstance(), så att en underklass med egna regler inte släpps igenom.
     if type(regelbok) is not Regelbok:
         raise _fel(_INDATA, "regelboken ska komma från las_regelbok, inte vara " + type(regelbok).__name__ + ".")
     if type(kontoplan) is not Kontoplan:
         raise _fel(_INDATA, "kontoplanen ska komma från las_kontoplan, inte vara " + type(kontoplan).__name__ + ".")
+    if momssatser is not None and type(momssatser) is not Momssatser:
+        raise _fel(_INDATA, "momsfilen ska komma från las_momssatser, inte vara " + type(momssatser).__name__
+                   + " (den får vara None bara när förslaget inte bygger på något underlag).")
     for period, klass, vad, funktion in (
             (underlagsperiod, Underlagsperiod, "underlagsperioden", "las_underlagsperiod"),
             (bankperiod, Bankperiod, "bankperioden", "las_bankfil eller sla_ihop_bankperioder"),
@@ -359,6 +402,7 @@ def _kontrollera_indatans_typer(regelbok, kontoplan, underlagsperiod, bankperiod
     for hamta, vad, funktion in (
             (lambda: regelbok.kontrollsumma, "regelboken", "las_regelbok"),
             (lambda: kontoplan.kontrollsumma, "kontoplanen", "las_kontoplan"),
+            (lambda: momssatser is None or momssatser.kontrollsumma, "momsfilen", "las_momssatser"),
             (lambda: underlagsperiod is None or underlagsperiod.underlag, "underlagsperioden", "las_underlagsperiod"),
             (lambda: bankperiod is None or bankperiod.rader, "bankperioden", "las_bankfil eller sla_ihop_bankperioder"),
             (lambda: kassaperiod is None or kassaperiod.rapporter, "kassaperioden", "las_kassaperiod")):
@@ -383,16 +427,22 @@ def _kort(summa):
     return repr(summa[:_VISADE_TECKEN] + ("…" if len(summa) > _VISADE_TECKEN else ""))
 
 
-def _kontrollera_kontrollsummor(regel, regelbok, kontoplan):
+def _kontrollera_kontrollsummor(regel, regelbok, kontoplan, momssatser):
     """K2 punkt 1: förslaget är byggt mot just de filer som det kontrolleras mot (granskning 7, M4).
 
-    regel är 'regel' i förslagets kopplingar. Summorna jämförs bara med de inlästa objekten.
+    regel är 'regel' i förslagets kopplingar. Summorna jämförs bara med de inlästa objekten. Momsfilen
+    (None om förslaget inte fick någon) ska vara den som regelboken kontrollerades mot, så att K5 prövar
+    samma satser som regelboken kontrollerades mot (P1, granskning 22).
     """
     mot = regelbok.kontrollerad_mot
     if kontoplan.kontrollsumma != mot["kontoplan"]:
         raise _fel(_K2, "kontoplanen är inte den som regelboken kontrollerades mot. Kontoplanens kontrollsumma är "
                    + _kort(kontoplan.kontrollsumma) + ", men regelboken kontrollerades mot en kontoplan med "
                    + _kort(mot["kontoplan"]) + ". Regelboken och förslaget ska kontrolleras mot samma kontoplan.")
+    if momssatser is not None and momssatser.kontrollsumma != mot["momssatser"]:
+        raise _fel(_K2, "momsfilen är inte den som regelboken kontrollerades mot. Momsfilens kontrollsumma är "
+                   + _kort(momssatser.kontrollsumma) + ", men regelboken kontrollerades mot en momsfil med "
+                   + _kort(mot["momssatser"]) + ". Regelboken och förslaget ska kontrolleras mot samma momsfil.")
     for nyckel, vad, faktisk in (
             ("regelbokens_kontrollsumma", "regelboken", regelbok.kontrollsumma),
             ("kontoplanens_kontrollsumma", "kontoplanen", kontoplan.kontrollsumma),
@@ -861,6 +911,127 @@ def _kontrollera_ursprung(forslag, regelbok, kontoplan, kallorna):
     return kopplingar
 
 
+# --- K5, K7 och K8 för underlag (P1, granskning 22, Hugos beslut 2026-10-30) ---
+
+class Underlagsfynd(NamedTuple):
+    """Ett fynd från kontrollera_underlag: en kontroll som säger att underlaget ska bli ett ärende."""
+
+    kontroll: str  # "K5", "K7" eller "K8"
+    typ: str       # vad fyndet gäller, till exempel "fel momssats"
+    text: str      # förklaringen för människan, med "Inget förslag görs"
+
+
+class Underlagskontroll(NamedTuple):
+    """Svaret från kontrollera_underlag."""
+
+    konton: object  # {momssats: konto} för underlagets momsrader när alla tre kontrollerna godtar det, annars None
+    fynd: tuple     # Underlagsfynd, tomt när underlaget godtas
+
+
+def _satser_pa_datumet(momssatser, datum):
+    """{varugrupp: sats} för varugrupperna i momsfilen som har en sats på datumet."""
+    satser = {}
+    for grupp in momssatser.varugrupper:
+        try:
+            satser[grupp] = momssatser.sats(grupp, datum)
+        except MomssatsFel:
+            pass
+    return satser
+
+
+def _visa_grupper(grupper, satser):
+    """Varugrupperna med sina satser i ett fynd, till exempel "'grupp' (6 %)"."""
+    return ", ".join(repr(grupp) + " (" + str(satser[grupp]) + " %)" for grupp in grupper)
+
+
+def _k5(underlag, regel, momssatser):
+    """K5 för underlagets momsrader. Returnerar ({sats: konto}, []) eller (None, [(typ, text), ...])."""
+    datum = underlag["datum"]
+    satser = _satser_pa_datumet(momssatser, datum)
+    tolerans = momssatser.tolerans_ore_per_rad
+    konton, fel = {}, []
+    for momsrad in underlag["moms"]:
+        sats = momsrad["momssats"]
+        rad = "Momsraden med satsen " + str(sats) + " %"
+        regelns = {grupp: konto for grupp, konto in regel["kontering"].items() if satser.get(grupp) == sats}
+        if sats not in satser.values():
+            fel.append((_FEL_SATS, rad + ": ingen varugrupp i momsfilen har satsen på " + datum + ". Satserna där på"
+                        " datumet är " + _visa_grupper(satser, satser) + "."))
+        elif not regelns:
+            fel.append((_FEL_SATS, rad + ": regeln " + regel["id"] + " har varugrupperna " + _visa_grupper(
+                regel["kontering"], satser) + " på " + datum + ", och ingen av dem har satsen i underlaget."))
+        elif len(set(regelns.values())) > 1:
+            fel.append((_FEL_SATS, rad + ": satsen passar flera varugrupper i regeln " + regel["id"] + " med olika"
+                        " konton (" + _visa_grupper(regelns, satser) + "). Kärnan vet inte vilket konto raden ska"
+                        " till."))
+        elif abs(momsrad[_MOMSFALT] * 100 - momsrad[_UNDERLAGSFALT] * sats) > tolerans * 100:
+            fel.append((_FEL_MOMS, rad + ": momsen är " + str(momsrad[_MOMSFALT]) + " öre på " + str(
+                momsrad[_UNDERLAGSFALT]) + " öre utan moms, men satsen ger " + str(
+                momsrad[_UNDERLAGSFALT] * sats // 100) + " öre, och momsfilen godtar högst " + str(tolerans)
+                        + " öre i skillnad per rad."))
+        else:
+            konton[sats] = sorted(set(regelns.values()))[0]
+    return (None, fel) if fel else (konton, [])
+
+
+def kontrollera_underlag(underlag, regel, regelbok, momssatser):
+    """K5, K7 och K8 för ett underlag med regeln regel. Returnerar en Underlagskontroll, annars KonteringsforslagFel.
+
+    underlag är ett underlag från las_underlagsperiod, regel regeln som regelboken ger det
+    (Regelbok.regel_for_underlag, inte None), regelbok från las_regelbok och momssatser från
+    las_momssatser. Samma funktion används av skapa_konteringsforslag, som stoppar förslaget vid ett
+    fynd, och av flödena, som gör ett ärende av varje fynd i stället för ett förslag. K7 prövas först
+    och ensam. Annars prövas K5 och K8, och båda kan ge fynd. Utan fynd är konton kontot per momssats
+    som underlagets kostnad ska bokföras på enligt regeln.
+    """
+    if type(regelbok) is not Regelbok:
+        raise _fel(_INDATA, "regelboken ska komma från las_regelbok, inte vara " + type(regelbok).__name__ + ".")
+    if type(momssatser) is not Momssatser:
+        raise _fel(_INDATA, "momsfilen ska komma från las_momssatser, inte vara " + type(momssatser).__name__
+                   + ". Utan momsfilen kan K5 inte köras.")
+    if type(regel) not in (dict, MappingProxyType) or not {"id", "kontering", "villkor"} <= set(regel):
+        raise _fel(_INDATA, "regeln ska vara en regel ur regelboken (Regelbok.regel_for_underlag), inte "
+                   + _sort(regel) + ".")
+    if regelbok.ar_agare_eller_narstaende(underlag["motpart"]):
+        return Underlagskontroll(None, (Underlagsfynd(
+            _K7, _KRAVER_BEDOMNING, "Underlaget är från en ägare eller närstående (K7). Det blir alltid ett ärende,"
+            " och en människa avgör hur det ska bokföras."),))
+    konton, fel = _k5(underlag, regel, momssatser)
+    fynd = []
+    if fel:
+        typ = _FEL_SATS if any(typ == _FEL_SATS for typ, _ in fel) else _FEL_MOMS
+        fynd.append(Underlagsfynd(_K5, typ, " ".join(text for _, text in fel) + " Inget förslag görs. En människa"
+                                  " avgör vilken moms som gäller."))
+    if regel["villkor"].get("avdragsbegransad") is True:
+        fynd.append(Underlagsfynd(
+            _K8, _AVDRAGSBEGRANSAT, "Regeln " + regel["id"] + " är avdragsbegränsad (K8). Inget förslag görs, och Vera"
+            " föreslår inte hur stor del av kostnaden eller momsen som får dras av. En människa avgör det, med stöd"
+            " av en redovisningskonsult."))
+    return Underlagskontroll(None if fynd else konton, tuple(fynd))
+
+
+def _kontrollera_underlagen(kopplingar, regelbok, momssatser, kallorna):
+    """K5, K7 och K8 på varje underlag i de kontrollerade kopplingarna. Returnerar kontrollerna som klarats.
+
+    Körs efter ursprungskontrollen, som har visat att varje underlag finns och har förslagets regel.
+    """
+    underlagen = [post["id"] for post in kopplingar["underlag"]]
+    if not underlagen:
+        return {}
+    if momssatser is None:
+        raise _fel(_INDATA, "förslaget bygger på ett underlag, men fick ingen momsfil. K5 kan inte köras utan"
+                   " momsfilen från las_momssatser, så förslaget skapas inte.")
+    regelns_id = kopplingar["regel"]["id"]
+    regel = [en for en in regelbok.regler if en["id"] == regelns_id][0]
+    for id_ in underlagen:
+        kontroll = kontrollera_underlag(kallorna.underlag[id_], regel, regelbok, momssatser)
+        if kontroll.fynd:
+            fynd = kontroll.fynd[0]
+            raise _fel(fynd.kontroll, "underlaget " + repr(id_) + ", " + fynd.typ + ": " + fynd.text + " Det ska vara"
+                       " ett ärende, inte ett förslag.")
+    return {_K5: "ok", _K7: "ok", _K8: "ok"}
+
+
 # --- Förslaget ---
 
 def _frys(varde):
@@ -954,23 +1125,29 @@ class Konteringsforslag:
                 + kronor(sum(rad["debet_ore"] for rad in verifikation["rader"])) + ")")
 
 
-def skapa_konteringsforslag(forslag, regelbok, kontoplan, underlagsperiod=None, bankperiod=None, kassaperiod=None):
-    """Kontrollerar förslaget med K2 och ursprungskontrollen. Returnerar ett Konteringsforslag, annars fel.
+def skapa_konteringsforslag(forslag, regelbok, kontoplan, momssatser=None, underlagsperiod=None, bankperiod=None,
+                            kassaperiod=None):
+    """Kontrollerar förslaget med K2, ursprungskontrollen och K5, K7 och K8. Returnerar ett Konteringsforslag, annars fel.
 
     forslag är förslaget som objekt (se överst i filen). regelbok ska komma från las_regelbok,
-    kontoplan från las_kontoplan, underlagsperiod från las_underlagsperiod, bankperiod från las_bankfil
-    eller sla_ihop_bankperioder och kassaperiod från las_kassaperiod. En period som förslaget inte
-    använder får vara None. Allt som inte går ihop stoppar förslaget med ett KonteringsforslagFel.
+    kontoplan från las_kontoplan, momssatser från las_momssatser, underlagsperiod från
+    las_underlagsperiod, bankperiod från las_bankfil eller sla_ihop_bankperioder och kassaperiod från
+    las_kassaperiod. En period som förslaget inte använder får vara None, och momsfilen får vara None
+    bara när förslaget inte bygger på något underlag (K5, K7 och K8 gäller underlag). Allt som inte går
+    ihop stoppar förslaget med ett KonteringsforslagFel.
     """
-    _kontrollera_indatans_typer(regelbok, kontoplan, underlagsperiod, bankperiod, kassaperiod)
+    _kontrollera_indatans_typer(regelbok, kontoplan, momssatser, underlagsperiod, bankperiod, kassaperiod)
     nytt = _kontrollera_formen(forslag)
-    _kontrollera_kontrollsummor(nytt["kopplingar"]["regel"], regelbok, kontoplan)
+    _kontrollera_kontrollsummor(nytt["kopplingar"]["regel"], regelbok, kontoplan, momssatser)
     _kontrollera_k2(nytt["verifikation"], kontoplan)
-    kopplingar = _kontrollera_ursprung(nytt, regelbok, kontoplan, _kallorna(underlagsperiod, bankperiod, kassaperiod))
+    kallorna = _kallorna(underlagsperiod, bankperiod, kassaperiod)
+    kopplingar = _kontrollera_ursprung(nytt, regelbok, kontoplan, kallorna)
+    kontroller = {_K2: "ok", _URSPRUNG: "ok"}
+    kontroller.update(_kontrollera_underlagen(kopplingar, regelbok, momssatser, kallorna))
     return Konteringsforslag(_FORSLAGSNYCKEL, {
         "forslag_id": nytt["forslag_id"],
         "verifikation": nytt["verifikation"],
         "kopplingar": kopplingar,
         "motivering": nytt["motivering"],
-        "kontroller": {_K2: "ok", _URSPRUNG: "ok"},
+        "kontroller": kontroller,
     })

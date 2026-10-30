@@ -7668,3 +7668,56 @@ välja, och vakten stoppar och släpper igenom som förut. Byggplanens steg 12 �
 **Kommandon:** `ls; ls`, `git status` (först och sist), pytest-kommandot i SPEC 7.1 för hela `scripts/tests` (två
 gånger), `date`, `grep -n`, `git add` och `git commit -F` med meddelandet i en fil i scratchpad. Verktyg: Read, Edit,
 Write (bara för meddelandet i scratchpad), AskUserQuestion och appens verktyg för plan och slutruta.
+
+## Hugos beslut 2026-10-30 om granskning 22
+
+Hugos beslut 2026-10-30, skrivna i chatten i sessionen som rättade P1 och P2. De svarar på "Beslut som behövs"
+1–7 i granskning 22 (av d127c3e). Ordagrant:
+
+    DINA BESLUT (fattade av ägaren, ska inte ifrågasättas):
+    1. P1: Kontrollerna K5, K7 och K8 flyttas IN i skapa_konteringsforslag,
+       så att ingen kod kan få ett förslag utan att kontrollerna körts.
+       Flödena ska inte längre anropa dem separat. Det befintliga
+       genvägstestet behålls men kompletteras.
+    2. P1: SPEC 7 ska beskriva den nya ordningen: att K5, K7 och K8 ligger i
+       skapa_konteringsforslag och vad genvägstestet faktiskt täcker.
+       Skriv ärligt, lova inte mer än testet visar.
+    3. P2: Ett underlag som flaggas av K4 (dubblett) får inget förslag alls,
+       samma linje som K5 och K8. K4-ärendet ska följa med i resultatet
+       från kontera_period, det får inte försvinna.
+    4. Öppet 27: Reserverade ord stoppar alla namn i konfigurationen, men
+       bara vid exakt träff (inte delsträng). Stäng Öppet 27.
+    5. Öppet 28: De tre valen bekräftas (nivå D på "regeln saknar flöde",
+       "flode" bara i regler för bankrader, "bankavgift" kräver exakt kontot
+       "kostnad"). Dessutom: "flode" stoppas på regler för pengar in.
+       Stäng Öppet 28.
+    6. P3: Lägg en rad i PROGRESS.md om att Q2-avtrycket räknas med det
+       gamla namnet.
+    7. Rätta raden "Opushat" under "Läge nu" i BYGGPLAN.md: GitHub står på
+       7d8cae9, i fas med lokalt.
+
+Uppdraget sa också att sessionen bara skulle rätta P1 och P2 och skriva in besluten, inget annat, och att testerna
+skulle skrivas först med "rött före" för P1 och P2. Avsnittet "ARBETSSÄTT" i chatten klipptes efter orden "ett test
+som anropar skapa_konteringsforslag direkt med ett", så resten av det är inte känt. Sessionen tolkade det som ett
+test som anropar `skapa_konteringsforslag` direkt med ett underlag som K5 eller K8 ska stoppa, och gjorde så (granskarens
+eget prov i P1).
+
+**Byggt 2026-10-30** (PROGRESS.md, "Läge 2026-10-30, rättelserna av P1 och P2 efter granskning 22"), inte granskat:
+
+- **1 och 2 (P1):** K5, K7 och K8 ligger i `scripts/konteringsforslag.py` som `kontrollera_underlag`, och
+  `skapa_konteringsforslag` kör dem på varje underlag i förslaget efter K2 och ursprungskontrollen. Funktionen tar
+  emot momsfilen, och ett förslag med underlag utan momsfil stoppas. Flödena frågar samma funktion för att göra
+  ärenden. Granskarens prov (SYNT-U-2025-019 direkt till `skapa_konteringsforslag`) stoppas nu med K5. Genvägstestet
+  är kvar och kompletterat med en läsning av koden som kräver att `skapa_konteringsforslag` anropar kontrollen. SPEC
+  7 beskriver ordningen och säger vad testet täcker och inte.
+- **3 (P2):** ett underlag som K4, K4a, K4b eller K4c har flaggat får inget förslag och inga andra ärenden, och varje
+  K4-ärende följer med i resultatet från `kontera_period`, utan nivå (nivåsteget, DESIGN 5 säger C). Det underlag
+  flaggan jämför med får sitt förslag. Det valet står under Öppet 29 för bekräftelse.
+- **4 (Öppet 27):** ny modul `scripts/reserverade_namn.py`. Alla inläsningsmoduler stoppar ett namn som är ett
+  reserverat ord vid exakt träff efter normaliseringen. Stängd.
+- **5 (Öppet 28):** `las_regelbok` stoppar `flode` på en regel för bankrader som pekar på en regel för pengar in i
+  `matchning.json`. De tre valen står kvar. Stängd.
+- **6 (P3):** raden står i PROGRESS.md under Klart (ded669d).
+- **7:** raden "Opushat" i BYGGPLAN.md är rättad.
+- **Rött före:** `scripts/tests/test_beslut_granskning_22.py` mot en kopia av 7d8cae9 i scratchpad: 32 röda, 2 gröna
+  (skydd) av 34. Hela sviten efter rättelsen: 4 353 passed, 0 röda.

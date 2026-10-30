@@ -22,7 +22,9 @@ Det här gör modulen:
 - Rader före rubrikraden hoppas över. Rubrikraden är den första raden som innehåller alla
   kolumnerna i bankformatet, i valfri ordning.
 - Avgränsaren upptäcks automatiskt på rubrikraden, bland dem som bankformatet tillåter.
-  Bankformatet får bara använda komma, semikolon, tabb och lodstreck.
+  Bankformatet får bara använda komma, semikolon, tabb och lodstreck. Inget kolumnnamn i
+  bankformatet får vara ett av kärnans reserverade ord (reserverade_namn.py, exakt träff efter
+  normaliseringen, Hugos beslut 2026-10-30, Öppet 27).
 - Ett fält får inte innehålla radbrytning. CSV tillåter det inuti citattecken, men i en
   bankfil betyder det nästan alltid att ett citattecken i fel läge har slagit ihop flera
   transaktioner till en. Då stoppas filen.
@@ -54,6 +56,7 @@ import hashlib
 from types import MappingProxyType
 
 from belopp import formatera_ore
+from reserverade_namn import inget_reserverat_namn
 from inlasning_skydd import (
     _HELTAL, _Filsort, _avkoda, _csv_rader, _filrad_for, _inga_dubbla_kolumnnamn, _inga_otillatna_tecken,
     _kontrollera_anteckning, _kontrollera_avgransare, _kontrollera_namn, _kontrollera_nycklar, _ladda_json, _las_fil,
@@ -114,8 +117,10 @@ def _kontrollera_bankformat(data, var):
 
     _kontrollera_nycklar(data["kolumner"], KOLUMN_NYCKLAR, (), var + ", 'kolumner',", BANKFIL)
     kolumner = {
-        nyckel: _kontrollera_namn(data["kolumner"][nyckel], "kolumnnamnet för " + repr(nyckel), var, BANKFIL,
-                                 "ett kolumnnamn")
+        nyckel: inget_reserverat_namn(
+            _kontrollera_namn(data["kolumner"][nyckel], "kolumnnamnet för " + repr(nyckel), var, BANKFIL,
+                              "ett kolumnnamn"),
+            "kolumnnamnet för " + repr(nyckel), var, BankfilFel)
         for nyckel in KOLUMN_NYCKLAR
     }
     _inga_dubbla_kolumnnamn(kolumner, var, BANKFIL)

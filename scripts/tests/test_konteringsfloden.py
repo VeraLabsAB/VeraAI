@@ -116,7 +116,11 @@ def test_forslagen_ar_konteringsforslag_som_klarat_kontrollerna(korning):
     assert type(korning.resultat) is Konteringsresultat and korning.resultat.forslag
     for forslag in korning.resultat.forslag:
         assert type(forslag) is Konteringsforslag
-        assert forslag.kontroller == {"K2": "ok", "ursprung": "ok"}
+        # Ett förslag med underlag har också klarat K5, K7 och K8 i skapa_konteringsforslag (P1, granskning 22).
+        if forslag.kopplingar["underlag"]:
+            assert forslag.kontroller == {"K2": "ok", "ursprung": "ok", "K5": "ok", "K7": "ok", "K8": "ok"}
+        else:
+            assert forslag.kontroller == {"K2": "ok", "ursprung": "ok"}
 
 
 def test_020_med_tva_momssatser_far_en_kostnadsrad_och_en_momsrad_per_sats(korning):
@@ -394,10 +398,12 @@ def test_k8_sager_vilken_bankrad_det_galler_och_flaggar_inte_en_oppen_dag(tmp_pa
 
 
 def test_004_ar_en_dublett_och_far_inget_forslag(korning):
-    # K4 tar bort dubbletten redan i underlagsperioden, där den är ett ärende (DESIGN 4a).
+    # K4 tar bort dubbletten redan i underlagsperioden, där den är ett ärende (DESIGN 4a). Ärendet följer med i
+    # resultatet från kontera_period (P2, granskning 22, Hugos beslut 2026-10-30).
     assert "SYNT-U-2025-004" not in [underlag["id"] for underlag in korning.underlagsperiod.underlag]
     assert "SYNT-U-2025-004" in str(korning.underlagsperiod.arenden)
-    assert korning.forslag_for("SYNT-U-2025-004") == [] and korning.arenden_for("SYNT-U-2025-004") == []
+    assert korning.forslag_for("SYNT-U-2025-004") == []
+    assert [arende["kontroll"] for arende in korning.arenden_for("SYNT-U-2025-004")] == ["K4"]
     # Originalet SYNT-U-2025-003 bokförs en gång.
     assert len(korning.forslag_for("SYNT-U-2025-003")) == 2
 

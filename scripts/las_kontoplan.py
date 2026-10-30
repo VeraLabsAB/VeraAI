@@ -53,6 +53,7 @@ from inlasning_skydd import (
 )
 from las_momssatser import HOGSTA_SATS
 from las_underlag import HELTAL_HOGST_SIFFROR
+from reserverade_namn import inget_reserverat_namn
 
 KONTOPLAN_NYCKLAR = ("status", "konton", "roller")
 KONTOPLAN_VALFRIA_NYCKLAR = ("anteckning",)
@@ -106,7 +107,9 @@ def _kontrollera_konto(konto, vad, var):
     _kontrollera_nycklar(konto, KONTO_NYCKLAR, KONTO_VALFRIA_NYCKLAR, var + ", " + vad + ",", _KONTOPLAN)
     nytt = {
         "nummer": _kontonummer(konto["nummer"], "'nummer' i " + vad, var),
-        "namn": _text_i_json(konto["namn"], "'namn' i " + vad, var, _KONTOPLAN),
+        # Ett kontonamn får inte vara ett reserverat ord (Hugos beslut 2026-10-30, Öppet 27).
+        "namn": inget_reserverat_namn(_text_i_json(konto["namn"], "'namn' i " + vad, var, _KONTOPLAN),
+                                      "'namn' i " + vad, var, KontoplanFel),
         "fran": None,
         "till": None,
     }
