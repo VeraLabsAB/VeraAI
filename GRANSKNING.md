@@ -8460,3 +8460,259 @@ projektmappen eftersom byggsessionen inte kunde köra `git`, se "Avsteg" ovan). 
   projektmappen: **4 399 passed**, 0 röda. "Rött före" upprepat mot en ren kopia av 7c1f148 tagen med `git archive`:
   **5 röda, 9 gröna av 14**, samma som byggsessionen. Kommandona står i PROGRESS.md, "Kommandon i commit-sessionen".
   Ingen push. CLAUDE.md är inte ändrad.
+
+## Granskning 26 (av c479915 och d1ab489) (2026-10-30)
+
+Kort oberoende granskning av Öppet 32 i en ny session som inte har sett byggsessionen eller commit-sessionen.
+Granskaren ändrade ingen kod och ingen rad i CLAUDE.md, och skrev i den här filen, PROGRESS.md och BYGGPLAN.md
+(statusraderna, CLAUDE.md, Hugos beslut 2026-10-30 om granskning 24, P10). Granskat: `git show c479915` och `git show
+d1ab489` (hela). Lästes också: CLAUDE.md, SPEC.md (7, stycket "Kostnadsraden står på det konto K5 ger", 7.1 och 11,
+stycket "Avgjort (Hugos beslut 2026-10-30 om granskning 25 ...)"), här granskning 25, "Hugos beslut 2026-10-30 om
+granskning 25" och "Hugos beslut 2026-10-30 om byggsessionen för Öppet 32", PROGRESS.md (statusraden, "Läge 2026-10-30,
+Öppet 32 rättad", tabellen Klart, Öppet 31–33 och "Nästa steg i byggordningen") och BYGGPLAN.md ("Läge nu", steg 22, 91
+och 92). Koden lästes i `scripts/konteringsforslag.py` (formen, K2, hela ursprungskontrollen med `_underlagets_varde`,
+`_sla_upp`, `_kontrollera_tackning`, `_kontrollera_momskonto` och `_kontrollera_regeln`, `_k5`, `kontrollera_underlag`,
+`_kontrollera_kostnadsraderna`, `_kontrollera_underlagen` och `skapa_konteringsforslag`), `scripts/konteringsfloden.py`
+(`_underlagets_arenden`, `_kostnad_och_moms`, flöde a och b, `kontera_period`), `scripts/las_regelbok.py` (kontona i
+konteringen), testbutikens regelbok, momsfil och kontoplan, underlagen 003, 009, 010, 019, 020 och 030, och testerna
+`test_beslut_granskning_25.py`, `test_beslut_granskning_23.py` och `test_beslut_granskning_22.py` (hjälpfunktionerna),
+`test_konteringsfloden.py` (`Korning`, `regelbok_med`) och `test_byggplan_progress.py`.
+
+### Viktigt först
+
+- **Inget kan bokföras utan godkännande, och ingen spärr har blivit svagare** (P4). c479915 lägger bara till ett
+  stopp (`_kontrollera_kostnadsraderna`, ett `raise`) i `_kontrollera_underlagen`, en text i SPEC 7 och 11 och en
+  testfil som bara skriver i testets tillfälliga mapp. d1ab489 är dokumentation. Inget skriver filer, och förslaget
+  har fortfarande inget fält för bokfört eller godkänt.
+- **Öppet 32 är byggd som Hugos beslut 1 säger** (P1): granskarens två prov från granskning 25 stoppas, med båda
+  momsfilerna, med ett fel som namnger allt uppdraget kräver (P3). K5, K7, K8 och Öppet 31 stoppar som förut, före den
+  nya kontrollen. "Rött före" stämmer (P5), sviten är grön, och dokumenten säger samma sak (P6).
+- **Men ett hål finns kvar, i samma familj** (P2, M1, nivå medel, Hugo eller Casper beslutar, ny punkt Öppet 34):
+  den nya kontrollen prövar bara rader som har underlagets `underlag_ore` som källa. En kostnadsrad vars belopp i
+  stället räknas som `skillnad` ur underlagets `belopp_ore` (minus momsen) har aldrig `underlag_ore` som källa, och
+  då prövas kontot aldrig. Granskarens prov (b) från granskning 25 (003 med kostnaden på 2440) och prov (a) (020 med
+  kontona bytta) går båda igenom med alla fem kontrollerna "ok" när kostnadsraderna byggs så. Också en bruttobokföring
+  (hela `belopp_ore` på 4010 utan momsrad, eller på 2440 på båda sidorna) godtas. Luckan finns före och efter
+  c479915, rör inte flödena, och förslaget kräver godkännande, så den är inte blockerande. Men beslutets syfte, att
+  kostnaden från ett underlag alltid står på det konto K5 ger, är inte nått för förslag byggda förbi flödena.
+- **Steg 91 kan stå som klart:** byggt som beslutet och SPEC 7 säger. Hålet är en ny punkt (Öppet 34), inte ett fel i
+  det som byggdes, på samma sätt som Öppet 32 var efter Öppet 31.
+
+### Fynd
+
+**P1 – Öppet 32 är byggd som beslutet säger, och granskarens två prov från granskning 25 stoppas (notering, rättat).**
+`scripts/konteringsforslag.py` rad 1035–1058 (`_kontrollera_kostnadsraderna`) och rad 1100: för varje underlag i
+kopplingarna, efter K5, K7, K8 och Öppet 31, går kontrollen igenom verifikationens rader, och för varje källa som är
+underlagets `underlag_ore` för en momssats kräver den att raden står på `konton[sats]` från `kontrollera_underlag`
+(underlagets egen regel på underlagets datum). Annat konto stoppar förslaget med kontrollen `ursprung`, också ett konto
+som står i regeln och ett rollkonto. Raderna som kontrolleras är `nytt["verifikation"]["rader"]`, den rena kopian som
+K2 och ursprungskontrollen redan prövat (rad 1215). **Provet, kört själv:** `test_beslut_granskning_25.py` i kopian av
+7c1f148 (5 röda, 9 gröna, P5) och granskarens egen provfil `test_granskare_prov26.py` (P2): 003 under `R-LEV-TE` med
+kostnaden på 2440 stoppas med testbutikens momsfil och med prov B:s momsfil, och 020 under `R-LEV-KAFFE` med två konton
+(4010 och 5460) och kontona bytta stoppas; med bara 25 % på fel konto pekar felet på rad 3 och satsen 25 %. Tre
+iakttagelser, inga fel: (a) `vantat = konton.get(sats)` kan i praktiken aldrig bli `None`, eftersom ursprungskontrollen
+redan har slagit upp satsen i underlaget (rad 584–589) och `_k5` ger ett konto för varje momsrad eller ett fynd som
+stoppar före; grenen "inget konto" i feltexten är bara ett skydd. (b) Satsen i källan är ett heltal (`_heltal`, rad
+584) och kontot text (K2, rad 507; regelboken, `las_regelbok.py` rad 529), så jämförelsen `rad["konto"] == vantat` kan
+inte luras av text mot tal (H6). (c) En rad med flera källor prövas per källa: två satser med olika konton på samma rad
+stoppas, två underlag med samma konto summerade på rätt konto godtas (H4).
+
+**P2 – Hålprov: ett hål hittat, i samma familj som Öppet 32 (M1, nivå medel, bör rättas före uppgift 5, Hugo eller
+Casper beslutar, Öppet 34).** Granskaren skrev `test_granskare_prov26.py`, bara i scratchpad, oberoende av
+byggsessionens test (men med dess hjälpfunktioner), och körde den mot kopior av d1ab489 (**25 gröna**) och 7c1f148
+(**8 röda, 16 gröna** av de 24 som fanns då). Proven, med utfallet i kopian av d1ab489:
+
+- *H1, kostnadsrad utan momssats i källan:* stoppas av ursprungskontrollen ("saknar 'momssats'", rad 581–583) före den
+  nya kontrollen, utan "Öppet 32" i felet.
+- *H2, momssats som K5 inte ger något konto för:* 019 (12 %, regeln `R-BUTIK-STAD` har bara `ovrigt` 25 %) med
+  kostnaden på 2440 stoppas av K5 ("fel momssats") före den nya kontrollen. Kontrollen kan inte nås med en sats som K5
+  inte ger konto för, eftersom `_k5` då ger ett fynd.
+- *H3, flera underlag i samma förslag:* 003 och 009 (båda `R-LEV-TE`) i ett förslag: båda på 4010 godtas med alla
+  kontrollerna; 009 på 2440 stoppas med 009:s id, rad 3, kontot K5 ger och 009:s datum 2025-01-20 i felet, utan 003 i
+  felet; 003 på 2440 stoppas med rad 1 och 003. **Röda i kopian av 7c1f148** (de två som stoppas).
+- *H4, en rad med flera källor:* 003 och 009 summerade (`summa`) på 4010 godtas; samma rad på 2440 stoppas; 020:s två
+  satser summerade på 4010 med granskarens regelbok (12 % → 4010, 25 % → 5460) stoppas med "25 %" och "K5 ger kontot
+  5460". **Röda i kopian av 7c1f148** (de två som stoppas).
+- *H5, förslag utan rader från underlag:* ett underlag i kopplingarna utan rad stoppas av punkt 4 ("ingen rad använder
+  det"). Flöde e (bankrad utan underlag) berörs inte: byggsessionens eget test, och `_kontrollera_underlagen` återvänder
+  tomt när kopplingarna inte har underlag (rad 1075–1076).
+- *H6, kontonummer som text mot tal:* kontot `4010` som tal på raden stoppas av K2 ("ska vara text"), ett tal i
+  regelbokens kontering stoppas av `las_regelbok` ("ska vara text"), och momssatsen som text `"12"` i källan stoppas av
+  ursprungskontrollen ("ska vara ett heltal"). Inget når den nya kontrollen med fel typ.
+- *H7, momsraden på kostnadskontot:* 003 med momsen på 4010 i stället för 2641 godtas med alla kontrollerna "ok".
+  **Som väntat: Öppet 33 är inte byggd** (beslut a). Punkt 5 säger bara vad en rad på ett momskonto får ha som källa,
+  inte att en momskälla måste stå på ett momskonto (granskning 25, P7).
+- *M1, kostnaden räknad ur `belopp_ore` i stället för `underlag_ore` (LUCKA, gröna i båda kopiorna):*
+  `test_l1_kostnaden_som_skillnad_belopp_minus_moms_pa_2440_godtas_LUCKA`: 003 under `R-LEV-TE` med verifikationen
+  2440 debet 14 938,00 kr, 2641 debet 1 792,56 kr, 2440 kredit 16 730,56 kr, exakt samma verifikation som granskarens
+  prov (b) i granskning 25, men kostnadsraden räknas som `skillnad` av `belopp_ore` och `moms_ore` (12 %) i stället för
+  `lika` av `underlag_ore`. Täckningen går ihop (`belopp_ore` räknas som alla delar, momsen dras ifrån och läggs till
+  igen på momsraden), punkt 8 godtar 2440 (roll), K5, Öppet 31 och Öppet 32 godtar: ingen rad har `underlag_ore` som
+  källa, så den nya kontrollen prövar ingenting. Förslaget skapas med alla fem kontrollerna "ok".
+  `test_l1_prov_a_kontona_bytta_som_skillnad_godtas_LUCKA`: 020 med granskarens regelbok (12 % → 4010, 25 % → 5460),
+  kostnaden för 12 % på 5460 och för 25 % på 4010, båda räknade som `skillnad` ur `belopp_ore` (minus de tre andra
+  delarna). Godtas med alla kontrollerna "ok", och verifikationen har 10 249,00 kr på 5460 och 916,00 kr på 4010,
+  tvärtom mot vad K5 ger. Här ser den nya kontrollen de *subtraherade* `underlag_ore`-källorna (25 % på raden för 12 %
+  och tvärtom), och de råkar stämma med kontot raden står på, så kontrollen godtar. Den prövar alltså inte "vilken
+  kostnad raden är", bara "vilka källor som nämns".
+- *M1, forts., bruttobokföring:* `test_l2_hela_beloppet_med_moms_pa_kostnadskontot_utan_momsrad_godtas_LUCKA`: 003 med
+  hela `belopp_ore` (16 730,56 kr, med moms) på 4010 debet och 2440 kredit, utan momsrad, godtas med alla
+  kontrollerna "ok". `test_l2_hela_beloppet_pa_leverantorsskulderna_bada_sidor_godtas_LUCKA`: hela beloppet på 2440 på
+  båda sidorna, ingen kostnad och ingen moms bokförs alls, godtas också. Ingen rad har `underlag_ore`, så Öppet 32
+  prövar ingenting; K5 godtar underlaget, Öppet 31 godtar regeln, täckningen går ihop.
+- *Kan kontrollen stoppa ett rätt förslag från flöde a, b eller e?* Nej. Flödena bygger varje kostnadsrad med `lika` ur
+  `underlag_ore` på `konton[sats]` från samma `kontrollera_underlag` med samma regel (`regel_for_underlag` på
+  underlagets datum, `konteringsfloden.py` rad 530 och 373–382), betalningen i flöde a har ingen kostnadsrad, och
+  flöde e har inget underlag. Byggsessionens test går igenom hela körningen och prövar varje kostnadsrad mot
+  `kontrollera_underlag`; granskarens H3 och H4 visar att också förslag med flera underlag och summerade rader godtas
+  när kontot är rätt. Betalningen i flöde a bokförs på bankens datum, men Öppet 32 prövar mot underlagets datum, som
+  K5, så ett regelbyte mellan fakturadatum och betaldatum stoppas av punkt 8 och Öppet 31 som förut, inte av något
+  nytt.
+
+*Varför M1 inte är blockerande:* flödena bygger aldrig så, bara kod förbi flödena kan, luckan fanns före c479915 och
+förslaget kräver godkännande av en människa. *Varför den bör rättas före uppgift 5:* samma skäl som Öppet 31 och 32
+(uppgift 5 ger `skapa_konteringsforslag` nya anropare), och den ger exakt den bokföring Hugos beslut 1 ville stoppa
+(kostnaden på 2440, eller kontona bytta inom regeln) med alla kontroller gröna. *Granskarens förslag till regel, för
+Hugo eller Casper att ta ställning till (Öppet 34):* i ett förslag med underlag får en rad med underlagets `belopp_ore`
+som källa bara räknas med `lika` och bara stå på leverantörsskulderna (rollen i kontoplanen), som flöde a bygger
+fakturan och betalningen; `underlag_ore` och `moms_ore` får bara räknas med `lika` eller `summa` (inte `skillnad`), så
+att ingen kostnadsrad kan byggas som en skillnad ur `belopp_ore`. Alternativ: att kräva flödenas form rakt av, en
+kostnadsrad per momsrad med `lika` ur `underlag_ore` på `konton[sats]` och en momsrad med `lika` ur `moms_ore` på
+kontot för ingående moms (det stänger också Öppet 33). Båda är beslut om vad ett förslag med underlag får se ut som,
+och det är inte granskarens sak att välja. Några rader kod och ett test med proven ovan.
+
+**P3 – Ordningen och feltexterna stämmer (notering).** K5 (H2), K7 (`test_p3_k7_fore_oppet_32`, `LEV-TE` i ägarlistan
+med regeln på nivå D), K8 (028 med kostnaden på 2440: "avdragsbegränsat") och Öppet 31 (byggsessionens test med
+granskarens prov från granskning 24, och 003 under `R-LEV-KAFFE`, som punkt 8 stoppar redan före
+`_kontrollera_underlagen`) stoppar alla före den nya kontrollen, utan "Öppet 32" i felet, och med samma texter som
+testerna i `test_beslut_granskning_22.py` och `_23.py` prövar (de är oförändrade och gröna). Felet för Öppet 32
+(rad 1052–1058) namnger raden ("rad 1 (konto 2440)"), underlaget (`'SYNT-U-2025-003'`), satsen ("12 %"), kontot K5 ger
+("K5 ger kontot 4010"), regeln (`'R-LEV-TE'`), datumet ("2025-01-07") och kontot raden står på ("står på kontot 2440"),
+provat i `test_p1_prov_b_003_pa_2440_stoppas`. En iakttagelse, inget fel: kontrollerna körs underlag för underlag (rad
+1080–1100), så i ett förslag med två underlag under samma regel där det första har kostnaden på fel konto och det andra
+är ett K5-ärende stoppar Öppet 32 på det första före K5 på det andra
+(`test_p3_tva_underlag_oppet_32_pa_det_forsta_fore_k5_pa_det_andra_IAKTTAGELSE`, 010 och 019 under `R-BUTIK-STAD`).
+Båda stoppar, så det är ofarligt, och Öppet 31 har samma ordning sedan bbb183a.
+
+**P4 – Inget i commitarna skriver filer, bokför något eller gör en spärr svagare (notering).** Diffen i
+`konteringsforslag.py` är dokumentationstext, en ny hjälpfunktion med ett `raise`, ett nytt argument (`rader`) till
+`_kontrollera_underlagen` och anropet av den: inget tas bort, och returvärdet är oförändrat (`git diff c479915 7c1f148
+--stat`: bara de tre filerna). Testfilen skriver bara i `tmp_path_factory.mktemp` (prov B:s momsfil och regelboken med
+två konton) och läser SPEC.md och `konteringsforslag.py` i projektet, som de tidigare testfilerna. d1ab489 rör bara
+`.md`-filer. Inget företagsspecifikt i `scripts/` utanför `scripts/tests/`: `grep` efter `4010`, `5460`, `2440`,
+`2641`, `syntet` och `SYNT` i kärnans tio moduler ger bara ordet "SYNTETISK" som exempel i två docstrings (före
+c479915). Feltexten för Öppet 32 nämner inga konton, namn eller belopp utom dem som kommer från förslaget och regeln.
+Hela sviten, med `test_inga_genvagar.py` och `test_karnan_ar_generell.py`, är grön.
+
+**P5 – "Rött före" stämmer: 5 röda och 9 gröna av 14, och sviten 4 399 gröna (notering).** `git archive` av 7c1f148
+till scratchpad, byggsessionens testfil kopierad dit och körd: **5 failed, 9 passed**, exakt de fem PROGRESS.md
+namnger (granskarens prov (a) och (b) med båda momsfilerna, "DID NOT RAISE", och dokumentationstestet, SPEC saknade
+"Öppet 32") och samma nio gröna. Hela sviten i projektmappen med kommandot i SPEC 7.1: **4 399 passed**, 0 röda, på 73
+sekunder, samma antal som PROGRESS.md. Kördes i bakgrunden, eftersom den tar över en minut; utskriften lästes med
+fil-verktyget Read (vakten stoppade `tail` på filen, som ligger utanför scratchpad).
+
+**P6 – Dokumenten säger samma sak (notering, med statusraderna som uppdateras här, och ett lågt fynd, L1).** SPEC 7
+(regeln, "prövas sist", rollkonton, flödena berörs inte, momsraden är Öppet 33), SPEC 11 (avgjort, byggt, steg 91),
+här "Hugos beslut 2026-10-30 om granskning 25" (ordagrant 1–2, byggt, rött före, avsteget) och "Hugos beslut 2026-10-30
+om byggsessionen för Öppet 32" (ordagrant a–c, gjort), PROGRESS.md (statusraden, lägesposten med "Steg i byggplanen: 91
+(klart)", tabellen Klart, Öppet 32 stängd och Öppet 33 öppen och inte byggd, "Nästa steg" punkt 3) och BYGGPLAN.md
+("Läge nu", steg 22, 91 ✅ och 92 ⬜) stämmer med varandra och med koden. Stegnumren 91 och 92 är de nästa lediga efter
+90 och stämmer med beslut b, och Öppet 33 är inte byggd (H7 visar att momsraden på kostnadskontot godtas), som beslut a
+säger. Byggplanstestet är grönt (kommando 13). Det som sa "inte granskad oberoende än" (PROGRESS.md statusraden,
+tabellen Klart, Öppet 32 och "Nästa steg" punkt 3; BYGGPLAN.md "Läge nu" och steg 91) uppdateras i den här commiten.
+**L1 (låg, dokumentation i koden):** docstringen i `scripts/konteringsforslag.py` rad 46–47 säger fortfarande "Var
+momsraden ('moms_ore') får stå är inte beslutat", men beslut a säger att den låses till kontot för ingående moms som
+Öppet 33. Rättas lämpligen när Öppet 33 byggs, eftersom ingen kod får ändras i en granskning. SPEC 7 och 11 säger
+rätt.
+
+**P8 – Avsteg och iakttagelser (notering).** Vakten stoppade fyra kommandon som granskaren skrev i strid med SPEC 7.1,
+alla bara läsande: ett `sed`, ett `grep` med `$` i mönstret, ett `grep` med `\` i mönstret och ett `tail` på
+bakgrundskörningens utskriftsfil utanför scratchpad. De ersattes med fil-verktyget Read eller `grep -e`. Hela sviten
+kördes i bakgrunden (73 sekunder). Granskarens provfil hade först tre egna fel (bankkontot kräver en bankrad som källa,
+och en regel för en ägare måste ha nivå D), rättade innan proven räknades. Inget i projektet ändrades utom de tre
+dokumentfilerna, och inget utanför projektet utom scratchpad.
+
+### Svar på uppdragets punkter
+
+1. **Byggd som beslutet säger:** ja. Varje rad med ett underlags `underlag_ore` för en momssats som källa måste stå på
+   kontot från `kontrollera_underlag`, annat konto stoppar (också inom regeln och rollkonton), sist efter K5, K7, K8
+   och Öppet 31, och granskarens två prov från granskning 25 stoppas med båda momsfilerna (P1).
+2. **Hålprov:** H1–H7 utfaller som de ska. Ett hål (M1): kostnadsraden räknad som `skillnad` ur `belopp_ore`, och
+   bruttobokföring utan momsrad, går förbi kontrollen (P2, Öppet 34). Inget rätt förslag från flöde a, b eller e
+   stoppas.
+3. **Ordningen och feltexterna:** stämmer (P3).
+4. **Säkerhet:** inget kan bokföras, ingen spärr svagare, inget företagsspecifikt i kärnan, testerna rör bara
+   scratchpad och tillfälliga mappar (P4).
+5. **Rött före:** 5 röda, 9 gröna, och sviten 4 399 gröna, 0 röda (P5).
+6. **Dokumenten:** säger samma sak; stegnumren stämmer med beslut b och Öppet 33 är inte byggd (P6). Ett lågt fynd i
+   kodens docstring (L1).
+7. **Kommandon:** nedan.
+
+### Steg 91
+
+**Steg 91 är klart och granskat:** Öppet 32 är byggd som Hugos beslut 1 och SPEC 7 säger. M1 är en ny punkt (Öppet
+34), inte en del av steg 91, men bör byggas före uppgift 5 (steg 23), som Öppet 33.
+
+### Testsviten
+
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`:
+**4 399 passed**, 0 misslyckade, på 73 sekunder, samma antal som PROGRESS.md.
+
+### Kommandon i den här granskningen
+
+`<scratch>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/30bbc850-a7ee-4e27-be42-42371d6094fc/scratchpad`.
+Allt kördes från projektmappen, ett kommando i taget, i förgrunden utom kommando 6.
+
+1. `ls`, `git status`, `git log --oneline -3`, `git show c479915 --stat`, `git show d1ab489 --stat`, `git show c479915`,
+   `git show d1ab489` och `git diff c479915 7c1f148 --stat`.
+2. `ls`, `cat`, `wc -l`, `grep -n -c` och `grep` med `-n`, `-e` och `-r` i projektet; stycken av filer och de två
+   stora `git show`-utskrifterna lästes med fil-verktyget Read.
+3. `mkdir -p <scratch>/kopia-7c1f148` och `mkdir -p <scratch>/kopia-d1ab489`.
+4. `git archive -o <scratch>/7c1f148.tar 7c1f148` och samma för `d1ab489`.
+5. `tar -xf <scratch>/7c1f148.tar -C <scratch>/kopia-7c1f148` och samma för `d1ab489`.
+6. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`
+   (hela sviten i projektmappen, i bakgrunden: **4 399 passed**, 0 röda, 73 sekunder).
+7. `cp -R scripts/tests/test_beslut_granskning_25.py <scratch>/kopia-7c1f148/scripts/tests/test_beslut_granskning_25.py`.
+8. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rA
+   <scratch>/kopia-7c1f148/scripts/tests/test_beslut_granskning_25.py` (**5 failed, 9 passed**, rött före, P5).
+9. Provfilen `test_granskare_prov26.py` skrevs med fil-verktyget Write i `<scratch>/kopia-d1ab489/scripts/tests/` och
+   rättades med fil-verktyget Edit.
+10. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rA
+    <scratch>/kopia-d1ab489/scripts/tests/test_granskare_prov26.py` (först **3 failed, 21 passed**, granskarens egna
+    provfel, se P8; efter rättelsen **24 passed**; med ordningsprovet i P3 tillagt, med `-rf`, **25 passed**).
+11. `cp -R <scratch>/kopia-d1ab489/scripts/tests/test_granskare_prov26.py <scratch>/kopia-7c1f148/scripts/tests/test_granskare_prov26.py`
+    (före ordningsprovet, 24 tester).
+12. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rA
+    <scratch>/kopia-7c1f148/scripts/tests/test_granskare_prov26.py` (**8 failed, 16 passed**: de åtta som stoppas av
+    den nya kontrollen, "DID NOT RAISE"; de fyra LUCKA-proven gröna också här, luckan fanns före).
+13. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q -k
+    byggplan_progress scripts/tests` efter att det här avsnittet och statusraderna skrivits.
+14. `git status`, `git add GRANSKNING.md PROGRESS.md BYGGPLAN.md` och `git commit -F <scratch>/commit-granskning-26.txt`
+    (meddelandet skrivet med fil-verktyget), sedan `git status` och `git log --oneline -3`.
+
+Vakten stoppade: `sed` (står inte på listan), `grep` med `$` och `grep` med `\` i mönstret, och `tail` på
+bakgrundskörningens utskriftsfil utanför scratchpad. Se P8.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **Öppet 34 (M1):** ska `skapa_konteringsforslag` stänga vägen där kostnaden räknas ur underlagets `belopp_ore` i
+   stället för `underlag_ore`, före uppgift 5? Granskarens förslag: en rad med ett underlags `belopp_ore` som källa får
+   bara räknas med `lika` och bara stå på leverantörsskulderna, och `underlag_ore` och `moms_ore` får inte räknas med
+   `skillnad`. Alternativet är att kräva flödenas form rakt av (som också stänger Öppet 33). Granskarens bedömning: ja,
+   på samma grund som Öppet 31 och 32, och gärna i samma steg som Öppet 33, eftersom båda rör vad en rad från ett
+   underlag får stå på.
+2. **Steg 91:** får räknas som granskat och klart (granskarens bedömning: ja; M1 är en ny punkt, inte ett fel i det
+   som byggdes).
+3. **L1:** docstringen om momsraden i `konteringsforslag.py` rättas när Öppet 33 byggs (granskarens bedömning: ja,
+   ingen egen session).
+
+STATUS: gult
+STEG I BYGGPLANEN: 91 – Öppet 32 – klart (granskat i den här granskningen)
+KAN JAG GÅ VIDARE: ja. Inget blockerande: inget kan bokföras, ingen spärr är svagare, och Öppet 32 är byggd som
+beslutet säger. Gult för att hålprovet hittade en väg förbi den nya kontrollen (M1, Öppet 34) som ger samma felaktiga
+bokföring som beslutet ville stoppa, för förslag byggda förbi flödena. Den bör rättas före uppgift 5, efter Hugos eller
+Caspers beslut, tillsammans med Öppet 33.
+ÄNDRINGAR I CLAUDE.md: inga
+BESLUT SOM BEHÖVS: 1–3 ovan.
+NÄSTA STEG: Hugo eller Casper svarar på 1–3. Sedan Öppet 33 och Öppet 34 (gärna i ett steg) och steg 92 (Öppet 26)
+före uppgift 5. Steg 15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
