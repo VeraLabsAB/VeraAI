@@ -146,10 +146,14 @@ K5, K7 och K8, efter ursprunget, för varje underlag som förslaget bygger på (
   K8 (DESIGN avsnitt 6): regelns villkor säger avdragsbegransad. Då ett fynd, "avdragsbegränsat", som
       bara säger vilken regel det gäller, aldrig hur stor del som får dras av.
 
-  Regeln är förslagets regel i 'kopplingar', som ursprungskontrollen punkt 8 redan har visat är den
-  regel regelboken ger underlaget. Momsfilen ska vara den som regelboken kontrollerades mot (samma
-  kontrollsumma, prövas i K2 punkt 1). Ett förslag med underlag men utan momsfil stoppas, eftersom K5
-  då inte kan köras.
+  Regeln är varje underlags egen regel: den regelboken ger underlaget på underlagets datum
+  (Regelbok.regel_for_underlag), som i flödena. Inte förslagets regel i 'kopplingar' (granskning 23,
+  P1, Hugos beslut 2026-10-30): förslagets regel kan gälla bankrader eller Z-rapporter och ändå ha ett
+  underlag bland raderna, eftersom ursprungskontrollen punkt 8 bara prövar källorna av det slag regeln
+  gäller. Då skulle K5 prövas mot bankregelns kontering och K8 mot bankregelns villkor. Ett underlag
+  som inte har någon regel på sitt datum stoppar förslaget: det ska vara ärendet "ny motpart".
+  Momsfilen ska vara den som regelboken kontrollerades mot (samma kontrollsumma, prövas i K2 punkt 1).
+  Ett förslag med underlag men utan momsfil stoppas, eftersom K5 då inte kan köras.
 
 Kopplingarna i förslaget får kontrollsummorna för regelboken, kontoplanen, momsfilen och
 matchningsformatet, och kontrollsumman för varje fil förslaget bygger på (underlaget, bankfilen och
@@ -1011,9 +1015,12 @@ def kontrollera_underlag(underlag, regel, regelbok, momssatser):
 
 
 def _kontrollera_underlagen(kopplingar, regelbok, momssatser, kallorna):
-    """K5, K7 och K8 på varje underlag i de kontrollerade kopplingarna. Returnerar kontrollerna som klarats.
+    """K5, K7 och K8 på varje underlag i de kontrollerade kopplingarna, mot underlagets egen regel.
 
-    Körs efter ursprungskontrollen, som har visat att varje underlag finns och har förslagets regel.
+    Returnerar kontrollerna som klarats. Körs efter ursprungskontrollen, som har visat att varje
+    underlag finns. Regeln är den regelboken ger underlaget på underlagets datum, som i flödena, inte
+    förslagets regel: den kan gälla bankrader eller Z-rapporter när ett underlag står bland raderna
+    (granskning 23, P1, Hugos beslut 2026-10-30). Ett underlag utan regel stoppar förslaget.
     """
     underlagen = [post["id"] for post in kopplingar["underlag"]]
     if not underlagen:
@@ -1021,10 +1028,15 @@ def _kontrollera_underlagen(kopplingar, regelbok, momssatser, kallorna):
     if momssatser is None:
         raise _fel(_INDATA, "förslaget bygger på ett underlag, men fick ingen momsfil. K5 kan inte köras utan"
                    " momsfilen från las_momssatser, så förslaget skapas inte.")
-    regelns_id = kopplingar["regel"]["id"]
-    regel = [en for en in regelbok.regler if en["id"] == regelns_id][0]
     for id_ in underlagen:
-        kontroll = kontrollera_underlag(kallorna.underlag[id_], regel, regelbok, momssatser)
+        underlag = kallorna.underlag[id_]
+        regel = regelbok.regel_for_underlag(underlag["typ"], underlag["motpart"], underlag["datum"])
+        if regel is None:
+            raise _fel(_URSPRUNG, "underlaget " + repr(id_) + " (" + underlag["typ"] + " från "
+                       + repr(underlag["motpart"]) + ") har ingen regel i regelboken på sitt datum " + underlag["datum"]
+                       + ", så K5 och K8 kan inte prövas mot underlagets egen regel. Det ska vara ett ärende (ny"
+                       " motpart), inte ett förslag.")
+        kontroll = kontrollera_underlag(underlag, regel, regelbok, momssatser)
         if kontroll.fynd:
             fynd = kontroll.fynd[0]
             raise _fel(fynd.kontroll, "underlaget " + repr(id_) + ", " + fynd.typ + ": " + fynd.text + " Det ska vara"
