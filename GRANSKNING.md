@@ -7722,6 +7722,55 @@ eget prov i P1).
 - **Rött före:** `scripts/tests/test_beslut_granskning_22.py` mot en kopia av 7d8cae9 i scratchpad: 32 röda, 2 gröna
   (skydd) av 34. Hela sviten efter rättelsen: 4 353 passed, 0 röda.
 
+## Hugos beslut 2026-10-30 om granskning 23
+
+Hugos beslut 2026-10-30, skrivna i chatten i sessionen som rättade P1 och P3 efter granskning 23 (nedan). De svarar
+på "Beslut som behövs" 1–5 i granskning 23 (av d5b2fba). Ordagrant:
+
+    DINA BESLUT (fattade av ägaren):
+    1. P1: K5, K7 och K8 i skapa_konteringsforslag ska prövas mot VARJE
+       underlags egen regel, inte mot förslagets regel. Ett underlag som
+       saknar egen regel stoppar förslaget. Granskarens prov B (varugruppen
+       "kostnad" i momsfilen + förslag byggt direkt med R-BANK-AVGIFT för
+       underlagen 028 och 019) ska stoppas av K8 respektive K5.
+    2. P3: Betalsätten i kassareglerna och företagets namn prövas också mot
+       reserverade ord, bara exakt träff. Uppdatera SPEC så texten stämmer.
+    3. Öppet 29: Vid K4a och K4b stoppas BÅDA underlagen i paret. Vid K4c
+       stoppas bara det flaggade, och originalets förslag märks med K4-
+       ärendets id så att den som godkänner ser kopplingen. Stäng Öppet 29.
+    4. P7: Ny regel i CLAUDE.md: körningar mot en kopia av koden och
+       körningar av enskilda testfiler skrivs i PROGRESS.md med exakt
+       kommando. Följ regeln i den här sessionen.
+    5. P9: Steg 22 räknas som klart först efter en kort oberoende granskning
+       av den här rättelsen. Skriv det så i BYGGPLAN.md "Läge nu".
+
+Uppdraget sa också att sessionen bara skulle rätta P1 och P3 och skriva in besluten, inget annat, med tester först
+och "rött före" mot d5b2fba för prov B, tre separata commits (P1; P3 och Öppet 29; dokumentation och CLAUDE.md) och
+ingen push.
+
+**Byggt 2026-10-30** (PROGRESS.md, "Läge 2026-10-30, rättelserna efter granskning 23"), inte granskat:
+
+- **1 (P1), 13126d2:** `_kontrollera_underlagen` i `scripts/konteringsforslag.py` slår upp varje underlags egen regel
+  med `Regelbok.regel_for_underlag` på underlagets datum och kör K5, K7 och K8 mot den. Ett underlag utan egen regel
+  stoppar förslaget. Prov B stoppas av K8 (028) och K5 (019). P2 i granskning 23 (`KeyError`) försvinner i
+  `skapa_konteringsforslag`. SPEC 7 säger det.
+- **2 (P3), 35afa8b:** `las_regelbok` prövar betalsätten i en Z-regels `kontering` och `foretag` med samma funktion
+  som de andra namnen. SPEC 7, `foretag/README.md`, `reserverade_namn.py` och `las_regelbok.py` räknar upp dem.
+- **3 (Öppet 29), 35afa8b:** vid K4a, K4b och "K4a och K4b" stoppas båda underlagen i paret, och originalet får ett
+  eget ärende. Vid K4c stoppas bara det flaggade, och originalets förslag får "Märkning K4c: underlaget '<id>' …" i
+  motiveringen. Ett ärende har inget eget id, så märkningen använder kontrollen och det flaggade underlagets id. Att
+  märkningen är text i motiveringen och inte ett eget fält står under Öppet 30 för bekräftelse.
+- **4 (P7):** regeln står i CLAUDE.md, och kommandona i sessionen står i PROGRESS.md.
+- **5 (P9):** BYGGPLAN.md "Läge nu" säger att steg 22 räknas som klart först efter en kort oberoende granskning av
+  13126d2 och 35afa8b.
+- **Rött före:** `scripts/tests/test_beslut_granskning_23.py` mot en kopia av d5b2fba i scratchpad: 19 röda, 3 gröna
+  (skydd) av 22, och det ändrade P2-testet i `test_beslut_granskning_22.py`: 2 röda, 32 gröna. Kommandona står i
+  PROGRESS.md. Hela sviten efter rättelsen: 4 375 passed (före: 4 353), 0 röda.
+- **Inte byggt, för Hugo eller Casper (Öppet 31):** ett underlag under en bankregel vars kostnad står på bankregelns
+  konto godtas fortfarande när underlagets egen regel godtar momssatsen (K5 prövar satsen, inte kontot). Bara kod
+  förbi flödena kan bygga så. Granskarens alternativ var att stoppa ett förslag med underlag vars regel inte gäller
+  underlag.
+
 ## Granskning 23 (av d5b2fba) (2026-10-30)
 
 Oberoende granskning i en ny session som inte har sett rättelsesessionen. Granskaren ändrade ingen kod och skrev bara

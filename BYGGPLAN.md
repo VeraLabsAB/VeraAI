@@ -25,10 +25,10 @@ Status: ✅ klart · 🔶 pågår · ⬜ inte påbörjat
 ## Läge nu
 
 - **Uppdaterad:** 2026-10-30
-- **Pågående steg:** 22 – Uppgift 4, flöde a, b och e (byggd och granskad; P1 och P2 rättade 2026-10-30 efter Hugos beslut om granskning 22, inte granskade; Öppet 26 kvar)
+- **Pågående steg:** 22 – Uppgift 4, flöde a, b och e (byggd och granskad två gånger; P1 och P3 från granskning 23 rättade och Öppet 29 stängd 2026-10-30 i 13126d2 och 35afa8b efter Hugos beslut om granskning 23, inte granskade; Öppet 26 kvar)
 - **Senast avslutade steg:** 12 – Ny version av inställningsfilen utan `disableAutoMode`, installerad och kontrollerad på Hugos dator (2026-10-29, `GRANSKNING.md`, "Kontroll efter bytet av inställningsfil, 2026-10-29"). Auto får användas på Hugos dator, med villkoren tills steg 15 är klart
-- **Nästa steg:** Hugo avgör om steg 22 räknas som klart utan en ny granskning av rättelserna av P1 och P2, eller om de granskas först (PROGRESS.md, "Läge 2026-10-30"), och bekräftar valet i P2 (Öppet 29). Därefter Öppet 26 (konton för hyra, el och telefon). Steg 15 (sandlådan) ska vara klar före steg 23 (uppgift 5)
-- **Opushat:** ja, bara commiten med rättelserna av P1 och P2 (2026-10-30). `main` på GitHub står på 7d8cae9, som var i fas med lokalt före den (rättat 2026-10-30: raden sa förut att GitHub stod på d127c3e)
+- **Nästa steg:** en kort oberoende granskning av rättelsen efter granskning 23 (13126d2 och 35afa8b) i en ny session. **Steg 22 räknas som klart först efter den granskningen** (Hugos beslut 2026-10-30 om granskning 23, beslut 5). Därefter Öppet 26 (konton för hyra, el och telefon). Steg 15 (sandlådan) ska vara klar före steg 23 (uppgift 5)
+- **Opushat:** ja: d5b2fba (P1 och P2 efter granskning 22), 269d641 (granskning 23), 13126d2 och 35afa8b (rättelserna efter granskning 23) och dokumentationscommiten efter dem (2026-10-30). `main` på GitHub står på 7d8cae9
 
 ---
 
@@ -88,7 +88,7 @@ Status: ✅ klart · 🔶 pågår · ⬜ inte påbörjat
 
 | # | Steg | Status | Klart när | Lånat från | Beror på |
 |---|---|---|---|---|---|
-| 22 | **Uppgift 4:** flöde a, b och e (leverantörsfakturor, kvitton, bankavgifter) med K5 och K8. Byggs på syntetisk data, med vakten installerad och Claude Code i det läge som frågar (inte Auto) tills provet med en fallerande vakt (Öppet 16) är gjort. Förutsättningar: B2 och B3 i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4". **Beslut:** D13 (moms på bankavgifter, bankraden som underlag) och vad "bankens datum" i D14 betyder är beslutade för testföretaget (Hugos beslut i chatten 2026-10-29, `GRANSKNING.md`, "D13 och D14 beslutade") | 🔶 byggd och granskad 2026-10-29 (granskning 22, e4d8cd7, gult). P1 och P2 rättade 2026-10-30 (Hugos beslut om granskning 22, PROGRESS.md "Läge 2026-10-30"), inte granskade. Öppet 26 och 29 kvar | Testerna i DESIGN 7, rad 4, är gröna | – | 12, 20, 21. Beror inte på steg 15 (Hugos beslut 2026-10-29, B1) |
+| 22 | **Uppgift 4:** flöde a, b och e (leverantörsfakturor, kvitton, bankavgifter) med K5 och K8. Byggs på syntetisk data, med vakten installerad och Claude Code i det läge som frågar (inte Auto) tills provet med en fallerande vakt (Öppet 16) är gjort. Förutsättningar: B2 och B3 i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4". **Beslut:** D13 (moms på bankavgifter, bankraden som underlag) och vad "bankens datum" i D14 betyder är beslutade för testföretaget (Hugos beslut i chatten 2026-10-29, `GRANSKNING.md`, "D13 och D14 beslutade") | 🔶 byggd och granskad 2026-10-29 (granskning 22, e4d8cd7, gult). P1 och P2 rättade 2026-10-30 (d5b2fba) och granskade i granskning 23 (269d641, gult). P1 och P3 från granskning 23 rättade och Öppet 29 stängd 2026-10-30 (13126d2, 35afa8b, Hugos beslut om granskning 23, PROGRESS.md "Läge 2026-10-30, rättelserna efter granskning 23"), inte granskade. Klart först efter en kort oberoende granskning av den rättelsen (beslut 5). Öppet 26 kvar | Testerna i DESIGN 7, rad 4, är gröna | – | 12, 20, 21. Beror inte på steg 15 (Hugos beslut 2026-10-29, B1) |
 | 23 | **Uppgift 5:** flöde c och d (Z-rapporter, kortinlösen, Swish, kontantinsättningar) och M9 | ⬜ | Försäljning per sats och månad stämmer på öret med `facit.json` | Jolene (Z-nummerserien, bokför aldrig dagskassa utan kontroll) | 15, 22 |
 | 24 | **Uppgift 6:** nivåerna A–D och K9, nivå D för ägarens bankrader | ⬜ | Varje skäl ger rätt nivå. Högsta nivån vinner | – | 23 |
 | 25 | Oberoende granskning av uppgift 4–6 | ⬜ | Inga allvarliga eller medelfynd kvar | – | 24 |
