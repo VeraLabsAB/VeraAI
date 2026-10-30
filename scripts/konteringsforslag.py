@@ -163,6 +163,16 @@ K5, K7 och K8, efter ursprunget, för varje underlag som förslaget bygger på (
   underlagets egen regel, så de berörs inte. Ett förslag med underlag som har olika regler kräver
   ett nytt beslut.
 
+  Kostnadsraden står på det konto K5 ger (Öppet 32, granskning 25, P7, Hugos beslut 2026-10-30).
+  Prövas sist, för varje underlag: varje rad som har underlagets 'underlag_ore' för en momssats som
+  källa ska stå på det konto kontrollera_underlag räknar fram för satsen ('konton'). Annat konto
+  stoppar förslaget, också ett annat konto i regeln och ett konto med en roll i kontoplanen (till
+  exempel leverantörsskulderna). Annars godtar ursprungskontrollen punkt 8 varje konto som står i
+  regeln eller har en roll, och kostnaden kan hamna på fel konto fast K5 och Öppet 31 godtog
+  förslaget (granskarens prov: en regel med två konton och kontona bytta, och kostnaden på
+  leverantörsskulderna). Flödena bygger kostnadsraderna ur samma 'konton', så de berörs inte. Var
+  momsraden ('moms_ore') får stå är inte beslutat.
+
 Kopplingarna i förslaget får kontrollsummorna för regelboken, kontoplanen, momsfilen och
 matchningsformatet, och kontrollsumman för varje fil förslaget bygger på (underlaget, bankfilen och
 Z-filen). Summorna kommer från inläsningen, aldrig från indata: de som står i indata jämförs bara (K2).
@@ -1022,15 +1032,44 @@ def kontrollera_underlag(underlag, regel, regelbok, momssatser):
     return Underlagskontroll(None if fynd else konton, tuple(fynd))
 
 
-def _kontrollera_underlagen(kopplingar, regelbok, momssatser, kallorna):
+def _kontrollera_kostnadsraderna(id_, underlag, regel, konton, rader):
+    """Öppet 32: varje rad med underlagets 'underlag_ore' som källa står på det konto K5 ger för momssatsen.
+
+    konton är {momssats: konto} från kontrollera_underlag, det konto regeln ger varugruppen med satsen.
+    Ursprungskontrollen punkt 8 godtar varje konto som står i regeln eller har en roll i kontoplanen,
+    så utan den här kontrollen kunde kostnaden stå på fel konto inom regeln eller på ett rollkonto
+    (granskning 25, P7, Hugos beslut 2026-10-30). Källorna är redan uppslagna av ursprungskontrollen,
+    så varje 'momssats' på en sådan rad finns i underlaget.
+    """
+    for nummer, rad in enumerate(rader, start=1):
+        for kalla in rad["ursprung"]["fran"]:
+            if kalla["kalla"] != "underlag" or kalla["id"] != id_ or kalla["falt"] != _UNDERLAGSFALT:
+                continue
+            sats = kalla["momssats"]
+            vantat = konton.get(sats)
+            if rad["konto"] == vantat:
+                continue
+            raise _fel(_URSPRUNG, "rad " + str(nummer) + " (konto " + rad["konto"] + ") är kostnaden från underlaget "
+                       + repr(id_) + " för momssatsen " + str(sats) + " % ('" + _UNDERLAGSFALT + "'), men K5 ger kontot "
+                       + (str(vantat) if vantat is not None else "inget konto") + " för den satsen enligt underlagets"
+                       " regel " + repr(regel["id"]) + " på " + underlag["datum"] + ", och raden står på kontot "
+                       + rad["konto"] + ". Kostnaden från ett underlag bokförs alltid på det konto K5 räknar fram för"
+                       " momssatsen, också när ett annat konto står i regeln eller har en roll i kontoplanen (Öppet 32,"
+                       " granskning 25, P7, Hugos beslut 2026-10-30).")
+
+
+def _kontrollera_underlagen(kopplingar, rader, regelbok, momssatser, kallorna):
     """K5, K7 och K8 på varje underlag i de kontrollerade kopplingarna, mot underlagets egen regel.
 
     Returnerar kontrollerna som klarats. Körs efter ursprungskontrollen, som har visat att varje
     underlag finns. Regeln är den regelboken ger underlaget på underlagets datum, som i flödena, inte
     förslagets regel: den kan gälla bankrader eller Z-rapporter när ett underlag står bland raderna
-    (granskning 23, P1, Hugos beslut 2026-10-30). Ett underlag utan regel stoppar förslaget. Sist
+    (granskning 23, P1, Hugos beslut 2026-10-30). Ett underlag utan regel stoppar förslaget. Sedan
     ska underlagets egen regel vara förslagets regel i kopplingarna, annars stoppas förslaget
     (Öppet 31, granskning 24, P5, Hugos beslut 2026-10-30): kontona prövades mot förslagets regel.
+    Sist ska varje kostnadsrad från underlaget i rader (verifikationens rader) stå på det konto K5
+    ger för momssatsen, annars stoppas förslaget (Öppet 32, granskning 25, P7, Hugos beslut
+    2026-10-30): punkt 8 godtar varje konto i regeln eller med en roll.
     """
     underlagen = [post["id"] for post in kopplingar["underlag"]]
     if not underlagen:
@@ -1058,6 +1097,7 @@ def _kontrollera_underlagen(kopplingar, regelbok, momssatser, kallorna):
                        + ". Ett förslag med underlag byggs bara med underlagets egen regel: annars prövas kontona mot en"
                        " annan regel, och underlagets kostnad kan hamna på fel konto (Öppet 31, Hugos beslut"
                        " 2026-10-30).")
+        _kontrollera_kostnadsraderna(id_, underlag, regel, kontroll.konton, rader)
     return {_K5: "ok", _K7: "ok", _K8: "ok"}
 
 
@@ -1172,7 +1212,8 @@ def skapa_konteringsforslag(forslag, regelbok, kontoplan, momssatser=None, under
     kallorna = _kallorna(underlagsperiod, bankperiod, kassaperiod)
     kopplingar = _kontrollera_ursprung(nytt, regelbok, kontoplan, kallorna)
     kontroller = {_K2: "ok", _URSPRUNG: "ok"}
-    kontroller.update(_kontrollera_underlagen(kopplingar, regelbok, momssatser, kallorna))
+    kontroller.update(_kontrollera_underlagen(kopplingar, nytt["verifikation"]["rader"], regelbok, momssatser,
+                                              kallorna))
     return Konteringsforslag(_FORSLAGSNYCKEL, {
         "forslag_id": nytt["forslag_id"],
         "verifikation": nytt["verifikation"],
