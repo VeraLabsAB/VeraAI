@@ -8392,3 +8392,71 @@ KAN JAG GÅ VIDARE: ja. Inget blockerande, inget kan bokföras och ingen spärr 
 rättelse före uppgift 5, efter Hugos eller Caspers beslut.
 NÄSTA STEG: Hugo eller Casper svarar på 1–2. Sedan Öppet 32 och Öppet 26 som egna steg före uppgift 5. Steg 15
 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
+
+## Hugos beslut 2026-10-30 om granskning 25
+
+Hugos beslut 2026-10-30, skrivna i uppdraget till sessionen som rättade Öppet 32. De svarar på "Beslut som behövs"
+1–2 i granskning 25 (av bbb183a och 277ca90, ovan). Ordagrant:
+
+    1. "Öppet 32 byggs före uppgift 5: kostnadsraden i ett förslag med
+       underlag ska stå på det konto som K5 räknar fram för underlagets
+       momssats. Annat konto stoppar förslaget."
+    2. "Öppet 31 räknas som granskad och klar."
+
+Uppdraget sa också: kontrollen läggs i `_kontrollera_underlagen` efter kontrollen från Öppet 31 och stoppar också
+rollkonton som 2440, med ett fel som nämner förväntat och faktiskt konto; en testfil med minst granskarens två prov
+från P7, ett prov per momsfil, skydd för flöde a, b och e och för ett förslag med rätt konto, och ett prov på att
+SPEC 7 nämner regeln; "rött före" mot en kopia av 7c1f148 med kommandona i PROGRESS.md; regeln i SPEC 7; hela
+sviten med antal före (4 385) och efter; två commits (kod, test och SPEC 7, sedan dokumentationen) och ingen push;
+CLAUDE.md ändras inte.
+
+**Byggt 2026-10-30** (PROGRESS.md, "Läge 2026-10-30, Öppet 32 rättad"), inte granskat:
+
+- **1 (Öppet 32):** `_kontrollera_underlagen` i `scripts/konteringsforslag.py` får verifikationens rader och prövar,
+  efter K5, K7, K8 och kontrollen från Öppet 31 och för varje underlag, att varje rad som har underlagets
+  `underlag_ore` för en momssats som källa står på det konto `kontrollera_underlag` räknar fram för satsen (`konton`,
+  ny delkontroll `_kontrollera_kostnadsraderna`). Annars stoppas förslaget med kontrollen `ursprung`, och felet namnger
+  raden, underlaget, satsen, kontot K5 ger, underlagets regel och datum, och kontot raden står på. Granskarens två prov
+  stoppas: `R-LEV-KAFFE` med två konton och kontona bytta (020, 12 % på 5460 och 25 % på 4010), och 003 under sin egen
+  regel med kostnaden på leverantörsskulderna 2440, båda med testbutikens momsfil och med prov B:s momsfil. Flödena
+  bygger kostnadsraderna ur samma `konton`, så de berörs inte. Var momsraden (`moms_ore`) får stå är inte beslutat
+  (granskarens förslag i P7: kontot för ingående moms) och är inte byggt. SPEC 7 säger vad som gäller. Öppet 32 stängd.
+- **2 (Öppet 31):** PROGRESS.md och BYGGPLAN.md säger att Öppet 31 är granskad och klar. Ingen kod.
+- **Rött före:** `scripts/tests/test_beslut_granskning_25.py` mot en kopia av koden före rättelsen i scratchpad: **5
+  röda och 9 gröna (skydd) av 14**. Röda: granskarens prov (a) och (b) med båda momsfilerna ("DID NOT RAISE": kopian
+  skapade förslaget) och dokumentationstestet (SPEC saknade Öppet 32). Gröna: flödet bokför 020 rätt med två konton i
+  regeln och samma förslag för hand med rätt konton godtas, ett förslag med rätt konto godtas, prov B stoppas av K5
+  och K8 först, granskarens prov från granskning 24 stoppas av Öppet 31 först, flöde a, b och e går igenom, och varje
+  kostnadsrad i hela körningen står på kontot K5 ger. Kommandona står i PROGRESS.md. **Avsteg:** sessionen startades i
+  mappen ovanför projektet, så vakten stoppade `git` och pytest mot `scripts/tests`; kopian togs med `cp -R` av den
+  orörda arbetsmappen (HEAD var 7c1f148 enligt `.git/refs/heads/main`) i stället för `git archive`, och hela sviten
+  kördes mot en kopia av det ändrade projektet: **4 399 passed** (före: 4 385), 0 röda. Commitarna gjordes i en
+  session startad i projektmappen, se nästa avsnitt.
+
+## Hugos beslut 2026-10-30 om byggsessionen för Öppet 32
+
+Hugos beslut 2026-10-30, skrivna i uppdraget till sessionen som committade Öppet 32 (commit-sessionen, startad i
+projektmappen eftersom byggsessionen inte kunde köra `git`, se "Avsteg" ovan). Ordagrant:
+
+    a. "Momsraden (moms_ore) låses till kontot för ingående moms som
+       eget steg, Öppet 33, efter Öppet 32. Inte i den här commiten."
+    b. "Öppet 32 och Öppet 26 får egna stegnummer i BYGGPLAN.md."
+    c. "SPEC 11-stycket får följa med i commit 1."
+
+**Gjort 2026-10-30** i commit-sessionen (PROGRESS.md, "Läge 2026-10-30, Öppet 32 rättad"):
+
+- **a (Öppet 33):** står under Öppet i PROGRESS.md som öppen och inte byggd, eget steg efter Öppet 32, utan
+  stegnummer än. Ingen kod: `_kontrollera_underlagen` prövar bara kostnadsraderna. SPEC 7 och 11 säger att momsraden
+  är Öppet 33 i stället för "inte beslutat".
+- **b (stegnummer):** Öppet 32 är steg 91 (✅ 2026-10-30) och Öppet 26 steg 92 (⬜) i BYGGPLAN.md, de nästa lediga
+  numren efter 90, placerade i fas C efter steg 22 som de hör ihop med. "Läge nu" och lägesposten i PROGRESS.md pekar
+  på steg 91. Byggplanstestet (`scripts/tests/test_byggplan_progress.py`) är grönt.
+- **c (SPEC):** `SPEC.md` (avsnitt 7 och det nya stycket i avsnitt 11) ligger i commit 1, c479915, tillsammans med
+  `scripts/konteringsforslag.py` och `scripts/tests/test_beslut_granskning_25.py`. Commit 2 är GRANSKNING.md,
+  PROGRESS.md och BYGGPLAN.md.
+- **Kontroll före commitarna:** `git status` visade exakt de fem ändrade filerna och den nya testfilen. Koddiffen
+  lägger bara till stoppet i `_kontrollera_underlagen` (hjälpfunktionen `_kontrollera_kostnadsraderna`, verifikationens
+  rader som nytt argument, och dokumentationstext), inget annat i kärnan. Hela sviten med kommandot i SPEC 7.1 i
+  projektmappen: **4 399 passed**, 0 röda. "Rött före" upprepat mot en ren kopia av 7c1f148 tagen med `git archive`:
+  **5 röda, 9 gröna av 14**, samma som byggsessionen. Kommandona står i PROGRESS.md, "Kommandon i commit-sessionen".
+  Ingen push. CLAUDE.md är inte ändrad.

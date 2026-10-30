@@ -1,15 +1,15 @@
 # PROGRESS – Veras bokföringsagent
 
 Uppdaterad 2026-10-30. Specifikation: `SPEC.md`. Byggordning: `DESIGN-regelbok.md` avsnitt 7.
-Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12: vakten installerades på Hugos dator 2026-10-28. Steg 12 är klart igen 2026-10-29: den nya versionen av inställningsfilen, där läget Auto tillåts igen (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Auto tillåts igen"), är installerad och kontrollerad (`GRANSKNING.md`, "Kontroll efter bytet av inställningsfil, 2026-10-29"). Auto får användas på Hugos dator, med villkoren tills steg 15 är klart. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Steg 13 är klart**: provet med en vakt som fallerar (steg 8 i kontrollen) är gjort och grönt 2026-10-29. **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4", och **D13 och D14** under "D13 och D14 beslutade" (baec52b). **Uppgift 4 är byggd** 2026-10-29 (4269f76, f6ed99e och e4cc538): flöde a, b och e med K5 och K8 i `scripts/konteringsfloden.py`, och den nya nyckeln `bokforing` i regelboken (Hugos OK i chatten 2026-10-29). Granskad i granskning 22 (e4d8cd7), gult: P1 och P2 kvar, 7 frågor väntar på Hugo. Pushad (`main` på GitHub står vid d127c3e). **Hugos beslut efter uppgift 4 (a–f)** står i `GRANSKNING.md`, "Beslut efter uppgift 4 (2026-10-29)" (48e7ed3), och är byggda 2026-10-29 i ded669d (c: nyckeln `flode`, reserverade namn och regeln `bankens-avgifter`) och 5753890 (f och e). Pushade 2026-10-29 (`main` på GitHub står på 7d8cae9). **Hugos beslut 2026-10-30 om granskning 22** (`GRANSKNING.md`, "Hugos beslut 2026-10-30 om granskning 22") är byggda 2026-10-30: K5, K7 och K8 ligger i `skapa_konteringsforslag` (P1), ett underlag som K4 flaggar får inget förslag och K4-ärendet följer med (P2), reserverade ord stoppar alla namn i konfigurationen vid exakt träff (Öppet 27, stängd) och `flode` stoppas på regler för pengar in (Öppet 28, stängd). **Granskade i granskning 23** (269d641, gult): P1 hade en lucka (K5 och K8 prövades mot förslagets regel, inte underlagets), P3 två namn som inte prövades. **Hugos beslut 2026-10-30 om granskning 23** (`GRANSKNING.md`, "Hugos beslut 2026-10-30 om granskning 23") är byggda 2026-10-30 i 13126d2 (P1) och 35afa8b (P3 och Öppet 29, stängd), och **granskade i granskning 24** (6dfcdcd, grönt): byggda som besluten säger, inget blockerande. **Steg 22 är klart** 2026-10-30: granskat i granskning 23 och 24 (Hugos beslut 2026-10-30 om granskning 24, beslut 3). **Öppet 31 är rättad** 2026-10-30 i bbb183a (förslagets regel ska vara underlagets egen regel, beslut 1) och **granskad i granskning 25** (grönt: byggd som beslutet säger, inget blockerande; en lucka inom regeln kvar som Öppet 32, väntar på beslut), och **Öppet 30 är stängd** (beslut 2). Nästa steg: se "Nästa steg i byggordningen". Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
+Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12: vakten installerades på Hugos dator 2026-10-28. Steg 12 är klart igen 2026-10-29: den nya versionen av inställningsfilen, där läget Auto tillåts igen (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Auto tillåts igen"), är installerad och kontrollerad (`GRANSKNING.md`, "Kontroll efter bytet av inställningsfil, 2026-10-29"). Auto får användas på Hugos dator, med villkoren tills steg 15 är klart. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Steg 13 är klart**: provet med en vakt som fallerar (steg 8 i kontrollen) är gjort och grönt 2026-10-29. **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4", och **D13 och D14** under "D13 och D14 beslutade" (baec52b). **Uppgift 4 är byggd** 2026-10-29 (4269f76, f6ed99e och e4cc538): flöde a, b och e med K5 och K8 i `scripts/konteringsfloden.py`, och den nya nyckeln `bokforing` i regelboken (Hugos OK i chatten 2026-10-29). Granskad i granskning 22 (e4d8cd7), gult: P1 och P2 kvar, 7 frågor väntar på Hugo. Pushad (`main` på GitHub står vid d127c3e). **Hugos beslut efter uppgift 4 (a–f)** står i `GRANSKNING.md`, "Beslut efter uppgift 4 (2026-10-29)" (48e7ed3), och är byggda 2026-10-29 i ded669d (c: nyckeln `flode`, reserverade namn och regeln `bankens-avgifter`) och 5753890 (f och e). Pushade 2026-10-29 (`main` på GitHub står på 7d8cae9). **Hugos beslut 2026-10-30 om granskning 22** (`GRANSKNING.md`, "Hugos beslut 2026-10-30 om granskning 22") är byggda 2026-10-30: K5, K7 och K8 ligger i `skapa_konteringsforslag` (P1), ett underlag som K4 flaggar får inget förslag och K4-ärendet följer med (P2), reserverade ord stoppar alla namn i konfigurationen vid exakt träff (Öppet 27, stängd) och `flode` stoppas på regler för pengar in (Öppet 28, stängd). **Granskade i granskning 23** (269d641, gult): P1 hade en lucka (K5 och K8 prövades mot förslagets regel, inte underlagets), P3 två namn som inte prövades. **Hugos beslut 2026-10-30 om granskning 23** (`GRANSKNING.md`, "Hugos beslut 2026-10-30 om granskning 23") är byggda 2026-10-30 i 13126d2 (P1) och 35afa8b (P3 och Öppet 29, stängd), och **granskade i granskning 24** (6dfcdcd, grönt): byggda som besluten säger, inget blockerande. **Steg 22 är klart** 2026-10-30: granskat i granskning 23 och 24 (Hugos beslut 2026-10-30 om granskning 24, beslut 3). **Öppet 31 är rättad** 2026-10-30 i bbb183a (förslagets regel ska vara underlagets egen regel, beslut 1) och **granskad i granskning 25** (grönt: byggd som beslutet säger, inget blockerande; en lucka inom regeln kvar som Öppet 32, väntar på beslut), och **Öppet 30 är stängd** (beslut 2). **Öppet 32 är rättad** 2026-10-30 (kostnadsraden i ett förslag med underlag står på det konto K5 ger för momssatsen, annars stoppas förslaget, Hugos beslut 2026-10-30 om granskning 25, beslut 1; committad 2026-10-30 som steg 91 i BYGGPLAN.md; inte granskad oberoende än), och **Öppet 31 räknas som granskad och klar** (beslut 2). **Hugos beslut 2026-10-30 om byggsessionen för Öppet 32** (`GRANSKNING.md`): momsraden är Öppet 33, ett eget steg efter Öppet 32 (a), och Öppet 32 och Öppet 26 är steg 91 och 92 (b). Nästa steg: se "Nästa steg i byggordningen". Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
 
 Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **4 385 passed**, 0 misslyckade (körd senast 2026-10-30 efter rättelsen av Öppet 31: 4 375 från
-förut och 10 nya i `scripts/tests/test_beslut_granskning_24.py`). Sedan installationen
+Testsviten: **4 399 passed**, 0 misslyckade (körd senast 2026-10-30 i commit-sessionen för Öppet 32, i projektmappen
+med kommandot i SPEC 7.1: 4 385 från förut och 14 nya i `scripts/tests/test_beslut_granskning_25.py`). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
 borttagen.
 
@@ -23,6 +23,117 @@ borttagen.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-10-30, Öppet 32 rättad
+
+Steg i byggplanen: 91 (klart)
+
+- **Vilket steg:** Öppet 32 är enligt granskning 25 inte en del av steg 22 utan ett eget steg före uppgift 5, och
+  BYGGPLAN.md gav först varken Öppet 32 eller Öppet 26 något stegnummer (granskning 25, P6). **Hugos beslut 2026-10-30
+  om byggsessionen för Öppet 32** (skrivna i uppdraget till commit-sessionen, ordagrant i `GRANSKNING.md`, "Hugos
+  beslut 2026-10-30 om byggsessionen för Öppet 32"): (a) momsraden (`moms_ore`) låses till kontot för ingående moms
+  som eget steg, Öppet 33, efter Öppet 32, inte i den här commiten; (b) Öppet 32 och Öppet 26 får egna stegnummer i
+  BYGGPLAN.md; (c) SPEC 11-stycket får följa med i commit 1. Gjort i commit-sessionen 2026-10-30: Öppet 32 är steg 91
+  (✅) och Öppet 26 steg 92 (⬜), de nästa lediga numren efter 90, i fas C efter steg 22; Öppet 33 står under Öppet
+  nedan, utan stegnummer än; SPEC 7 och 11 säger att momsraden är Öppet 33.
+- **Commit-sessionen 2026-10-30** (byggsessionen kunde inte köra `git`, se "Avsteg" nedan) kontrollerade före
+  commitarna att `git status` visade exakt de fem ändrade filerna och den nya testfilen, att koddiffen i
+  `scripts/konteringsforslag.py` bara lägger till stoppet i `_kontrollera_underlagen` (hjälpfunktionen
+  `_kontrollera_kostnadsraderna`, verifikationens rader som nytt argument, och dokumentationstext; inget annat), körde
+  hela sviten med kommandot i SPEC 7.1 i projektmappen (**4 399 passed**, 0 röda) och upprepade "rött före" mot en
+  kopia tagen med `git archive` av 7c1f148 (**5 röda, 9 gröna**, samma som byggsessionen). Kommandona står under
+  "Kommandon i commit-sessionen" nedan.
+- **Hugos beslut 2026-10-30 om granskning 25**, skrivna i uppdraget till den här sessionen och ordagrant i
+  `GRANSKNING.md`, "Hugos beslut 2026-10-30 om granskning 25": (1) Öppet 32 byggs före uppgift 5: kostnadsraden i ett
+  förslag med underlag ska stå på det konto som K5 räknar fram för underlagets momssats, och annat konto stoppar
+  förslaget. (2) Öppet 31 räknas som granskad och klar.
+- **1 (Öppet 32), byggt i commit 1 ("Öppet 32: kostnadsraden står på det konto K5 ger"):** `_kontrollera_underlagen` i
+  `scripts/konteringsforslag.py` får verifikationens rader och prövar, efter K5, K7, K8 och kontrollen från Öppet 31
+  och för varje underlag, att varje rad som har underlagets `underlag_ore` för en momssats som källa står på det konto
+  `kontrollera_underlag` räknar fram för satsen (`konton`, ny delkontroll `_kontrollera_kostnadsraderna`). Annars
+  stoppas förslaget med kontrollen `ursprung`, och felet namnger raden, underlaget, satsen, kontot K5 ger, underlagets
+  regel och datum, och kontot raden står på. Granskarens två prov från P7 stoppas: `R-LEV-KAFFE` med två konton
+  (livsmedel på 4010, ovrigt på 5460) och kontona bytta för SYNT-U-2025-020, och SYNT-U-2025-003 under sin egen regel
+  med kostnaden på leverantörsskulderna 2440, båda med testbutikens momsfil och med prov B:s momsfil från granskning
+  23. Flödena a, b och e bygger kostnadsraderna ur samma `konton` (`konteringsfloden._kostnad_och_moms`), så de berörs
+  inte, och ett test visar att varje kostnadsrad i hela körningen står på kontot K5 ger. Momsraden (`moms_ore`) är
+  inte byggd: den är Öppet 33, ett eget steg efter Öppet 32 (Hugos beslut 2026-10-30 om byggsessionen för Öppet 32,
+  a). Inget annat i kärnan är ändrat, och inget företagsspecifikt finns i `scripts/`. SPEC 7 säger vad som gäller.
+  Öppet 32 stängd.
+- **2 (Öppet 31):** står som granskad och klar under Öppet och i BYGGPLAN.md. Ingen kod.
+- **Rött före** (`scripts/tests/test_beslut_granskning_25.py` mot en kopia av koden före rättelsen, HEAD 7c1f148):
+  **5 röda och 9 gröna av 14**. Röda: granskarens prov (a) och (b) med båda momsfilerna, alla fyra med "DID NOT RAISE"
+  (kopian skapade förslaget), och dokumentationstestet (SPEC saknade Öppet 32). De nio gröna är skydd som ska vara
+  gröna före: flödet bokför 020 rätt med två konton i regeln och samma förslag för hand med rätt konton godtas (båda
+  momsfilerna), ett förslag med rätt konto godtas, prov B stoppas av K5 och K8 först, granskarens prov från granskning
+  24 stoppas av Öppet 31 först, flöde a (003 med fakturan och betalningen), flöde b (kvittot 015) och flöde e (bankrad
+  117 utan underlag) går igenom, och varje kostnadsrad i körningen står på kontot K5 ger.
+- **Avsteg (för Hugo att känna till):** sessionen startades i `~/VERA`, mappen ovanför projektet, inte i
+  `~/VERA/agent`. Vakten kräver att allt körs i mappen där sessionen startade, och stoppade därför `git` (ingen
+  git-mapp där), `cd`, `git -C` och appens eget verktyg för att byta mapp, och pytest mot `scripts/tests` hade inget
+  mål. Allt kördes i stället mot kopior i scratchpad, som SPEC 7.1 tillåter: "rött före" mot en kopia av den orörda
+  arbetsmappen tagen med `cp -R` (HEAD var 7c1f148 enligt `.git/refs/heads/main`, och sviten där gav samma 4 385 som
+  PROGRESS.md), inte med `git archive`, och hela sviten efter rättelsen mot en kopia av det ändrade projektet.
+  Commitarna (kod, test och SPEC; sedan dokumentationen) gjordes 2026-10-30 i en ny session startad i projektmappen
+  (commit-sessionen), som körde sviten med kommandot i SPEC 7.1 och "rött före" med `git archive` mot 7c1f148, se
+  ovan.
+- **Kommandon i den här sessionen** (P7). `<scratch>` är sessionens scratchpad-mapp,
+  `/private/tmp/claude-501/-Users-hugolindholmer-VERA/a568ef37-2cd8-4cf6-ac98-58fd22d7bc64/scratchpad`, och
+  `<agent>` är `/Users/hugolindholmer/VERA/agent`. Allt kördes från `~/VERA`, i förgrunden, och vakten släppte igenom
+  allt nedan:
+  1. `mkdir -p <scratch>/kopia-7c1f148`
+  2. `cp -R <agent>/ <scratch>/kopia-7c1f148` (den orörda arbetsmappen före alla ändringar)
+  3. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q
+     <scratch>/kopia-7c1f148/scripts/tests` (hela sviten mot den orörda kopian: **4 385 passed**, antalet före)
+  4. `cp -R <agent>/scripts/tests/test_beslut_granskning_25.py <scratch>/kopia-7c1f148/scripts/tests/test_beslut_granskning_25.py`
+  5. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rA
+     <scratch>/kopia-7c1f148/scripts/tests/test_beslut_granskning_25.py` (**5 failed, 9 passed**, rött före)
+  6. `cp -R <agent>/ <scratch>/kopia-arbete` efter kodändringen och SPEC 7, sedan `cp -R
+     <agent>/scripts/konteringsforslag.py <scratch>/kopia-arbete/scripts/konteringsforslag.py` och `diff` mellan dem
+     (lika)
+  7. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rA
+     <scratch>/kopia-arbete/scripts/tests/test_beslut_granskning_25.py` (den nya testfilen efter rättelsen: **14 passed**)
+  8. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rf
+     <scratch>/kopia-arbete/scripts/tests` (hela sviten efter rättelsen: **4 399 passed**)
+  9. Efter dokumentationen: `cp -R` av de fyra dokumentfilerna till `<scratch>/kopia-arbete/` och kommando 8 igen (se
+     "Testsviten" nedan)
+  10. `ls`, `cat`, `grep`, `wc` och `diff` för att läsa. Stycken av filer lästes med fil-verktyget Read.
+  Vakten stoppade: `cd` och `git -C` (står inte på listan), fem kommandon med `;` eller `\` (ihopkopplade, eller
+  `grep` med `\` i mönstret), och verktyget som byter sessionens mapp (står inte på listan över tillåtna verktyg).
+  `git log`, `git status` och `git show` gav "not a git repository" från `~/VERA`. Inget i projektet ändrades utom
+  de sex filerna i de två commitarna, och inget utanför projektet utom scratchpad.
+- **Kommandon i commit-sessionen** (P7), 2026-10-30, startad i `~/VERA/agent`. `<scratch>` är den sessionens
+  scratchpad-mapp, `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/fe3a6544-42b9-4c18-a0f5-d8275a1477ea/scratchpad`.
+  Ett kommando i taget, och vakten släppte igenom allt nedan:
+  1. `ls` och `git status` (exakt fem ändrade filer och en ny).
+  2. `cat CLAUDE.md`, `git diff scripts/konteringsforslag.py`, `git diff SPEC.md`, `git diff BYGGPLAN.md GRANSKNING.md`,
+     `head -n 120 PROGRESS.md`, `cat BYGGPLAN.md`, `cat scripts/tests/test_beslut_granskning_25.py` och `grep -n` med
+     `-e` för att läsa. Stycken av filer lästes med fil-verktyget Read och ändrades med fil-verktyget Edit.
+  3. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`
+     (hela sviten i projektmappen, kommandot i SPEC 7.1, i bakgrunden: **4 399 passed**, 0 röda, 82 sekunder).
+  4. `mkdir -p <scratch>/kopia-7c1f148`
+  5. `git archive -o <scratch>/kopia-7c1f148.tar 7c1f148`
+  6. `tar -xf <scratch>/kopia-7c1f148.tar -C <scratch>/kopia-7c1f148`
+  7. `cp -R scripts/tests/test_beslut_granskning_25.py <scratch>/kopia-7c1f148/scripts/tests/test_beslut_granskning_25.py`
+  8. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rA
+     <scratch>/kopia-7c1f148/scripts/tests/test_beslut_granskning_25.py` (rött före mot den rena kopian av 7c1f148:
+     **5 failed, 9 passed**. Röda: granskarens prov (a) och (b) med båda momsfilerna, "DID NOT RAISE", och
+     dokumentationstestet. Gröna: de nio skydden. Samma som byggsessionens kommando 5.)
+  9. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q -k
+     byggplan_progress scripts/tests` efter dokumentationen (byggplanstestet: **8 passed**).
+  10. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q -k
+      beslut_granskning_25 scripts/tests` efter tillägget om Öppet 33 i SPEC (de 14 nya testerna: **14 passed**).
+  11. `git add` och `git commit -F <scratch>/commit-1.txt` respektive `<scratch>/commit-2.txt` (meddelandena skrivna
+      med fil-verktyget Write), sedan `git status` och `git log`.
+  Vakten stoppade: `sed` två gånger (står inte på listan), `grep` två gånger med `\|` i mönstret (omvänt snedstreck),
+  `tail` på bakgrundskörningens utskriftsfil utanför scratchpad (lästes med fil-verktyget Read i stället), och pytest
+  med en enskild testfil i projektet som mål (bara `scripts/tests` eller en kopia tillåts, därför `-k` i kommando 10).
+  Inget i projektet ändrades utom de sex filerna i de två commitarna, och inget utanför projektet utom scratchpad.
+- **Testsviten:** 4 399 passed (före: 4 385), 0 röda, i byggsessionen mot kopian av det ändrade projektet (kommando 8
+  och 9) och i commit-sessionen i projektmappen med kommandot i SPEC 7.1 (kommando 3). Byggplanstestet grönt efter
+  stegnumren (kommando 9).
+- **Opushat:** d5b2fba, 269d641, 13126d2, 35afa8b, aecccdf, 6dfcdcd, bbb183a, 277ca90, 7c1f148 (granskning 25),
+  c479915 (Öppet 32: kod, test och SPEC) och dokumentationscommiten efter den. `main` på GitHub står på 7d8cae9.
 
 ## Läge 2026-10-30, granskning 25 av Öppet 31
 
@@ -746,7 +857,8 @@ fattade och byggda, se avsnittet ovan.)
 | Hugos beslut 2026-10-30 om granskning 23: K5, K7 och K8 mot varje underlags egen regel, och ett underlag utan egen regel stoppar förslaget (P1); betalsätten i Z-reglerna och företagets namn prövas mot de reserverade orden (P3); K4a och K4b stoppar båda underlagen i paret, K4c bara det flaggade med märkning i originalets motivering (Öppet 29, stängd); regeln om kommandon i PROGRESS.md i CLAUDE.md (P7). 19 av 22 nya tester röda mot d5b2fba. Granskat i granskning 24 (6dfcdcd, grönt) | 13126d2, 35afa8b, aecccdf |
 | Granskning 24 (av aecccdf): rättelserna efter granskning 23 är byggda som besluten säger, grönt. **Steg 22 klart** (Hugos beslut 2026-10-30 om granskning 24) | 6dfcdcd |
 | Hugos beslut 2026-10-30 om granskning 24: förslagets regel ska vara underlagets egen regel, annars stoppas förslaget i `skapa_konteringsforslag` (Öppet 31, stängd); Öppet 30 stängd; ny regel i CLAUDE.md om granskningssessioner. 4 av 10 nya tester röda mot 6dfcdcd. Granskat i granskning 25 (grönt) | bbb183a, 277ca90 |
-| Granskning 25 (av bbb183a och 277ca90): Öppet 31 är byggd som beslutet säger, inget hål i den nya kontrollen, grönt. P7: kostnaden kan stå på fel konto inom regeln för ett förslag förbi flödena (Öppet 32, väntar på beslut). Bara dokumentation | commiten "Granskning 25" |
+| Granskning 25 (av bbb183a och 277ca90): Öppet 31 är byggd som beslutet säger, inget hål i den nya kontrollen, grönt. P7: kostnaden kan stå på fel konto inom regeln för ett förslag förbi flödena (Öppet 32). Bara dokumentation | commiten "Granskning 25" |
+| Hugos beslut 2026-10-30 om granskning 25: kostnadsraden i ett förslag med underlag står på det konto K5 ger för momssatsen, annars stoppas förslaget i `skapa_konteringsforslag` (Öppet 32, stängd, steg 91); Öppet 31 granskad och klar. 5 av 14 nya tester röda mot en kopia av 7c1f148, upprepat mot `git archive` av 7c1f148 i commit-sessionen. Hugos beslut 2026-10-30 om byggsessionen för Öppet 32: momsraden är Öppet 33, Öppet 32 och 26 är steg 91 och 92. **Inte granskad oberoende** | c479915, och dokumentationen efter den |
 | Beslut f och e: `R-BUTIK-FORBRUKNING` (5460) och `R-LEV-TILLBEHOR` (4010), nivå B, i testbutikens regelbok, och testregeln för DESIGN 4b borttagen. SPEC 7 nämner `kontera_period` | 5753890 |
 | Granskning 11, Q7 (Hugos beslut 2026-10-29): pusha som det är. Historiken skrivs inte om, och ingen tagg byts eller pushas. Repot på GitHub är privat och får inte göras publikt utan en ny genomgång av hela historiken först. `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd". Bara dokumentation | commiten "Q7 stängd: pusha som det är, repot förblir privat" |
 
@@ -942,14 +1054,26 @@ fattade och byggda, se avsnittet ovan.)
     regel inte gäller underlag. BESLUTSFATTARE SAKNAS.~~ **Stängd** (Hugos beslut 2026-10-30 om granskning 24, beslut
     1, efter granskarens bedömning i P5): `skapa_konteringsforslag` stoppar ett förslag när förslagets regel inte är
     underlagets egen regel, uppslagen på underlagets datum. Byggt 2026-10-30 i bbb183a, se "Läge 2026-10-30, Öppet 31
-    rättad och steg 22 klart". Granskad i granskning 25 (grönt).
-32. **Kostnaden kan stå på fel konto inom regeln, eller på ett rollkonto, för ett förslag byggt förbi flödena**
+    rättad och steg 22 klart". Granskad i granskning 25 (grönt), och **räknas som granskad och klar** (Hugos beslut
+    2026-10-30 om granskning 25, beslut 2).
+32. ~~**Kostnaden kan stå på fel konto inom regeln, eller på ett rollkonto, för ett förslag byggt förbi flödena**
     (granskning 25, P7). `kontrollera_underlag` räknar fram kontot per momssats (`konton`), men
     `_kontrollera_underlagen` prövar inte att raden med `underlag_ore` står på det kontot, och ursprungskontrollen
     punkt 8 godtar varje konto som står i regeln eller har en roll. Granskarens prov: `R-LEV-KAFFE` med två konton
     och kontona bytta godtas, och 003 med kostnaden på 2440 godtas, med alla kontroller "ok". Flödena bygger ur
     `konton` och bokför rätt. Granskarens förslag: kräv i `_kontrollera_underlagen` att varje `underlag_ore`-rad står
-    på `konton[sats]` och varje `moms_ore`-rad på kontot för ingående moms, före uppgift 5. BESLUTSFATTARE SAKNAS.
+    på `konton[sats]` och varje `moms_ore`-rad på kontot för ingående moms, före uppgift 5. BESLUTSFATTARE SAKNAS.~~
+    **Stängd** (Hugos beslut 2026-10-30 om granskning 25, beslut 1): kostnadsraden i ett förslag med underlag ska stå
+    på det konto som K5 räknar fram för underlagets momssats, och annat konto stoppar förslaget. Byggt 2026-10-30, se
+    "Läge 2026-10-30, Öppet 32 rättad", committad 2026-10-30 som steg 91 i BYGGPLAN.md (Hugos beslut 2026-10-30 om
+    byggsessionen för Öppet 32, b). Inte granskad oberoende än. Momsraden (`moms_ore`) ingick inte i beslutet och är
+    inte byggd: den är Öppet 33 (samma beslut, a).
+33. **Momsraden (`moms_ore`) i ett förslag med underlag låses till kontot för ingående moms** (granskarens andra
+    förslag i granskning 25, P7). I dag prövar `_kontrollera_underlagen` bara kostnadsraderna (Öppet 32), så en momsrad
+    kan stå på ett annat konto som står i regeln eller har en roll i kontoplanen, för ett förslag byggt förbi
+    flödena. Flödena bygger momsraden ur kontoplanens roll `ingaende_moms`, så de berörs inte. **Byggs som eget steg
+    efter Öppet 32, inte i commiten för Öppet 32** (Hugos beslut 2026-10-30 om byggsessionen för Öppet 32, a,
+    `GRANSKNING.md`). Inget stegnummer i BYGGPLAN.md än. **Öppen, inte byggd.**
 
 ## Nästa steg i byggordningen
 
@@ -972,9 +1096,11 @@ fattade och byggda, se avsnittet ovan.)
    och Öppet 27 och 28 stängda. **Granskade i granskning 23** (gult): P1 hade en lucka och P3 två namn, **rättade
    2026-10-30** i 13126d2 och 35afa8b efter Hugos beslut om granskning 23, och Öppet 29 stängd. **Granskade i
    granskning 24** (6dfcdcd, grönt). **Steg 22 är klart 2026-10-30** (Hugos beslut 2026-10-30 om granskning 24,
-   beslut 3). Öppet 31 från granskning 24 rättad i bbb183a och granskad i granskning 25 (grönt). Kvar, som egna
-   steg: Öppet 32 (granskning 25, P7, väntar på beslut) och Öppet 26 (konton
-   för hyra, el och telefon). Pushad till 7d8cae9. DESIGN 7 säger oberoende granskning efter uppgift 3 och 6, inte efter 4. Det som var förutsättningarna:
+   beslut 3). Öppet 31 från granskning 24 rättad i bbb183a, granskad i granskning 25 (grönt) och klar (Hugos beslut
+   2026-10-30 om granskning 25, beslut 2). **Öppet 32 (granskning 25, P7) rättad 2026-10-30** efter Hugos beslut om
+   granskning 25 (beslut 1) och committad som steg 91 i BYGGPLAN.md, inte granskad oberoende än. Kvar, som egna
+   steg: Öppet 33 (momsraden, inget stegnummer än) och steg 92, Öppet 26 (konton för hyra, el och telefon) (Hugos
+   beslut 2026-10-30 om byggsessionen för Öppet 32, a och b). Pushad till 7d8cae9. DESIGN 7 säger oberoende granskning efter uppgift 3 och 6, inte efter 4. Det som var förutsättningarna:
    flöde a, b och e (leverantörsfakturor, kvitton och bankavgifter)
    med K5 och K8 (BYGGPLAN steg 22). Förutsättningar, Hugos beslut 2026-10-29 (`GRANSKNING.md`, "Beslut
    2026-10-29 – inför uppgift 4"):
