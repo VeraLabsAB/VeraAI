@@ -7958,3 +7958,211 @@ också uppdaterar PROGRESS.md och BYGGPLAN.md (P9).
 STATUS: gult
 KAN JAG GÅ VIDARE: ja, men P1 bör rättas före uppgift 5. Inget kan bokföras och ingen spärr är svagare.
 NÄSTA STEG: Hugo eller Casper svarar på 1–5. Därefter rättelsen av P1 i en egen session, och Öppet 26.
+
+## Granskning 24 (av aecccdf) (2026-10-30)
+
+Kort oberoende granskning i en ny session som inte har sett rättelsesessionen. Granskaren ändrade ingen kod och skrev
+bara i den här filen. Granskat: `git diff d5b2fba aecccdf` per fil (commitarna 13126d2, 35afa8b och aecccdf, 13
+filer). Lästes också: CLAUDE.md, SPEC.md (7, 7.1 och 11), BYGGPLAN.md ("Läge nu" och steg 22), PROGRESS.md ("Läge
+2026-10-30, rättelserna efter granskning 23", Öppet 26–31, "Nästa steg" och "Beslut") och här "Hugos beslut 2026-10-30
+om granskning 23" och granskning 23. Koden lästes i `scripts/konteringsforslag.py` (`kontrollera_underlag` och
+`_kontrollera_underlagen`), `scripts/konteringsfloden.py` (K4-delen av `kontera_period`, `_k4_arende`,
+`_k4_arende_for_originalet`, `_markning_k4c`, `_skapa`), `scripts/las_underlag.py` (`_kontroll_k4`),
+`scripts/las_regelbok.py` (betalsätten och `foretag`), `scripts/reserverade_namn.py` och testerna
+`test_beslut_granskning_23.py`, `test_beslut_granskning_22.py`, `test_konteringsfloden.py`, `test_inga_genvagar.py` och
+`test_byggplan_progress.py`.
+
+### Viktigt först
+
+- **Inget kan bokföras utan godkännande, och ingen spärr har blivit svagare** (P9). De tre commitarna lägger bara till
+  kontroller och stopp: K5, K7 och K8 prövas mot en strängare regel än förut, två namn till stoppas i regelboken, och
+  fler underlag stoppas vid K4a och K4b. Inget skriver filer eller ger ett förslag ett fält för bokfört eller godkänt.
+- **Inget blockerande.** P1 och P3 från granskning 23 och Öppet 29 är byggda som Hugos beslut säger, med prov B
+  bekräftat i en kopia (P1 nedan). Ett fynd bör rättas före uppgift 5 (P5, Öppet 31, Hugos beslut), resten är
+  noteringar.
+- **Steg 22 får räknas som klart**, se sist i avsnittet.
+
+### Fynd
+
+**P1 – K5, K7 och K8 prövas mot varje underlags egen regel, och prov B stoppas (notering, rättat).**
+`_kontrollera_underlagen` slår upp `regelbok.regel_for_underlag(typ, motpart, datum)` för varje underlag i
+`kopplingar["underlag"]` och kör `kontrollera_underlag` med den, inte med förslagets regel. Ett underlag utan regel på
+sitt datum stoppar förslaget med kontrollen `ursprung` och texten att det ska vara ärendet "ny motpart". Flödena gör
+samma uppslag (`kontera_period`, samma funktion och samma datum), så förslaget och flödet kan inte få olika regler.
+**Prov B, kört själv:** granskaren skrev en egen provfil (`test_granskare_prov24.py`, oberoende av rättelsesessionens
+test, bara i scratchpad) som ger momsfilen varugruppen `kostnad` med 12 % och bygger ett förslag för hand under
+`R-BANK-AVGIFT` med bankrad 117 i januari som avgift. I en kopia av aecccdf: **SYNT-U-2025-028 stoppas av K8** (felet
+nämner `R-RESTAURANG-1`) och **SYNT-U-2025-019 av K5** (felet nämner `R-BUTIK-STAD`), och med testbutikens egen
+momsfil stoppas båda med K8 respektive K5 i stället för `KeyError` (granskning 23, P2). Samma fil i en kopia av
+d5b2fba: "DID NOT RAISE" för både 028 och 019, och `KeyError: 'kostnad'` med testbutikens momsfil, alltså exakt det
+granskning 23 såg. Kvar är det som inte byggdes: `kontrollera_underlag` ger fortfarande `KeyError` om någon anropar
+den direkt med en regel för bankrader och en momsfil utan varugruppen. Det är den säkra riktningen (krasch, inget
+förslag), och PROGRESS.md säger det öppet. Ett `KonteringsforslagFel` i stället vore prydligare, men inget krav.
+
+**P2 – Det ändrade testet `test_k5_moms_inom_toleransen_godtas` testar samma sak som före (notering).** Diffen ändrar
+bara hur underlagen byggs: förut ändrades 003 ensamt (momsen ett öre upp, beloppet ett öre upp), nu ändras 004
+(dubletten av 003) likadant. Påståendena är orörda: 003 får inget ärende, och fakturans momsrad är `2641` med
+179 257 öre. Skälet till ändringen stämmer: med bara 003 ändrat får 003 och 004 samma fakturanummer och olika belopp,
+alltså K4a, och då stoppas båda enligt Öppet 29, så testet hade blivit rött av ett annat skäl än det prövar. Det som
+testet inte längre visar är att originalet fick sitt förslag fast 004 var K4a-flaggat, men det var just beteendet som
+Hugos beslut 3 tog bort, och motsatsen prövas nu i `test_o29_k4a_och_k4b_stoppar_bada_underlagen_i_paret`. Inget skydd
+är svagare.
+
+**P3 – Betalsätten i Z-reglerna och företagets namn prövas mot de reserverade orden, bara exakt träff (notering,
+rättat).** `_kontrollera_kontering` anropar `inget_reserverat_namn` för varje betalsätt i en Z-regels `kontering`,
+och `_kontrollera_regelbok` för `foretag`, med samma funktion som de andra namnen. Den jämför hela namnet efter
+`normalisera_for_jamforelse`, så `bankavgift`, `BANKAVGIFT` och `bank avgift` stoppas och `Bankavgift AB`,
+`bankavgifter` och `bank-avgift` godtas (testat i `test_p3_...`). SPEC 7 räknar nu upp de två namnen, liksom
+`foretag/README.md` (på två ställen), `reserverade_namn.py` och `las_regelbok.py`, och ett test läser texterna.
+SPEC-texten stämmer med koden.
+
+**P4 – Öppet 29 är byggd som beslutet säger (notering).** I `kontera_period`: för varje K4-ärende i underlagsperioden
+flaggas det underlag som bär ärendet. Är kontrollen `K4a`, `K4b` eller `K4a och K4b` flaggas också originalet
+(`jamfort_med`), och det får ett eget ärende med samma kontroll och typ, texten att inget förslag görs för något av de
+två, det flaggade underlagets id, sin bankrad och sin regel. Är kontrollen `K4c` flaggas bara det flaggade, och
+originalets id läggs i `k4c_markeringar`; `_skapa` lägger sedan `Märkning K4c: underlaget '<id>' …` sist i
+motiveringen för varje förslag vars underlag är originalet, alltså både fakturan och betalningen. `las_underlag.py`
+visar att `jamfort_med` för K4a och K4b alltid är ett underlag som behålls i perioden, så `i_perioden[original]` kan
+inte saknas. Två kanter, båda rimliga: ett original med flera K4a-flaggade kopior får ett ärende per kopia, och om
+originalet i ett K4c-par självt stoppas (till exempel av K4a mot ett tredje underlag) faller märkningen bort, men
+K4c-ärendet namnger ändå originalet. Testerna prövar K4a, K4b, "K4a och K4b" och K4c från underlagsfilerna hela vägen
+genom `las_underlagsperiod` och `kontera_period`, och att inget förslag utan kopia är märkt. De nya byggstenarna
+(`_k4_arende_for_originalet`, `_markning_k4c`, `_underlagets_regel_id`) börjar med understreck och omfattas därför av
+`test_flodenas_alla_byggstenar_ar_forbjudna`.
+
+**P5 – Öppet 31, granskarens bedömning: ja, ett förslag bör stoppas när förslagets regel inte är underlagets regel,
+före uppgift 5 (bör rättas, Hugo eller Casper beslutar).** Granskarens prov bekräftar luckan i aecccdf: SYNT-U-2025-003
+(12 %, egen regel `R-LEV-TE` med `livsmedel` på 4010) under `R-BANK-AVGIFT` med kostnaden på 6570 godtas med
+`{'K2': 'ok', 'ursprung': 'ok', 'K5': 'ok', 'K7': 'ok', 'K8': 'ok'}`. K5 prövar satsen mot `R-LEV-TE`, men kontot
+prövas av ursprungskontrollen punkt 8 mot förslagets regel, där 6570 står. Det är den enda vägen kvar där ett förslag
+med underlag bokför kostnaden på fel konto med alla kontroller gröna. *Finns det något legitimt fall där de skiljer
+sig?* Inte i flödena som finns eller planeras närmast: i flöde a och b byggs både fakturan och betalningen med
+underlagets egen regel (`kopplingar.regel` är `R-LEV-TE` för båda), flöde e har inget underlag, och uppgift 5 (flöde c
+och d: Z-rapporter, kortinlösen, Swish, kontantinsättningar) bygger på Z-rapporter och bankrader, inte underlag. Först
+längre fram kan ett förslag tänkas ha flera underlag med olika regler (Ö4 samlat per vecka, Ö8 kreditnotor, Ö11
+bankens avgiftsspecifikation som eget underlag), och då kan regeln mjukas upp med ett nytt beslut. *Förslag:*
+`_kontrollera_underlagen` stoppar förslaget om `regel["id"]` för underlagets egen regel inte är
+`kopplingar["regel"]["id"]` (några rader och ett test med provet ovan), och SPEC 7 säger det. Varför före uppgift 5:
+uppgift 5 ger `skapa_konteringsforslag` nya anropare med regler för Z-rapporter och bankrader, och det är precis
+sådana regler som luckan gäller. Inte blockerande: bara kod förbi flödena kan bygga så, och förslaget kräver ändå
+godkännande.
+
+**P6 – Öppet 30, granskarens bedömning: märkningen som text i motiveringen räcker tills nivåsteget (uppgift 6), inte
+tills appen (notering, Hugo eller Casper bekräftar).** Det som talar för: förslaget är oföränderligt, så märkningen
+kan inte tappas bort efter att förslaget skapats, den står på en fast plats (sist i motiveringen, med
+`MARKNING_K4C` som konstant), och den som läser förslaget ser den. Det som talar emot: DESIGN 5 säger nivå C rad för
+rad för K4a–K4c, och nivåsteget ska då hitta märkningen i kod. Att leta efter en text i ett fritextfält är skört
+(texten kan ändras, och en motivering skulle i teorin kunna innehålla orden av annat skäl). *Förslag:* när uppgift 6
+byggs får förslaget ett eget fält för märkningar (till exempel en lista `markningar` med kontroll och underlagets id),
+och motiveringen behåller texten för människor. Till dess räcker texten, och ingen kod läser den ännu.
+
+**P7 – "Rött före" står med exakta kommandon och går att upprepa inom SPEC 7.1 (notering).** PROGRESS.md räknar upp
+kommandona 1–10 med `<scratch>` definierad till rättelsesessionens scratchpad-mapp. Granskaren upprepade 1–3 och 5–8
+mot en ny kopia av d5b2fba (`git archive`, `tar -x -C`, `cp -R` av de två testfilerna från projektet): **19 röda och 3
+gröna av 22** i `test_beslut_granskning_23.py` (samma tre gröna som PROGRESS.md namnger) och **2 röda och 32 gröna av
+34** i `test_beslut_granskning_22.py` (`k4a` och `k4b` i P2-testet). Allt stod på listan i SPEC 7.1 och vakten släppte
+igenom det. Den första körningen med 20 röda går inte att upprepa, eftersom filen skrevs om, men PROGRESS.md säger
+det och varför. En iakttagelse, inget fel: både rättelsesessionen och den här granskningen startade hela sviten en
+gång i bakgrunden, och Claude Code lägger då utskriften utanför scratchpad, där vakten inte låter den läsas. Det är
+bortkastat: sviten bör köras i förgrunden (den tar drygt en minut).
+
+**P8 – Inget företagsspecifikt i `scripts/` (notering).** `grep -rn -i` efter `syntet`, `testbutik`, `SYNT-`,
+`R-BANK`, `R-LEV`, `R-BUTIK`, `R-RESTAURANG`, `AGARE-1` och `R-Z-TB` utan `tests` gav bara ordet "SYNTETISK" som
+exempel på ett statusfält i två gamla kommentarer, och `grep -rn -w` efter testbutikens konton och belopp (6570, 4010,
+1940, 2440, 2640, 5460, 25000, 12500, 1661856, 1493800, 179257 och 1673057) gav inget. Det nya i kärnan är allmänt:
+`MARKNING_K4C`, `_STOPPAR_BADA` och feltexterna nämner inga konton, namn eller belopp. `test_karnan_ar_generell.py` är
+grön.
+
+**P9 – Ingen spärr är svagare (notering).** `test_inga_genvagar.py` är oförändrad och grön. Diffen i
+`konteringsforslag.py` tar bort uppslaget av förslagets regel och ersätter det med ett strängare uppslag; i
+`konteringsfloden.py` läggs bara stopp och text till; i `las_regelbok.py` läggs två kontroller till. De två gamla
+testerna som ändrats (P2 här och P2-testet i `test_beslut_granskning_22.py`) kräver minst lika mycket som förut.
+
+**P10 – PROGRESS.md och BYGGPLAN.md är inte uppdaterade i den här granskningen (notering, samma som granskning 23,
+P9).** Uppdraget sa "Ändra ingen annan fil", och granskaren följde det. CLAUDE.md säger att en granskningssession
+också uppdaterar PROGRESS.md och "Läge nu" i BYGGPLAN.md (Hugos beslut 2026-10-29). De två reglerna går inte ihop, och
+det blev samma avsteg två granskningar i rad. `test_byggplan_progress.py` förblir grön (den kräver bara att varje
+granskning har ett eget nummer). *Förslag:* Hugo eller Casper avgör vilken regel som gäller, och nästa session skriver
+in granskning 24 i PROGRESS.md och sätter steg 22 som klart i BYGGPLAN.md, i samma commit (CLAUDE.md).
+
+### Svar på uppdragets punkter
+
+1. **P1:** ja, varje underlags egen regel på underlagets datum, ett underlag utan regel stoppar, och prov B stoppas
+   av K8 (028) och K5 (019) i granskarens egen kopia. Rött i kopian av d5b2fba.
+2. **Det ändrade testet:** samma påståenden som före, inget skydd svagare (P2).
+3. **P3:** ja, båda namnen, bara exakt träff, och SPEC-texten stämmer.
+4. **Öppet 29:** ja, K4a/K4b stoppar båda med ärende för båda, K4c bara det flaggade, och alla originalets förslag
+   har märkningen (P4).
+5. **Öppet 31:** stoppa när reglerna skiljer sig, före uppgift 5. Inget legitimt fall i flödena a, b, e eller i
+   uppgift 5 (P5).
+6. **Öppet 30:** räcker tills uppgift 6, då ett eget fält bör byggas (P6).
+7. **Rött före:** kommandona står i PROGRESS.md och gav samma utfall vid upprepning (P7).
+8. **Företagsspecifikt i `scripts/`:** inget (P8).
+
+### Steg 22
+
+**Steg 22 får räknas som klart.** Villkoret i BYGGPLAN.md ("testerna i DESIGN 7, rad 4, är gröna") är uppfyllt, hela
+sviten är grön, och inget blockerande eller medel finns kvar i uppgift 4:s flöden. Det som är kvar ligger utanför
+steget: Öppet 26 (konton för hyra, el och telefon, redan planerad som eget steg), Öppet 31 (P5, en liten rättelse
+före uppgift 5) och Öppet 30 (P6, i uppgift 6). Nästa session sätter ✅ på steg 22 i BYGGPLAN.md och skriver samma sak
+i PROGRESS.md i samma commit.
+
+### Testsviten
+
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`:
+**4 375 passed**, 0 misslyckade, på 72 sekunder, samma antal som PROGRESS.md.
+
+### Kommandon i den här granskningen
+
+`<scratch>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/81b9e514-7a4c-4c55-b8fd-a25f5c4ed24e/scratchpad`.
+Allt kördes från projektmappen.
+
+1. `git log --oneline -8`, `git show --stat 13126d2 35afa8b aecccdf`, `git show --format=%H%n%B --stat aecccdf --
+   GRANSKNING.md`, `git diff d5b2fba aecccdf -- <filer>` (per fil och i grupper).
+2. `ls`, `cat`, `head -3`, `wc -l` och `grep` (bara `-n`, `-i`, `-r`, `-w`, `-e`, `-A`, `-B`, `--exclude-dir=`) i
+   projektet; stycken av filer lästes med fil-verktyget Read.
+3. `mkdir -p <scratch>/kopia-aecccdf` och `mkdir -p <scratch>/kopia-d5b2fba`.
+4. `git archive --format=tar -o <scratch>/aecccdf.tar aecccdf` och samma för `d5b2fba`.
+5. `tar -x -f <scratch>/aecccdf.tar -C <scratch>/kopia-aecccdf` och samma för `d5b2fba`.
+6. Provfilen `test_granskare_prov24.py` skrevs med fil-verktyget Write i `<scratch>/kopia-aecccdf/scripts/tests/` och
+   kopierades med `cp -R` till `<scratch>/kopia-d5b2fba/scripts/tests/`.
+7. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rA
+   <scratch>/kopia-aecccdf/scripts/tests/test_granskare_prov24.py` (**4 passed**) och samma med `--tb=line` mot
+   `<scratch>/kopia-d5b2fba/…` (**3 failed, 1 passed**: "DID NOT RAISE" för 028 och 019, `KeyError: 'kostnad'`, och
+   provet för Öppet 31 grönt i båda kopiorna).
+8. `cp -R scripts/tests/test_beslut_granskning_23.py <scratch>/kopia-d5b2fba/scripts/tests/test_beslut_granskning_23.py`
+   och samma för `test_beslut_granskning_22.py`.
+9. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rA
+   <scratch>/kopia-d5b2fba/scripts/tests/test_beslut_granskning_23.py` (**19 failed, 3 passed**) och samma för
+   `test_beslut_granskning_22.py` (**2 failed, 32 passed**).
+10. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`
+    (**4 375 passed**). Sviten startades först en gång i bakgrunden; utskriften lades utanför scratchpad och lästes
+    inte (vakten stoppade `tail` mot den), så den kördes igen i förgrunden.
+11. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q -k
+    byggplan_progress scripts/tests` efter att det här avsnittet skrivits (**8 passed**, 4 367 bortvalda): den nya
+    rubriken har ett eget nummer.
+12. `git status`, `git add GRANSKNING.md` och `git commit -F <scratch>/commit-granskning-24.txt` (meddelandet skrivet
+    med fil-verktyget).
+
+**Avsteg:** vakten stoppade tio kommandon som granskaren skrev i strid med SPEC 7.1, alla bara läsande: ett `&&`, ett
+`git -C`, två `sed`, tre `grep` med `\` i mönstret, ett `grep` med `;` i mönstret, ett `tail` mot bakgrundskörningens
+utskrift utanför scratchpad, och ett `cp -R` med en felskriven scratchpad-sökväg. De gjordes om ett i taget eller
+ersattes med fil-verktyget Read. Inget i projektet ändrades utom den här filen. Uppdraget sa "Ändra ingen annan fil",
+vilket går före CLAUDE.md:s regel om PROGRESS.md och BYGGPLAN.md (P10).
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **Öppet 31 (P5):** ska ett förslag stoppas när förslagets regel inte är underlagets egen regel, före uppgift 5?
+   Granskarens bedömning: ja.
+2. **Öppet 30 (P6):** räcker märkningen som text i motiveringen tills uppgift 6, där ett eget fält byggs?
+   Granskarens bedömning: ja.
+3. **Steg 22:** får räknas som klart (granskarens bedömning). Nästa session sätter ✅ i BYGGPLAN.md och skriver det i
+   PROGRESS.md i samma commit.
+4. **P10:** vilken regel gäller när uppdraget säger "Ändra ingen annan fil" och CLAUDE.md säger att granskningen också
+   uppdaterar PROGRESS.md och BYGGPLAN.md?
+
+STATUS: grönt
+KAN JAG GÅ VIDARE: ja. Inget blockerande, inget kan bokföras och ingen spärr är svagare. P5 är en liten rättelse före
+uppgift 5, efter Hugos beslut.
+NÄSTA STEG: Hugo eller Casper svarar på 1–4. Nästa session sätter steg 22 som klart i BYGGPLAN.md och PROGRESS.md,
+sedan Öppet 26 och Öppet 31 som egna steg före uppgift 5. Steg 15 (sandlådan) ska vara klar före steg 23.
