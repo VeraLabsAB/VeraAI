@@ -189,12 +189,24 @@ K5, K7 och K8, efter ursprunget, för varje underlag som förslaget bygger på (
   beräkningen, inte om kontot.
 
   Momsraden står på kontot för ingående moms (Öppet 33, granskning 25, P7, Hugos beslut
-  2026-10-30 om byggsessionen för Öppet 32, a). Prövas sist, för varje underlag: varje rad som har
-  underlagets 'moms_ore' som källa ska stå på kontot för ingående moms (rollen ingaende_moms i
+  2026-10-30 om byggsessionen för Öppet 32, a). Prövas efter Öppet 34, för varje underlag: varje rad
+  som har underlagets 'moms_ore' som källa ska stå på kontot för ingående moms (rollen ingaende_moms i
   kontoplanen). Annat konto stoppar förslaget. Punkt 5 säger bara vad en rad på ett momskonto får
   ha som källa, inte att momsen från ett underlag måste stå på ett momskonto, så utan den här
   kontrollen godtogs momsen på kostnadskontot (granskning 26, H7). Flödena bygger momsraden ur
   kontoplanens roll, så de berörs inte.
+
+  Sidan för beloppet (Öppet 35, granskning 27, M1, Hugos beslut 2026-10-31). Prövas sist, för varje
+  underlag: en rad med underlagets 'belopp_ore' som källa står i debet bara när förslaget har minst
+  en bankrad i kopplingarna (betalningen), och i kredit bara när ingen rad har underlagets
+  'underlag_ore' eller 'moms_ore' som källa i kredit (fakturan). Annars godtogs fakturan spegelvänd
+  (beloppet i debet, kostnaden och momsen i kredit) och två lika stora fakturor kvittade mot varandra
+  på leverantörsskulderna, båda utan bankrad (granskarens prov h1 och h2): Öppet 34 räknar raderna
+  per underlag och prövar inte sidan, och punkt 5 prövar inte sidan eftersom kreditnotor inte är
+  bestämda (Ö8). En kreditnota kan inte läsas in i dag (typen finns inte och negativa belopp stoppas
+  i las_underlag), så regeln stoppar ingen. När Ö8 byggs måste regeln prövas igen. Halvan om kredit
+  stoppas i dag redan av täckningen eller Öppet 34. Flödena bygger betalningen med bankraden och
+  fakturan med kostnaden och momsen i debet, så de berörs inte.
 
 Kopplingarna i förslaget får kontrollsummorna för regelboken, kontoplanen, momsfilen och
 matchningsformatet, och kontrollsumman för varje fil förslaget bygger på (underlaget, bankfilen och
@@ -1161,6 +1173,42 @@ def _kontrollera_momsraderna(id_, kontoplan, verifikation):
                    " beslut 2026-10-30 om byggsessionen för Öppet 32, a).")
 
 
+def _kontrollera_beloppssidan(id_, kopplingar, verifikation):
+    """Öppet 35: underlagets 'belopp_ore' i debet bara med en bankrad, och i kredit bara när delarna inte står i kredit.
+
+    Flödena har 'belopp_ore' i debet bara i betalningen, tillsammans med bankraden, och i kredit bara i
+    fakturan, med kostnaden och momsen i debet. Utan den här kontrollen godtogs fakturan spegelvänd
+    (beloppet i debet, kostnaden och momsen i kredit, en faktura bokförd som en kreditnota, fast
+    kreditnotor inte finns, Ö8) och två lika stora fakturor kvittade mot varandra på leverantörsskulderna,
+    båda utan bankrad och med alla kontroller gröna (granskning 27, M1, Hugos beslut 2026-10-31). Öppet 34
+    räknar raderna per underlag och prövar inte sidan. Halvan om kredit stoppas i dag redan av täckningen
+    (punkt 7), eftersom 'belopp_ore' räknar med alla delarna på sin sida, eller av Öppet 34 om en del
+    dras ifrån med 'skillnad', men ligger här så att beslutet står på ett ställe. Prövas sist, efter
+    Öppet 33.
+    """
+    kallor = _underlagets_kallor(id_, verifikation["rader"])
+    for nummer, rad, kalla in kallor:
+        if kalla["falt"] != _BELOPPSFALT:
+            continue
+        vad = "rad " + str(nummer) + " (konto " + rad["konto"] + ")"
+        if rad["debet_ore"] > 0:
+            if kopplingar["bankrader"]:
+                continue
+            raise _fel(_URSPRUNG, vad + " har underlaget " + repr(id_) + ", '" + _BELOPPSFALT + "' som källa i debet,"
+                       " men förslaget har ingen bankrad. Hela beloppet att betala står i debet bara i betalningen,"
+                       " tillsammans med bankraden: utan bankrad bokför raden fakturan baklänges, som en kreditnota"
+                       " (en egen dokumenttyp som inte finns än, Ö8), eller kvittar den mot en annan faktura (Öppet 35,"
+                       " granskning 27, M1, Hugos beslut 2026-10-31).")
+        delarna = sorted({(annan, annan_rad["konto"]) for annan, annan_rad, annan_kalla in kallor
+                          if annan_kalla["falt"] != _BELOPPSFALT and annan_rad["kredit_ore"] > 0})
+        if delarna:
+            raise _fel(_URSPRUNG, vad + " har underlaget " + repr(id_) + ", '" + _BELOPPSFALT + "' som källa i kredit,"
+                       " och " + ", ".join("rad " + str(annan) + " (konto " + konto + ")" for annan, konto in delarna)
+                       + " har underlagets '" + _UNDERLAGSFALT + "' eller '" + _MOMSFALT + "' som källa också i"
+                       " kredit. Hela beloppet att betala står i kredit bara i fakturan, där kostnaden och momsen står"
+                       " i debet (Öppet 35, granskning 27, M1, Hugos beslut 2026-10-31).")
+
+
 def _kontrollera_underlagen(kopplingar, verifikation, regelbok, kontoplan, momssatser, kallorna):
     """K5, K7 och K8 på varje underlag i de kontrollerade kopplingarna, mot underlagets egen regel.
 
@@ -1175,8 +1223,10 @@ def _kontrollera_underlagen(kopplingar, verifikation, regelbok, kontoplan, momss
     punkt 8 godtar varje konto i regeln eller med en roll. Sedan räknas underlagets 'belopp_ore'
     bara med 'lika', bara på leverantörsskulderna och bara på en rad, och 'underlag_ore' och
     'moms_ore' aldrig med 'skillnad' (Öppet 34, granskning 26, M1, Hugos beslut 2026-10-30 om
-    granskning 26). Sist står varje momsrad från underlaget på kontot för ingående moms (Öppet 33,
-    Hugos beslut 2026-10-30 om byggsessionen för Öppet 32, a).
+    granskning 26). Sedan står varje momsrad från underlaget på kontot för ingående moms (Öppet 33,
+    Hugos beslut 2026-10-30 om byggsessionen för Öppet 32, a). Sist står underlagets 'belopp_ore' i
+    debet bara med en bankrad i förslaget, och i kredit bara när delarna inte står i kredit (Öppet 35,
+    granskning 27, M1, Hugos beslut 2026-10-31).
     """
     underlagen = [post["id"] for post in kopplingar["underlag"]]
     if not underlagen:
@@ -1208,6 +1258,7 @@ def _kontrollera_underlagen(kopplingar, verifikation, regelbok, kontoplan, momss
         _kontrollera_kostnadsraderna(id_, underlag, regel, kontroll.konton, rader)
         _kontrollera_beloppsraderna(id_, kontoplan, verifikation)
         _kontrollera_momsraderna(id_, kontoplan, verifikation)
+        _kontrollera_beloppssidan(id_, kopplingar, verifikation)
     return {_K5: "ok", _K7: "ok", _K8: "ok"}
 
 
