@@ -9055,3 +9055,38 @@ beloppet i debet utan bankrad. De fanns före 7801a64 och bör rättas före upp
 BESLUT SOM BEHÖVS: 1–3 ovan.
 NÄSTA STEG: Hugo eller Casper svarar på 1–3. Sedan Öppet 35 (eget steg) och steg 92 (Öppet 26) före uppgift 5. Steg
 15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
+
+## Hugos beslut 2026-10-31 om granskning 27
+
+Skrivet av Hugo i chatten 2026-10-31, i uppdraget till byggsessionen för Öppet 35:
+
+    "BESLUT FRÅN HUGO:
+    Beloppet i debet ska kräva en bankrad. belopp_ore får bara stå i kredit när delarna inte gör det."
+
+Uppdraget sa också: bygg Öppet 35 som eget steg, lägg bara till stopp, sist i den befintliga ordningen, och lägg in
+en mening i SPEC 11 om att regeln om högst en rad är bekräftad. Om regeln skulle stoppa en riktig kreditnota skulle
+sessionen stanna och fråga.
+
+**Vad det betyder för "Beslut som behövs" ovan:** (1) Öppet 35 byggs, med de två delar av granskarens förslag som
+beslutet nämner. Granskarens tredje del, att `belopp_ore` i debet bara får stå "utan underlagets delar alls", står
+inte i beslutet och är inte byggd. (2) Steg 93 räknades redan som klart (BYGGPLAN.md). (3) SPEC 11 har fått meningen.
+
+### Byggsessionen för Öppet 35 (2026-10-31)
+
+- **Kreditnotor först.** En riktig kreditnota kan inte läsas in i dag: `las_underlag.TYPER` har bara
+  `leverantorsfaktura` och `kvitto`, och negativa belopp stoppas "tills det är bestämt hur kreditnotor ska behandlas"
+  (SPEC 11, Ö8). Ingen testdata och inget i SPEC har en kreditnota. Två nya tester visar hur de hanteras i dag (typen
+  `kreditnota` och negativa belopp stoppas när underlaget läses). Regeln stoppar alltså ingen kreditnota, och
+  sessionen fortsatte. När Ö8 byggs måste regeln prövas igen: en kreditnota med beloppet i debet utan bankrad har
+  samma form som h1.
+- **Öppet 35 rättad** i 109fdcf, steg 94 i BYGGPLAN.md: `_kontrollera_beloppssidan` i `scripts/konteringsforslag.py`,
+  anropad sist i `_kontrollera_underlagen`, efter Öppet 33. Ett underlags `belopp_ore` står i debet bara när
+  förslaget har minst en bankrad i kopplingarna, och i kredit bara när ingen rad har underlagets `underlag_ore` eller
+  `moms_ore` i kredit. Bara ett nytt stopp: ingen kontroll borttagen, returvärdet oförändrat, inget företagsspecifikt.
+  Granskarens h1 och h2 stoppas med fel som namnger raden, kontot, underlaget, sidan och Öppet 35.
+- **Halvan om kredit** stoppas i dag redan av täckningen eller Öppet 34 (byggsessionens bedömning efter att ha läst
+  koden), så den prövas med två tester direkt på delkontrollen.
+- **Rött före:** 5 av 13 nya tester i `scripts/tests/test_beslut_granskning_27.py` röda mot koden i b7d9fac, körda i
+  projektmappen innan koden ändrades. Sviten efter: **4 434 passed**. Kommandona står i PROGRESS.md, "Läge
+  2026-10-31, Öppet 35 byggd".
+- **Inte granskad oberoende än.** Förslag: en kort granskning i en ny session, som för steg 22 (P9 i granskning 23).
