@@ -8733,3 +8733,325 @@ av). Byggsessionen följer förslaget om Hugo eller Casper inte säger annat i u
 granskat och klart) och punkt 3 (docstringen om momsraden, L1, rättas i samma steg) är inte uttryckligen besvarade;
 granskarens bedömning (ja på båda) gäller tills Hugo eller Casper säger annat. **Inte byggt.** Stegnummer sätts av
 byggsessionen (nästa lediga efter 92 är 93, Hugos beslut 2026-10-30 om byggsessionen för Öppet 32, b).
+
+## Granskning 27 (av 7801a64 och 68e86bb) (2026-10-31)
+
+Oberoende granskning av steg 93 (Öppet 33 och Öppet 34) i en ny session som inte har sett byggsessionen. Granskaren
+ändrade ingen kod och ingen rad i CLAUDE.md, och skrev i den här filen, PROGRESS.md och BYGGPLAN.md (statusraderna,
+CLAUDE.md, Hugos beslut 2026-10-30 om granskning 24, P10). Granskat: `git diff 5b4aa83..68e86bb` (hela), `git show
+7801a64` (testfilen) och `git diff 7801a64..68e86bb` (dokumentationen). Lästes också: CLAUDE.md, SPEC.md (7, styckena
+"Beloppet och sätten att räkna" och "Momsraden står på kontot för ingående moms", 7.1 och 11, stycket "Avgjort (Hugos
+beslut 2026-10-30 om granskning 26 ...)"), här granskning 26 (hela, med H1–H7 och de fyra LUCKA-proven) och "Hugos
+beslut 2026-10-30 om granskning 26", PROGRESS.md (statusraden, "Läge 2026-10-30, Öppet 33 och 34 byggda", tabellen
+Klart, Öppet 32–34 och "Nästa steg" punkt 3) och BYGGPLAN.md ("Läge nu" och steg 93). Koden lästes i
+`scripts/konteringsforslag.py` (docstringen överst, konstanterna, `_underlagets_varde`, `_sla_upp`, `_rakna`,
+`_kontrollera_momskonto`, `_kontrollera_bankkonto`, `_kontrollera_regeln`, `_kontrollera_tackning`,
+`_kontrollera_ursprung`, `_k5`, `kontrollera_underlag`, `_kontrollera_kostnadsraderna`, de nya `_rollens_konto`,
+`_underlagets_kallor`, `_kontrollera_beloppsraderna` och `_kontrollera_momsraderna`, `_kontrollera_underlagen` och
+`skapa_konteringsforslag`), `scripts/las_kontoplan.py` (rollerna, `rollens_konto` och `kontots_roller`),
+`scripts/konteringsfloden.py` (`_underlagets_arenden`), `scripts/las_underlag.py` (K4c:s villkor), testbutikens
+kontoplan och regelbok (R-LEV-TE och R-LEV-KAFFE), underlagen 003, 009 och 020, byggsessionens
+`test_beslut_granskning_26.py` (hela), det ändrade testet i `test_konteringsforslag.py` med hjälpfunktionerna,
+hjälpfunktionerna i `test_beslut_granskning_22.py`, `_23.py` och `_25.py`, `Korning` och `regelbok_med` i
+`test_konteringsfloden.py` och `test_byggplan_progress.py`.
+
+### Beslut som redan var taget (Hugo, 2026-10-31)
+
+Uppdraget till den här granskningen, skrivet i chatten av Hugo 2026-10-31, säger ordagrant:
+
+    "BESLUT SOM REDAN ÄR TAGET (Hugo, 2026-10-31): regeln "ett underlags belopp_ore står på högst en rad i
+    förslaget" BEHÅLLS. Den fanns inte i din ursprungliga granskning. Granska den som vilken annan kod som helst,
+    men fråga inte om den ska vara kvar."
+
+**Vad det betyder:** byggsessionens tillägg till granskarens förslag i granskning 26 (P2 och "Beslut som behövs" 1),
+att ett underlags `belopp_ore` står på högst en rad i förslaget (`_kontrollera_beloppsraderna`, sista stoppet), är
+beslutat av Hugo och behålls. Det som PROGRESS.md ("Läge 2026-10-30, Öppet 33 och 34 byggda" och Öppet 34) och
+SPEC 11 kallar "för Hugo eller Casper att bekräfta" är därmed bekräftat (se L2 nedan om texterna). Regeln granskas
+här som annan kod (P1 och P3), inte om den ska finnas.
+
+### Viktigt först
+
+- **Inget kan bokföras utan godkännande, och ingen spärr har blivit svagare** (P5). 7801a64 lägger bara till stopp
+  i `_kontrollera_underlagen` (två nya delkontroller med var sitt `raise`, två hjälpfunktioner, ett nytt argument och
+  verifikationen i stället för raderna som argument), tar inte bort något och ändrar inte returvärdet. SPEC 7 och 11
+  och docstringen är text. Testfilen skriver bara i testets tillfälliga mapp. 68e86bb rör bara `.md`-filer. CLAUDE.md,
+  `foretag/`, `testforetag/`, `testdata/` och `sparr/` är oförändrade. Förslaget har inget fält för bokfört eller
+  godkänt.
+- **Öppet 33 och Öppet 34 är byggda som beslutet säger** (P1): granskarens prov H7 och de fyra LUCKA-proven från
+  granskning 26 stoppas, byggda om här oberoende av byggsessionens test, med fel som namnger raden, underlaget,
+  kontot raden står på och vad som gäller. Ordningen K5, K8, Öppet 31, 32, 34 och sist 33 stämmer (P2). "Rött före"
+  stämmer (P6) och sviten är grön med 4 421 tester (P6).
+- **Nio egna prov försökte ta sig förbi kontrollerna. Sju stoppas där de ska. Två går igenom, och båda fanns
+  före 7801a64** (P3, M1, nivå medel, inte blockerande, Hugo eller Casper beslutar, ny punkt Öppet 35): förslag där
+  underlagets `belopp_ore` står i debet på leverantörsskulderna utan någon bankrad. (h1) Fakturan spegelvänd, 2440
+  debet `belopp_ore`, 4010 kredit `underlag_ore`, 2641 kredit `moms_ore`, godtas med alla fem kontrollerna "ok": en
+  leverantörsfaktura bokförd som en kreditnota, fast kreditnotor är en egen dokumenttyp som inte finns (Ö8). (h2) Två
+  fakturor under samma regel med exakt samma belopp, den enas `belopp_ore` i debet på 2440 och den andras i kredit på
+  2440, godtas också: inget bokförs, som i granskarens fjärde prov, men nu med varje underlag på exakt en rad, så
+  regeln om högst en rad ser det inte. Ingen av de nya kontrollerna prövar sidan, och inget prövar att en rad med
+  `belopp_ore` i debet (betalningen) har en bankrad i förslaget. Samma familj som Öppet 31–34: vad ett förslag med
+  underlag får se ut som, för kod förbi flödena.
+- **Steg 93 kan stå som klart:** byggt som beslutet och SPEC 7 säger. M1 är en ny punkt (Öppet 35), inte ett fel i
+  det som byggdes, på samma sätt som Öppet 34 var efter Öppet 32.
+
+### Fynd
+
+**P1 – Öppet 33 och Öppet 34 är byggda som beslutet säger, och diffen lägger bara till stopp (notering, rättat).**
+`scripts/konteringsforslag.py` rad 1100–1141 (`_kontrollera_beloppsraderna`): för varje källa på verifikationens
+rader som pekar på underlaget går kontrollen igenom (a) en källa som är `underlag_ore` eller `moms_ore` på en rad som
+räknas med `skillnad` stoppar, oavsett om källan är den första eller en som dras ifrån; (b) en källa som är
+`belopp_ore` på en rad som inte räknas med `lika` stoppar; (c) en sådan rad på ett konto utan rollen
+`leverantorsskulder` stoppar; (d) efter alla rader stoppar fler än en rad med underlagets `belopp_ore`. Rad 1144–1161
+(`_kontrollera_momsraderna`): en källa som är `moms_ore` på en rad vars konto saknar rollen `ingaende_moms` stoppar.
+Båda anropas i `_kontrollera_underlagen` (rad 1209–1210) efter `_kontrollera_kostnadsraderna`, per underlag, och
+returvärdet är oförändrat (rad 1211). `skapa_konteringsforslag` skickar `nytt["verifikation"]` (den rena kopian från
+`_kontrollera_formen`) i stället för raderna (rad 1325). Diffen tar inte bort någon kontroll: `git diff
+5b4aa83..7801a64 -- scripts/konteringsforslag.py` har bara tillägg i koden och ändrad text i docstringarna (det gamla
+"Var momsraden ('moms_ore') får stå är inte beslutat" är borta, granskning 26, L1). **Provet, kört själv:**
+granskarens egen provfil `test_granskare_prov27.py` (P3) bygger H7 och LUCKA 1–4 om från grunden (med egna
+hjälpfunktioner, bara `skapa`, `stoppas`, `tva_konton` och `Korning` från de gamla testfilerna) och alla fem stoppas
+med rätt kontroll och text: H7 med "Öppet 33", "kontot 2641" och "'moms_ore'"; LUCKA 1 med "rad 1 (konto 2440)
+räknas med 'skillnad'", "'belopp_ore'" och "Öppet 34"; LUCKA 2 med "rad 1 (konto 5460) räknas med 'skillnad'"; LUCKA
+3 med "inte är leverantörsskulderna"; LUCKA 4 med "rad 1 och 2" och "högst en rad". Byggsessionens 22 tester är gröna
+i sviten. Tre iakttagelser, inga fel: (a) regeln "aldrig `skillnad`" för `underlag_ore` och `moms_ore` gäller också
+när källan dras ifrån (plats 2 eller senare), vilket är strängare än ordalydelsen "räknas med" kan läsas, och det är
+rätt: en kostnad räknad som bankraden minus momsen hade annars gått förbi. (b) Regeln om högst en rad prövas sist i
+funktionen, efter beräkningssättet och kontot, så ett förslag med `belopp_ore` på två rader där den ena räknas fel
+får felet om beräkningen (provat i e4). (c) `_rollens_konto` fångar `KontoplanFel` bara för feltexten; kontot på
+raden är redan prövat av K2 punkt 6, så grenen "kontot med rollen" nås i praktiken inte.
+
+**P2 – Ordningen stämmer: K5, K8, Öppet 31, Öppet 32, sedan 34, sedan 33 (notering).** I `kontrollera_underlag`
+prövas K7 först och ensam, sedan K5 och K8 (rad 1042–1057); i `_kontrollera_underlagen` sedan Öppet 31 (rad 1201),
+Öppet 32 (rad 1208), Öppet 34 (rad 1209) och Öppet 33 (rad 1210), per underlag. **Provat själv:** e8 (019 under
+R-BUTIK-STAD, byggd som LUCKA 3 med hela beloppet på 5460) stoppas av K5 utan "Öppet 34" i felet; e9 (kostnaden på
+2440 ur `underlag_ore`, momsen på 4010 och beloppet på 4010, tre fel i samma förslag) stoppas av Öppet 32 utan "Öppet
+33" eller "Öppet 34" i felet; e9b (momsen på 4010 och beloppet på 4010) stoppas av Öppet 34 utan "Öppet 33"; e3
+(momsen på 2621, utgående moms) stoppas av ursprungskontrollen punkt 5 före Öppet 33. Byggsessionens tre
+ordningsprov (K5 och K8 först, Öppet 31 först, Öppet 32 först) är gröna också mot 5b4aa83, som de ska. Samma
+iakttagelse som i granskning 26, P3: med två underlag prövas alla sex kontrollerna på det första före K5 på det
+andra; båda stoppar, så det är ofarligt.
+
+**P3 – Hålprov: LUCKA 1–4 och H7 stoppas, nio egna prov, två hål i en ny familj (M1, nivå medel, Hugo eller Casper
+beslutar, Öppet 35).** Granskaren skrev `test_granskare_prov27.py`, bara i scratchpad, och körde den mot kopior av
+68e86bb (**22 gröna**) och 5b4aa83 (**9 röda, 13 gröna**: de nio röda är det 7801a64 stänger). Proven, med utfallet i
+kopian av 68e86bb:
+
+- *s0, skydd:* fakturan för 003 med rätt form godtas, och betalningen som flöde a byggde (2440 debet `belopp_ore`,
+  1940 kredit bankraden) godtas när den skickas in igen för hand med bara id i kopplingarna.
+- *H7 och LUCKA 1–4 från granskning 26:* stoppas (P1). Röda mot 5b4aa83.
+- *e1, bruttot som `summa` på kostnadskontot:* 4010 debet `underlag_ore` + `moms_ore` som `summa`, 2440 kredit
+  `belopp_ore`. Öppet 32 godtar (raden har `underlag_ore` på K5:s konto), Öppet 34 godtar (inte `skillnad`, beloppet
+  rätt). **Öppet 33 stoppar**: momsen på ett konto som inte är ingående moms. Röd mot 5b4aa83. Det är därför Öppet 33
+  behövs också när Öppet 34 finns.
+- *e2, kreditsidan som delarna:* `underlag_ore` och `moms_ore` på 2440 i kredit i stället för `belopp_ore`.
+  Täckningen går ihop. **Öppet 32 stoppar** (rad 3 på 2440, K5 ger 4010). Grön också mot 5b4aa83.
+- *e3, momsen på utgående momskontot 2621:* ursprungskontrollen punkt 5 stoppar ("utgående moms"), före Öppet 33.
+- *e4, `belopp_ore` först i en `skillnad`:* en delbetalning byggd som 2440 debet `belopp_ore` (003), 1940 kredit
+  bankrad 117 (125,00 kr ut), 2440 kredit `skillnad`(`belopp_ore`, bankraden). K2 och täckningen går ihop, punkt 8
+  godtar rollkontona. **Öppet 34 stoppar** rad 3 ("räknas med 'skillnad'", "bara med 'lika'"), före regeln om högst en
+  rad. Röd mot 5b4aa83. Iakttagelse I1 nedan: så får alltså ingen framtida delbetalning eller betalning med avgift
+  byggas.
+- *e4b, `belopp_ore` subtraherat i en `skillnad`:* med bankrad 26 i februari (exakt 003:s belopp) blir skillnaden 0
+  och K2 stoppar, så provet använder en påhittad rad med 1 öre; täckningen stoppar (bankraden två gånger i debet) före
+  Öppet 34. Provet visar bara att inget går igenom. `belopp_ore` kan bara stå som subtraherad källa när den första
+  källan är större, och då stoppar (b) i P1.
+- *e5, två fakturor summerade på en rad:* 003 och 009 (båda R-LEV-TE) med kostnaderna som `summa` på 4010, momsen
+  som `summa` på 2641 och båda beloppen som `summa` på 2440. **Öppet 34 stoppar** rad 3 ("räknas med 'summa'",
+  "'belopp_ore'"). Röd mot 5b4aa83. *e5b:* samma förslag med var sin `belopp_ore`-rad på 2440 godtas med alla
+  kontrollerna "ok" (summerade kostnader och summerad moms är tillåtet).
+- *e6, avrundning:* ett öre flyttat från momsen till kostnaden stoppas av ursprungskontrollen punkt 3 ("skillnad 0,01
+  kr"). *e7, negativt belopp:* `debet_ore` negativt stoppas av K2. Inget når de nya kontrollerna med fel belopp eller
+  fel tecken.
+- *e8, e9, e9b, ordningen:* se P2.
+- *h1, fakturan spegelvänd (LUCKA, grön i båda kopiorna):* `test_h1_fakturan_bakvand_godtas_LUCKA`: 003 under
+  R-LEV-TE med 2440 debet 16 730,56 kr (`belopp_ore`), 4010 kredit 14 938,00 kr (`underlag_ore`) och 2641 kredit
+  1 792,56 kr (`moms_ore`). Täckningen går ihop (hela underlaget på varje sida), punkt 8 godtar, K5 och Öppet 31
+  godtar, Öppet 32 godtar (4010), Öppet 34 godtar (en rad, `lika`, 2440), Öppet 33 godtar (2641). Förslaget skapas
+  med alla fem kontrollerna "ok". Sidan prövas inte av någon kontroll (punkt 5 säger uttryckligen att den inte
+  prövas, eftersom kreditnotor inte är bestämda, Ö8). Det är en leverantörsfaktura bokförd som en kreditnota, eller
+  en återföring, utan något underlag som säger det.
+- *h2, betalning utan bankrad mot en annan faktura (LUCKA, grön i båda kopiorna):*
+  `test_h2_betalning_utan_bankrad_mot_en_annan_faktura_godtas_LUCKA`: testdatan kopierad till testets mapp, där 009
+  får exakt 003:s belopp och momsrad (olika datum och fakturanummer, så K4c slår inte; båda har R-LEV-TE). Förslaget
+  2440 debet 16 730,56 kr (003 `belopp_ore`) och 2440 kredit 16 730,56 kr (009 `belopp_ore`), datum 2025-01-20,
+  godtas med alla fem kontrollerna "ok". Varje underlag står på exakt en rad, med `lika`, på leverantörsskulderna, så
+  regeln om högst en rad ser det inte: den räknar per underlag. Ingen kostnad och ingen moms bokförs, som i
+  granskarens fjärde prov i granskning 26. *h3, skydd:* samma sak med 003:s betalning mot 009:s kostnad och moms i
+  kredit, olika belopp, stoppas av K2. h2 kräver alltså två fakturor under samma regel med exakt samma belopp.
+- *Kan de nya kontrollerna stoppa ett rätt förslag från flöde a, b eller e?* Nej. Byggsessionens skyddstest går
+  igenom hela körningen och prövar att varje rad med ett underlag som källa har rätt form (`moms_ore` på kontot för
+  ingående moms, `belopp_ore` med `lika` på leverantörsskulderna och en per underlag och förslag, ingen `skillnad`),
+  och granskarens s0 och e5b visar att betalningen och ett förslag med två underlag godtas. `konteringsfloden.py`
+  bygger momsraden ur kontoplanens roll och beloppet en gång med `lika` (granskning 26, P2, oförändrat).
+
+*Vad h1 och h2 har gemensamt:* `belopp_ore` står i debet på leverantörsskulderna, som betalningen i flöde a, men
+förslaget har ingen bankrad. I flödena finns `belopp_ore` i debet bara i betalningen, tillsammans med bankraden på
+bankkontot. *Varför M1 inte är blockerande:* luckan fanns före 7801a64 (grön i kopian av 5b4aa83), flödena bygger
+aldrig så, bara kod förbi flödena kan, h2 kräver två fakturor med exakt samma belopp, och förslaget kräver
+godkännande av en människa, som ser att fakturan står på fel sida. *Varför den bör rättas före uppgift 5:* samma skäl
+som Öppet 31–34 (uppgift 5 ger `skapa_konteringsforslag` nya anropare), och h1 ger en bokföring som inget underlag
+säger (en faktura återförd) med alla kontroller gröna. *Granskarens förslag till regel, för Hugo eller Casper att ta
+ställning till (Öppet 35):* i ett förslag med underlag står `belopp_ore` i kredit (fakturan) bara när underlagets
+`underlag_ore` och `moms_ore` inte står i kredit, och i debet (betalningen) bara när förslaget har minst en bankrad
+i kopplingarna och ingen rad med underlagets `underlag_ore` eller `moms_ore`. Det stoppar h1 (beloppet i debet utan
+bankrad) och h2 (samma). Alternativ: kräv flödenas två former rakt av (fakturan: kostnad och moms i debet,
+`belopp_ore` i kredit; betalningen: `belopp_ore` i debet, bankraden i kredit, inget annat från underlaget). Båda
+är beslut om vad ett förslag med underlag får se ut som, och hänger ihop med Ö8 (kreditnotor), så det är inte
+granskarens sak att välja. Några rader kod och ett test med h1 och h2.
+
+**P4 – Det ändrade gamla testet är rimligt och rött mot 5b4aa83 (notering, med ett lågt fynd, L1).**
+`scripts/tests/test_konteringsforslag.py` rad 979–988: testet hette
+`test_tackningen_godtar_underlaget_som_skillnad_mellan_beloppet_och_momsen` och visade att täckningen godtar
+kostnaden räknad som `belopp_ore` minus momsen, exakt granskarens LUCKA 1 på rätt konto. Det är ändrat till
+`..._godtar_men_oppet_34_stoppar_...`, kräver nu att förslaget stoppas med kontrollen `ursprung`, "rad 1 (konto
+4010) räknas med 'skillnad'", "'belopp_ore'" och "Öppet 34", och att "används" inte står i felet (så att det inte är
+täckningens fel). Kommentaren säger varför och att förslaget godtogs före steg 93. Rimligt: beteendet är ändrat med
+beslut, testet säger det nya och behåller spåret av det gamla, och antalet tester är oförändrat. **Rött mot
+5b4aa83, kört själv:** det ändrade testet kopierat till kopian av 5b4aa83 och kört med `-k oppet_34`: **1 failed**,
+"DID NOT RAISE" (kommando 12). **L1 (låg, test):** påståendet `"används" not in text` utesluter täckningens två fel
+med "används", men inte det tredje ("dras ... ifrån ... mer än den läggs till"). De andra texterna som krävs
+("räknas med 'skillnad'", "Öppet 34") kommer bara från Öppet 34, som prövas efter täckningen, så testet bevisar ändå
+att täckningen godtog. Påståendet är överflödigt, inte fel. Ingen åtgärd krävs.
+
+**P5 – Inget företagsspecifikt i kärnan, inget fält för bokfört eller godkänt, inget skriver filer (notering).**
+`grep -r` efter `4010`, `5460`, `2440`, `2641`, `1940`, `SYNT`, `syntet`, `Syntet` och `LEV-TE` i `scripts/` utanför
+`scripts/tests/` ger bara ordet "SYNTETISK" som exempel i två docstrings (`las_kontoplan.py` rad 10 och
+`las_momssatser.py` rad 11, före 7801a64). De nya kontrollerna använder bara rollnamnen `leverantorsskulder` och
+`ingaende_moms` (kärnans egna, `las_kontoplan.ROLLER`) och kontot från förslaget och kontoplanen i feltexterna.
+`grep` efter `bokford`, `bokfört`, `godkand`, `godkänd` och `godkant` i `konteringsforslag.py` ger bara docstringarna
+som säger att fältet inte finns (rad 5 och 1256); `Konteringsforslag` har fortfarande bara `forslag_id`,
+`verifikation`, `kopplingar`, `motivering` och `kontroller`. `git diff 5b4aa83..68e86bb` för CLAUDE.md, `foretag/`,
+`testforetag/`, `testdata/` och `sparr/` är tom. Byggsessionens testfil skriver bara i `tmp_path_factory.mktemp` och
+läser SPEC.md och `konteringsforslag.py` i projektet, som de tidigare testfilerna. Granskarens provfil skriver bara i
+scratchpad och i testets tillfälliga mapp (kopian av testdatan i h2).
+
+**P6 – "Rött före" stämmer: 12 röda och 10 gröna av 22, det gamla testet rött, och sviten 4 421 gröna (notering).**
+`git archive` av 5b4aa83 till scratchpad, byggsessionens testfil kopierad dit och körd: **12 failed, 10 passed**,
+exakt de tolv PROGRESS.md namnger (H7 med båda momsfilerna, momsen på leverantörsskulderna, LUCKA 1 med båda
+momsfilerna och på 4010, LUCKA 2, 3 och 4, `underlag_ore` som `skillnad`, ordningsprovet Öppet 34 före 33, alla "DID
+NOT RAISE", och dokumentationstestet, SPEC saknade Öppet 33 och 34) och samma tio gröna skydd. Det ändrade gamla
+testet: 1 failed mot kopian (P4). Hela sviten i projektmappen med kommandot i SPEC 7.1: **4 421 passed**, 0 röda, på
+74 sekunder, samma antal som PROGRESS.md (4 399 + 22). Kördes i bakgrunden, eftersom den tar över en minut;
+utskriften lästes med fil-verktyget Read.
+
+**P7 – Dokumenten säger samma sak (notering, med statusraderna som uppdateras här, och ett lågt fynd, L2).** SPEC 7
+(båda styckena: regeln, ordningen "efter Öppet 32" och "sist, efter Öppet 34", "högst en rad" som byggsessionens
+tillägg, flödena berörs inte, punkt 5:s begränsning), SPEC 11 (avgjort, byggt som steg 93, rött före, det gamla
+testet), här "Hugos beslut 2026-10-30 om granskning 26" (ordagrant, byggsessionen följer förslaget), docstringen i
+`konteringsforslag.py` (rad 166–197, samma ordning och samma skäl), PROGRESS.md (statusraden, lägesposten med "Steg i
+byggplanen: 93 (klart)", testsviten 4 421, tabellen Klart, Öppet 33 och 34 stängda, "Nästa steg" punkt 3) och
+BYGGPLAN.md ("Läge nu", steg 93 ✅) stämmer med varandra och med koden. Stegnumret 93 är nästa lediga efter 92.
+Kommandona i byggsessionens post (P7-regeln i CLAUDE.md) går att följa, och "rött före" är kört om här med samma
+utfall. Det som sa "inte granskad oberoende än" (PROGRESS.md statusraden, lägesposten, tabellen Klart, Öppet 33 och
+34 och "Nästa steg" punkt 3; BYGGPLAN.md "Läge nu" och steg 93) uppdateras i den här commiten. Byggplanstestet är
+grönt (kommando 15). **L2 (låg, dokumentation):** PROGRESS.md (lägesposten och Öppet 34) och SPEC 11 säger att regeln
+om högst en rad är "för Hugo eller Casper att bekräfta". Den är bekräftad av Hugo 2026-10-31 (uppdraget till den här
+granskningen, ovan). Granskaren ändrar inte SPEC (uppdraget: inga andra filer); texterna i PROGRESS.md rättas i
+statusuppdateringen här, och SPEC 11 kan få en mening om beslutet i nästa dokumentationscommit.
+
+**I1 – Iakttagelse, inget fel: vad Öppet 34 utesluter för framtiden.** `belopp_ore` bara med `lika` betyder att en
+betalning med avgift (bankraden större än fakturan, avgiften som `skillnad`) eller en delbetalning (fakturan större
+än bankraden, resten som `skillnad`, e4) inte kan byggas med `belopp_ore` som källa i skillnaden. Det är så beslutet
+lyder, och flödena bygger inget sådant i dag. När ett sådant flöde behövs (till exempel Ö11, bankens avgifter som
+underlag) måste det byggas på annat sätt eller regeln ändras med ett nytt beslut.
+
+**P8 – Avsteg och iakttagelser (notering).** Vakten stoppade sex kommandon som granskaren skrev i strid med SPEC
+7.1, alla bara läsande: ett `git log` ihopkopplat med `&&`, två `grep` med `\|` i mönstret, två `grep -E` med `|` i
+mönstret och ett `cat` på en sökväg som inte fanns (det sista inte vakten utan filen). De ersattes med ett kommando i
+taget och `grep` med flera `-e`. Hela sviten kördes i bakgrunden (74 sekunder). Granskarens provfil hade först två
+egna fel (kopplingarna från ett färdigt förslag har kontrollsummor, och Öppet 33:s fel nämner "byggsessionen för
+Öppet 32"), rättade innan proven räknades, och ett prov (e4) byggdes om när det visade sig stoppas av K2 i stället
+för Öppet 34. Inget i projektet ändrades utom de tre dokumentfilerna, och inget utanför projektet utom scratchpad.
+
+### Svar på uppdragets punkter
+
+1. **Koden stänger Öppet 33 och 34, lägger bara till stopp, tar inte bort något och ändrar inte returvärdet:** ja
+   (P1).
+2. **Ordningen K5, K8, Öppet 31, 32, sedan 34, sedan 33:** stämmer (P2).
+3. **LUCKA-proven och H7 prövade själv, och egna prov:** alla fem stoppas; nio egna prov, sju stoppas där de ska
+   (avrundning, negativt belopp, brutto som `summa`, kreditsidan som delarna, moms på utgående momskontot,
+   `belopp_ore` i en `skillnad`, två fakturor summerade), två går igenom (h1 och h2, M1, fanns före) (P3).
+4. **Det ändrade gamla testet:** rimligt, och rött mot 5b4aa83 (P4, L1).
+5. **Inget företagsspecifikt i `scripts/` utanför `scripts/tests/`, och inget fält för bokfört eller godkänt:**
+   stämmer (P5).
+6. **Sviten:** 4 421 gröna, 0 röda (P6).
+7. **Granskningen och beslutet om högst en rad:** här, under granskning 27. Inga andra filer ändrade utom
+   statusraderna i PROGRESS.md och BYGGPLAN.md (CLAUDE.md).
+
+### Steg 93
+
+**Steg 93 är klart och granskat:** Öppet 33 och Öppet 34 är byggda som Hugos beslut och SPEC 7 säger, och regeln om
+högst en rad är beslutad av Hugo 2026-10-31. M1 är en ny punkt (Öppet 35), inte en del av steg 93, men bör byggas
+före uppgift 5 (steg 23).
+
+### Testsviten
+
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`:
+**4 421 passed**, 0 misslyckade, på 74 sekunder, samma antal som PROGRESS.md.
+
+### Kommandon i den här granskningen
+
+`<scratch>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/2b2a0a1f-5f2a-4bf8-9f05-f5f32c340f48/scratchpad`.
+Allt kördes från projektmappen, ett kommando i taget, i förgrunden utom kommando 7.
+
+1. `git log --oneline -8`, `git status --short`, `git diff --stat 5b4aa83..68e86bb`, `git diff 5b4aa83..7801a64 --
+   scripts/konteringsforslag.py scripts/tests/test_konteringsforslag.py SPEC.md`, `git show 7801a64 --
+   scripts/tests/test_beslut_granskning_26.py`, `git diff 7801a64..68e86bb`, `git diff 5b4aa83..68e86bb -- CLAUDE.md`
+   och `git diff 5b4aa83..68e86bb -- foretag testforetag testdata sparr` (de två sista tomma).
+2. `cat`, `ls`, `wc -l` och `grep` med `-n`, `-c`, `-e`, `-r`, `-A`, `-B`, `--include` och `--exclude-dir` i
+   projektet; stycken av filer och de stora `git diff`-utskrifterna lästes med fil-verktyget Read.
+3. `mkdir -p <scratch>/kopia-5b4aa83` och `mkdir -p <scratch>/kopia-68e86bb`.
+4. `git archive -o <scratch>/5b4aa83.tar 5b4aa83` och samma för `68e86bb`.
+5. `tar -xf <scratch>/5b4aa83.tar -C <scratch>/kopia-5b4aa83` och samma för `68e86bb`.
+6. `grep -n -r -e 4010 -e 5460 -e 2440 -e 2641 -e 1940 -e SYNT -e syntet -e Syntet -e LEV-TE --include='*.py'
+   --exclude-dir=tests scripts` (P5).
+7. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`
+   (hela sviten i projektmappen, i bakgrunden: **4 421 passed**, 0 röda, 74 sekunder).
+8. Provfilen `test_granskare_prov27.py` skrevs med fil-verktyget Write i `<scratch>/kopia-68e86bb/scripts/tests/` och
+   rättades med fil-verktyget Edit.
+9. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rA
+   <scratch>/kopia-68e86bb/scripts/tests/test_granskare_prov27.py` (först **2 failed, 20 passed**, granskarens egna
+   provfel, se P8; efter rättelsen **22 passed**; efter ombyggt e4, med `-rf`, **22 passed**).
+10. `cp -R scripts/tests/test_beslut_granskning_26.py <scratch>/kopia-5b4aa83/scripts/tests/test_beslut_granskning_26.py`.
+11. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rA
+    <scratch>/kopia-5b4aa83/scripts/tests/test_beslut_granskning_26.py` (**12 failed, 10 passed**, rött före, P6).
+12. `cp -R scripts/tests/test_konteringsforslag.py <scratch>/kopia-5b4aa83/scripts/tests/test_konteringsforslag.py`
+    och `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line
+    -rA -k oppet_34 <scratch>/kopia-5b4aa83/scripts/tests/test_konteringsforslag.py` (**1 failed**, "DID NOT RAISE",
+    P4).
+13. `cp -R <scratch>/kopia-68e86bb/scripts/tests/test_granskare_prov27.py <scratch>/kopia-5b4aa83/scripts/tests/test_granskare_prov27.py`
+    (två gånger, före och efter ombyggt e4).
+14. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rA
+    <scratch>/kopia-5b4aa83/scripts/tests/test_granskare_prov27.py` (**9 failed, 13 passed**: de nio som 7801a64
+    stänger, "DID NOT RAISE"; h1 och h2 gröna också här, luckan fanns före).
+15. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q -k
+    byggplan_progress scripts/tests` efter att det här avsnittet och statusraderna skrivits.
+16. `git status`, `git add GRANSKNING.md PROGRESS.md BYGGPLAN.md` och `git commit -F <scratch>/commit-granskning-27.txt`
+    (meddelandet skrivet med fil-verktyget), sedan `git status` och `git log --oneline -3`.
+
+Vakten stoppade: `&&` mellan två kommandon, `\|` i `grep`-mönster (två gånger) och `|` i `grep -E`-mönster (två
+gånger). Se P8.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **Öppet 35 (M1):** ska `skapa_konteringsforslag` stänga vägen där ett underlags `belopp_ore` står i debet på
+   leverantörsskulderna utan bankrad (h1, fakturan spegelvänd, och h2, två fakturor med samma belopp mot varandra),
+   före uppgift 5? Granskarens förslag: `belopp_ore` i kredit bara utan underlagets delar i kredit, och i debet bara
+   med minst en bankrad i förslaget och utan underlagets delar alls. Alternativet är flödenas två former rakt av.
+   Hänger ihop med Ö8 (kreditnotor). Granskarens bedömning: ja, på samma grund som Öppet 31–34, i ett eget steg med
+   nästa lediga nummer.
+2. **Steg 93:** får räknas som granskat och klart (granskarens bedömning: ja; M1 är en ny punkt, inte ett fel i det
+   som byggdes).
+3. **L2:** SPEC 11 får en mening om att regeln om högst en rad är beslutad av Hugo 2026-10-31, i nästa
+   dokumentationscommit (granskarens bedömning: ja, ingen egen session).
+
+STATUS: gult
+STEG I BYGGPLANEN: 93 – Öppet 33 och Öppet 34 – klart (granskat i den här granskningen)
+KAN JAG GÅ VIDARE: ja. Inget blockerande: inget kan bokföras, ingen spärr är svagare, Öppet 33 och 34 är byggda som
+beslutet säger, och alla prov från granskning 26 stoppas. Gult för att hålprovet hittade två förslag (M1, Öppet 35)
+som godtas med alla kontroller gröna: fakturan spegelvänd, och två lika stora fakturor mot varandra, båda med
+beloppet i debet utan bankrad. De fanns före 7801a64 och bör rättas före uppgift 5, efter Hugos eller Caspers beslut.
+ÄNDRINGAR I CLAUDE.md: inga
+BESLUT SOM BEHÖVS: 1–3 ovan.
+NÄSTA STEG: Hugo eller Casper svarar på 1–3. Sedan Öppet 35 (eget steg) och steg 92 (Öppet 26) före uppgift 5. Steg
+15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
