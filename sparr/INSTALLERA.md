@@ -17,7 +17,7 @@ Agenten kan därför inte ändra filerna.
 | Fil i projektet | Kopieras till | Vad den gör |
 |---|---|---|
 | `sparr/kommandosparr.py` | `/Library/Application Support/ClaudeCode/vera/kommandosparr.py` | **Vakten.** Ett litet program som Claude Code kör före varje verktyg. Det stoppar allt som inte står på listan i SPEC 7.1. Det stoppar också ett kommando vars program ligger i en mapp som du kan ändra utan lösenord, och kommandon som ändrar `PATH` (PATH-regeln, se nedan). |
-| `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.295 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Inte heller i filerna som zsh läser när det startar och de filer som de läser in: nvm-mappen `~/.nvm`, `~/.zkbd`, `~/.zsh_sessions`, `~/.zlogout` och systemets zsh-filer i `/etc` (granskning 13, P1 b), och `~/.zcompdump`,
+| `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.295 startar inte alls. Agenten får inte skriva i `.git/hooks`, `.git/config` och `.git/info`, i projektmappens `.venv`, i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`. Inte heller i filerna som zsh läser när det startar och de filer som de läser in: nvm-mappen `~/.nvm`, `~/.zkbd`, `~/.zsh_sessions`, `~/.zlogout` och systemets zsh-filer i `/etc` (granskning 13, P1 b), och `~/.zcompdump`,
 som zsh:s `compinit` läser in vid start (granskning 14, R1), eller i den kompilerade versionen (`.zwc`) av någon av zsh:s startfiler eller av `~/.zcompdump`, som zsh läser i stället för filen (granskning 15, S2). Inte heller i Claude Code för Terminal (`~/.local/bin/claude` och `~/.local/share/claude`), i skrivbordsappens egen Claude Code (`~/Library/Application Support/Claude/claude-code`) eller i appen (`/Applications/Claude.app`) (granskning 13, P4 a). Inte heller någonstans i hela `~/Library/Application Support/Claude`, där också skrivbordsappens egna inställningar ligger (Hugos svar 2026-10-28 efter granskning 13, punkt 3). Inte heller i en fil som heter `.ugrep`, i någon mapp, som är inställningsfilen för det program som `grep` kör i agentens skal (granskning 16, G7). Läget "auto" går att använda, och skills kan inte köra skalkommandon. |
 | `requirements.txt` (listan över paket) | `/Library/Application Support/ClaudeCode/vera/venv` (skapas, kopieras inte) | **Projektets Python med pytest**, som testsviten körs med. Den låg förut i mappen `.venv` i projektet, som du äger, och då stoppade PATH-regeln testsviten. Nu ligger den där bara systemet kan ändra den (Hugos beslut 2026-10-28 om vakten, beslut 1). |
 
@@ -568,10 +568,11 @@ shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-set
 - Jämför de tre summorna, tecken för tecken, med dem som den oberoende granskningen har skrivit upp
   (Hugos beslut 2026-10-28). `requirements.txt` är listan över paket som installeras i steg 9 (granskning
   15, S6, Hugos beslut 2026-10-28). **Är någon summa olika: stoppa och fråga.** Kopiera ingenting.
-- Summorna ska vara exakt de här (2026-10-28 efter granskning 19, och 2026-10-29 för inställningarna). Den
-  oberoende granskningen ska skriva upp samma summor. Skiljer granskningens summor från dessa: stoppa och fråga.
+- Summorna ska vara exakt de här (2026-10-28 efter granskning 19, och 2026-11-04 för inställningarna, versionen
+  med sandlåda, steg 15). Den oberoende granskningen ska skriva upp samma summor. Skiljer granskningens summor från
+  dessa: stoppa och fråga.
   - `sparr/kommandosparr.py`: `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d`
-  - `sparr/managed-settings.json`: `149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2`
+  - `sparr/managed-settings.json`: `903909fe24769eb358ba42082c993f4ce5b70d62359672f4b2777c04ac23607e`
   - `requirements.txt`: `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a`
 
 ## Steg 6: skapa mapparna och låt systemet äga dem
@@ -812,6 +813,156 @@ Stoppa och fråga.**
 Ny granskad `managed-settings.json`: kör steg 5 och 10–13 (svara `y` när steg 10 frågar), sedan kontrollen
 steg 1, 2, 3, 9.
 
+## Provkörning med sandlådan, före bytet (steg 15)
+
+Den här provkörningen ska visa att testerna i grupp A–C från provkörningen 2026-11-04 är gröna i sandlådan. Ingenting
+installeras, inget kräver lösenord, och de låsta inställningarna är oförändrade. Sandlådan gäller bara den här sessionen.
+Kör i programmet **Terminal**, ett kommando i taget:
+
+```bash
+cd ~/VERA/agent
+```
+
+```bash
+~/.local/bin/claude --version
+```
+
+- Skriv upp versionen. Den behövs vid bytet nedan. Provkörningen 2026-11-04 gjordes med 2.1.314.
+
+```bash
+~/.local/bin/claude --settings '{"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false,"autoAllowBashIfSandboxed":false,"excludedCommands":[]}}'
+```
+
+Be sedan Claude: "Kör exakt det här kommandot med Bash-verktyget, och ändra ingenting i det:" och klistra in:
+
+```
+'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rfs scripts/tests
+```
+
+**Väntat på sista raden: `2 failed`, `4604 passed` och `17 skipped`.** Skicka hela slutet av utskriften till sessionen som hjälper dig.
+
+- **De två röda ska vara grupp D**, och bara de: `test_beslut_granskning_17.py::test_h6_en_lank_till_git_stoppas` och
+  `test_kommandosparr.py::test_beslut_1_gamla_venv_i_projektet_stoppas`. De kan bli gröna först efter bytet, eftersom de
+  låsta inställningarna fortfarande har de gamla förbuden. Av samma skäl stoppas `git add` fortfarande i den här
+  sessionen. **Är något annat test rött: stoppa och fråga.**
+- **Av de 17 överhoppade är 11 spärrtestet**, med texten `SPÄRRTESTET HOPPAS ÖVER`. Det är väntat före bytet. De andra **6**
+  hoppades över också 2026-11-04, och skälet har inte kontrollerats. Utskriften (`-rfs`) visar vilka de är.
+- Avsluta med `/exit`.
+
+## Byte till versionen med sandlåda (steg 15)
+
+Hugos beslut 2026-11-04 om sandlådan (`GRANSKNING.md`). Alla kommandon körs i en sandlåda, och förbuden för `.git` och `.venv` i inställningarna är avsmalnade. Vakten är oförändrad och stoppar fortfarande fil-verktygen i hela `.git` och i varje `.venv`. **Agenten kör inga av kommandona.** Du kör dem själv i Terminal,
+ett i taget, och skriver ditt administratörslösenord när datorn frågar. **Visar ett kommando något annat än det som står:
+stoppa och fråga**, och kör inte nästa kommando. `sudo cp`, `sudo chown` och `sudo chmod` visar ingenting när de går bra.
+
+**Innan du börjar:** den oberoende granskningen ska vara klar, provkörningen ovan ska vara gjord, och filen ska vara den som
+granskades. Sessionen där bytet görs ska inte vara en session med agenten: kör allt i ett vanligt Terminal-fönster.
+
+**1. Version.** Läs av båda, eftersom Claude Code har uppdaterat sig efter 2.1.314:
+
+```bash
+~/.local/bin/claude --version
+```
+
+Läs också raden **Claude Code** i `/status` i skrivbordsappen. Båda ska vara minst 2.1.295, som filen kräver. Är Terminalens
+version en annan än i provkörningen: gör provkörningen igen med den versionen. Dokumentationen anger ingen lägsta version för
+nycklarna i `sandbox`. Den nämner bara 2.1.224 (avslutande snedstreck) och 2.1.285 (`allowUnsandboxedCommands`), och båda är
+äldre än 2.1.295. Att sandlådan körs i skrivbordsappen står inte på sidorna som är lästa (se "Inte bekräftat" i
+`GRANSKNING.md`), så det prövas i punkt 6.
+
+**2. Kontrollsummor, före bytet:**
+
+```bash
+shasum -a 256 ~/VERA/agent/sparr/managed-settings.json ~/VERA/agent/sparr/kommandosparr.py
+```
+
+```bash
+shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+- Den nya filen i projektet: `903909fe24769eb358ba42082c993f4ce5b70d62359672f4b2777c04ac23607e`. Den oberoende granskningen ska ha skrivit upp samma summa.
+- Filen som är installerad nu: `149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2`.
+- Vakten, båda ställena (beslut 5, den ändras inte): `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d`.
+
+**3. Spara förra versionen**, bredvid den, så att du kan backa utan agenten:
+
+```bash
+sudo cp -i "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/managed-settings.fore-sandladan.json"
+```
+
+```bash
+sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.fore-sandladan.json"
+```
+
+```bash
+sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.fore-sandladan.json"
+```
+
+- `-i` gör att datorn frågar innan den skriver över. Frågar den: svara `n`, stoppa och fråga.
+
+**4. Kopiera den nya versionen.** Inställningarna börjar gälla direkt för nya sessioner.
+
+```bash
+sudo cp ~/VERA/agent/sparr/managed-settings.json "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+```bash
+sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+```bash
+sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+**5. Kontrollera efter bytet:**
+
+```bash
+shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/managed-settings.fore-sandladan.json"
+```
+
+- Första raden ska vara `903909fe24769eb358ba42082c993f4ce5b70d62359672f4b2777c04ac23607e` och andra `149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2`.
+
+```bash
+ls -lde@ "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/managed-settings.fore-sandladan.json"
+```
+
+- Båda ska vara `-rw-r--r--`, med ägaren `root` och gruppen `wheel`. Extra uppgifter följer regeln i steg 2.
+
+**6. Kontrollen efter bytet.** Avsluta skrivbordsappen helt (Cmd+Q) och öppna den igen. Avsluta också öppna sessioner i Terminal.
+
+1. **Terminal:** kör `cd ~/VERA/agent` och `~/.local/bin/claude`, och skriv `/status`. Raden **Setting sources** ska visa `Enterprise managed settings (file)`.
+2. **Skriv `/sandbox` och öppna fliken Config.** Listan **Denied within allowed** ska ha `.git/hooks`, `.git/config` och dina förbud. Inga egna undantag eller nya mappar att skriva i ska finnas: en tom lista i de låsta inställningarna kan inte hålla dem borta (Hugos svar 2026-11-04), så du lägger aldrig till `excludedCommands`, `allowWrite` eller `--add-dir` själv. Avsluta med `/exit`.
+3. **Ny session i fliken Code i skrivbordsappen, startad i `~/VERA/agent`.** Be agenten köra `git status`. Claude Code frågar som vanligt (beslut 3). Säg ja. Kommandot ska visa läget i projektet.
+4. **Hela sviten, inne i sandlådan.** Be agenten köra:
+
+   ```
+   '/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests
+   ```
+
+   **Väntat: `0 failed`, alltså inga röda.** Grupp D ska nu vara gröna. Det ska inte stå `SPÄRRTESTET HOPPAS ÖVER`. Spärrtestet i `scripts/tests/test_sandladan.py` prövar git add och git commit i en kopia av repot, att skrivning i `.git/hooks`, `.git/config` och `.git/info` stoppas, att skrivning utanför projektet, i `~/.local/share/claude`, i appen och i appens Claude Code stoppas, och att läsning av `~/.ssh` stoppas. **Står den texten där, eller är något rött: stoppa och fråga.**
+5. **`git add` och `git commit` på riktigt.** Görs vid nästa ändring i projektet: de ska gå igenom. Stoppas de med `Operation not permitted`: stoppa och fråga.
+6. **Sista kontrollen:** steg 2, 4 och 9 i "Kontroll efter installationen" nedan. Be också agenten skapa en mapp i scratchpad med `mkdir -p`, eftersom kopior och provfiler ligger där. Det ska gå igenom.
+7. **Skalet:** kontrollskriptet i steg 4 g gäller oförändrat.
+
+**Det här gäller från nu:**
+
+- Kommandon med `git fetch`, `git pull` och `git push` mot en SSH-adress går inte i sandlådan på macOS, enligt dokumentationen. De står inte heller på listan i SPEC 7.1. Du kör dem själv i Terminal.
+- Får `git merge` eller `git checkout` felet `unable to unlink old`, kör du kommandot själv i Terminal (dokumentationen, "A git command fails with `unable to unlink old`").
+- Ett kommando du själv skriver efter `!` körs oftast utanför sandlådan, enligt dokumentationen.
+- **Caspers dator:** förbudet `Edit(~/VERA/agent/.venv/**)` förutsätter att projektet ligger i `~/VERA/agent`. Ligger det någon annanstans blir det en ny version av filen (steg 14).
+
+**Backa till förra versionen.** Vägrar Claude Code eller skrivbordsappen starta, stoppas allt med `Sandbox is required`, eller blir något i kontrollen fel. Kör i Terminal, som inte behöver agenten:
+
+```bash
+sudo cp "/Library/Application Support/ClaudeCode/managed-settings.fore-sandladan.json" "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+```bash
+shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+- Summan ska vara `149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2`. Avsluta sedan appen helt och öppna den igen. Vakten är kvar, oförändrad. Skriv upp vad som hände, och fråga.
+
 ## Caspers dator
 
 Samma steg, i samma ordning, och samma versionskontroll i steg 1 (minst 2.1.295, med `/status` i
@@ -820,8 +971,8 @@ med hela sökvägen och samma varning för installerarens förslag). Samma kontr
 kontrollen efter installationen, steg 1, och samma kontroll av agentens skal i steg 4 h. Samma förprov i
 steg 3 och samma kontroll av mapparna i steg 2 och 13. Samma kontroll av vaktens Python i steg 2 b: på
 Caspers dator är den inte kontrollerad, så den kan visa en annan version eller att utvecklarverktygen saknas.
-Då gäller samma sak: stoppa och fråga. Samma `managed-settings.json` fungerar: regeln som hindrar agenten att skriva i
-`.git` (`Edit(//**/.git/**)`) gäller varje `.git`-mapp på datorn och har inget användarnamn i sig.
+Då gäller samma sak: stoppa och fråga. Samma `managed-settings.json` fungerar: reglerna som hindrar agenten att skriva i
+`.git/hooks`, `.git/config` och `.git/info` gäller varje `.git`-mapp på datorn och har inget användarnamn i sig.
 Skillnader:
 
 - Sökvägen till projektet kan vara en annan. Byt `~/VERA/agent` i steg 1, 4 g, 5, 7, 9, 10 och 12 mot där

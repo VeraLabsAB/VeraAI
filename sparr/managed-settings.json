@@ -3,14 +3,33 @@
   "allowManagedHooksOnly": true,
   "allowManagedPermissionRulesOnly": true,
   "disableSkillShellExecution": true,
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "autoAllowBashIfSandboxed": false,
+    "excludedCommands": [],
+    "filesystem": {
+      "denyWrite": [
+        "/Applications/Claude.app",
+        "~/Library/Application Support/Claude/claude-code",
+        "~/.local/share/claude"
+      ],
+      "denyRead": ["~/.ssh"]
+    }
+  },
   "permissions": {
     "disableBypassPermissionsMode": "disable",
     "deny": [
       "Bash(sudo *)",
       "Bash(su *)",
       "Bash(su)",
-      "Edit(//**/.git/**)",
-      "Edit(//**/.git)",
+      "Read(~/.ssh/**)",
+      "Edit(//**/.git/hooks/**)",
+      "Edit(//**/.git/hooks)",
+      "Edit(//**/.git/config)",
+      "Edit(//**/.git/info/**)",
+      "Edit(//**/.git/info)",
       "Edit(//**/.ugrep)",
       "Edit(~/.ugrep)",
       "Edit(~/.zshrc)",
@@ -59,7 +78,7 @@
       "Edit(~/Library/Application Support/Claude/**)",
       "Edit(//Applications/Claude.app/**)",
       "Edit(//opt/homebrew/**)",
-      "Edit(//**/.venv/**)"
+      "Edit(~/VERA/agent/.venv/**)"
     ]
   },
   "hooks": {

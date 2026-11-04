@@ -30,6 +30,7 @@ import subprocess
 import pytest
 
 from test_kommandosparr import (  # noqa: F401 (fixturerna används av pytest via namnen)
+    installera_utan_sandlada,
     AGENT_KOMMANDO,
     INSTALLERA,
     KROKLISTOR,
@@ -634,7 +635,8 @@ def test_historiken_ar_flyttad_till_granskning():
 
 def test_installera_ar_kortare_an_fore_granskning_15():
     # Före: 989 rader, 9 043 ord, 51 kommandorutor och 16 sudo-kommandon (räknat 2026-10-28 i byggsessionen).
-    text = INSTALLERA.read_text(encoding="utf-8")
+    # Avsnitten för versionen med sandlåda (steg 15) räknas inte: de är ett byte, och prövas i test_sandladan.py.
+    text = installera_utan_sandlada()
     assert len(text.splitlines()) < 989
     assert len(text.split()) < 9043
     assert len(re.findall(r"^ *```bash", text, flags=re.M)) < 51

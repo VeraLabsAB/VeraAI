@@ -40,6 +40,7 @@ from test_beslut_granskning_15 import (
     inget_zsh,
 )
 from test_kommandosparr import (  # noqa: F401 (fixturerna används av pytest via namnen)
+    AVSMALNADE_FORBUD,
     INSTALLERA,
     PROJEKTET,
     _bedom,
@@ -394,9 +395,14 @@ def test_h6_samma_namn_skrivet_pa_olika_satt_jamfors_lika(vakt):
     assert vakt._jamforbar("café") == vakt._jamforbar("café") == vakt._jamforbar("CAFÉ")
 
 
-def test_h6_vakten_har_samma_forbud_som_installningarna(vakt):
+def test_h6_vakten_har_samma_forbud_som_installningarna_utom_de_avsmalnade(vakt):
+    # Hugos beslut 2026-11-04 om sandlådan, beslut 5 och 6: inställningarna har avsmalnade förbud för .git och .venv,
+    # och vakten är oförändrad. Skillnaden står i AVSMALNADE_FORBUD. Allt annat är lika, i samma ordning.
     edit = [r[len("Edit("):-1] for r in _installningar()["permissions"]["deny"] if r.startswith("Edit(")]
-    assert list(vakt.SKRIVFORBUD) == edit
+    forvantade = []
+    for regel in vakt.SKRIVFORBUD:
+        forvantade += AVSMALNADE_FORBUD.get(regel, [regel])
+    assert edit == forvantade
 
 
 def test_h6_vakten_provar_alla_skrivverktyg(vakt):
