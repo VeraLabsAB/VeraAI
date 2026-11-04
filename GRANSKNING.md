@@ -10800,3 +10800,26 @@ Skrivna av Hugo i chatten 2026-11-04, i uppdraget till planeringssessionen. Orda
 - **Uppdraget säger "ändra inga andra steg i BYGGPLAN.md", så tre rader är inte ändrade och säger mindre än besluten.** Steg 23 har inte 102 under "Beror på". Steg 96 nämner inte beslut 2 och 4. Steg 100 säger fortfarande "väntar på besked". Det rätta står i "Läge nu" och i steg 102 i BYGGPLAN.md och i PROGRESS.md (Öppet 41, 44, 47 och 50).
 - **Beslut 6:** förslaget står i `PLAN-KASSIO-FORSLAG.md`. BYGGPLAN.md skrivs inte om förrän Hugo eller Casper har svarat på frågorna där.
 - Ingen kod, inga test och inget i SPEC, CLAUDE.md eller vakten är ändrat.
+
+## Hugos beslut 2026-11-04 om planen (PLAN-KASSIO-FORSLAG.md)
+
+Skrivna av Hugo i chatten 2026-11-04, i uppdraget till planeringssessionen. Ordagrant:
+
+    "HUGOS BESLUT 2026-11-04 OM PLANEN:
+    1. KASSIO-KRAV.md är kravkällan i repot.
+    2. Pilotens omfång: alternativ C och sedan B. Först en skuggpilot (förslag: 2027-01-11) där Kassio tar fram veckoutkast på pilotkundens riktiga data men inget skrivs i Fortnox. Sedan (förslag: 2027-03-01) bokföring, moms och veckoutkast som skrivs i Fortnox efter godkännande. Resten byggs under piloten. Datumen är uppskattningar.
+    3. Granskning: en oberoende granskning per steg bara för det som rör godkännande, spärrar, skrivning i Fortnox eller pengar. Annat granskas per grupp. Fynd som kräver handbyggd kod förbi flödena och ändå en människas godkännande går till Öppet, inte till nya steg före piloten, utom när de rör godkännandet.
+    4. Kunden ändrar ett förslag: får en egen form som designas och granskas som säkerhet innan den byggs. Förslaget ska alltid gå ihop (K2), en stängd period förblir stängd, och inget skrivs före godkännandet.
+    5. Saknat kvitto: förslag ändå, med egen form och märkningen "kvitto saknas". Momsen i det fallet är en fråga till redovisningskonsulten.
+    6. Nivåerna A–D finns kvar för att sortera och flagga. Nivå D är alltid en människas beslut.
+    7. I båda lägena skrivs inget i Fortnox förrän veckans utkast är godkänt, och underlag hämtas på samma sätt i båda lägena. SPEC 4 och 5 skrivs om i nästa session.
+    8. I piloten: kvitton och fakturor vidarebefordras till en egen adress, och kontoutdrag laddas upp. Mejlkoppling och BankID-koppling kommer senare.
+    9. En webbapp som fungerar i mobilen räcker i piloten, också för foto. Mobilappen kommer senare.
+    10. Bokföringsmetod: pilotkundens ekonomiansvarige svarar vilken metod som används. Bara den byggs till piloten.
+    11. Syntet Krog AB och Syntet Bygg AB väntar till efter piloten. De ersätts före piloten av ett syntetiskt nystartat aktiebolag.
+    12. Namnbytet till Kassio görs i dokument och kod nu (nästa session). Repot byter namn senare.
+    13. Steg 14 (Caspers dator) stryks tills Casper har en ny dator. Han behöver bara webbappen i piloten.
+    14. Jurist och redovisningskonsult kontaktas den här veckan av Hugo eller Casper, oavsett alternativ.
+    15. Alla svar på frågorna i PLAN-KASSIO-FORSLAG.md avsnitt F är enligt förslagets rekommendationer, med svaren ovan."
+
+Uppdraget säger också att SPEC.md, CLAUDE.md och namnbytet görs i nästa session, och att pilotkundens namn inte skrivs i någon fil.
