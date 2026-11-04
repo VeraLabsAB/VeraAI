@@ -10314,4 +10314,213 @@ Skrivna av Hugo i chatten 2026-11-04, i uppdraget till byggsessionen för steg 9
 - **Vad testerna visar om K4c:** med samma motpart och samma datum får fakturanumret inte avgöra (`_kan_avgora` i `matcha_bank.py`), så bankraden är tvetydig och
   Öppet 40 stoppar betalningen först. K4-kontrollen hörs bara när Öppet 40 godtar, till exempel samma nummer och olika motpart. Stopp blir det i båda fallen.
 - **Inte byggt, enligt uppdraget:** steg 96, steg 100 och registret. SPEC är inte ändrad, så SPEC 7 beskriver inte Öppet 43 (PROGRESS.md, Öppet 47 b).
-- **Inte granskad oberoende än.**
+- **Inte granskad oberoende än.** (Granskad i granskning 32, nedan.)
+
+## Granskning 32 (av 95afce1 och 0985899) (2026-11-04)
+
+Oberoende granskning av steg 99 (Öppet 43) i en ny session som inte har sett byggsessionen, mot 344a8d2. Granskaren ändrade ingen kod och ingen rad i
+CLAUDE.md, SPEC eller vakten, och skrev bara i den här filen, PROGRESS.md och BYGGPLAN.md. Allt annat skrevs i scratchpad. Lästes: CLAUDE.md, SPEC.md 7 och
+7.1, här "Hugos beslut 2026-10-30 om granskning 22" (punkt 3), "Granskning 30" (P1 och P4), "Hugos beslut 2026-11-04 om granskning 30", "Granskning 31" och
+"Hugos beslut 2026-11-04 om granskning 31", BYGGPLAN.md ("Läge nu" och steg 99–101), `git show` av båda commitarna, `_kontroll_k4` i `scripts/las_underlag.py`,
+K4-delen i `kontera_period` och `_markning_k4c` i `scripts/konteringsfloden.py`, `_kontrollera_k4` med omgivning i `scripts/konteringsforslag.py` och hela
+`scripts/tests/test_beslut_granskning_31.py`.
+
+Ord i den här texten: **K4** är kontrollen för dubbletter bland underlagen. **K4a** är samma fakturanummer med annat belopp, **K4b** samma fakturanummer med annat
+datum, och **K4c** en möjlig dublett (samma belopp och datum, och samma motpart eller samma fakturanummer, men inte båda). Det **flaggade** underlaget är det K4 slår larm om, och
+**originalet** det som det jämförs med. **Märkningen** är meningen "Märkning K4c: ..." som flödena skriver i motiveringen till originalets förslag. **Familjen** är
+som i granskning 29–31: ett förslag byggt för hand, förbi flödena, som har underlag, har en form flödena aldrig bygger, och godtas med alla kontroller gröna.
+
+### Beslut som redan var tagna (prövades inte om)
+
+K4a, K4b och "K4a och K4b" stoppar båda underlagen. K4c stoppar det flaggade, och originalet godtas bara med märkningen. Samma regler som i flödena. Gränsen i
+Öppet 46 (K4 ser bara underlagen i perioden) hör till steg 101.
+
+### Viktigt först
+
+- **Inget kan bokföras eller godkännas av koden, och ingen spärr har blivit svagare.** 95afce1 lägger bara till ett stopp. Allt nedan gäller förslag, som alltid
+  kräver godkännande av en människa.
+- **Öppet 43 är byggd som beslutet säger, och under samma perioder hittades ingen väg runt den.** I 60 slumpade uppställningar med 239 K4-ärenden stoppades allt som ska
+  stoppas, och inget annat. g11 stoppas för båda underlagen.
+- **Flödena är orörda i sak.** Utfallet från `kontera_period` är identiskt tecken för tecken före och efter steget, i 67 uppställningar med sammanlagt 1 834 förslag
+  (`diff` av utfallen är tom).
+- **Rött före och sviten stämmer:** 46 av 60 (41 "DID NOT RAISE" och 5 kodtest), 14 gröna, och **4 552 passed**.
+- **Byggsessionens oro om märkningen stämmer, och är nu körd (P1, låg).** Kontrollen letar efter en textbit var som helst i motiveringen, så "inte Märkning K4c:
+  underlaget 'X' är flaggat" godtas. Det kräver kod förbi flödena, och förslaget är ett förslag som ändå får finnas. Bara upplysningen till godkännaren står på spel.
+- **Ett beslut behövs om godkännandekortet (P2, låg, bedömning).** Märkningen finns för att godkännaren ska se kopplingen, men beslut 4 om granskning 30 säger att kortet inte ska visa
+  motiveringen. Då försvinner kopplingen också för flödenas egna förslag, om kortet inte räknar fram den ur K4:s ärenden.
+- **Inget fynd hör till familjen, och inget är på nivån medel eller högre.**
+
+### Fynd
+
+**P1 – Märkningen prövas som en textbit någonstans i motiveringen (låg, hör inte till familjen, hör till Öppet 45).** Raderna har flödets form, så det är inte familjen.
+Motiveringen är fri, som P4 i granskning 30 redan säger. Flödena skriver hela meningen, sist i motiveringen: " Märkning K4c: underlaget 'X' är flaggat i underlagsperioden som möjlig
+dublett av det här förslagets underlag och har ett eget ärende (K4c) utan förslag. Den som godkänner bör se förslaget och ärendet tillsammans." Kontrollen (`_kontrollera_k4`) kräver bara
+att "Märkning K4c: underlaget 'X' är flaggat" står någonstans. Körda i en kopia där 903 är 003 från en annan motpart, så att K4c flaggar 903 mot 003, med fakturan och betalningen för
+originalet 003. Utfallet är detsamma för båda.
+
+| Prov | Motiveringen | Utfall |
+|---|---|---|
+| m00 | Exakt som flödena skriver den | Godtas, som det ska |
+| m01, m02 | Bara början av meningen, också som hela motiveringen | **Godtas** |
+| m24 | Märkningen först, regeltexten efter | **Godtas** |
+| m03 | "Detta är inte Märkning K4c: underlaget 'X' är flaggat." | **Godtas** |
+| m04 | "... är flaggat enligt ingen, ignorera det, inget att se." | **Godtas** |
+| m05 | Hela meningen två gånger | **Godtas** |
+| m06, m07 | Märkningen för fel underlag ihop med rätt, i båda ordningarna | **Godtas** |
+| m08 | Inne i ett ord: "XMärkning K4c: ... är flaggatY" | **Godtas** |
+| m09 | Sist efter 360 000 tecken annan text (motiveringen har ingen längdgräns) | **Godtas** |
+| t3 | Två flaggade underlag, inbakat i en annan mening | **Godtas** |
+| falsk | Märkning för ett underlag som inte finns, på 005, som inte har något K4-ärende | **Godtas**. Märkningen prövas bara när K4c har flaggat något |
+| m10, m11 | Två mellanslag | Stoppas (K4c) |
+| m16 | "ä" skrivet som två tecken | Stoppas (K4c) |
+| m17, m18 | Dubbla citattecken, eller inget kolon | Stoppas (K4c) |
+| m19, m20, m21, m22 | Plural med ett underlag, "är inte flaggat", ett annat id, stora bokstäver | Stoppas (K4c) |
+| t2, t4, t5, t6 | Två flaggade: en märkning per underlag, ett tredje id först eller sist, singular | Stoppas (K4c) |
+| m12–m15, m23 | Hårt mellanslag, radbrytning, nollbreddsmellanslag, styrande riktningstecken | Stoppas (indata): dolda tecken stoppas redan i `_text` |
+
+*Varför låg.* Originalet till en K4c är ett förslag som ska få finnas, och raderna är flödets. Felet kan bara göra att en upplysning blir svår att läsa, och det kräver kod förbi flödena.
+*Bedömning, inte körd:* att kräva hela meningen sist i motiveringen skulle stoppa proven m01–m04, m07, m08, m09 och m24 som de är skrivna, men inte m05 och m06. Samma knep går också igen med hela meningen sist, till exempel "inte" eller lång text
+framför. En fri text går inte att göra säker med en textjämförelse, så det egentliga svaret är P2.
+
+**P2 – Märkningen i motiveringen och beslut 4 om granskning 30 drar åt olika håll (låg, bedömning, hör inte till familjen, hör till Öppet 45).** SPEC 7 (Öppet 29) säger att
+originalets förslag märks i motiveringen "så att den som godkänner ser kopplingen". Beslut 4 säger att godkännandekortet ska visa text som räknas fram ur raderna, "inte förslagets egen text eller
+motivering". Byggsessionen skriver att beslut 4 är "det egentliga skyddet" mot P1. Det stämmer bara till hälften: det skyddar mot en falsk märkning, men tar också bort den enda väg
+kopplingen har till godkännaren, också för flödenas egna förslag. Det flaggade underlaget har sitt eget ärende, men kortet för originalet skulle inte säga att det finns. Kortet är inte
+byggt, så inget är fel i dag, och inget av detta är provat. Granskarens bedömning: skriv in i Öppet 45 att kortet för ett original räknar fram K4c-kopplingen ur K4:s ärenden, inte ur motiveringen.
+
+**P3 – Gränsen i Öppet 46 gäller mappen också, inte bara datumen (låg, tillägg till steg 101, hör inte till familjen).** Prövar inte om gränsen, och stoppar inget i steg 99. Prov v9 (körd): i uppställningen
+g11 läses underlagen från en mapp utan 009, med samma datum som hela perioden. K4 flaggar inget, och fakturan för 003 godtas. Med hela mappen stoppas den ("K4a och K4b").
+`test_kvar_k4_ser_bara_underlagen_i_perioden` dokumenterar bara att datumen skärs. Registret i steg 101 bör alltså inte utgå från att perioden är komplett bara för att datumen stämmer.
+
+**P4 – Två små saker i testfilen (låg, test, hör inte till familjen).** (a) Inget test dokumenterar P1. Gränsen för perioden har `test_kvar_...`, men märkningen står bara i text, där byggsessionen skriver "inte provat,
+läst i koden". (b) `fakturan` i `test_beslut_granskning_31.py` tar med rader med beloppet 0, vilket flödena inte gör. Den fungerar för 003, 009 och 903, som testet använder, men för till exempel 005 stoppas förslaget av K2
+("rad 5 har varken debet eller kredit", körd: det var fel i granskarens första prov). Inget fel i dag, men hjälpfunktionen är inte flödets form för alla underlag.
+
+### Svar på uppdragets punkter
+
+**1. Kontrollen mot flödena: stämmer regel för regel** (läst, och körd i punkt 5, s1).
+
+| Regel | `kontera_period` | `_kontrollera_k4` | Stämmer? |
+|---|---|---|---|
+| Det flaggade underlaget | `flaggade.add(k4["id"])` för alla ärenden | `flaggat == id_` stoppar, oavsett kontroll | Ja |
+| Originalet vid K4a, K4b och "K4a och K4b" | `flaggade.add(original)` om kontrollen står i `_STOPPAR_BADA` | Stoppar om kontrollen står i `_STOPPAR_BADA` | Ja, samma tre namn, och ett test håller dem lika |
+| Originalet vid K4c | `k4c_markeringar[original]` i ärendenas ordning, märkningen läggs till | Samlar samma lista i samma ordning, och kräver märkningens början | Ja, utom P1: kontrollen prövar mindre än flödena skriver |
+| Originalet vid K4 (dublett) | Inget händer, förslaget byggs | Inget händer, förslaget godtas | Ja |
+| Dubletten vid K4 | Inte i perioden | Ursprunget stoppar först, inte i perioden | Ja |
+
+- **Läser ärendena ur `underlagsperiod.arenden`, utan ny K4-logik:** ja. Kontrollen läser bara `kontroll`, `id`, `jamfort_med` och `text`, och jämför inga fakturanummer, belopp, datum eller motparter.
+- **Bara stopp tillagda:** `git show 95afce1` visar i `konteringsforslag.py` bara tillagda rader, utom tre rader i docstrings, som är omskrivna. Ingen gammal kontroll är borttagen. Returvärdet och anropet är oförändrade.
+- **Inget företagsspecifikt:** `grep` efter 4010, 5460, 2440, 2641, 1940, LEV-TE, AGARE och "import konter" i filen ger inget.
+- **I `konteringsfloden.py` är det enda att konstanten importeras:** `git diff 344a8d2 HEAD -- scripts/konteringsfloden.py` visar importen och tre borttagna rader (konstanten och dess kommentar).
+- **`git diff 344a8d2 HEAD` för** CLAUDE.md, SPEC.md, `foretag`, `testforetag`, `testdata`, `sparr`, `las_underlag.py`, `matcha_bank.py` och `las_bank.py` **är tom.** Efter 344a8d2 finns exakt två commits (`git log --all`).
+
+**2. Märkningen:** se P1. Svar på uppdragets frågor: inbakad i en annan mening, ja, godtas. Två gånger, ja. För fel underlag ihop med rätt, ja. Andra mellanslag eller andra synliga tecken, nej, stoppas. Dolda tecken stoppas
+redan i `_text`. Bara i början av motiveringen, ja, godtas.
+
+**3. Rött före: 46 av 60, fördelningen stämmer** (körd mot `git archive` av 344a8d2 i scratchpad): **46 failed, 14 passed**.
+
+| Antal | Varför rött | Vilka |
+|---|---|---|
+| 41 | "DID NOT RAISE", förslaget gick igenom, alltså beteende | 21 utanför `utan_ratt_markning` och 20 i den gruppen, lästa i varsin körning |
+| 5 | Bara för att koden saknas, bevisar inget beteende | `test_koden_...`: `AttributeError` (2), `KeyError`, `ValueError`, och texten saknas |
+
+De 14 gröna är skydd, som också är gröna före. *Inte upprepat:* byggsessionens tio mutationsprov.
+
+**4. Hela sviten: 4552 passed in 97.73s** (körd, före dokumentationen), 0 röda, samma siffra som byggsessionen. Se också kommando 14 nedan.
+
+**5. Vägar runt Öppet 43** (alla körda, i samma perioder om inget annat står).
+
+| Prov | Vad provet gör | Utfall |
+|---|---|---|
+| g11 | Ett K4-par där bara ett av underlagen står i förslaget, 003 eller 009 | Stoppas, "K4a och K4b" (projektets test och granskarens) |
+| v12 | Två underlag under samma regel där ett är flaggat, i båda ordningarna, och originalet med det flaggade, också med rätt märkning | Stoppas av formen: "förslaget har 2 underlag" |
+| v1 | Två underlag under olika regler, och en faktura ihop med en flaggad betalning | Stoppas av regelkontrollen i ursprunget (punkt 8) |
+| v2 | Ett flaggat underlag i kvittots form, fast det är en faktura | Stoppas av formen |
+| s1 | Ett flaggat underlag som faktura, betalning och kvitto, med sitt riktiga par | 113, 17 och 9 stoppas, alla av K4 |
+| s1 | Varje flaggat underlag mot varje bankrad med samma belopp | 59 av 59 stoppas |
+| v10 | Ordningen: K4c med samma motpart, betalningen för 003 och för 903 | Stoppas av Öppet 40, som byggsessionen säger. Felet talar om paret, inte om K4. Stopp blir det |
+| v7 | Fler än två med samma fakturanummer: K4a, K4b, "K4a och K4b" och en dublett av K4a-kopian | 003 och alla tre stoppas, dubletten är inte i perioden, flödena bygger inget för dem, och flödets 27 andra förslag godtas igen |
+| v8 | En kedja av K4c: 901 mot 003, 902 mot 901, 903 mot 003 | 901, 902 och 903 stoppas. 003 kräver märkning för 901 och 903, som flödet skriver |
+| v3 | Id i annan form: små bokstäver, blanksteg, nollbredd, kyrilliskt tecken | Stoppas av indata eller ursprunget |
+| v4 | Id och motivering som en egen sorts text med falska jämförelser | Stoppas (indata) |
+| v5 | Kopplingarna tomma, med fel underlag, eller 009 två gånger, medan raderna har 009 | Stoppas av ursprunget |
+| v6 | Bankrad 84, betalningen för flaggade 009, utan underlag i förslaget, under alla 12 regler | 12 av 12 stoppas av ursprunget. Skälen lästes inte ett och ett. Ett förslag utan underlag har ingen form än (Öppet 44, steg 100) |
+| v9 | Mappen utan det andra underlaget | **Godtas**, gränsen i Öppet 46 (P3) |
+
+**Inget nytt hål i familjen, och ingen ny väg runt under samma perioder.**
+
+*s1, slumpade uppställningar:* 60 körningar på kopior av testdatan med planterade K4-par, sammanlagt 239 ärenden (78 K4, 26 K4a, 22 K4b, 40 "K4a och K4b" och 73 K4c). Reglerna skrevs för sig i provet, ur ärendena.
+K4c-originalen stoppas utan märkning och godtas med den: 33 fakturor, 3 betalningar och 2 kvitton. Utan K4-ärende godtas 872 fakturor, 328 betalningar och 164 kvitton. Ingen avvikelse.
+
+*Inte provat:* ordningen mot K5. Provet v11 stoppades av ursprunget på granskarens egna rader, innan K5 nåddes. En `Underlagsperiod` byggd för hand med den privata nyckeln, eftersom SPEC 7 redan säger att medveten kod inte kan bevisas bort.
+
+**6. Flöde a, b och e: samma förslag som förut, och inget stoppas** (körd).
+
+| Uppställning | Fakturor | Betalningar | Kvitton | Bankavgifter | Ärenden |
+|---|---|---|---|---|---|
+| Testdatan | 16 | 6 | 3 | 4 | 10 |
+| g11 | 14 | 4 | 3 | 4 | 12 |
+| K4a | 15 | 5 | 3 | 4 | 12 |
+| K4b | 15 | 5 | 3 | 4 | 12 |
+| K4c, annat nummer | 16 | 5 | 3 | 4 | 11 |
+| K4c, annan motpart | 16 | 6 | 3 | 4 | 11 |
+| Fyra med samma nummer | 15 | 5 | 3 | 4 | 17 |
+
+Utfallet (förslag, verifikation, kopplingar, motivering, kontroller och ärenden) skrevs till en fil för både `git archive` av 344a8d2 och 0985899, i 67 uppställningar: de sju ovan och 60 slumpade, 1 834 förslag, ingen körning stoppades.
+**Filerna är identiska** (3 400 583 byte var, `diff -q` tom). I de 60 slumpade skapades dessutom alla 1 642 flödesförslag en gång till genom kontrollen, utan stopp. Bankavgifterna är 4 i alla sju.
+
+**7. Familjen:** P1, P2, P3 och P4 hör inte till familjen (Öppet 31–43). Inget nytt hål i familjen hittades.
+
+### Vad som är kört och vad som är bedömning
+
+**Kört:** rött före, sviten, alla prov (m, t, v, s och f), jämförelsen med `diff` och `git`-kontrollerna. **Läst, inte kört:** att reglerna i tabellen i punkt 1 är samma rad för rad (men s1 prövar utfallet). **Bedömning, inte kört:** allvarsnivåerna, hela P2,
+vad ett krav på hela meningen skulle stoppa i P1, och att registret bör ta hänsyn till mappen i P3. **Inte upprepat:** byggsessionens mutationsprov. Inget här är en bedömning av bokföringsregler: "rätt" betyder samma som flödena gör.
+
+### Steg 99
+
+Byggt som beslutet säger. Granskarens bedömning: steg 99 kan räknas som klart. P1–P4 är inte fel i besluten om steget.
+
+### Testsviten
+
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`: **4552 passed in 97.73s**.
+
+### Kommandon i den här granskningen
+
+`<scratch>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/24c38fd4-5e36-42c8-b0cf-7714b3957794/scratchpad` och `<python>` är
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Allt kördes från projektmappen, ett kommando i taget.
+
+1. `git status`, `git show --stat 95afce1`, `git show --stat 0985899`, `git show 95afce1 -- scripts/konteringsfloden.py scripts/konteringsforslag.py` och `git show 0985899 -- GRANSKNING.md BYGGPLAN.md`.
+2. `grep` och `ls` i projektet, `cat testdata/syntet-testbutik/2025-Q1/underlag/SYNT-U-2025-015.json`, och stycken av filer med fil-verktyget Read.
+3. `git diff 344a8d2 HEAD --stat`, `git diff 344a8d2 HEAD -- CLAUDE.md SPEC.md foretag testforetag testdata sparr scripts/las_underlag.py scripts/matcha_bank.py scripts/las_bank.py` (tom), `git diff 344a8d2 HEAD --
+   scripts/konteringsfloden.py`, `grep -n -e 4010 -e 5460 -e 2440 -e 2641 -e 1940 -e LEV-TE -e AGARE -e "import konter" scripts/konteringsforslag.py` (tom), `git log --all --oneline --decorate -8`, `git show 344a8d2 --stat` och `git show 344a8d2 -- PROGRESS.md`.
+4. `mkdir -p <scratch>/kopia-fore <scratch>/kopia-nu`, `git archive -o <scratch>/344a8d2.tar 344a8d2`, `git archive -o <scratch>/0985899.tar 0985899`, `tar -xf <scratch>/344a8d2.tar -C <scratch>/kopia-fore` och `tar -xf <scratch>/0985899.tar -C <scratch>/kopia-nu`.
+5. `cp -R scripts/tests/test_beslut_granskning_31.py <scratch>/kopia-fore/scripts/tests/test_beslut_granskning_31.py`.
+6. Rött före: `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rf <scratch>/kopia-fore/scripts/tests/test_beslut_granskning_31.py` (**46 failed, 14 passed**).
+7. Skälen: samma fil med `-qq --tb=line -k "test_koden"` (**5 failed**, skälen i punkt 3), `-qq --tb=line -k "not test_koden"` (41 röda, utskriften klipptes), `-qq --tb=line -rN -k "not test_koden and not utan_ratt_markning"` (21 "DID NOT RAISE") och `-qq --tb=line -rN -k
+   "utan_ratt_markning"` (20 "DID NOT RAISE").
+8. `<python> -B -m pytest -p no:cacheprovider -q scripts/tests` (**4552 passed**).
+9. Provfilen `test_granskare_prov32.py` skrevs med fil-verktyget Write i `<scratch>/kopia-nu/scripts/tests/`. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rP <scratch>/kopia-nu/scripts/tests/test_granskare_prov32.py` gav först **1 failed, 15 passed**, fel i granskarens prov: `fakturan` tar med
+   rader med beloppet 0 (P4 b). Rättat med Edit.
+10. Samma med `-k "test_m_falsk or test_v1_ or test_v2 or test_v3 or test_v11 or test_s_"` (**1 failed, 5 passed**, fel i v11: 009 fick en motpart utan regel, rättat med Edit, och provet nådde sedan ändå inte K5) och med `-k "test_v11 or test_v12"` (**2 passed**).
+11. `cp -R <scratch>/kopia-nu/scripts/tests/test_granskare_prov32.py <scratch>/kopia-fore/scripts/tests/test_granskare_prov32.py`. Samma pytest med `-k "test_f_"` mot `kopia-fore` med `-rP` och mot `kopia-nu` (**1 passed** vardera; provet skriver `<scratch>/utfall-kopia-fore.json` och `<scratch>/utfall-kopia-nu.json`).
+12. `diff -q <scratch>/utfall-kopia-fore.json <scratch>/utfall-kopia-nu.json` (tom) och `wc -c` på båda (3 400 583 byte var).
+13. Samma pytest mot `kopia-nu` med `-rP -k "test_m_varianter or test_m_markningens or test_m_tva"` (**2 passed**), och hela provfilen utan `-rP` (**17 passed in 71.09s**). `grep -c "x" <scratch>/344a8d2.tar` gav ingen utskrift och användes inte till något.
+14. Efter det här avsnittet och statusraderna: `<python> -B -m pytest -p no:cacheprovider -q scripts/tests` (**4552 passed**), `git add GRANSKNING.md PROGRESS.md BYGGPLAN.md`, `git commit -F <scratch>/commit-granskning-32.txt` och `git status`.
+
+Vakten stoppade tio kommandon granskaren skrev i strid med SPEC 7.1, alla bara läsande: ett ihopkopplat med `&&` och `|`, fyra `grep` med omvänt snedstreck, fyra `grep` med `|` i mönstret och ett `grep` med `*` utan citattecken. De ersattes med ett kommando i taget och flera `-e`. Inget utanför projektet ändrades utom scratchpad.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **P1 och P2 (Öppet 49), låga:** ska det skrivas in som krav i Öppet 45 att godkännandekortet för ett original räknar fram K4c-kopplingen ur K4:s ärenden, inte ur motiveringen? Och ska märkningen i kontrollen lämnas som den är tills dess? Granskarens bedömning: ja på båda, eftersom en fri text ändå inte går att göra säker
+   med en textjämförelse.
+2. **P4 (Öppet 49), låg:** ska ett test som dokumenterar P1 läggas till, och hjälpfunktionen `fakturan` rättas, i samband med steg 96? Granskarens bedömning: ja.
+3. **Steg 99:** får räknas som granskat och klart (granskarens bedömning: ja).
+
+P3 behöver inget beslut. Det är ett tillägg till designen i steg 101, antecknat under Öppet 46.
+
+STATUS: grönt
+STEG I BYGGPLANEN: 99 – Öppet 43 – klart (granskat i den här granskningen, väntar på besked)
+KAN JAG GÅ VIDARE: ja till steg 100 och 96. Inget kan bokföras, ingen spärr är svagare, kontrollen stämmer med flödena, rött före och sviten stämmer, flödena ger samma förslag, och ingen väg runt hittades under samma perioder. Fynden är låga.
+ÄNDRINGAR I CLAUDE.md: inga
+BESLUT SOM BEHÖVS: 1–3 ovan.
+NÄSTA STEG: Hugo eller Casper svarar på 1–3. Sedan steg 100 (Öppet 44), steg 96 (Öppet 37 och 48), steg 101 (registret, designsteg) och steg 92 (Öppet 26). Steg 15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
