@@ -10830,3 +10830,9 @@ Skrivna av Hugo i chatten 2026-11-04, i uppdraget till steg 52. Ordagrant:
 
     "1. "Pengar" i beslut 3 betyder betalningar, utbetalningar och belopp kunden ska betala, inte varje belopp i bokföringen. Läsaren i karantän och driftmiljön räknas som spärrar och granskas per steg.
     2. Pilotkundens företagsnamn står kvar i historik (GRANSKNING.md, PROGRESS.md och git), i linje med beslutet om Q7. I gällande regeltext (CLAUDE.md och SPEC.md) står "pilotkunden" från och med nu."
+
+## Hugos beslut 2026-11-04 om steg 52
+
+Skrivet av Hugo i chatten 2026-11-04, i uppdraget till steg 104. Ordagrant:
+
+    "1. Raden om foretag/<namn>/ i CLAUDE.md står kvar, med tillägget "(testföretagen; pilotkundens konfiguration ligger i driftmiljön, steg 116)"."
