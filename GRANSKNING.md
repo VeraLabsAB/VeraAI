@@ -9990,3 +9990,61 @@ stämmer med flödena, rött före och sviten stämmer, flödena går igenom och
 BESLUT SOM BEHÖVS: 1–5 ovan.
 NÄSTA STEG: Hugo eller Casper svarar på 1–5. Sedan steg 98 (Öppet 40), steg 96 (Öppet 37, och SPEC 7 i dess dokumentation) och
 steg 92 (Öppet 26). Steg 15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
+
+## Hugos beslut 2026-11-04 om granskning 30
+
+Skrivna av Hugo i chatten 2026-11-04, i uppdraget till byggsessionen för steg 98. Ordagrant:
+
+    "HUGOS BESLUT 2026-11-04 OM GRANSKNING 30:
+    1. P1 (Öppet 43): skapa_konteringsforslag ska stoppa ett underlag som K4 har flaggat, i linje med beslutet 2026-10-30
+       om granskning 22, punkt 3 ("inget förslag alls"). Eget steg 99, före uppgift 5.
+    2. P2 (Öppet 44): förslag utan underlag ska ha fasta former, samma princip som (b). Formen för flöde e byggs som eget
+       steg 100, före uppgift 5. Regel framåt: varje nytt flöde byggs med sin form i samma steg.
+    3. P3: kvittot (g9) och bankraden mot ägaren (g10) ingår i steg 98.
+    4. P4: senare, men som krav: godkännandekortet ska visa text som räknas fram ur raderna, inte förslagets egen text
+       eller motivering. Tas upp när godkännandekortet byggs.
+    5. P5: krav i steget där förslag sparas och godkänns, före piloten: samma underlag eller bankrad får inte bokföras i
+       två förslag.
+    6. Steg 97 är granskat och klart.
+    7. Pushen 2026-11-04 15:58 gjordes av Hugo från hans dator."
+
+### Byggsessionen för steg 98 (2026-11-04)
+
+- **Byggt** i d8a5edc: `_kontrollera_bankradens_par` i `scripts/konteringsforslag.py`, som `skapa_konteringsforslag` anropar
+  allra sist, efter flödenas former. Ett förslag med både underlag och bankrad ska vara ett par bland matchningarna från
+  `matcha_period`. Bara ett nytt stopp, returvärdet oförändrat, inget företagsspecifikt. `konteringsfloden.py` och
+  `matcha_bank.py` är inte ändrade.
+- **Sätten som prövades, före koden** (uppdraget, punkt 1 a–d):
+  1. *Flödena skickar med sitt `Matchningsresultat`.* Underkänt mot b: det är en vanlig `NamedTuple` som kan byggas för hand,
+     och ett skydd kräver en ändring i `matcha_bank.py`, utanför gränserna.
+  2. *Samma parameter, och kontrollen räknar om och jämför.* Parametern blir onödig, så det är sätt 4 med ett extra fält.
+  3. *Ny parameter `bedomningsdatum`.* Fungerar, men kräver en ändring i flödena och ger en uppgift till som kan vara fel,
+     fast datumet inte ändrar paren.
+  4. *`skapa_konteringsforslag` kör själv `matcha_period`, med samma perioder och regelbok och ett fast sent datum.* **Valt.**
+     a: samma funktion, ingen kopierad logik. b: inget resultat tas emot, så inget kan vara handbyggt, och perioderna och
+     regelboken har redan typskydden. c: en period som saknas ger `MatchningFel`, som stoppar förslaget. d: flödena behöver inte
+     ändras alls.
+  5. *Kopiera villkoren för belopp, motpart och datum.* Underkänt mot a.
+- **Varför ett fast datum räcker.** I `matcha_period` används bedömningsdatumet bara i en kontroll av indatan och i valet mellan
+  "väntande" och ärendet "saknat underlag". Grenen som bygger `matchningar` läser det inte (läst i koden). Körd:
+  `test_skydd_paren_beror_inte_pa_bedomningsdatumet` ger samma 12 matchningar för fem datum, från sista bankradens dag till
+  9999-12-31.
+- **Punkt 4 i uppdraget utlöstes inte:** flöde a, b och e stoppas inte, och `skapa_konteringsforslag` har inga andra anropare än
+  flödena och testerna. Inget gammalt test gick sönder, utom det omgjorda r5-testet.
+- **Rött före: 16** (körd mot `git archive` av 2a57517): 15 av 24 i `test_beslut_granskning_30.py` och det omgjorda r5-testet i
+  `test_beslut_granskning_29.py`. Av de 16 är **12 röda för att förslaget gick igenom** ("DID NOT RAISE"), bland annat r5, g9 och
+  g10, **1 för att matchningen inte anropades**, och **3 bara för att funktionen eller texten inte fanns** (som P7 b i granskning
+  30 påpekade), så de 3 bevisar inte att beteendet ändrades. De 9 gröna är skydd. **Testet att ett handbyggt resultat inte kan
+  lämnas in är ett av skydden, och är grönt också före:** det har aldrig funnits någon väg in, och det är inte en ändring som
+  kan vara röd. **Sviten efter: 4 492 passed.**
+- **Mutationsprov, sex ändringar i en kopia. Fem gav rött direkt. En överlevde: att bara underlagets id jämförs** (23 passed).
+  Inget test prövade ett underlag som har ett eget par och en annan bankrad med samma belopp, eftersom testdatan inte har två
+  bankrader med samma belopp. Ett test lades till, med ett riktigt fall i en kopia av banken, och då gav den rött.
+  Alla kommandon står i PROGRESS.md, "Läge 2026-11-04, steg 98 byggt".
+- **Inte byggt, enligt uppdraget:** steg 96, 99 och 100. SPEC är inte ändrad, så SPEC 7 beskriver inte kontrollen än (se PROGRESS.md,
+  Öppet 47).
+- **Två saker som inte stoppas, och som väntar på besked** (PROGRESS.md, Öppet 46 och 47): kontrollen vet bara om de perioder den
+  får (körd, dokumenterad i ett test), och matchningen körs en gång per förslag med bankrad, så tiden växer med periodens storlek
+  (uppmätt på testdatan, och en bedömning för större perioder).
+- **Inte granskad oberoende än.** Kärnan har fått en strängare kontroll, så granskningen bör pröva om den stoppar något flödena
+  bygger, och om det går att få ett par godtaget som flödenas egen körning inte har.
