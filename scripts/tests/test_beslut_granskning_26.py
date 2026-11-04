@@ -294,22 +294,24 @@ def test_skydd_ett_forslag_med_ratt_form_godtas(korning, korning_b):
         assert forslag.kontroller == ALLA_KONTROLLER and kostnadskonton(forslag) == {12: "4010"}
 
 
-def test_skydd_momsen_summerad_over_tva_satser_godtas(korning):
-    # 'summa' är tillåtet för 'moms_ore': 020:s två momsrader på en rad på kontot för ingående moms, med kostnaden
-    # per sats på kontot K5 ger (testbutikens regelbok ger samma konto för båda satserna).
+def test_momsen_summerad_over_tva_satser_stoppas_av_formen(korning):
+    # Öppet 34 tillåter 'summa' för 'moms_ore', och här stod förut ett skydd för det: 020:s två momsrader på en rad på
+    # kontot för ingående moms, med kostnaden per sats på kontot K5 ger. Flödena bygger aldrig den formen, utan en
+    # momsrad per sats, så nu stoppas förslaget (Hugos beslut 2026-11-04 om granskning 29, beslut 1). Öppet 34 stoppar
+    # inte förslaget, utan formen gör det, sist.
     underlag = underlaget(korning, PROV_A)
     tolv, tjugofem, datum = momsraden(underlag, 12), momsraden(underlag, 25), underlag["datum"]
     egen = korning.regelbok.regel_for_underlag(underlag["typ"], underlag["motpart"], datum)
     from konteringsforslag import kontrollera_underlag
     konton = kontrollera_underlag(underlag, egen, korning.regelbok, korning.momssatser).konton
-    forslag = skapa(korning, forslag_for_hand(korning, PROV_A, [
+    text = stoppas(korning, forslag_for_hand(korning, PROV_A, [
         rad(konton[12], tolv["underlag_ore"], 0, "lika", kalla(PROV_A, "underlag_ore", 12)),
         rad(konton[25], tjugofem["underlag_ore"], 0, "lika", kalla(PROV_A, "underlag_ore", 25)),
         rad(roll(korning, INGAENDE_MOMS, datum), tolv["moms_ore"] + tjugofem["moms_ore"], 0, "summa",
             kalla(PROV_A, "moms_ore", 12), kalla(PROV_A, "moms_ore", 25)),
         rad(roll(korning, LEVERANTORSSKULDER, datum), 0, underlag["belopp_ore"], "lika", kalla(PROV_A, "belopp_ore")),
-    ], "Momsen summerad"))
-    assert forslag.kontroller == ALLA_KONTROLLER
+    ], "Momsen summerad"), "ursprung", "formen fakturan", "Öppet 39")
+    assert "Öppet 34" not in text
 
 
 def test_skydd_020_med_tva_konton_i_regeln_godtas_med_ratt_konton(korning_tva):

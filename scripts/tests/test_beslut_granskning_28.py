@@ -10,10 +10,10 @@ _kontrollera_beloppssidan, i grenen för debet, efter Öppet 35:s krav på att f
   kredit 'moms_ore') i samma förslag som 009:s riktiga betalning (2440 debet 009 'belopp_ore', 1940 kredit bankrad 84
   i februari). Godtogs med alla kontrollerna "ok": Öppet 35 frågar bara om förslaget har någon bankrad.
 - Granskarens prov b2: 003 och 009 med samma belopp (en kopia av testdatan) kvittade mot varandra på 2440, plus 009
-  som delar i debet mot bankrad 26 (003:s betalning, 16 730,56 kr) i kredit på 1940. Godtogs också, och godtas
-  fortfarande: b2 uppfyller (a), eftersom bankrad 26 är 003:s betalning och står mot 003:s belopp. Konteringen är
-  identisk med flöde a:s två förslag (009:s faktura och 003:s betalning) i samma förslag, så det är inte felaktig
-  bokföring och inte ett nytt hål i familjen (Hugos beslut 2026-11-04, 1). b2 är därför ett skydd här.
+  som delar i debet mot bankrad 26 (003:s betalning, 16 730,56 kr) i kredit på 1940. Godtogs också: b2 uppfyller (a),
+  eftersom bankrad 26 är 003:s betalning och står mot 003:s belopp, och var ett skydd här (Hugos beslut 2026-11-04, 1).
+  Sedan steg 97 stoppas b2 av flödenas former (Hugos beslut 2026-11-04 om granskning 29, beslut 1 och 6), och testet
+  är ett stopp-test. Samma sak gäller skyddet för två betalningar i ett förslag.
 - Granskarens prov b3: 003:s 'belopp_ore' i debet på 2440 mot bankrad 26 som källa på 4010 i kredit, utan någon rad på
   bankkontot. Godtogs också: punkt 6 säger bara vad bankkontot får ha som källa, inte var en bankrad får stå.
 - Byggsessionens prov: två rader med 'belopp_ore' i debet (003 och 009 med samma belopp) mot en enda rad på
@@ -95,42 +95,31 @@ def test_o36_b1_fakturan_spegelvand_ihop_med_en_annan_fakturas_betalning_stoppas
     assert "Öppet 35" not in text
 
 
-def test_skydd_b2_en_fakturas_betalning_och_en_annan_faktura_i_samma_forslag_godtas(korning, korning_lika):
-    # Granskarens b2, i kopian där 009 har 003:s belopp: 2440 debet 003 'belopp_ore', 2440 kredit 009 'belopp_ore',
-    # 4010 debet 009 'underlag_ore', 2641 debet 009 'moms_ore' och 1940 kredit bankrad 26 (16 730,56 kr, 003:s
-    # betalning). Skydd (grönt också före rättelsen): b2 godtas under (a), Hugos beslut 2026-11-04 (1). Granskaren
-    # räknade b2 som ett hål, men bankrad 26 är 003:s betalning och står mot just 003:s belopp: regeln ser en rad
-    # med 'belopp_ore' i debet och en egen rad på bankkontot i kredit med samma belopp ur en bankrad (003:s
-    # betalning), och ett belopp i kredit med delarna i debet (009:s faktura). Konteringen är identisk med flöde a:s
-    # två förslag för 009:s faktura och 003:s betalning, bara i samma förslag, så det är inte felaktig bokföring
-    # och inte ett nytt hål i familjen. Att en faktura och en annan fakturas betalning står i samma förslag ska
-    # kontrolleras med en redovisningskonsult och tas upp igen när godkännandekortet i appen byggs (samma beslut,
-    # 3, PROGRESS.md, Öppet).
+def forslag_b2(korning_lika):
+    """Granskarens b2, i kopian där 009 har 003:s belopp: 2440 debet 003 'belopp_ore', 2440 kredit 009 'belopp_ore',
+    4010 debet 009 'underlag_ore', 2641 debet 009 'moms_ore' och 1940 kredit bankrad 26 (16 730,56 kr, 003:s betalning)."""
     tre, nio = underlaget(korning_lika, PROV_B), underlaget(korning_lika, ANDRA)
     assert tre["belopp_ore"] == nio["belopp_ore"] and tre["moms"] == nio["moms"]
-    assert korning_lika.underlagsperiod.arenden == korning.underlagsperiod.arenden
     momsrad, bankraden = momsraden(nio, 12), korning_lika.bankrad(2, 26)
     assert -bankraden["belopp_ore"] == tre["belopp_ore"]
     skulder = roll(korning_lika, LEVERANTORSSKULDER)
-    forslag = skapa(korning_lika, forslag_med(korning_lika, PROV_B, [
+    return forslag_med(korning_lika, PROV_B, [
         rad(skulder, tre["belopp_ore"], 0, "lika", kalla(PROV_B, "belopp_ore")),
         rad(skulder, 0, nio["belopp_ore"], "lika", kalla(ANDRA, "belopp_ore")),
         rad("4010", momsrad["underlag_ore"], 0, "lika", kalla(ANDRA, "underlag_ore", 12)),
         rad(roll(korning_lika, INGAENDE_MOMS), momsrad["moms_ore"], 0, "lika", kalla(ANDRA, "moms_ore", 12)),
         rad(roll(korning_lika, BANK), 0, tre["belopp_ore"], "lika", bankkalla(bankraden)),
-    ], "b2 i granskning 28", bankraden["transaktionsdag"], [PROV_B, ANDRA], [bankraden]))
-    assert forslag.kontroller == ALLA_KONTROLLER
-    # Samma kontering som flöde a:s två förslag, per konto och sida.
-    fakturan_009, betalningen_003 = korning_lika.forslag_for(ANDRA)[0], korning_lika.forslag_for(PROV_B)[1]
-    assert fakturan_009.forslag_id == "F-FAKTURA-" + ANDRA and betalningen_003.forslag_id == "F-BETALNING-" + PROV_B
+    ], "b2 i granskning 28", bankraden["transaktionsdag"], [PROV_B, ANDRA], [bankraden])
 
-    def per_konto(rader):
-        summor = {}
-        for rad_ in rader:
-            summor[rad_["konto"]] = summor.get(rad_["konto"], 0) + rad_["debet_ore"] - rad_["kredit_ore"]
-        return summor
-    assert per_konto(forslag.verifikation["rader"]) == per_konto(
-        fakturan_009.verifikation["rader"] + betalningen_003.verifikation["rader"])
+
+def test_b2_en_fakturas_betalning_och_en_annan_faktura_i_samma_forslag_stoppas(korning, korning_lika):
+    # b2 godtogs förut, under (a), med ett skyddstest här (Hugos beslut 2026-11-04 om granskning 28, 1). Nu stoppas
+    # den: Hugos beslut 2026-11-04 om granskning 29, beslut 1 (flödenas former rakt av, allt annat stoppas, också b2)
+    # och beslut 6 (beslutet att godta b2 ersätts av beslut 1). Öppet 38 står kvar: säger redovisningskonsulten ja kan
+    # formen "faktura + annan fakturas betalning" läggas till uttryckligen. Konteringen per konto är densamma som i
+    # flöde a:s två förslag, så det är inte beloppen som stoppar, utan att två affärshändelser står i ett förslag.
+    assert korning_lika.underlagsperiod.arenden == korning.underlagsperiod.arenden
+    stoppas(korning_lika, forslag_b2(korning_lika), "ursprung", "2 underlag", "Öppet 39")
 
 
 def test_o36_b3_bankraden_pa_kostnadskontot_i_stallet_for_bankkontot_stoppas(korning):
@@ -189,19 +178,25 @@ def test_skydd_fakturan_och_betalningen_for_hand_godtas(korning):
     assert skapa(korning, betalningen_for_hand(korning)).kontroller == ALLA_KONTROLLER
 
 
-def test_skydd_tva_betalningar_i_ett_forslag_med_var_sin_bankkontorad_godtas(korning):
-    # Skydd (grönt också före rättelsen): 003:s och 009:s betalningar i samma förslag, var och en med sin egen rad på
-    # bankkontot (bankrad 26 och 84 i februari). Två rader med 'belopp_ore' i debet, två rader på bankkontot.
+def forslag_tva_betalningar(korning):
+    """003:s och 009:s betalningar i samma förslag, var och en med sin egen rad på bankkontot (bankrad 26 och 84 i
+    februari). Två rader med 'belopp_ore' i debet, två rader på bankkontot."""
     tre, nio = underlaget(korning, PROV_B), underlaget(korning, ANDRA)
     tjugosex, attiofyra = korning.bankrad(2, 26), korning.bankrad(2, 84)
     skulder, bank = roll(korning, LEVERANTORSSKULDER), roll(korning, BANK)
-    forslag = skapa(korning, forslag_med(korning, PROV_B, [
+    return forslag_med(korning, PROV_B, [
         rad(skulder, tre["belopp_ore"], 0, "lika", kalla(PROV_B, "belopp_ore")),
         rad(skulder, nio["belopp_ore"], 0, "lika", kalla(ANDRA, "belopp_ore")),
         rad(bank, 0, tre["belopp_ore"], "lika", bankkalla(tjugosex)),
         rad(bank, 0, nio["belopp_ore"], "lika", bankkalla(attiofyra)),
-    ], "Två betalningar", attiofyra["transaktionsdag"], [PROV_B, ANDRA], [tjugosex, attiofyra]))
-    assert forslag.kontroller == ALLA_KONTROLLER
+    ], "Två betalningar", attiofyra["transaktionsdag"], [PROV_B, ANDRA], [tjugosex, attiofyra])
+
+
+def test_tva_betalningar_i_ett_forslag_med_var_sin_bankkontorad_stoppas_av_formen(korning):
+    # Godtogs förut, med ett skyddstest här: Öppet 36 är uppfylld, varje belopp har sin egen bankkontorad. Nu stoppas
+    # förslaget av formen (Hugos beslut 2026-11-04 om granskning 29, beslut 1).
+    text = stoppas(korning, forslag_tva_betalningar(korning), "ursprung", "2 underlag", "Öppet 39")
+    assert "Öppet 36" not in text
 
 
 def test_skydd_flode_a_b_och_e_gar_igenom(korning):

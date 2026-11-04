@@ -219,6 +219,29 @@ K5, K7 och K8, efter ursprunget, för varje underlag som förslaget bygger på (
   betalningen (beloppet i debet, bankraden på bankkontot i kredit med samma belopp), så flödena berörs
   inte. När Ö8 (kreditnotor) byggs måste regeln prövas igen, som Öppet 35.
 
+  Flödenas former (Öppet 39, granskning 29, P1, steg 97, Hugos beslut 2026-11-04 om granskning 29, beslut 1
+  och 3). Prövas allra sist, en gång för förslaget: ett förslag med underlag har exakt en av flödenas tre
+  former. Allt annat stoppas, och det som flödena inte bygger läggs till uttryckligen om det behövs, som
+  vaktens kommandolista. Alla tre har exakt ett underlag och inga Z-rapporter:
+
+    fakturan     en leverantörsfaktura, inga bankrader. Kostnaden (underlag_ore) på det konto K5 ger och
+                 momsen (moms_ore) på kontot för ingående moms, per momsrad i debet, och leverantörsskulderna
+                 i kredit med belopp_ore.
+    betalningen  en leverantörsfaktura, en bankrad. Exakt två rader: leverantörsskulderna i debet med
+                 belopp_ore, och bankkontot i kredit med bankraden som enda källa.
+    kvittot      ett kvitto, en bankrad. Kostnaden och momsen i debet som i fakturan, och bankkontot i kredit
+                 med bankraden som enda källa.
+
+  Varje rad räknas med 'lika' och har exakt en källa. En rad med beloppet 0 tas inte med, varken för
+  kostnaden eller för momsen, som i flödena och K2 (Hugos svar i chatten 2026-11-04). Raderna får stå i vilken
+  ordning som helst. Förslag utan underlag (bankavgiften i flöde e) berörs inte. Kontrollerna K5, Öppet 31–36
+  och de andra ovan står kvar och prövas först, så att felet säger mer än att formen är fel. Annars gick en
+  bankrad som källa på kostnadskontot igenom (granskarens prov r6–r9 och r16), och 'summa' av flera bankrader
+  (r3) och en faktura baklänges ihop med en annan fakturas delar (r11). Formerna stoppar också b2 och två
+  betalningar i samma förslag, och ersätter beslutet att godta b2 (samma beslut, 6, Öppet 38). Formerna
+  kontrollerar inte att bankraden hör till underlaget (Öppet 40, steg 98) eller verifikationens datum (Öppet
+  41). En ny typ av underlag stoppas tills dess form är tillagd: när Ö8 (kreditnotor) byggs behövs en egen form.
+
 Kopplingarna i förslaget får kontrollsummorna för regelboken, kontoplanen, momsfilen och
 matchningsformatet, och kontrollsumman för varje fil förslaget bygger på (underlaget, bankfilen och
 Z-filen). Summorna kommer från inläsningen, aldrig från indata: de som står i indata jämförs bara (K2).
@@ -296,6 +319,16 @@ _UNDERLAGSFALT = "underlag_ore"
 _MOMSFALT = "moms_ore"
 _BELOPPSFALT = "belopp_ore"
 _LEVERANTORSSKULDER = "leverantorsskulder"
+# Typerna av underlag som har en form (las_underlag.TYPER), och flödenas tre former (Öppet 39).
+_LEVERANTORSFAKTURA = "leverantorsfaktura"
+_KVITTO = "kvitto"
+_FAKTURAN = "fakturan"
+_BETALNINGEN = "betalningen"
+_KVITTOT = "kvittot"
+_TRE_FORMERNA = ("Ett förslag med underlag har exakt en av flödenas tre former: fakturan, betalningen och kvittot, med"
+                 " exakt ett underlag. Allt annat stoppas, och det som flödena inte bygger läggs till uttryckligen om"
+                 " det behövs (Öppet 39, granskning 29, P1, steg 97, Hugos beslut 2026-11-04 om granskning 29, beslut"
+                 " 1).")
 # Sidorna i täckningen.
 _SIDOR = ("debet", "kredit")
 _DELARNA = ("Ett underlags 'belopp_ore' räknas som alla dess momsraders '" + _UNDERLAGSFALT + "' och '" + _MOMSFALT
@@ -1286,6 +1319,96 @@ def _kontrollera_beloppssidan(id_, kontoplan, kopplingar, verifikation):
                        " i debet (Öppet 35, granskning 27, M1, Hugos beslut 2026-10-31).")
 
 
+def _radens_form(konto, debet, kredit, berakning, kallor):
+    """Det som en rad jämförs på mot formen: konto, belopp, sida, sättet att räkna och källorna."""
+    return konto, debet, kredit, berakning, tuple(tuple(sorted(kalla.items())) for kalla in kallor)
+
+
+def _konto_med_rollen(kontoplan, roll, datum):
+    """Kontot med rollen på datumet, eller None. None är inget konto, så ingen rad passar då formen."""
+    try:
+        return kontoplan.rollens_konto(roll, datum)
+    except KontoplanFel:
+        return None
+
+
+def _formens_rader(form, underlag, konton, kontoplan, bankrad_id, datum):
+    """Raderna som formen ska ha, som (radens form, raden i ett felmeddelande). Se "Flödenas former" överst i filen."""
+    id_, belopp = underlag["id"], underlag[_BELOPPSFALT]
+    skulder = _konto_med_rollen(kontoplan, _LEVERANTORSSKULDER, datum)
+    hela = {"kalla": "underlag", "id": id_, "falt": _BELOPPSFALT}
+    bankkontot = (_radens_form(_konto_med_rollen(kontoplan, _BANK, datum), 0, belopp, "lika",
+                               [{"kalla": "bankrad", "id": bankrad_id, "falt": _BELOPPSFALT}]),
+                  "bankkontot i kredit, " + kronor(belopp) + ", med bankraden " + repr(bankrad_id) + " som enda källa")
+    if form == _BETALNINGEN:
+        return [(_radens_form(skulder, belopp, 0, "lika", [hela]), "leverantörsskulderna i debet, " + kronor(belopp)
+                 + ", med '" + _BELOPPSFALT + "' som källa"), bankkontot]
+    rader = []
+    for momsrad in underlag["moms"]:
+        sats = momsrad["momssats"]
+        for falt, konto, vad in ((_UNDERLAGSFALT, konton[sats], "kostnaden"),
+                                 (_MOMSFALT, _konto_med_rollen(kontoplan, _INGAENDE_MOMS, datum), "momsen")):
+            if momsrad[falt]:
+                rader.append((_radens_form(konto, momsrad[falt], 0, "lika", [
+                    {"kalla": "underlag", "id": id_, "falt": falt, "momssats": sats}]),
+                    vad + " i debet på kontot " + str(konto) + ", " + kronor(momsrad[falt]) + ", med '" + falt
+                    + "' för momssatsen " + str(sats) + " % som källa"))
+    if form == _KVITTOT:
+        return rader + [bankkontot]
+    return rader + [(_radens_form(skulder, 0, belopp, "lika", [hela]), "leverantörsskulderna i kredit, "
+                     + kronor(belopp) + ", med '" + _BELOPPSFALT + "' som källa")]
+
+
+def _kontrollera_flodets_form(underlag, konton, kontoplan, kopplingar, verifikation):
+    """Öppet 39: förslaget har exakt en av flödenas tre former, fakturan, betalningen eller kvittot.
+
+    Se "Flödenas former" överst i filen (granskning 29, P1, steg 97, Hugos beslut 2026-11-04 om granskning 29, beslut
+    1 och 3). underlag är förslagets underlag och konton kontot per momssats från kontrollera_underlag. Har förslaget
+    flera underlag stoppas det här först, och då används inte underlag till något annat än felet. Flödena bygger
+    exakt de här raderna (konteringsfloden.py, _kostnad_och_moms, _leverantorsfaktura och _kvitto).
+    """
+    id_, typ = underlag["id"], underlag["typ"]
+    if len(kopplingar["underlag"]) != 1:
+        raise _fel(_URSPRUNG, "förslaget har " + str(len(kopplingar["underlag"])) + " underlag ("
+                   + ", ".join(repr(post["id"]) for post in kopplingar["underlag"]) + "). " + _TRE_FORMERNA)
+    if kopplingar["z_rapporter"]:
+        raise _fel(_URSPRUNG, "förslaget har underlaget " + repr(id_) + " och en Z-rapport. " + _TRE_FORMERNA)
+    bankrader = kopplingar["bankrader"]
+    if len(bankrader) > 1:
+        raise _fel(_URSPRUNG, "förslaget har underlaget " + repr(id_) + " och " + str(len(bankrader)) + " bankrader ("
+                   + ", ".join(repr(post["id"]) for post in bankrader) + "). En betalning eller ett kvitto har exakt en"
+                   " bankrad. Delbetalningar läggs till som en egen form senare, om ett riktigt företag behöver det"
+                   " (beslut 3). " + _TRE_FORMERNA)
+    if typ == _KVITTO:
+        if not bankrader:
+            raise _fel(_URSPRUNG, "underlaget " + repr(id_) + " är ett kvitto, och förslaget har ingen bankrad. Ett"
+                       " kvitto får ett förslag först när matchningen har parat ihop det med en bankrad. "
+                       + _TRE_FORMERNA)
+        form = _KVITTOT
+    elif typ == _LEVERANTORSFAKTURA:
+        form = _BETALNINGEN if bankrader else _FAKTURAN
+    else:
+        raise _fel(_URSPRUNG, "underlaget " + repr(id_) + " har typen " + repr(typ) + ", som ingen av formerna gäller."
+                   " En ny typ av underlag behöver en egen form. " + _TRE_FORMERNA)
+    vantade = _formens_rader(form, underlag, konton, kontoplan, bankrader[0]["id"] if bankrader else None,
+                             verifikation["datum"])
+    kvar = [radform for radform, _ in vantade]
+    andra = []
+    for nummer, rad in enumerate(verifikation["rader"], start=1):
+        radform = _radens_form(rad["konto"], rad["debet_ore"], rad["kredit_ore"], rad["ursprung"]["berakning"],
+                               rad["ursprung"]["fran"])
+        if radform in kvar:
+            kvar.remove(radform)
+        else:
+            andra.append("rad " + str(nummer) + " (konto " + rad["konto"] + ")")
+    if kvar or andra:
+        raise _fel(_URSPRUNG, "underlaget " + repr(id_) + " (" + typ + ") " + ("med en bankrad" if bankrader else "utan"
+                   " bankrad") + " ska ha formen " + form + ", men raderna stämmer inte med den." + (
+                       " Saknas: " + "; ".join(visas for radform, visas in vantade if radform in kvar) + "." if kvar
+                       else "") + (" Hör inte till formen: " + ", ".join(andra) + "." if andra else "") + " "
+                   + _TRE_FORMERNA)
+
+
 def _kontrollera_underlagen(kopplingar, verifikation, regelbok, kontoplan, momssatser, kallorna):
     """K5, K7 och K8 på varje underlag i de kontrollerade kopplingarna, mot underlagets egen regel.
 
@@ -1305,7 +1428,8 @@ def _kontrollera_underlagen(kopplingar, verifikation, regelbok, kontoplan, momss
     debet bara med en bankrad i förslaget, och i kredit bara när delarna inte står i kredit (Öppet 35,
     granskning 27, M1, Hugos beslut 2026-10-31), och beloppet i debet har en egen rad på bankkontot i
     kredit med samma belopp ur en bankrad, där varje rad på bankkontot räknas bara en gång (Öppet 36,
-    granskning 28, M1, Hugos beslut 2026-11-04).
+    granskning 28, M1, Hugos beslut 2026-11-04). Allra sist, efter alla underlag, har förslaget exakt en av
+    flödenas tre former (Öppet 39, granskning 29, P1, Hugos beslut 2026-11-04 om granskning 29, beslut 1).
     """
     underlagen = [post["id"] for post in kopplingar["underlag"]]
     if not underlagen:
@@ -1338,6 +1462,8 @@ def _kontrollera_underlagen(kopplingar, verifikation, regelbok, kontoplan, momss
         _kontrollera_beloppsraderna(id_, kontoplan, verifikation)
         _kontrollera_momsraderna(id_, kontoplan, verifikation)
         _kontrollera_beloppssidan(id_, kontoplan, kopplingar, verifikation)
+    # Efter alla underlag, så att Öppet 31–36 får säga sitt först. Formen har ett underlag, och flera stoppas där.
+    _kontrollera_flodets_form(underlag, kontroll.konton, kontoplan, kopplingar, verifikation)
     return {_K5: "ok", _K7: "ok", _K8: "ok"}
 
 
