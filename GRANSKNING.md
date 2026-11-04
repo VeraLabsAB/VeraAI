@@ -10781,3 +10781,22 @@ KAN JAG GÅ VIDARE: ja till steg 96 och 101. Inget kan bokföras, ingen spärr �
 ÄNDRINGAR I CLAUDE.md: inga
 BESLUT SOM BEHÖVS: 1–5 ovan.
 NÄSTA STEG: Hugo eller Casper svarar på 1–5. Sedan steg 96 (Öppet 37, 48, 49 P4 och SPEC 7), steg 101 (registret, designsteg) och steg 92 (Öppet 26). Steg 15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
+
+## Hugos beslut 2026-11-04 om granskning 33
+
+Skrivna av Hugo i chatten 2026-11-04, i uppdraget till planeringssessionen. Ordagrant:
+
+    "HUGOS BESLUT 2026-11-04 OM GRANSKNING 33:
+    1. P1 (Öppet 41): datumet ska prövas mot det datum flödet skulle ha valt, för förslag både med och utan underlag. Eget steg med nästa lediga nummer, före steg 23 (uppgift 5). Datumet räknas som en del av formen, samma princip som (b).
+    2. P2 och P3: de två missvisande testerna görs om i steg 96. Radnumret läggs tillbaka när flöde d byggs (uppgift 5).
+    3. P5: las_regelbok ska stoppa en avgiftsregel med kostnaden på bankkontot. Kan vänta, under Öppet.
+    4. P6: SPEC 7 ska beskriva Öppet 44 också, i steg 96.
+    5. Steg 100 är granskat och klart.
+    6. Före nästa kodsteg görs en planeringssession där BYGGPLAN.md stäms av mot Kassio-specen (den här sessionen)."
+
+### Planeringssessionen (2026-11-04)
+
+- **Beslut 1 är steg 102 i BYGGPLAN.md**, nästa lediga nummer. Raden står före steg 23 i tabellen. Beslutet ersätter "senare, låg prioritet" i beslut 4 om granskning 29 (PROGRESS.md, Öppet 41).
+- **Uppdraget säger "ändra inga andra steg i BYGGPLAN.md", så tre rader är inte ändrade och säger mindre än besluten.** Steg 23 har inte 102 under "Beror på". Steg 96 nämner inte beslut 2 och 4. Steg 100 säger fortfarande "väntar på besked". Det rätta står i "Läge nu" och i steg 102 i BYGGPLAN.md och i PROGRESS.md (Öppet 41, 44, 47 och 50).
+- **Beslut 6:** förslaget står i `PLAN-KASSIO-FORSLAG.md`. BYGGPLAN.md skrivs inte om förrän Hugo eller Casper har svarat på frågorna där.
+- Ingen kod, inga test och inget i SPEC, CLAUDE.md eller vakten är ändrat.
