@@ -355,19 +355,29 @@ def test_skydd_paren_beror_inte_pa_bedomningsdatumet(korning):
         assert svar.matchningar == flodenas, datum
 
 
-def test_skydd_en_faktura_och_en_bankavgift_behover_ingen_matchning(korning, monkeypatch):
-    # Fakturan och bankavgiften berörs inte: bara ett förslag med både underlag och bankrad prövas. Förslag utan underlag
-    # får sin form i steg 100 (Öppet 44), inte här.
+def test_skydd_en_faktura_behover_ingen_matchning(korning, monkeypatch):
+    # Fakturan berörs inte: Öppet 40 prövar bara ett förslag med både underlag och bankrad.
     def far_inte_koras(*_):
         raise AssertionError("Matchningen ska inte köras för ett förslag utan par.")
     monkeypatch.setattr(konteringsforslag, "matcha_period", far_inte_koras, raising=False)
     assert skapa(korning, prov_b_003(korning), bankperiod=None).kontroller == ALLA_KONTROLLER
+
+
+def test_skydd_en_bankavgift_fran_flodet_godtas_igen_med_en_enda_matchning(korning, monkeypatch):
+    # Ändrat i steg 100 (Öppet 44, beslut 2 om granskning 30): bankavgiften kör nu matchningen, en gång, för sin form.
+    anrop = []
+
+    def spion(*args):
+        anrop.append(args)
+        return matcha_period(*args)
+    monkeypatch.setattr(konteringsforslag, "matcha_period", spion, raising=False)
     avgiften = [forslag for forslag in korning.resultat.forslag if not forslag.kopplingar["underlag"]][0]
     kopplingar = avgiften.kopplingar
     kopplingar["bankrader"] = [{"id": post["id"]} for post in kopplingar["bankrader"]]
     igen = skapa(korning, {"forslag_id": avgiften.forslag_id, "verifikation": avgiften.verifikation,
                            "kopplingar": kopplingar, "motivering": avgiften.motivering})
     assert igen.kontroller == {"K2": "ok", "ursprung": "ok"}
+    assert len(anrop) == 1
 
 
 # --- Kvar efter steget: dokumenterat, inte önskat ---

@@ -183,7 +183,8 @@ def test_p1_ett_forslag_utan_underlag_behover_ingen_momsfil(korning):
                                  "matchningsformatets_kontrollsumma": mot["matchningsformat"]}},
         "motivering": "Byggt för hand i testet för P1.",
     }
-    assert skapa(korning, forslag, momssatser=None, underlagsperiod=None).kontroller == {"K2": "ok", "ursprung": "ok"}
+    # Underlagsperioden behövs nu för matchningen (Öppet 44, steg 100, Hugos svar i chatten 2026-11-04). Momsfilen behövs inte.
+    assert skapa(korning, forslag, momssatser=None).kontroller == {"K2": "ok", "ursprung": "ok"}
 
 
 def test_p1_en_annan_momsfil_an_regelbokens_stoppas(korning, tmp_path):

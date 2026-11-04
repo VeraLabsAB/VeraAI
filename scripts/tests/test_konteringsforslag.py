@@ -29,7 +29,8 @@ from las_momssatser import las_momssatser  # noqa: E402
 from las_regelbok import las_regelbok  # noqa: E402
 from las_underlag import las_underlagsperiod  # noqa: E402
 from konteringsforslag import (  # noqa: E402
-    FORSLAG_NYCKLAR, Konteringsforslag, KonteringsforslagFel, skapa_konteringsforslag,
+    FORSLAG_NYCKLAR, Konteringsforslag, KonteringsforslagFel, _kallorna, _kontrollera_formen, _kontrollera_ursprung,
+    skapa_konteringsforslag,
 )
 
 KASSAREGISTER = "TB-KASSA-1"
@@ -216,23 +217,29 @@ def test_4a_betalningen(kallor):
     assert resultat.kopplingar["regel"]["regelbokens_kontrollsumma"] == kallor.regelbok.kontrollsumma
 
 
+# Beslut 2 om granskning 30 (Öppet 44, steg 100): ett förslag utan underlag har flöde e:s form, och allt annat stoppas tills dess
+# flöde finns. Testen av Z-rapporter och kortinlösen är därför stopp-test. Formen prövas allra sist, så att felet kommer visar att
+# K2, ursprunget och täckningen redan har godtagit förslaget. När flöde c och d byggs i uppgift 5 får de sina former i samma steg.
+OPPET_44 = "Öppet 44"
+
+
 def test_4c_z_1001(kallor):
-    resultat = skapa(kallor, z_1001())
-    rader = resultat.verifikation["rader"]
+    stoppas(kallor, z_1001(), "ursprung", OPPET_44, "Z-rapport")
+    rader = z_1001()["verifikation"]["rader"]
     assert sum(r["debet_ore"] for r in rader) == sum(r["kredit_ore"] for r in rader) == 596500
-    assert [(r["konto"], r["debet_ore"] or r["kredit_ore"]) for r in rader] == [
-        ("1910", 95600), ("1580", 411500), ("1581", 89400), ("3002", 378750), ("2621", 45450), ("3001", 137840),
-        ("2611", 34460)]
-    assert resultat.kopplingar["z_rapporter"] == [
+    # Kopplingen till kassan prövas direkt i ursprungskontrollen, eftersom inget Z-förslag kan skapas (Hugos svar i chatten
+    # 2026-11-04): rapportdatumet och kassafilens kontrollsumma kommer från läsningen av kassan. Används av flöde c i uppgift 5.
+    kopplingar = _kontrollera_ursprung(
+        _kontrollera_formen(z_1001()), kallor.regelbok, kallor.kontoplan,
+        _kallorna(kallor.underlagsperiod, kallor.bankperiod, kallor.kassaperiod))
+    assert kopplingar["z_rapporter"] == [
         {"kassaregister": KASSAREGISTER, "znummer": 1001, "rapportdatum": "2025-01-02",
          "filens_kontrollsumma": sha256(DATAMAPP / "kassa" / "kassa_2025-01-02.csv")}]
 
 
 def test_4d_kortinlosen_med_avgiften_som_skillnad(kallor):
-    resultat = skapa(kallor, kortinlosen(kallor))
-    assert [(r["konto"], r["debet_ore"], r["kredit_ore"]) for r in resultat.verifikation["rader"]] == [
-        ("1940", 406562, 0), ("6570", 4938, 0), ("1580", 0, 411500)]
-    assert [k["znummer"] for k in resultat.kopplingar["z_rapporter"]] == [1001]
+    # Beslut 2 om granskning 30: stoppas tills flöde d finns (se ovan).
+    stoppas(kallor, kortinlosen(kallor), "ursprung", OPPET_44, "Z-rapport")
 
 
 def test_4e_bankavgiften(kallor):
@@ -247,15 +254,18 @@ def test_summa_av_flera_bankrader(kallor):
         rad("1940", 89400, 0, "summa", bankrad(forsta), bankrad(andra)),
         rad("1581", 0, 89400, "lika", z("betalsatt_swish")),
     ], "R-BANK-SWISH", bankrader=[forsta, andra], z_rapporter=[1001])
-    assert skapa(kallor, data).kopplingar["bankrader"][1]["radnr"] == 2
+    # Beslut 2 om granskning 30: stoppas tills flöde d finns (se ovan). Felet kommer sist, så 'summa' godtas av ursprunget.
+    stoppas(kallor, data, "ursprung", OPPET_44, "Z-rapport")
 
 
 def test_period_som_inte_anvands_far_vara_none(kallor):
     assert skapa(kallor, fakturan(), bankperiod=None, kassaperiod=None).kontroller == KONTROLLER_MED_UNDERLAG
-    # Utan underlag behövs ingen momsfil, och K5, K7 och K8 körs inte (P1).
-    for data in (skapa(kallor, z_1001(), momssatser=None, underlagsperiod=None, bankperiod=None),
-                 skapa(kallor, bankavgiften(kallor), momssatser=None, underlagsperiod=None, kassaperiod=None)):
-        assert data.kontroller == {"K2": "ok", "ursprung": "ok"}
+    # Utan underlag behövs ingen momsfil, och K5, K7 och K8 körs inte (P1). Bankavgiften behöver båda perioderna för
+    # matchningen (Öppet 44, Hugos svar i chatten 2026-11-04): testet för stoppet står i test_beslut_granskning_32.py.
+    data = skapa(kallor, bankavgiften(kallor), momssatser=None, kassaperiod=None)
+    assert data.kontroller == {"K2": "ok", "ursprung": "ok"}
+    # Beslut 2 om granskning 30: Z-rapporten stoppas tills flöde c finns (se ovan), också här utan de perioder den inte använder.
+    stoppas(kallor, z_1001(), "ursprung", OPPET_44, "Z-rapport", momssatser=None, underlagsperiod=None, bankperiod=None)
 
 
 def test_en_bankperiod_for_en_manad_godtas(kallor):
@@ -973,7 +983,8 @@ def test_tackningen_godtar_samma_del_i_debet_och_kredit(kallor):
     # 4e: bankraden står både på kostnaden (debet) och på bankkontot (kredit), en gång på varje sida.
     # 4d: bankraden läggs till och dras ifrån i debet (0 gånger), och kortförsäljningen står en gång per sida.
     assert skapa(kallor, bankavgiften(kallor))
-    assert skapa(kallor, kortinlosen(kallor))
+    # Beslut 2 om granskning 30: 4d stoppas tills flöde d finns. Felet kommer efter täckningen, som alltså har godtagit det.
+    stoppas(kallor, kortinlosen(kallor), "ursprung", OPPET_44, "Z-rapport")
 
 
 def test_tackningen_godtar_men_oppet_34_stoppar_underlaget_som_skillnad_mellan_beloppet_och_momsen(kallor):
@@ -996,7 +1007,8 @@ def test_tackningen_godtar_totalsumman_mot_betalsatten(kallor):
         rad("1581", 89400, 0, "lika", z("betalsatt_swish")),
         rad("3002", 0, 596500, "lika", z("summa_brutto")),
     ], "R-Z-TB-KASSA-1", z_rapporter=[1001])
-    assert skapa(kallor, data)
+    # Beslut 2 om granskning 30: stoppas tills flöde c finns. Felet kommer efter täckningen, som alltså har godtagit det.
+    stoppas(kallor, data, "ursprung", OPPET_44, "Z-rapport")
 
 
 # --- Momskontona (punkt 5, granskning 7 M2) ---
@@ -1125,7 +1137,10 @@ def test_z_rapport_med_ett_annat_kassaregisters_regel_stoppas(kallor, tmp_path):
         data["regler"].append(ny)
 
     regelbok, summa = regelbok_med(kallor, tmp_path, ny_regel)
-    assert skapa_med_regelboken(kallor, z_1001(), regelbok, summa)
+    # Beslut 2 om granskning 30: med rätt regel stoppas Z-rapporten först sist, av formen (Öppet 44), tills flöde c finns.
+    with pytest.raises(KonteringsforslagFel) as fel:
+        skapa_med_regelboken(kallor, z_1001(), regelbok, summa)
+    assert OPPET_44 in str(fel.value) and "Z-rapport" in str(fel.value)
     data = z_1001()
     data["kopplingar"]["regel"]["id"] = "R-Z-ANNAN-KASSA"
     with pytest.raises(KonteringsforslagFel) as fel:
@@ -1138,8 +1153,11 @@ def test_z_rapport_med_ett_annat_kassaregisters_regel_stoppas(kallor, tmp_path):
 def test_regeln_godtar_rollkontona_och_regelns_egna_konton(kallor):
     # Skydd: exemplen i DESIGN 4 använder både regelns konton och rollkontona (bank, leverantörsskulder,
     # ingående och utgående moms), och alla godtas.
-    for data in (fakturan(), betalningen(kallor), z_1001(), kortinlosen(kallor), bankavgiften(kallor)):
+    for data in (fakturan(), betalningen(kallor), bankavgiften(kallor)):
         assert skapa(kallor, data)
+    # Beslut 2 om granskning 30: 4c och 4d går förbi regelkontrollen och stoppas sist, av formen, tills flöde c och d finns.
+    for data in (z_1001(), kortinlosen(kallor)):
+        stoppas(kallor, data, "ursprung", OPPET_44, "Z-rapport")
 
 
 # --- Kontrollsummorna (K2 punkt 1, granskning 7 M4) ---

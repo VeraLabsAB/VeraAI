@@ -10,7 +10,8 @@ förslaget som ett objekt (se nedan), regelboken från las_regelbok, kontoplanen
 momsfilen från las_momssatser och perioderna från las_underlagsperiod, las_bankfil (eller
 sla_ihop_bankperioder) och las_kassaperiod, och kör alltid alla kontroller. En period som förslaget
 inte behöver får vara None, och momsfilen får vara None bara när förslaget inte bygger på något
-underlag. Bara om allt stämmer returneras ett Konteringsforslag, som inte går att ändra och bara kan
+underlag. Ett förslag med en bankrad behöver både bankperioden och underlagsperioden, eftersom
+matchningen körs på dem (Öppet 40 och 44). Bara om allt stämmer returneras ett Konteringsforslag, som inte går att ändra och bara kan
 skapas där. Annars stoppas förslaget med ett KonteringsforslagFel, och inget förslag skapas. Det är
 ett fel i kärnan, inte ett ärende: det betyder att koden som räknade fram förslaget har räknat fel,
 eller har byggt ett förslag där det skulle ha blivit ett ärende.
@@ -234,7 +235,7 @@ K5, K7 och K8, efter ursprunget, för varje underlag som förslaget bygger på (
 
   Varje rad räknas med 'lika' och har exakt en källa. En rad med beloppet 0 tas inte med, varken för
   kostnaden eller för momsen, som i flödena och K2 (Hugos svar i chatten 2026-11-04). Raderna får stå i vilken
-  ordning som helst. Förslag utan underlag (bankavgiften i flöde e) berörs inte. Kontrollerna K5, Öppet 31–36
+  ordning som helst. Förslag utan underlag har en egen form (Öppet 44, nedan). Kontrollerna K5, Öppet 31–36
   och de andra ovan står kvar och prövas först, så att felet säger mer än att formen är fel. Annars gick en
   bankrad som källa på kostnadskontot igenom (granskarens prov r6–r9 och r16), och 'summa' av flera bankrader
   (r3) och en faktura baklänges ihop med en annan fakturas delar (r11). Formerna stoppar också b2 och två
@@ -268,6 +269,30 @@ K5, K7 och K8, efter ursprunget, för varje underlag som förslaget bygger på (
   inget flaggat underlag och skriver märkningen själva, så de berörs inte. K4 körs på underlagen i perioden, så kontrollen vet
   inget om underlag utanför den (Öppet 46). Ett förslag utan underlag berörs inte.
 
+  Förslag utan underlag (Öppet 44, steg 100, granskning 30, P2, Hugos beslut 2026-11-04 om granskning 30, beslut 2). Prövas allra
+  sist, efter K4, för ett förslag utan underlag: det ska ha flöde e:s form, bankavgiften. Allt annat utan underlag stoppas tills
+  dess flöde finns, samma princip som flödenas former i steg 97:
+
+    källorna   inga Z-rapporter och exakt en bankrad, och bankraden är pengar ut.
+    matchningen  bankraden står bland raderna som inte kräver underlag (kraver_inte_underlag i matcha_period). Samma anrop som
+               Öppet 40, med samma perioder, samma regelbok och samma fasta datum. Öppet 40 kör bara för förslag med underlag och
+               den här kontrollen bara för förslag utan, så inget förslag kör matchningen två gånger. Går matchningen inte att
+               göra, till exempel utan underlagsperioden, stoppas förslaget.
+    regeln     den regelboken ger raden på verifikationens datum (regel_for_bankrad). Regeln har flode bankavgift
+               (las_regelbok.FLODE_BANKAVGIFT), och förslagets regel i 'kopplingar' är den regeln.
+    beloppet   inte större än regelns hogst_belopp_ore, om regeln har en sådan.
+    raderna    exakt två, i vilken ordning som helst: regelns kostnadskonto i debet och bankkontot (rollen bank i kontoplanen) i
+               kredit, båda räknade med 'lika', med bankraden som enda källa och med samma belopp.
+
+  Annars gick avgiften igenom på leverantörsskulderna, och Swish in, kortinlösen och en Z-rapport på fel konto, och en avgift över
+  regelns gräns eller på en regel utan flöde (granskarens n1 och n4–n8). Formen är samma rader som flöde e bygger
+  (konteringsfloden.py, _bankrad_utan_underlag), men inget importeras därifrån, eftersom flödena importerar den här modulen. Formen
+  säger inget om verifikationens datum (Öppet 41), och ingenting om samma bankrad i två förslag (steg 101).
+
+  Regel framåt (samma beslut): varje nytt flöde byggs med sin form i samma steg. Flöde c (Z-rapporter) och flöde d (Swish,
+  kortinlösen och kontanter) i uppgift 5 stoppas här tills deras former är tillagda. Därför går exemplen 4c och 4d i
+  DESIGN-regelbok.md inte att skapa i dag.
+
 Kopplingarna i förslaget får kontrollsummorna för regelboken, kontoplanen, momsfilen och
 matchningsformatet, och kontrollsumman för varje fil förslaget bygger på (underlaget, bankfilen och
 Z-filen). Summorna kommer från inläsningen, aldrig från indata: de som står i indata jämförs bara (K2).
@@ -286,7 +311,7 @@ from las_bank import Bankperiod, kronor
 from las_kassa import Kassaperiod
 from las_kontoplan import Kontoplan, KontoplanFel
 from las_momssatser import Momssatser, MomssatsFel
-from las_regelbok import Regelbok
+from las_regelbok import FLODE_BANKAVGIFT, Regelbok
 from las_underlag import HELTAL_HOGST_SIFFROR, Underlagsperiod
 from matcha_bank import MatchningFel, matcha_period
 from normalisering import normalisera_for_jamforelse
@@ -384,6 +409,11 @@ _STOPPAR_BADA = (_K4A, _K4B, _K4A + " och " + _K4B)
 _OPPET_43 = ("Ett underlag som K4 har flaggat får inget förslag (Öppet 43, steg 99, Hugos beslut 2026-11-04 om granskning"
              " 30, beslut 1, och Hugos beslut 2026-10-30 om granskning 22, punkt 3, och om granskning 23, Öppet 29). Det ska"
              " vara ett ärende, som flödena gör.")
+
+# Nyckeln för kostnadskontot i konteringen i en regel med flödet bankavgift (las_regelbok.FLODETS_KONTERING).
+_KOSTNAD = "kostnad"
+_OPPET_44 = ("Ett förslag utan underlag ska ha flöde e:s form, bankavgiften. Allt annat utan underlag stoppas tills dess flöde"
+             " finns (Öppet 44, steg 100, Hugos beslut 2026-11-04 om granskning 30, beslut 2).")
 
 
 class KonteringsforslagFel(Exception):
@@ -1586,6 +1616,69 @@ def _kontrollera_k4(kopplingar, motivering, underlagsperiod):
                        " Motiveringen ska ha: " + repr(_k4c_markningens_borjan(k4c_flaggade)) + ". " + _OPPET_43)
 
 
+def _kontrollera_forslag_utan_underlag(kopplingar, verifikation, regelbok, kontoplan, kallorna, underlagsperiod, bankperiod):
+    """Öppet 44: ett förslag utan underlag har flöde e:s form. Se "Förslag utan underlag" överst i filen.
+
+    kopplingar är de kontrollerade kopplingarna, och ursprungskontrollen har visat att bankraden finns. Flöde e bygger exakt
+    de här raderna (konteringsfloden.py, _bankrad_utan_underlag). Varje nytt flöde (c, d och Z-rapporter i uppgift 5) måste
+    byggas med sin form i samma steg (Hugos beslut 2026-11-04 om granskning 30, beslut 2).
+    """
+    if kopplingar["underlag"]:
+        return
+    if kopplingar["z_rapporter"]:
+        raise _fel(_URSPRUNG, "förslaget har inget underlag men en Z-rapport. Flödet för Z-rapporter är inte byggt, och formen"
+                   " läggs till i samma steg som flödet. " + _OPPET_44)
+    if len(kopplingar["bankrader"]) != 1:
+        raise _fel(_URSPRUNG, "förslaget har inget underlag och " + str(len(kopplingar["bankrader"])) + " bankrader ("
+                   + ", ".join(repr(post["id"]) for post in kopplingar["bankrader"]) + "). Bankavgiften har exakt en bankrad. "
+                   + _OPPET_44)
+    id_ = kopplingar["bankrader"][0]["id"]
+    bankraden = kallorna.bankrader[id_]
+    visas = "bankraden " + repr(id_) + " (radnummer " + str(bankraden["radnr"]) + ")"
+    if bankraden[_BELOPPSFALT] >= 0:
+        raise _fel(_URSPRUNG, visas + " är pengar in, och bankavgiften är pengar ut. Flödet för pengar in är inte byggt, och"
+                   " formen läggs till i samma steg som flödet. " + _OPPET_44)
+    try:
+        matchning = matcha_period(bankperiod, underlagsperiod, regelbok, _SENT_BEDOMNINGSDATUM)
+    except MatchningFel as fel:
+        raise _fel(_URSPRUNG, "matchningen kunde inte göras, så det går inte att pröva om " + visas + " kräver underlag: "
+                   + str(fel) + " " + _OPPET_44) from None
+    namnen = [post["regel"] for post in matchning.kraver_inte_underlag if post["bankrad"]["id"] == id_]
+    if not namnen:
+        raise _fel(_URSPRUNG, visas + " står inte bland raderna som inte kräver underlag: "
+                   + _vad_matchningen_sager(id_, matchning) + ". " + _OPPET_44)
+    datum = verifikation["datum"]
+    regel = regelbok.regel_for_bankrad(namnen[0], datum)
+    if regel is None:
+        raise _fel(_URSPRUNG, visas + " passar regeln " + repr(namnen[0]) + " i matchningsformatet, men ingen regel i regelboken"
+                   " gäller den på " + datum + ". " + _OPPET_44)
+    if regel.get("flode") != FLODE_BANKAVGIFT:
+        raise _fel(_URSPRUNG, "regeln " + repr(regel["id"]) + " för " + visas + " har inte flödet " + repr(FLODE_BANKAVGIFT)
+                   + " (nyckeln 'flode' i regelboken). " + _OPPET_44)
+    if kopplingar["regel"]["id"] != regel["id"]:
+        raise _fel(_URSPRUNG, "förslagets regel i 'kopplingar' är " + repr(kopplingar["regel"]["id"]) + ", men regelboken ger "
+                   + visas + " regeln " + repr(regel["id"]) + ". " + _OPPET_44)
+    belopp, grans = -bankraden[_BELOPPSFALT], regel["villkor"].get("hogst_belopp_ore")
+    if grans is not None and belopp > grans:
+        raise _fel(_URSPRUNG, visas + " är " + kronor(belopp) + ", men regeln " + repr(regel["id"]) + " har gränsen "
+                   + kronor(grans) + ". Det ska vara ett ärende, inte ett förslag. " + _OPPET_44)
+    kalla = [{"kalla": "bankrad", "id": id_, "falt": _BELOPPSFALT}]
+    kostnad, bank = regel["kontering"][_KOSTNAD], _konto_med_rollen(kontoplan, _BANK, datum)
+    vantade = ((_radens_form(kostnad, belopp, 0, "lika", kalla), "kostnadskontot " + kostnad + " i debet"),
+               (_radens_form(bank, 0, belopp, "lika", kalla), "bankkontot " + str(bank) + " i kredit"))
+    former = [_radens_form(rad["konto"], rad["debet_ore"], rad["kredit_ore"], rad["ursprung"]["berakning"],
+                           rad["ursprung"]["fran"]) for rad in verifikation["rader"]]
+    saknas = [vad for form, vad in vantade if form not in former]
+    andra = ["rad " + str(nummer) + " (konto " + rad["konto"] + ")" for nummer, (rad, form) in
+             enumerate(zip(verifikation["rader"], former), start=1) if form not in [form_ for form_, _ in vantade]]
+    # Med exakt två rader betyder en rad utanför formen att en väntad rad saknas. andra behövs bara i felet.
+    if saknas or len(former) != len(vantade):
+        raise _fel(_URSPRUNG, "raderna för " + visas + " har inte formen, som är exakt två rader med " + kronor(belopp)
+                   + " och bankraden som enda källa, räknade med 'lika'." + (
+                       " Saknas: " + " och ".join(saknas) + "." if saknas else "") + (
+                       " Hör inte till formen: " + ", ".join(andra) + "." if andra else "") + " " + _OPPET_44)
+
+
 # --- Förslaget ---
 
 def _frys(varde):
@@ -1688,8 +1781,9 @@ def skapa_konteringsforslag(forslag, regelbok, kontoplan, momssatser=None, under
     las_underlagsperiod, bankperiod från las_bankfil eller sla_ihop_bankperioder och kassaperiod från
     las_kassaperiod. En period som förslaget inte använder får vara None, och momsfilen får vara None
     bara när förslaget inte bygger på något underlag (K5, K7 och K8 gäller underlag). Ett förslag med både
-    underlag och bankrad ska dessutom vara ett par i matcha_period (Öppet 40), och ett underlag som K4 har
-    flaggat stoppas (Öppet 43). Allt som inte går ihop stoppar förslaget med ett KonteringsforslagFel.
+    underlag och bankrad ska dessutom vara ett par i matcha_period (Öppet 40), ett underlag som K4 har
+    flaggat stoppas (Öppet 43), och ett förslag utan underlag ska ha flöde e:s form (Öppet 44). Allt som inte går
+    ihop stoppar förslaget med ett KonteringsforslagFel.
     """
     _kontrollera_indatans_typer(regelbok, kontoplan, momssatser, underlagsperiod, bankperiod, kassaperiod)
     nytt = _kontrollera_formen(forslag)
@@ -1702,6 +1796,8 @@ def skapa_konteringsforslag(forslag, regelbok, kontoplan, momssatser=None, under
                                               kallorna))
     _kontrollera_bankradens_par(kopplingar, regelbok, underlagsperiod, bankperiod)
     _kontrollera_k4(kopplingar, nytt["motivering"], underlagsperiod)
+    _kontrollera_forslag_utan_underlag(kopplingar, nytt["verifikation"], regelbok, kontoplan, kallorna, underlagsperiod,
+                                       bankperiod)
     return Konteringsforslag(_FORSLAGSNYCKEL, {
         "forslag_id": nytt["forslag_id"],
         "verifikation": nytt["verifikation"],
