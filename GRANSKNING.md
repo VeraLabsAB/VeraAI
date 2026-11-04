@@ -9090,3 +9090,284 @@ inte i beslutet och är inte byggd. (2) Steg 93 räknades redan som klart (BYGGP
   projektmappen innan koden ändrades. Sviten efter: **4 434 passed**. Kommandona står i PROGRESS.md, "Läge
   2026-10-31, Öppet 35 byggd".
 - **Inte granskad oberoende än.** Förslag: en kort granskning i en ny session, som för steg 22 (P9 i granskning 23).
+
+## Granskning 28 (av 109fdcf och f10c65b) (2026-11-04)
+
+Kort oberoende granskning av steg 94 (Öppet 35) i en ny session som inte har sett byggsessionen, mot b7d9fac.
+Granskaren ändrade ingen kod och ingen rad i CLAUDE.md, och skrev i den här filen, PROGRESS.md och BYGGPLAN.md
+(statusraderna, CLAUDE.md, Hugos beslut 2026-10-30 om granskning 24, P10: uppdraget sa "committa bara GRANSKNING.md",
+men CLAUDE.md gäller ändå). Lästes: CLAUDE.md, SPEC.md (7, stycket "Sidan för beloppet", 7.1 och 11, stycket "Avgjort
+(Hugos beslut 2026-10-31 om granskning 27 ...)" och Ö8), här "Granskning 27" (hela) och "Hugos beslut 2026-10-31 om
+granskning 27", BYGGPLAN.md ("Läge nu" och steg 94), PROGRESS.md (statusraden, "Läge 2026-10-31, Öppet 35 byggd",
+tabellen Klart, Öppet 35 och "Nästa steg" punkt 3), `git show 109fdcf` (koden) och `git show f10c65b` (SPEC och
+BYGGPLAN), koden i `scripts/konteringsforslag.py` (docstringen överst, `_kontrollera_k2`, `_underlagets_varde`,
+`_sla_upp`, `_kontrollera_momskonto`, `_kontrollera_bankkonto`, `_kontrollera_kopplingar`, `_kontrollera_regeln`,
+`_kontrollera_tackning`, `_kontrollera_ursprung`, `kontrollera_underlag`, `_kontrollera_kostnadsraderna`,
+`_underlagets_kallor`, `_kontrollera_beloppsraderna`, `_kontrollera_momsraderna`, den nya
+`_kontrollera_beloppssidan`, `_kontrollera_underlagen` och `skapa_konteringsforslag`), `scripts/konteringsfloden.py`
+(`_skapa`, `_kostnad_och_moms` och `_leverantorsfaktura`), byggsessionens `test_beslut_granskning_27.py` (hela),
+hjälpfunktionerna i `test_beslut_granskning_22.py`, `_25.py` och `_26.py`, `Korning` i `test_konteringsfloden.py`,
+`test_byggplan_progress.py`, underlagen 003 och 009, bankfilerna (raderna för LEV-TE) och regelboken (R-LEV-TE).
+
+### Beslut som redan var tagna (prövades inte om)
+
+Hugos beslut 2026-10-31: "Beloppet i debet ska kräva en bankrad. belopp_ore får bara stå i kredit när delarna inte gör
+det." Granskarens tredje del i granskning 27 ("i debet bara utan underlagets delar alls") är medvetet inte byggd.
+Regeln om högst en rad är beslutad av Hugo 2026-10-31. Inget av det prövas om här. M1 nedan är ett hål i beslutets
+ordalydelse som den är byggd, inte ett förslag att ändra beslutet: det är Hugos eller Caspers sak att avgöra om
+hålet ska stängas och hur.
+
+### Viktigt först
+
+- **Inget kan bokföras utan godkännande, och ingen spärr har blivit svagare** (P1, P7). 109fdcf lägger bara till
+  en delkontroll med två `raise` och ett anrop sist i `_kontrollera_underlagen`. Ingen kontroll är borttagen, de fyra
+  borttagna raderna i diffen är text i docstringarna, och returvärdet är oförändrat. f10c65b rör bara `.md`-filer.
+  Inget företagsspecifikt i kärnan. CLAUDE.md, `foretag/`, `testforetag/`, `testdata/` och `sparr/` är oförändrade.
+- **Öppet 35 är byggd som beslutet säger, ordagrant** (P1, P2): beloppet i debet kräver minst en bankrad i
+  förslaget, beloppet i kredit stoppas när en del står i kredit, kontrollen står sist efter Öppet 33, h1 och h2
+  stoppas (byggda om här oberoende av byggsessionens test). "Rött före" stämmer (5 av 13, P3), sviten 4 434 gröna
+  (P4). Flöde a, b och e går igenom (P6).
+- **Sju egna prov försökte ta sig runt Öppet 35. Fyra stoppas där de ska. Tre går igenom, och alla tre fanns före
+  109fdcf** (P5, M1, nivå medel, inte blockerande, Hugo eller Casper beslutar, ny punkt Öppet 36): kravet på bankrad
+  gäller **per förslag**, inte per underlag. Fakturan spegelvänd (h1) och två fakturor kvittade mot varandra (h2) går
+  igenom med alla kontroller gröna så fort förslaget också innehåller någon bankrad, till exempel en annan fakturas
+  betalning (b1, b2), och en bankrad räknas även när den inte står på bankkontot (b3).
+- **Utanför steg 94, hittat av ett prov om belopp 0** (M2, nivå medel, Hugo eller Casper beslutar, ny punkt Öppet
+  37): ett underlag med `belopp_ore` 0 läses in utan anmärkning, och flöde a bygger då en faktura med en enda rad,
+  som K2 stoppar. Felet fångas inte i `kontera_period`, så hela körningen stannar på det underlaget, utan ärende.
+  Inget bokförs fel, men inget förslag görs för någon i perioden.
+- **Steg 94 kan stå som klart och granskat:** byggt som beslutet säger. M1 är en ny punkt (Öppet 36), på samma sätt
+  som Öppet 35 var efter steg 93, och M2 hör inte till steget alls.
+
+### Fynd
+
+**P1 – Koden stämmer med beslutet, ordagrant, och diffen lägger bara till stopp (notering).**
+`scripts/konteringsforslag.py` rad 1176–1209 (`_kontrollera_beloppssidan`): för varje källa på verifikationens rader
+som pekar på underlaget och är `belopp_ore`: (a) står raden i debet och förslaget har minst en bankrad i de
+kontrollerade kopplingarna, godtas raden; (b) står raden i debet utan bankrad, stoppas förslaget med ett fel som
+namnger raden, kontot, underlaget, "i debet", "ingen bankrad" och Öppet 35; (c) står raden i kredit och någon rad
+har underlagets `underlag_ore` eller `moms_ore` som källa i kredit, stoppas förslaget med ett fel som namnger raden,
+kontot, underlaget, "i kredit", de andra raderna och Öppet 35. Det är beslutets två meningar. "Minst en bankrad"
+betyder `kopplingar["bankrader"]` från `_kontrollera_ursprung` (rad 1374 och 1376), alltså bankrader som både står i
+förslagets kopplingar och används av någon rad (punkt 4), inte bara listas. Anropet står sist i
+`_kontrollera_underlagen` (rad 1261), efter Öppet 33 (rad 1260), per underlag, och returvärdet är oförändrat (rad
+1262). `git diff b7d9fac..109fdcf -- scripts/konteringsforslag.py`: 59 tillagda rader och 4 borttagna, alla fyra i
+docstringarna ("Prövas sist" blev "Prövas efter Öppet 34" för Öppet 33, och "Sist står varje momsrad" blev "Sedan ...
+Sist står underlagets 'belopp_ore'"). **Inget företagsspecifikt:** `grep -r` efter `4010`, `5460`, `2440`, `2641`,
+`1940`, `SYNT`, `syntet`, `Syntet` och `LEV-TE` i `scripts/` utanför `scripts/tests/` ger bara ordet "SYNTETISK" i
+två docstrings från förut (kommando 10). Den nya kontrollen använder bara fältnamnen och kopplingarna.
+
+**P2 – Ordningen stämmer: Öppet 35 sist, efter 32, 34 och 33 (notering).** Provat själv: o1 (h1 med beloppet på
+4010, bryter mot Öppet 34 och 35) får Öppet 34:s fel utan "Öppet 35"; o2 (h1 med kostnaden på 2440, bryter mot Öppet
+32 och 35) får Öppet 32:s fel utan "Öppet 35". Byggsessionens test för Öppet 33 före 35 är grönt, och det är grönt
+också mot b7d9fac, som det ska (ordningsprovet bevisar bara ordningen när båda finns).
+
+**P3 – "Rött före" stämmer: 5 röda och 8 gröna av 13 mot `git archive` av b7d9fac (notering).** Byggsessionens testfil
+kopierad till kopian och körd (kommando 7): **5 failed, 8 passed**. De fem röda är h1 och h2 ("DID NOT RAISE"), de två
+testerna direkt på delkontrollen (`AttributeError`, funktionen fanns inte) och texttestet ("Öppet 35" saknades i
+koden). De åtta gröna är de två om kreditnotor, ordningstestet och de fem skydden, som ska vara gröna före. Samma
+antal och samma tester som PROGRESS.md säger. Byggsessionen körde "rött före" i projektmappen innan koden ändrades,
+inte mot en kopia; utfallet här mot kopian är detsamma.
+
+**P4 – Sviten: 4 434 gröna (notering).** Hela sviten i projektmappen med kommandot i SPEC 7.1 (kommando 6, i
+bakgrunden, 74 sekunder): **4 434 passed**, 0 röda, samma antal som PROGRESS.md (4 421 + 13). Utskriften lästes med
+fil-verktyget Read, eftersom `tail` på bakgrundskörningens fil stoppades av vakten (filen ligger i Claude Codes egen
+mapp utanför projektet och scratchpad).
+
+**P5 – Hålprov: h1 och h2 stoppas, kredithalvan nås aldrig, tre prov går igenom (M1), ett prov utanför steget (M2).**
+Granskaren skrev `test_granskare_prov28.py`, bara i scratchpad, och körde den mot kopior av f10c65b (**19 gröna**) och
+b7d9fac (**2 röda, 17 gröna**: de två röda är s1 och s2, det 109fdcf stänger). Proven, med utfallet i kopian av
+f10c65b:
+
+- *s1, s2, skydd:* h1 (003 spegelvänd) och h2 (003 och 009 med samma belopp mot varandra, i en kopia av testdatan i
+  testets mapp) byggda om från grunden stoppas av Öppet 35 med rätt text och utan "Öppet 32", "33" eller "34". Röda
+  mot b7d9fac. *s3:* fakturan och betalningen för hand med rätt form godtas.
+- *k1–k3, halvan om kredit med hela förslag (uppdragets punkt 4):* **ingen når Öppet 35, alla stoppas av täckningen
+  (punkt 7).** k1: balanserat, debet 003 och 009 som delar (009 med 003:s belopp), kredit 003 som belopp OCH som
+  delar. Debet är rent, så felet är kredits: "i kredit används underlaget '003' ... 2 gånger". k2: beloppet och momsen
+  på båda sidorna (symmetriskt): täckningen prövar debet först, "i debet används ... 2 gånger". k3: kredit beloppet +
+  momsen, debet 003:s delar + 009:s moms: täckningen stoppar i debet (009 används delvis). Byggsessionens bedömning,
+  att kredithalvan stoppas av täckningen eller Öppet 34 innan den nås, stämmer: `belopp_ore` består av alla delarna,
+  så en del i kredit tillsammans med beloppet i kredit är alltid samma del två gånger på samma sida, eller, med
+  `skillnad`, stoppad av Öppet 34. Grenen (c) i P1 kan alltså bara nås direkt, som byggsessionens två tester gör. Det
+  är inte ett fel, men en iakttagelse (I1): grenen är i praktiken död kod som bara dokumenterar beslutet.
+- *b1, fakturan spegelvänd plus en annan fakturas betalning (LUCKA, M1):* 003 som h1 (2440 debet `belopp_ore`
+  16 730,56 kr, 4010 kredit `underlag_ore`, 2641 kredit `moms_ore`) och i samma förslag 009:s riktiga betalning (2440
+  debet 009 `belopp_ore` 15 037,12 kr, 1940 kredit bankrad 84 i februari, 15 037,12 kr), datum 2025-02-19, båda
+  underlagen och bankraden i kopplingarna, regeln R-LEV-TE. **Godtas med alla fem kontrollerna "ok"**, också mot
+  b7d9fac. Bankraden hör till 009, men Öppet 35 frågar bara om förslaget har någon bankrad. 003 är fortfarande en
+  faktura bokförd baklänges, utan kreditnota.
+- *b2, h2 plus en betalning med en främmande bankrad (LUCKA, M1):* i kopian där 009 har 003:s belopp: 2440 debet 003
+  `belopp_ore`, 2440 kredit 009 `belopp_ore` (kvittningen), 4010 debet 009 `underlag_ore`, 2641 debet 009 `moms_ore`,
+  1940 kredit bankrad 26 (16 730,56 kr, egentligen 003:s betalning). Varje underlag står helt på varje sida det
+  används, varje belopp på en rad, och förslaget har en bankrad. **Godtas med alla kontrollerna "ok"**, också mot
+  b7d9fac. Granskarens tredje del från granskning 27 ("i debet bara utan underlagets delar alls") hade stoppat b1
+  (003:s delar står i förslaget) men inte b2 (003 har inga delar där).
+- *b3, beloppet i debet mot en bankrad på kostnadskontot (LUCKA, M1):* 2440 debet 003 `belopp_ore`, 4010 kredit med
+  bankrad 26 som källa (16 730,56 kr). Punkt 6 säger bara vad bankkontot får ha som källa, inte var en bankrad får
+  stå, och 4010 står i regeln. **Godtas med alla kontrollerna "ok"**, också mot b7d9fac. Betalningen har alltså ingen
+  rad på bankkontot, men Öppet 35 räknar bankraden ändå.
+- *b4, h1 med en bankrad i kopplingarna som ingen rad använder:* stoppas av punkt 4 ("ingen rad använder det"), utan
+  "Öppet 35". Det är därför "minst en bankrad" i P1 betyder en använd bankrad.
+- *b5, h1 plus 003:s egen betalning i samma förslag:* stoppas av täckningen (003:s delar två gånger i debet), före
+  Öppet 34 och 35.
+- *b6, belopp 0 (uppdragets punkt 5):* ett underlag med `belopp_ore` 0 och momsraden 0/0 **läses in** av
+  `las_underlagsperiod` utan anmärkning (K13 går ihop: 0 + 0 = 0, och bara negativa tal stoppas). Ett förslag för hand
+  med rader med 0 på båda sidorna stoppas av K2 ("varken debet eller kredit") före Öppet 35. Ingen rad med 0 når
+  alltså Öppet 35.
+- *b7, samma underlag genom flödena (IAKTTAGELSE, M2, utanför steg 94):* `Korning(underlag=<mappen med bara det
+  underlaget>)` **stannar med `KonteringsforslagFel` (K2): "verifikationen har 1 rad, men en verifikation ska ha minst
+  två rader"**, också mot b7d9fac. `_kostnad_och_moms` i `konteringsfloden.py` hoppar över momsrader med 0 (rad 380),
+  så fakturan får bara raden på leverantörsskulderna med 0 i kredit, och `kontera_period` fångar inte felet (det finns
+  inget `except KonteringsforslagFel` i filen). Hela körningen stannar på ett underlag, utan ärende och utan förslag
+  för de andra. Se M2.
+- *f1–f4, flöde a, b och e (uppdragets punkt 6):* fakturan och betalningen för 003, kvittot 015 och bankavgiften
+  (bankrad 117 i januari, R-BANK-AVGIFT, utan underlag) går igenom som förut, utan ärenden. f4, strängare än Öppet 35:
+  i hela körningen har varje förslag med ett underlags `belopp_ore` i debet exakt en rad på bankkontot i kredit, med
+  samma belopp som raden i debet. Det är så flödena bygger betalningen, och det är det som b1–b3 inte har.
+
+*Vad b1, b2 och b3 har gemensamt (M1):* beslutet säger "en bankrad", och koden frågar om förslaget har någon bankrad
+alls, var som helst och med vilket belopp som helst. Betalningen i flöde a har bankraden på bankkontot i kredit med
+exakt beloppet på raden med `belopp_ore` i debet. *Varför M1 inte är blockerande:* samma skäl som i granskning 27:
+luckan fanns före 109fdcf (gröna mot b7d9fac), flödena bygger aldrig så (f4), bara kod förbi flödena kan, b1 kräver
+två underlag under samma regel i ett förslag och b2 två fakturor med exakt samma belopp, och förslaget kräver
+godkännande av en människa, som ser fem rader där två hör till en annan faktura. *Varför den bör stängas före uppgift
+5:* samma skäl som Öppet 31–35 (uppgift 5 ger `skapa_konteringsforslag` nya anropare), och b1 ger samma bokföring
+som h1 (en faktura återförd utan underlag) med alla kontroller gröna. *Vad granskaren ser som möjliga sätt, för Hugo
+eller Casper att ta ställning till (Öppet 36), inte granskarens val:* (a) för varje rad med ett underlags `belopp_ore`
+i debet ska förslaget ha en rad på bankkontot (rollen `bank`) i kredit med samma belopp, räknad ur en bankrad, som
+flöde a bygger (stoppar b1, b2 och b3; f4 visar att flödena uppfyller det); (b) flödenas två former rakt av (fakturan:
+kostnad och moms i debet, `belopp_ore` i kredit, inget annat; betalningen: `belopp_ore` i debet, bankraden i kredit,
+inget annat), som granskning 27 nämnde som alternativ; (c) lämna som det är tills uppgift 5, med det här avsnittet
+som dokumentation. (a) är några rader i `_kontrollera_beloppssidan` och ett test med b1–b3. Hänger ihop med Ö8 på
+samma sätt som Öppet 35: när kreditnotor byggs måste regeln prövas igen. **Inget här handlar om bokföringsregler:**
+det är bara vad ett förslag med underlag får se ut som för kod förbi flödena.
+
+**P6 – Flöde a, b och e går igenom (notering).** Se f1–f4 i P5, och byggsessionens fyra skyddstest (gröna också mot
+b7d9fac). `konteringsfloden.py` är oförändrad (P7).
+
+**P7 – 109fdcf och f10c65b rör bara koden, testfilen och dokumentationen (notering).** `git diff --stat
+b7d9fac..f10c65b`: `scripts/konteringsforslag.py` (+59 −4), `scripts/tests/test_beslut_granskning_27.py` (+244),
+BYGGPLAN.md, GRANSKNING.md, PROGRESS.md och SPEC.md. `git diff b7d9fac..f10c65b -- CLAUDE.md foretag testforetag
+testdata sparr scripts/konteringsfloden.py scripts/las_underlag.py` är tom. SPEC 7.1 är inte rörd (diffen i SPEC.md
+ligger i avsnitt 7, stycket "Sidan för beloppet", och i 11). Testfilen skriver bara i `tmp_path` och
+`tmp_path_factory.mktemp`, och läser `konteringsforslag.py` i projektet, som de tidigare testfilerna.
+
+**P8 – Dokumenten säger samma sak, med statusraderna som uppdateras här (notering, med ett lågt fynd, L1).** SPEC 7
+("Sidan för beloppet": regeln, "minst en bankrad i kopplingarna", "Prövas sist, efter Öppet 33", kreditnotor,
+"Halvan om kredit stoppas i dag redan av täckningen eller Öppet 34"), SPEC 11 (avgjort, byggt som steg 94, rött
+före, granskarens tredje del inte byggd, Ö8), här "Hugos beslut 2026-10-31 om granskning 27" (ordagrant), docstringen
+i `konteringsforslag.py` (rad 199–209 och i funktionen), PROGRESS.md (statusraden, lägesposten med "Steg i
+byggplanen: 94 (klart)", testsviten 4 434, tabellen Klart, Öppet 35 stängd, "Nästa steg" punkt 3) och BYGGPLAN.md
+("Läge nu", steg 94 ✅) stämmer med varandra och med koden. SPEC 7 säger exakt det som är byggt, så M1 är ett hål i
+regeln, inte ett fel i texten. Kommandona i byggsessionens post (P7-regeln i CLAUDE.md) går att följa. Det som sa
+"inte granskad oberoende än" (PROGRESS.md statusraden, lägesposten, tabellen Klart, Öppet 35 och "Nästa steg" punkt
+3; BYGGPLAN.md "Läge nu" och steg 94) uppdateras i den här commiten, och Öppet 36 och 37 läggs till i PROGRESS.md.
+Byggplanstestet är grönt (kommando 11). **L1 (låg, test):** byggsessionens skyddstest
+`test_skydd_varje_belopp_i_debet_i_flodena_har_en_bankrad` prövar samma svaga villkor som regeln (att
+`kopplingar["bankrader"]` inte är tom), så det hade varit grönt också för ett flöde som byggde b1. Granskarens f4
+prövar att bankraden står på bankkontot i kredit med samma belopp. Om Öppet 36 byggs enligt (a) bör skyddstestet
+skärpas på samma sätt. Ingen åtgärd krävs nu.
+
+**M2 – Ett underlag med belopp 0 stannar hela körningen (nivå medel, utanför steg 94, Hugo eller Casper beslutar,
+Öppet 37).** Se b6 och b7 i P5. `las_underlag` stoppar negativa tal men inte 0, K13 går ihop, och flöde a bygger en
+faktura med en rad, som K2 stoppar med ett fel som går upp genom `kontera_period`. Säker riktning (inget förslag
+görs), men ett enda sådant underlag i mappen ger inga förslag alls för perioden, och felet säger "verifikationen har
+1 rad", inte vilket underlag det gäller. Fanns före 109fdcf. Granskarens bedömning: ett beslut om vad som gäller för
+nollfakturor (stoppa underlaget när det läses, som negativa tal, eller göra ett ärende), och ett test. Inte
+granskarens sak att välja. Inte blockerande för steg 94.
+
+**P9 – Avsteg och iakttagelser (notering).** Vakten stoppade sju kommandon som granskaren skrev i strid med SPEC 7.1,
+alla bara läsande: ett `git status` ihopkopplat med `&&` och `sed`, två `sed`, tre `grep` med `\|` eller `\.` i
+mönstret, ett `grep` med `<` i mönstret och ett `tail` på bakgrundskörningens utskrift utanför projektet och
+scratchpad (se P4). De ersattes med ett kommando i taget, `grep` med flera `-e` och fil-verktyget Read. Granskarens
+provfil hade först två egna fel (b5 stoppas av täckningen, inte Öppet 34, och b6 startade flödena, som stannade, se
+M2), rättade innan proven räknades (b7 skrevs för att visa M2). Inget i projektet ändrades utom de tre
+dokumentfilerna, och inget utanför projektet utom scratchpad.
+
+### Svar på uppdragets punkter
+
+1. **Koden stämmer med beslutet ordagrant, kontrollen står sist efter Öppet 33, bara stopp tillagda, returvärdet
+   oförändrat, inget företagsspecifikt:** ja (P1, P2).
+2. **"Rött före" mot `git archive` av b7d9fac:** 5 av 13 röda, stämmer (P3).
+3. **Hela sviten:** 4 434 gröna, stämmer (P4).
+4. **Halvan om kredit med hela förslag:** tre prov, alla stoppas av täckningen innan Öppet 35 nås. Grenen kan bara
+   nås direkt (P5, k1–k3, I1).
+5. **Nya sätt runt Öppet 35:** tre prov går igenom, alla med en bankrad som inte hör till underlaget (b1: en annan
+   fakturas betalning, b2: en främmande bankrad vid kvittningen, b3: bankraden på kostnadskontot). M1, Öppet 36.
+   Belopp 0 når aldrig Öppet 35 (b6), men stannar hela körningen i flödena (b7, M2, Öppet 37, utanför steget).
+6. **Flöde a, b och e:** går igenom (P6).
+7. **109fdcf och f10c65b rör inget annat:** stämmer (P7).
+
+### Steg 94
+
+**Steg 94 är klart och granskat:** Öppet 35 är byggd som Hugos beslut och SPEC 7 säger. M1 är en ny punkt (Öppet
+36), i samma familj som Öppet 31–35, och bör avgöras före uppgift 5 (steg 23). M2 (Öppet 37) hör inte till steget.
+
+### Testsviten
+
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`:
+**4 434 passed**, 0 misslyckade, på 74 sekunder, samma antal som PROGRESS.md.
+
+### Kommandon i den här granskningen
+
+`<scratch>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/43a46ec6-f1ca-43d6-bb62-6699c68e26f1/scratchpad`.
+Allt kördes från projektmappen, ett kommando i taget, i förgrunden utom kommando 6.
+
+1. `git status`, `git show 109fdcf --stat`, `git show f10c65b --stat`, `git show 109fdcf -- scripts/konteringsforslag.py`,
+   `git show f10c65b -- SPEC.md BYGGPLAN.md`, `git diff b7d9fac..109fdcf -- scripts/konteringsforslag.py`,
+   `git diff --stat b7d9fac..f10c65b` och `git diff b7d9fac..f10c65b -- CLAUDE.md foretag testforetag testdata sparr
+   scripts/konteringsfloden.py scripts/las_underlag.py` (tom).
+2. `cat`, `ls`, `head`, `tail`, `wc -l` och `grep` med `-n`, `-c`, `-l`, `-i`, `-e`, `-r`, `--include` och
+   `--exclude-dir` i projektet; stycken av filer och den stora `git show`-utskriften lästes med fil-verktyget Read.
+3. `mkdir -p <scratch>/kopia-b7d9fac` och `mkdir -p <scratch>/kopia-f10c65b`.
+4. `git archive -o <scratch>/b7d9fac.tar b7d9fac` och samma för `f10c65b`.
+5. `tar -xf <scratch>/b7d9fac.tar -C <scratch>/kopia-b7d9fac` och samma för `f10c65b`.
+6. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`
+   (hela sviten i projektmappen, i bakgrunden: **4 434 passed**, 0 röda, 74 sekunder; utskriften läst med Read).
+7. `cp -R scripts/tests/test_beslut_granskning_27.py <scratch>/kopia-b7d9fac/scripts/tests/test_beslut_granskning_27.py`
+   och `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line
+   -rA <scratch>/kopia-b7d9fac/scripts/tests/test_beslut_granskning_27.py` (**5 failed, 8 passed**, rött före, P3).
+8. Provfilen `test_granskare_prov28.py` skrevs med fil-verktyget Write i `<scratch>/kopia-f10c65b/scripts/tests/` och
+   rättades med fil-verktyget Edit (b5 och b6, b7 tillagt).
+9. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rA
+   <scratch>/kopia-f10c65b/scripts/tests/test_granskare_prov28.py` (först **2 failed, 16 passed**, granskarens egna
+   provfel, se P9; efter rättelsen **19 passed**).
+10. `grep -n -r -e 4010 -e 5460 -e 2440 -e 2641 -e 1940 -e SYNT -e syntet -e Syntet -e LEV-TE --include='*.py'
+    --exclude-dir=tests scripts` (P1).
+11. `cp -R <scratch>/kopia-f10c65b/scripts/tests/test_granskare_prov28.py <scratch>/kopia-b7d9fac/scripts/tests/test_granskare_prov28.py`
+    och `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line
+    -rA <scratch>/kopia-b7d9fac/scripts/tests/test_granskare_prov28.py` (**2 failed, 17 passed**: s1 och s2 röda, det
+    109fdcf stänger; b1, b2, b3 och b7 gröna också här, luckorna fanns före).
+12. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q -k
+    byggplan_progress scripts/tests` efter att det här avsnittet och statusraderna skrivits.
+13. `git status`, `git add GRANSKNING.md PROGRESS.md BYGGPLAN.md` och `git commit -F <scratch>/commit-granskning-28.txt`
+    (meddelandet skrivet med fil-verktyget), sedan `git status`.
+
+Vakten stoppade: `&&` och `sed` i det första kommandot, två `sed`, `\|` och `\.` i `grep`-mönster (tre gånger), `<` i
+ett `grep`-mönster och `tail` utanför projektet. Se P9.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **Öppet 36 (M1):** ska kravet på bankrad i Öppet 35 gälla per rad med `belopp_ore` i debet, så att b1 (fakturan
+   spegelvänd ihop med en annan fakturas betalning), b2 (kvittningen ihop med en främmande bankrad) och b3
+   (bankraden på kostnadskontot) stoppas, före uppgift 5? Granskarens möjliga sätt: (a) en rad på bankkontot i
+   kredit med samma belopp, räknad ur en bankrad, för varje sådan rad; (b) flödenas två former rakt av; (c) lämna
+   till uppgift 5. Granskarens bedömning: ja, på samma grund som Öppet 31–35, i ett eget steg med nästa lediga
+   nummer. Inte granskarens sak att välja (a) eller (b).
+2. **Öppet 37 (M2):** vad gäller för ett underlag med `belopp_ore` 0: stoppa det när underlaget läses (som negativa
+   tal), eller göra ett ärende? I dag stannar hela körningen. Eget steg, inte en del av Öppet 36.
+3. **Steg 94:** får räknas som granskat och klart (granskarens bedömning: ja; M1 är en ny punkt, inte ett fel i det
+   som byggdes, och M2 hör inte till steget).
+
+STATUS: gult
+STEG I BYGGPLANEN: 94 – Öppet 35 – klart (granskat i den här granskningen)
+KAN JAG GÅ VIDARE: ja. Inget blockerande: inget kan bokföras, ingen spärr är svagare, Öppet 35 är byggd som
+beslutet säger ordagrant, h1 och h2 stoppas, "rött före" och sviten stämmer, flöde a, b och e går igenom. Gult för
+att hålprovet hittade tre förslag (M1, Öppet 36) som godtas med alla kontroller gröna: h1 och h2 går igenom så fort
+förslaget har någon bankrad, också en annan fakturas eller en på fel konto. De fanns före 109fdcf och bör avgöras
+före uppgift 5. Dessutom M2 (Öppet 37), utanför steget: ett underlag med belopp 0 stannar hela körningen.
+ÄNDRINGAR I CLAUDE.md: inga
+BESLUT SOM BEHÖVS: 1–3 ovan.
+NÄSTA STEG: Hugo eller Casper svarar på 1–3. Sedan Öppet 36 (eget steg) och steg 92 (Öppet 26) före uppgift 5. Steg
+15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
