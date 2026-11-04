@@ -10823,3 +10823,10 @@ Skrivna av Hugo i chatten 2026-11-04, i uppdraget till planeringssessionen. Orda
     15. Alla svar på frågorna i PLAN-KASSIO-FORSLAG.md avsnitt F är enligt förslagets rekommendationer, med svaren ovan."
 
 Uppdraget säger också att SPEC.md, CLAUDE.md och namnbytet görs i nästa session, och att pilotkundens namn inte skrivs i någon fil.
+
+## Hugos svar 2026-11-04 efter steg 103
+
+Skrivna av Hugo i chatten 2026-11-04, i uppdraget till steg 52. Ordagrant:
+
+    "1. "Pengar" i beslut 3 betyder betalningar, utbetalningar och belopp kunden ska betala, inte varje belopp i bokföringen. Läsaren i karantän och driftmiljön räknas som spärrar och granskas per steg.
+    2. Pilotkundens företagsnamn står kvar i historik (GRANSKNING.md, PROGRESS.md och git), i linje med beslutet om Q7. I gällande regeltext (CLAUDE.md och SPEC.md) står "pilotkunden" från och med nu."
