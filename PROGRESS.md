@@ -8,8 +8,8 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet arbetar mot skuggpiloten (SPEC avsnitt 9 och `BYGGPLAN.md`). Än finns ett testföretag, Syntet Testbutik AB.
 Inget i koden kan i dag bokföra något.
 
-Testsviten: **4 612 passed, 11 skipped**, 0 misslyckade (körd senast 2026-11-04 i granskning 34, i projektmappen med
-kommandot i SPEC 7.1. De 11 är spärrtestet, som hoppas över tills sandlådan är installerad). Sedan installationen
+Testsviten: **4 691 passed, 39 skipped**, 0 misslyckade (körd senast 2026-11-05 i byggsessionen efter P6, i projektmappen med
+kommandot i SPEC 7.1. De 39 är spärrproven, som hoppas över tills sandlådan är installerad). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
 borttagen.
 
@@ -23,6 +23,30 @@ borttagen.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-11-05, Hugos beslut efter P6 införda, inte granskade och inte installerade
+
+Steg i byggplanen: 15 (pågår)
+
+- **Säkerhet:** ingenting är installerat, inget sudo är kört, och inget i `/Library` eller utanför projektmappen och scratchpad är ändrat. `sparr/kommandosparr.py` och kommandolistan i SPEC 7.1 är oförändrade. **Installera inte förrän den nya oberoende granskningen är klar.** Spärrtestet har aldrig körts i en riktig sandlåda.
+- **P6, Hugos körning 2026-11-05 00:33**, i Terminal, utan Claude och utan sandlåda, i `~/VERA/agent`: `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rs -k test_h1_ scripts/tests`. Resultat: **25 passed, 6 skipped, 4683 deselected**. De 6 är H1-proven, med "nya filer i testets tillfälliga mapp har inte exakt com.apple.provenance". Filerna låg under `/private/var/folders/.../T/`. I appen, utan sandlåda, går samma prov igenom (byggsessionen 2026-11-05, och hela sviten i den här sessionen, där inget H1-prov hoppades över).
+- **Besluten** står ordagrant i `GRANSKNING.md`, "Hugos beslut 2026-11-05 efter P6", med byggsessionens egna val.
+- **`sparr/managed-settings.json`:** `requiredMinimumVersion` är 2.1.305, ingen annan ändring. Ny summa: `1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da`.
+- **`sparr/INSTALLERA.md`:** "Prov utanför sandlådan" gäller bara grupp D, och körs i en kopia av en granskad commit. "Spärrprovet i kopian" har ett nytt steg d, H1-proven i appen, och att ta bort kopian är nu steg e. Hoppas H1-proven över backar Hugo inte, utan stannar och frågar. Provkörningen och bytet säger samma sak. Versionen är 2.1.305 överallt där den säger vad filen kräver, också i steg 1, i Caspers avsnitt och i kontrollen efter installationen. Det är fler ställen än uppdraget räknade upp, och skälet står i `GRANSKNING.md`. 2.1.295 står bara kvar som dokumentationens krav för `onFailure`.
+- **Meddelandet när H1-proven hoppas över** säger nu att proven körs i appen. Koden som avgör när de hoppas över är oförändrad, flyttad till en funktion så att den går att testa.
+- **CLAUDE.md:** meningen om prov utanför sandlådan, enligt beslut 1. Före: "Prov som inte kan köras i sandlådan (grupp D och H1-proven) hoppas över där med ett tydligt meddelande. Hugo kör dem utanför sandlådan, i Terminal, varje gång vakten eller de låsta inställningarna ändras (...)". Efter: bara grupp D i den meningen, och tre nya meningar om att H1-proven körs i appen, att spärrprovet kontrollerar det inne i sandlådan, och att ett nytt beslut behövs om de hoppas över där.
+- **Tester ändrade:** `test_2026_11_05_beslut_1_filen_ar_den_installerade_plus_sandladan_och_ssh` sätter tillbaka 2.1.295 innan summan räknas, så det visar fortfarande att inget annat i filen skiljer. `test_prov_utanfor_sandladan_sager_vad_som_galler` kräver inte längre texten `H1-PROVET HOPPAS ÖVER`, utan i stället beslutet efter P6. Listorna `SPARRPROVET` och `UTANFOR` följer de nya raderna, och okända kommandon stoppas som förut (mutation nedan). Testet som begränsar antalet ord i `INSTALLERA.md` är oförändrat. Det slog larm på mina källhänvisningar i steg 1, och jag kortade texten.
+- **Körningar** (`<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`, `<S>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/96511b90-fbf9-4069-8e33-2240d88aba29/scratchpad`). Från projektmappen, ett kommando i taget. `<S>/kopia` gjordes med `mkdir -p <S>/kopia` och `cp -R scripts sparr CLAUDE.md SPEC.md <S>/kopia/`.
+  1. `<python> -B -m pytest -p no:cacheprovider -q --tb=no -rf scripts/tests`, nya tester mot gamla filer (**25 failed, 4666 passed, 39 skipped**, rött före). Testen av meddelandet ingår inte i de röda, eftersom koden och testet ändrades samtidigt. De visas i körning 4.
+  2. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -k test_steg_5_har_filernas scripts/tests` (1 failed, 2 passed, visade den nya summan, eftersom `shasum` inte står på listan).
+  3. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests` (1 failed, 4690 passed, 39 skipped: `test_installera_ar_kortare_an_fore_granskning_15`, 9057 ord mot högst 9042, min text kortades).
+  4. Mutation i `<S>/kopia/scripts/tests/test_beslut_granskning_17.py`, det gamla meddelandet tillbaka: `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rf -k test_p6_ <S>/kopia/scripts/tests/test_beslut_granskning_17.py` (**1 failed, 1 passed**).
+  5. Mutation i `<S>/kopia/sparr/INSTALLERA.md`, `sudo rm -rf ~/VERA/agent` i en kodruta i steg d: `<python> -B -m pytest -p no:cacheprovider -q --tb=no -rf -k test_avsnitten_for_steg_15 <S>/kopia/scripts/tests/test_sandladan.py` (**1 failed, 3 passed**).
+  6. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -r f scripts/tests`, utan sandlåda (**4691 passed, 39 skipped**). De 39 är 30 `SPÄRRPROVET I KOPIAN HOPPAS ÖVER` och 9 `SPÄRRTESTET HOPPAS ÖVER`, samma 39 som förut. Förut 4675 passed: 16 nya prov.
+  7. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -k test_byggplan scripts/tests`, byggplanstestet med statusraderna.
+- **Verifierat med körning:** ovan, och Hugos körning i P6. **Min bedömning, inte provad:** att H1-proven går igenom inne i sandlådan i appen. De har aldrig körts där med filer som har märkningen, och det visas först i spärrprovet, steg d.
+- **SPEC 7.1 är inte ändrad.** Den säger "minst 2.1.295" om versionskontrollen före installationen, och uppdraget nämner inte SPEC. Den strängaste gäller när texterna skiljer sig åt. Väntar på beslut.
+- **Opushat:** som nedan, och commiten med den här texten. Sessionen pushar inte.
 
 ## Läge 2026-11-05, sandlådan byggd igen efter granskning 34, inte granskad och inte installerad
 

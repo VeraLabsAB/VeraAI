@@ -11136,3 +11136,23 @@ Byggsessionens egna val, som granskningen ska titta på:
 **Spärrtestet har aldrig körts i en riktig sandlåda.** Provat utan sandlåda i en påhittad kopia i scratchpad: alla 30 försök lyckades, testen blev röda och inget blev kvar i kopian (körning). Det visar att testen slår larm och städar, inte att sandlådan stoppar. Det visas först efter installationen. Stöd finns från Hugos provkörning 2026-11-04, med samma förbud: `git status` fungerade och `git add` stoppades.
 
 **Inte visat:** att de 14 förbuden behövs eller inte (beslut 1 gör dem överflödiga enligt modellen i granskning 34), en bar git-mapp i en undermapp, där `git status` bara slår till om man står i den mappen (bedömning, inte provad), och allt som bara går att visa efter installationen.
+
+## Hugos beslut 2026-11-05 efter P6
+
+Skrivna av Hugo i chatten 2026-11-05, i uppdraget för byggsessionen. Ordagrant:
+
+    1. H1-proven hoppas över i Terminal, inte på grund av sandlådan. Beslut 3 om granskning 34 ändras för dem: H1-proven körs i appen, som är där märkningen sätts och där vakten används. Spärrprovet efter installationen kontrollerar i appen, inne i sandlådan, att H1-proven går igenom och inte hoppas över. Hoppas de över där behövs ett nytt beslut. Grupp D körs fortfarande utanför sandlådan i Terminal.
+    2. requiredMinimumVersion höjs till 2.1.305.
+    3. Proven utanför sandlådan körs i en kopia av en granskad commit, inte i projektmappen, eftersom de körs med Hugos fulla rättigheter.
+
+### Så är det byggt, och vad som inte är visat
+
+Körningen som besluten bygger på står i `PROGRESS.md` under steg 15. Byggsessionens egna val, som granskningen ska titta på:
+
+- **Versionen ändrades på fler ställen i `sparr/INSTALLERA.md` än uppdraget räknade upp.** Texten sa att filen kräver 2.1.295, och kontrollerna i steg 1, i Caspers avsnitt och i kontrollen efter installationen godtog 2.1.295. Med den nya filen hade en version mellan 2.1.295 och 2.1.305 gått igenom kontrollen och sedan inte startat. Därför säger de nu 2.1.305. `2.1.295` står bara kvar som dokumentationens krav för `onFailure` (test).
+- **SPEC 7.1 är inte ändrad.** Den säger "minst 2.1.295" om versionskontrollen före installationen. Uppdraget nämner inte SPEC, och den strängaste gäller när texterna skiljer sig åt. Att rätta raden är ett eget beslut.
+- **H1-proven körs i kopian `~/VERA/sparrprov`, i samma session i appen som spärrprovet** (punkt d), före att kopian tas bort. Väntat: `31 passed`.
+- **Ett rött H1-prov behandlas som ett överhoppat:** Hugo backar inte, utan stannar och frågar. Beslutet säger inget om rött. Ett H1-prov prövar kontrollskriptet, inte sandlådans förbud.
+- **Testet som jämför filen med den installerade versionen** sätter nu tillbaka 2.1.295 innan summan räknas. Det visar att sandlådan, `Read(~/.ssh/**)` och versionen är det enda som skiljer filerna åt.
+
+**Inte visat:** att H1-proven går igenom inne i sandlådan. De har aldrig körts där med filer som har märkningen: i Hugos provkörning 2026-11-04, i Terminal med sandlåda, hoppades de över. Testernas tillfälliga mapp ligger i sandlådan under `/private/tmp/claude-501/`, och om nya filer där får `com.apple.provenance` visas först i punkt d. Det är därför beslut 1 har ett utfall för att de hoppas över. Sandlådan och spärrtestet har fortfarande aldrig körts i en riktig installation.

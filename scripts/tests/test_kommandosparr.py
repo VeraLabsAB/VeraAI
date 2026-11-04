@@ -1708,8 +1708,9 @@ def test_filregler_har_en_form_som_galler_pa_varje_dator():
 
 def test_installningarna_kraver_lagst_den_version_som_kan_stoppa_vid_krasch():
     # onFailure kräver Claude Code 2.1.295 (code.claude.com/docs/en/hooks). En äldre version ska inte
-    # starta alls (Hugos beslut 2026-10-28, punkt 3).
-    assert _installningar()["requiredMinimumVersion"] == "2.1.295"
+    # starta alls (Hugos beslut 2026-10-28, punkt 3). Filen kräver nu 2.1.305, som också nyckeln
+    # allowNestedUserNamespaces kräver (Hugos beslut 2026-11-05 efter P6, beslut 2).
+    assert _installningar()["requiredMinimumVersion"] == "2.1.305"
 
 
 def installera_utan_sandlada():
@@ -1859,7 +1860,8 @@ def _steg(text):
 
 def test_installationen_kontrollerar_versionen_forst():
     # Hugos beslut 2026-10-28, beslut 3: versionen i appen kontrolleras med /status i en Claude Code-session
-    # och ska vara 2.1.295 eller senare. Hugos beslut 2026-10-28, granskning 13, P3 b: Claude Code för
+    # och ska vara 2.1.305 eller senare (Hugos beslut 2026-11-05 efter P6, beslut 2, förut 2.1.295). Hugos beslut
+    # 2026-10-28, granskning 13, P3 b: Claude Code för
     # Terminal ligger i ~/.local/bin, utanför PATH, så versionen där kontrolleras och uppdateras med hela
     # sökvägen, aldrig med bara claude.
     text, rader = _installationskommandon()
@@ -1867,7 +1869,7 @@ def test_installationen_kontrollerar_versionen_forst():
     forsta_rader = forsta
     forsta = _en_rad(forsta)
     assert "version" in rubrik.lower()
-    assert "/status" in forsta and "2.1.295" in forsta
+    assert "/status" in forsta and "2.1.305" in forsta
     assert "Check for Updates" in forsta, "hur Hugo uppdaterar appen ska stå med"
     for kommando in TERMINAL_VERSION:
         assert f"```bash\n{kommando}\n```" in forsta_rader, kommando

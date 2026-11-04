@@ -114,22 +114,45 @@ def _ls(fil):
     return subprocess.run([LS, "-lde@", "--", str(fil)], capture_output=True, text=True, timeout=30).stdout
 
 
-@pytest.fixture
-def provfil(tmp_path):
+def _provfil_eller_hoppa_over(tmp_path):
     """En fil i testets tillfälliga mapp med exakt en extra uppgift, com.apple.provenance.
 
-    Hugos beslut 2026-11-05 om granskning 34, beslut 3 och P6: provet går bara att köra när nya filer får uppgiften av
-    sig själva. Varför de ibland inte får den är inte fastställt (sandlådan eller Terminal), så testet frågar filen och
-    gissar inte."""
+    Provet går bara att köra när nya filer får uppgiften av sig själva. Hugos körning 2026-11-05 (P6): i Terminal, utan
+    sandlåda, får de inte uppgiften, och i appen får de den. Testet frågar filen och gissar inte. Proven körs i appen
+    (Hugos beslut 2026-11-05 efter P6, beslut 1)."""
     fil = tmp_path / "provfil"
     fil.write_text("x\n", encoding="utf-8")
     rader = _ls(fil).splitlines()
     if not (len(rader) == 2 and rader[0].split()[0].endswith("@") and rader[1].split() == [PROVENANCE, "11"]):
         pytest.skip(
             f"H1-PROVET HOPPAS ÖVER: nya filer i testets tillfälliga mapp har inte exakt {PROVENANCE} här: {rader}. "
-            'Provet behöver köras där de får den, se INSTALLERA.md, "Prov utanför sandlådan".'
+            'Proven körs i appen, som är där märkningen sätts, se INSTALLERA.md, "Spärrprovet i kopian", punkt d.'
         )
     return fil
+
+
+@pytest.fixture
+def provfil(tmp_path):
+    return _provfil_eller_hoppa_over(tmp_path)
+
+
+# De två testen nedan heter inte test_h1_, så att antalet i körningen med -k test_h1_ är detsamma (INSTALLERA.md).
+
+
+def test_p6_meddelandet_nar_h1_proven_hoppas_over_sager_att_de_kors_i_appen(tmp_path, monkeypatch):
+    monkeypatch.setitem(globals(), "_ls", lambda _fil: "-rw-r--r--  1 a b 2 1 jan 00:00 provfil\n")
+    with pytest.raises(pytest.skip.Exception) as hoppade:
+        _provfil_eller_hoppa_over(tmp_path)
+    meddelande = str(hoppade.value)
+    assert "H1-PROVET HOPPAS ÖVER" in meddelande
+    assert "Proven körs i appen" in meddelande
+    assert "utanför sandlådan" not in meddelande
+
+
+def test_p6_h1_proven_hoppas_inte_over_nar_filen_har_markningen(tmp_path, monkeypatch):
+    rader = f"-rw-r--r--@  1 a b 2 1 jan 00:00 provfil\n\t{PROVENANCE}\t  11 \n"
+    monkeypatch.setitem(globals(), "_ls", lambda _fil: rader)
+    assert _provfil_eller_hoppa_over(tmp_path).name == "provfil"
 
 
 def _avviker(resultat, fil):

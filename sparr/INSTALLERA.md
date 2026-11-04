@@ -17,7 +17,7 @@ Agenten kan därför inte ändra filerna.
 | Fil i projektet | Kopieras till | Vad den gör |
 |---|---|---|
 | `sparr/kommandosparr.py` | `/Library/Application Support/ClaudeCode/vera/kommandosparr.py` | **Vakten.** Ett litet program som Claude Code kör före varje verktyg. Det stoppar allt som inte står på listan i SPEC 7.1. Det stoppar också ett kommando vars program ligger i en mapp som du kan ändra utan lösenord, och kommandon som ändrar `PATH` (PATH-regeln, se nedan). |
-| `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.295 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Inte heller i filerna som zsh läser när det startar och de filer som de läser in: nvm-mappen `~/.nvm`, `~/.zkbd`, `~/.zsh_sessions`, `~/.zlogout` och systemets zsh-filer i `/etc` (granskning 13, P1 b), och `~/.zcompdump`,
+| `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.305 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Inte heller i filerna som zsh läser när det startar och de filer som de läser in: nvm-mappen `~/.nvm`, `~/.zkbd`, `~/.zsh_sessions`, `~/.zlogout` och systemets zsh-filer i `/etc` (granskning 13, P1 b), och `~/.zcompdump`,
 som zsh:s `compinit` läser in vid start (granskning 14, R1), eller i den kompilerade versionen (`.zwc`) av någon av zsh:s startfiler eller av `~/.zcompdump`, som zsh läser i stället för filen (granskning 15, S2). Inte heller i Claude Code för Terminal (`~/.local/bin/claude` och `~/.local/share/claude`), i skrivbordsappens egen Claude Code (`~/Library/Application Support/Claude/claude-code`) eller i appen (`/Applications/Claude.app`) (granskning 13, P4 a). Inte heller någonstans i hela `~/Library/Application Support/Claude`, där också skrivbordsappens egna inställningar ligger (Hugos svar 2026-10-28 efter granskning 13, punkt 3). Inte heller i en fil som heter `.ugrep`, i någon mapp, som är inställningsfilen för det program som `grep` kör i agentens skal (granskning 16, G7). Läget "auto" går att använda, och skills kan inte köra skalkommandon. |
 | `requirements.txt` (listan över paket) | `/Library/Application Support/ClaudeCode/vera/venv` (skapas, kopieras inte) | **Projektets Python med pytest**, som testsviten körs med. Den låg förut i mappen `.venv` i projektet, som du äger, och då stoppade PATH-regeln testsviten. Nu ligger den där bara systemet kan ändra den (Hugos beslut 2026-10-28 om vakten, beslut 1). |
 
@@ -69,15 +69,15 @@ tabellen över fälten för en vakt av typen `command` ("Requires Claude Code v2
 avsnittet "Block the action when a hook fails". Kontrollerat 2026-10-28.
 
 Du har två Claude Code: den i **Claude-appen** och **Claude Code för Terminal**. Båda ska ha version
-2.1.295 eller senare. Först appen, med `/status` (Hugos beslut 2026-10-28, beslut 3):
+2.1.305 eller senare. Först appen, med `/status` (Hugos beslut 2026-10-28, beslut 3):
 
 1. Öppna Claude-appen, gå till fliken **Code** och starta en ny session, till exempel i `~/VERA/agent`.
 2. Skriv `/status` i rutan där du skriver till Claude och tryck Retur. `/status` är ett kommando till
    Claude Code, inte till Terminal. Det visar bland annat versionen och var inställningarna kommer ifrån,
    och ändrar ingenting.
-3. Läs raden **Claude Code**. Den visar versionen, till exempel `2.1.300`. Jämför siffergrupperna mellan
-   punkterna en i taget, från vänster: `2.1.300` och `2.2.0` är senare än `2.1.295`, men `2.1.29` är
-   äldre (29 är mindre än 295).
+3. Läs raden **Claude Code**. Den visar versionen, till exempel `2.1.310`. Jämför siffergrupperna mellan
+   punkterna en i taget, från vänster: `2.1.310` och `2.2.0` är senare än `2.1.305`, men `2.1.30` är
+   äldre (30 är mindre än 305).
 4. Raden **Setting sources** (var inställningarna kommer från) visas inte i skrivbordsappen. Den läses i
    Terminal, se nedan.
 
@@ -110,10 +110,10 @@ Kontrollera versionen i Terminal. Öppna Terminal och kör:
 ```
 
 - Visar versionen av Claude Code för Terminal, till exempel `2.1.312 (Claude Code)`, och ändrar ingenting.
-  Versionen ska vara 2.1.295 eller senare (jämför som i punkt 3 ovan).
+  Versionen ska vara 2.1.305 eller senare (jämför som i punkt 3 ovan).
 - Säger Terminal `no such file or directory`: Claude Code för Terminal ligger inte där. Stoppa och fråga.
 
-**Om versionen i Terminal är äldre än 2.1.295**, uppdatera:
+**Om versionen i Terminal är äldre än 2.1.305**, uppdatera:
 
 ```bash
 ~/.local/bin/claude update
@@ -121,7 +121,7 @@ Kontrollera versionen i Terminal. Öppna Terminal och kör:
 
 - Hämtar och installerar den senaste versionen av Claude Code för Terminal (det kräver internet). Det ska
   stå `Successfully updated from … to version …` eller `Claude Code is up to date (…)`. Kör sedan
-  `~/.local/bin/claude --version` igen. Är versionen fortfarande äldre än 2.1.295: stoppa och fråga.
+  `~/.local/bin/claude --version` igen. Är versionen fortfarande äldre än 2.1.305: stoppa och fråga.
   (Kommandona står på code.claude.com/docs/en/setup, "Verify your installation" och "Update manually".)
 
 **Raden Setting sources, i Terminal** (Hugos svar 2026-10-28, punkt 3, och Hugos beslut 2026-10-28,
@@ -152,22 +152,22 @@ Skriv sedan `/status` i Claude Code i Terminal och tryck Retur. Leta upp raden s
 - Står det något annat på raden som inte är nämnt här: stoppa och fråga.
 - Avsluta Claude Code i Terminal med `/exit`.
 
-**Om appens version är äldre än 2.1.295: stoppa och uppdatera först.**
+**Om appens version är äldre än 2.1.305: stoppa och uppdatera först.**
 
 1. Klicka på **Claude** i menyraden överst på skärmen (när Claude-appen är aktiv) och välj **Check for
    Updates…**. Installera uppdateringen om det finns en.
 2. Avsluta appen helt (**Claude > Quit Claude**, eller Cmd+Q) och öppna den igen.
 3. Starta en ny session och gör `/status` igen.
-4. Gå vidare först när versionen är minst 2.1.295. Säger appen att den redan är senaste versionen, men
-   versionen fortfarande är äldre än 2.1.295: stoppa och fråga.
+4. Gå vidare först när versionen är minst 2.1.305. Säger appen att den redan är senaste versionen, men
+   versionen fortfarande är äldre än 2.1.305: stoppa och fråga.
 
 Terminalen och skrivbordsappen har **var sin** Claude Code med var sitt versionsnummer, och att uppdatera
 den ena uppdaterar inte den andra (sidan **code.claude.com/docs/en/desktop**, avsnittet "Claude Code
 version in the Code tab"). Kontrollera därför versionen i båda: i appen med `/status` och i Terminal med
 `~/.local/bin/claude --version` (ovan), innan du installerar vakten.
 
-De låsta inställningarna innehåller också `"requiredMinimumVersion": "2.1.295"`, så att en äldre Claude
-Code inte startar alls efter installationen (Hugos beslut 2026-10-28). Kontrollen här behövs ändå,
+De låsta inställningarna innehåller också `"requiredMinimumVersion": "2.1.305"`, så att en äldre Claude
+Code inte startar alls efter installationen (Hugos beslut 2026-11-05 efter P6). Kontrollen här behövs ändå,
 eftersom inställningarna inte gäller förrän de är installerade.
 
 En inställning har ingen lägsta version i dokumentationen: `disableSkillShellExecution` (skills kör inga
@@ -571,7 +571,7 @@ shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-set
 - Summorna ska vara exakt de här (2026-10-28 efter granskning 19, och 2026-11-05 för inställningarna). Den
   oberoende granskningen ska skriva upp samma summor. Skiljer granskningens summor från dessa: stoppa och fråga.
   - `sparr/kommandosparr.py`: `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d`
-  - `sparr/managed-settings.json`: `0ed5330e97f0043816de73aafe999655d0e776d43f4681c5a2f2f0ba7b54cb30`
+  - `sparr/managed-settings.json`: `1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da`
   - `requirements.txt`: `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a`
 
 ## Steg 6: skapa mapparna och låt systemet äga dem
@@ -844,7 +844,7 @@ Utskriften (`-rfs`) visar vilka som hoppas över, och varför:
 
 - `GRUPP D HOPPAS ÖVER`: **2** prov, `test_h6_en_lank_till_git_stoppas` och `test_beslut_1_gamla_venv_i_projektet_stoppas`. De skapar en mapp `.git` eller `.venv`, och det ska sandlådan stoppa. De körs i "Prov utanför sandlådan" nedan.
 - `SPÄRRTESTET HOPPAS ÖVER` och `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`: väntat före bytet, eftersom sandlådan ännu inte står i de låsta inställningarna.
-- `H1-PROVET HOPPAS ÖVER`: **6** prov hoppades över 2026-11-04. Orsaken är inte fastställd (granskning 34, P6).
+- `H1-PROVET HOPPAS ÖVER`: **6** prov. Väntat i Terminal: de hoppas över där också utan sandlåda (Hugos körning 2026-11-05, P6). De körs i appen, se "Spärrprovet i kopian", punkt d.
 
 Avsluta med `/exit`.
 
@@ -863,10 +863,10 @@ granskades. Sessionen där bytet görs ska inte vara en session med agenten: kö
 ~/.local/bin/claude --version
 ```
 
-Läs också raden **Claude Code** i `/status` i skrivbordsappen. Båda ska vara minst **2.1.305**. Filen kräver 2.1.295, men nyckeln `allowNestedUserNamespaces` kräver 2.1.305 enligt dokumentationen ([settings-reference.md](https://code.claude.com/docs/en/settings-reference.md)). Är Terminalens
+Läs också raden **Claude Code** i `/status` i skrivbordsappen. Båda ska vara minst **2.1.305**. Filen kräver 2.1.305 (Hugos beslut 2026-11-05 efter P6, beslut 2), och det gör också nyckeln `allowNestedUserNamespaces` enligt dokumentationen ([settings-reference.md](https://code.claude.com/docs/en/settings-reference.md)). Är Terminalens
 version en annan än i provkörningen: gör provkörningen igen med den versionen. För de andra nycklarna i `sandbox` anger dokumentationen ingen lägsta version.
 Den nämner bara 2.1.224 (avslutande snedstreck) och 2.1.285 (`allowUnsandboxedCommands`), och båda är
-äldre än 2.1.295. Att sandlådan körs i skrivbordsappen står inte på sidorna som är lästa (se "Inte bekräftat" i
+äldre än 2.1.305. Att sandlådan körs i skrivbordsappen står inte på sidorna som är lästa (se "Inte bekräftat" i
 `GRANSKNING.md`), så det prövas i punkt 6.
 
 **2. Kontrollsummor, före bytet:**
@@ -879,7 +879,7 @@ shasum -a 256 ~/VERA/agent/sparr/managed-settings.json ~/VERA/agent/sparr/komman
 shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
 ```
 
-- Den nya filen i projektet: `0ed5330e97f0043816de73aafe999655d0e776d43f4681c5a2f2f0ba7b54cb30`. Den oberoende granskningen ska ha skrivit upp samma summa.
+- Den nya filen i projektet: `1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da`. Den oberoende granskningen ska ha skrivit upp samma summa.
 - Filen som är installerad nu: `149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2`.
 - Vakten, båda ställena (beslut 5, den ändras inte): `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d`.
 
@@ -919,7 +919,7 @@ sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
 shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/managed-settings.fore-sandladan.json"
 ```
 
-- Första raden ska vara `0ed5330e97f0043816de73aafe999655d0e776d43f4681c5a2f2f0ba7b54cb30` och andra `149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2`.
+- Första raden ska vara `1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da` och andra `149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2`.
 
 ```bash
 ls -lde@ "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/managed-settings.fore-sandladan.json"
@@ -952,7 +952,7 @@ ls -lde@ "/Library/Application Support/ClaudeCode/managed-settings.json" "/Libra
    '/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests
    ```
 
-   **Väntat: inget `failed`, alltså inga röda.** Det ska inte stå `SPÄRRTESTET HOPPAS ÖVER`. Det ska stå `GRUPP D HOPPAS ÖVER` (2 prov) och `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`, som körs i punkt 8. `H1-PROVET HOPPAS ÖVER` kan stå (6 prov, granskning 34, P6). Spärrtestet i `scripts/tests/test_sandladan.py` prövar här att `git status` och läsning i projektet fungerar, att en fil eller mapp med namnet `.git` stoppas i testets tillfälliga mapp, att skrivning utanför projektet, i `~/.local/share/claude`, i appen och i appens Claude Code stoppas, och att läsning av `~/.ssh` stoppas. **Står `SPÄRRTESTET HOPPAS ÖVER` där, eller är något rött: stoppa och fråga.**
+   **Väntat: inget `failed`, alltså inga röda.** Det ska inte stå `SPÄRRTESTET HOPPAS ÖVER`. Det ska stå `GRUPP D HOPPAS ÖVER` (2 prov) och `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`, som körs i punkt 8. Det ska inte heller stå `H1-PROVET HOPPAS ÖVER`. Står `H1-PROVET HOPPAS ÖVER` där: backa inte, utan fortsätt till "Spärrprovet i kopian", punkt d, som säger vad du gör. Spärrtestet i `scripts/tests/test_sandladan.py` prövar här att `git status` och läsning i projektet fungerar, att en fil eller mapp med namnet `.git` stoppas i testets tillfälliga mapp, att skrivning utanför projektet, i `~/.local/share/claude`, i appen och i appens Claude Code stoppas, och att läsning av `~/.ssh` stoppas. **Står `SPÄRRTESTET HOPPAS ÖVER` där, eller är något rött: stoppa och fråga.**
 5. **`git add` och `git commit` stoppas i sandlådan, och det är rätt.** Från den här installationen committar agenten inte (Hugos beslut 2026-11-05, beslut 2). Varje session slutar med färdiga kommandon, ett i taget, som du kör själv med `!` i sessionen eller i Terminal. Gör det vid nästa ändring i projektet.
 6. **Sista kontrollen:** steg 2, 4 och 9 i "Kontroll efter installationen" nedan. Be också agenten skapa en mapp i scratchpad med `mkdir -p`, eftersom kopior och provfiler ligger där. Det ska gå igenom.
 7. **Skalet:** kontrollskriptet i steg 4 g gäller oförändrat.
@@ -1018,11 +1018,23 @@ Frågar Claude Code om du litar på mappen: svara ja. Be Claude: "Kör exakt det
 
 **Väntat: inget `failed`, och varken `SPÄRRTESTET HOPPAS ÖVER` eller `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`.** Avsluta med `/exit`.
 
-**c. Kör samma prov i skrivbordsappen.** Starta en ny session i fliken **Code**, i mappen `sparrprov` i `~/VERA`, inte i en worktree, och be Claude köra samma kommando. Samma väntade resultat. Det här är också provet av att sandlådan körs i skrivbordsappen. Arkivera sessionen efteråt.
+**c. Kör samma prov i skrivbordsappen.** Starta en ny session i fliken **Code**, i mappen `sparrprov` i `~/VERA`, inte i en worktree, och be Claude köra samma kommando. Samma väntade resultat. Det här är också provet av att sandlådan körs i skrivbordsappen. Låt sessionen vara kvar till d.
 
 **Är något rött i b eller c: lyckades ett försök, så backar du direkt** med "Backa till förra versionen" ovan, tar bort kopian och frågar. **Står någon av texterna `HOPPAS ÖVER` ovan där, körs provet inte i sandlådan:** backa också och fråga.
 
-**d. Ta bort kopian, i Terminal.** Kopiera kommandona exakt. Det mellersta raderar hela mappen, utan papperskorg.
+**d. Kör H1-proven i skrivbordsappen, i samma session som i c** (Hugos beslut 2026-11-05 efter P6, beslut 1). I Terminal hoppas de över, också utan sandlåda (Hugos körning 2026-11-05, P6). Appen är där märkningen `com.apple.provenance` sätts och där vakten används. Be Claude: "Kör exakt det här kommandot med Bash-verktyget, och ändra ingenting i det:" och klistra in:
+
+```
+'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rs -k test_h1_ scripts/tests
+```
+
+- **Väntat: `31 passed`, inget `skipped`, inget `failed`, och inte texten `H1-PROVET HOPPAS ÖVER`.** Inga överhoppade H1-prov, alltså.
+- **Hoppas de över, så backa inte.** Stanna och fråga, utan att göra något mer i projektet. Spärrproven i b och c har redan gått igenom, så sandlådan fungerar då ändå. Det är H1-proven som inte går att köra där, och då behövs ett nytt beslut.
+- **Är ett H1-prov rött: backa inte heller, men stanna och fråga.** Skicka hela utskriften.
+
+Arkivera sessionen efteråt.
+
+**e. Ta bort kopian, i Terminal.** Kopiera kommandona exakt. Det mellersta raderar hela mappen, utan papperskorg.
 
 ```bash
 cd ~/VERA/agent
@@ -1040,9 +1052,9 @@ ls -ld ~/VERA/sparrprov
 
 ## Prov utanför sandlådan (steg 15)
 
-Hugos beslut 2026-11-05 om granskning 34, beslut 3. Grupp D (2 prov) och H1-proven (6 prov) kan inte köras i sandlådan. Där hoppas de över med texterna `GRUPP D HOPPAS ÖVER` och `H1-PROVET HOPPAS ÖVER`. Du kör dem själv i Terminal, varje gång vakten eller de låsta inställningarna ändras.
+Hugos beslut 2026-11-05 om granskning 34, beslut 3, och Hugos beslut 2026-11-05 efter P6, beslut 1 och 3. Det här avsnittet gäller bara grupp D (2 prov). De kan inte köras i sandlådan, och där hoppas de över med texten `GRUPP D HOPPAS ÖVER`. Du kör dem själv i Terminal, varje gång vakten eller de låsta inställningarna ändras. H1-proven körs inte här, utan i appen, se "Spärrprovet i kopian", punkt d.
 
-Du kör dem i en kopia av en granskad commit, inte i projektmappen. I projektmappen kan en testfil ha lagts av agenten, och här körs den utan sandlåda, med dina rättigheter. En kopia från `git clone` har bara det som är committat (granskning 34, P6).
+Du kör dem i en kopia av en granskad commit, inte i projektmappen, eftersom de körs med dina fulla rättigheter. I projektmappen kan en testfil ha lagts av agenten, och här körs den utan sandlåda. En kopia från `git clone` har bara det som är committat.
 
 **a. Gör kopian.** Det första kommandot ska säga `No such file or directory`. Finns mappen: stoppa och fråga.
 
@@ -1067,11 +1079,10 @@ git log -1 --format=%H
 **b. Kör proven:**
 
 ```bash
-'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs -k 'test_h6_en_lank_till_git_stoppas or test_beslut_1_gamla_venv_i_projektet_stoppas or test_h1_' scripts/tests
+'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs -k 'test_h6_en_lank_till_git_stoppas or test_beslut_1_gamla_venv_i_projektet_stoppas' scripts/tests
 ```
 
 - **Väntat: inget `failed`, och inte `GRUPP D HOPPAS ÖVER`.** Är något rött, eller står den texten där: stoppa och fråga.
-- **Står `H1-PROVET HOPPAS ÖVER` där: inte avgjort.** Var H1-proven går att köra är inte fastställt (granskning 34, P6). Skicka utskriften till sessionen som hjälper dig. Det här stycket skrivs om när P6 är besvarad.
 
 **c. Ta bort kopian.** Kopiera kommandona exakt. Det andra raderar hela mappen, utan papperskorg.
 
@@ -1085,7 +1096,7 @@ rm -rf ~/VERA/provkopia
 
 ## Caspers dator
 
-Samma steg, i samma ordning, och samma versionskontroll i steg 1 (minst 2.1.295, med `/status` i
+Samma steg, i samma ordning, och samma versionskontroll i steg 1 (minst 2.1.305, med `/status` i
 skrivbordsappen och med `~/.local/bin/claude --version` i Terminal om Claude Code för Terminal finns där,
 med hela sökvägen och samma varning för installerarens förslag). Samma kontrollskript i steg 4 g och i
 kontrollen efter installationen, steg 1, och samma kontroll av agentens skal i steg 4 h. Samma förprov i
@@ -1138,7 +1149,7 @@ dator (175db51), ännu inte på Caspers.
    installationen, till exempel inställningar som styrs från claude.ai: stoppa och fråga (Hugos svar
    2026-10-28, punkt 3). Avsluta med `/exit`. Läs också i skrivbordsappens `/status`
    raden **Claude Code**: versionen ska vara
-   2.1.295 eller senare. Läget "auto" ska gå att välja (Hugos beslut 2026-10-29): i terminalens Claude Code,
+   2.1.305 eller senare. Läget "auto" ska gå att välja (Hugos beslut 2026-10-29): i terminalens Claude Code,
    tryck Shift+Tab några gånger, och "auto" ska komma upp.
 
    **Skalet, igen efter installationen** (Hugos beslut 2026-10-28, granskning 13, P1 a, och efter

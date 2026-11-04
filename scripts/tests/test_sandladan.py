@@ -1,4 +1,5 @@
-"""Steg 15: sandlådan (Hugos beslut 2026-11-04 om sandlådan och Hugos beslut 2026-11-05 om granskning 34, GRANSKNING.md).
+"""Steg 15: sandlådan (Hugos beslut 2026-11-04 om sandlådan, Hugos beslut 2026-11-05 om granskning 34 och Hugos beslut
+2026-11-05 efter P6, GRANSKNING.md).
 
 Tre delar:
 
@@ -42,6 +43,7 @@ from test_kommandosparr import (  # noqa: F401 (fixturen används av pytest via 
 )
 
 CLAUDE_MD = PROJEKTET / "CLAUDE.md"
+GRANSKNING = PROJEKTET / "GRANSKNING.md"
 # Vaktens kontrollsumma, oförändrad sedan 2026-10-28 (INSTALLERA.md, steg 5). Beslut 5: vakten ändras inte.
 VAKTENS_SUMMA = "314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d"
 # Filen som är installerad i dag, före steg 15.
@@ -159,12 +161,14 @@ def test_2026_11_05_beslut_1_varken_avsmalningen_eller_granskarens_forbud_finns(
 
 
 def test_2026_11_05_beslut_1_filen_ar_den_installerade_plus_sandladan_och_ssh():
-    # Tar man bort sandbox-blocket och Read(~/.ssh/**) ska det bli exakt filen som är installerad i dag, byte för byte.
+    # Tar man bort sandbox-blocket och Read(~/.ssh/**) och sätter tillbaka den gamla versionen (Hugos beslut 2026-11-05
+    # efter P6, beslut 2), ska det bli exakt filen som är installerad i dag, byte för byte.
     rader = INSTALLNINGAR.read_text(encoding="utf-8").splitlines(keepends=True)
     start = rader.index('  "sandbox": {\n')
     slut = rader.index("  },\n", start)
     kvar = rader[:start] + rader[slut + 1:]
     kvar.remove('      "Read(~/.ssh/**)",\n')
+    kvar[kvar.index('  "requiredMinimumVersion": "2.1.305",\n')] = '  "requiredMinimumVersion": "2.1.295",\n'
     assert hashlib.sha256("".join(kvar).encode("utf-8")).hexdigest() == FORE_STEG_15
 
 
@@ -199,7 +203,7 @@ def test_inget_annat_i_filen_ar_andrat():
         "sandbox",
         "hooks",
     }
-    assert installningar["requiredMinimumVersion"] == "2.1.295"
+    assert installningar["requiredMinimumVersion"] == "2.1.305"
     assert set(installningar["permissions"]) == {"disableBypassPermissionsMode", "deny"}
     andra = [r for r in installningar["permissions"]["deny"] if not r.startswith("Edit(")]
     assert andra == ["Bash(sudo *)", "Bash(su *)", "Bash(su)", "Read(~/.ssh/**)"]
@@ -226,13 +230,19 @@ def test_inget_annat_i_filen_ar_andrat():
         "git add",
         "git commit -m",
         "från installationen av steg 15",
-        "Prov som inte kan köras i sandlådan",
-        "grupp D och H1-proven",
+        "Prov som inte kan köras i sandlådan (grupp D)",
+        "H1-proven hoppas över i Terminal och körs i appen",
+        "inne i sandlådan",
+        "behövs ett nytt beslut",
         "Hugos beslut 2026-11-05",
     ],
 )
 def test_2026_11_05_beslut_2_och_3_star_i_claude_md(text):
     assert text in CLAUDE_MD.read_text(encoding="utf-8")
+
+
+def test_efter_p6_beslut_1_claude_md_sager_inte_att_h1_proven_kors_utanfor_sandladan():
+    assert "grupp D och H1-proven" not in CLAUDE_MD.read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------------------------
@@ -288,12 +298,15 @@ SPARRPROVET = [
     "git log -1 --format=%H",
     "~/.local/bin/claude",
     f"{PYTHON} -q --tb=short -rfs -k test_sparr_ scripts/tests",
+    # Hugos beslut 2026-11-05 efter P6, beslut 1: H1-proven i appen, med kommandot från Hugos körning.
+    f"{PYTHON} -q --tb=line -rs -k test_h1_ scripts/tests",
     "cd ~/VERA/agent",
     "rm -rf ~/VERA/sparrprov",
     "ls -ld ~/VERA/sparrprov",
 ]
 
-UTANFOR_K = "test_h6_en_lank_till_git_stoppas or test_beslut_1_gamla_venv_i_projektet_stoppas or test_h1_"
+# Bara grupp D (Hugos beslut 2026-11-05 efter P6, beslut 1).
+UTANFOR_K = "test_h6_en_lank_till_git_stoppas or test_beslut_1_gamla_venv_i_projektet_stoppas"
 UTANFOR = [
     "ls -ld ~/VERA/provkopia",
     "git clone --no-hardlinks ~/VERA/agent ~/VERA/provkopia",
@@ -487,14 +500,83 @@ def test_provkorningen_har_samma_nycklar_som_filen_utom_filesystem():
     "text",
     [
         "GRUPP D HOPPAS ÖVER",
-        "H1-PROVET HOPPAS ÖVER",
         "varje gång vakten eller de låsta inställningarna ändras",
-        "granskad",
-        "P6",
+        "i en kopia av en granskad commit",
+        "Hugos beslut 2026-11-05 efter P6, beslut 1 och 3",
     ],
 )
 def test_prov_utanfor_sandladan_sager_vad_som_galler(text):
     assert text in _avsnitt(UTANFOR_RUBRIK)
+
+
+def test_efter_p6_beslut_1_prov_utanfor_sandladan_galler_bara_grupp_d():
+    avsnitt = _avsnitt(UTANFOR_RUBRIK)
+    assert "bara grupp D" in avsnitt
+    assert "test_h1_" not in avsnitt and "H1-PROVET HOPPAS ÖVER" not in avsnitt
+    assert "inte avgjort" not in avsnitt
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "**d. Kör H1-proven i skrivbordsappen",
+        "`31 passed`",
+        "H1-PROVET HOPPAS ÖVER",
+        "backa inte",
+        "sandlådan fungerar då ändå",
+        "nytt beslut",
+        "Hugos beslut 2026-11-05 efter P6, beslut 1",
+    ],
+)
+def test_efter_p6_beslut_1_sparrprovet_kor_h1_proven_i_appen(text):
+    assert text in _avsnitt(SPARRPROV_RUBRIK)
+
+
+def test_efter_p6_beslut_1_h1_proven_kommer_efter_provet_i_appen_och_fore_kopian_tas_bort():
+    avsnitt = _avsnitt(SPARRPROV_RUBRIK)
+    platser = [
+        avsnitt.index(text)
+        for text in (
+            "**c. Kör samma prov i skrivbordsappen.**",
+            "**Är något rött i b eller c:",
+            "**d. Kör H1-proven i skrivbordsappen",
+            "Arkivera sessionen efteråt.",
+            "**e. Ta bort kopian, i Terminal.**",
+        )
+    ]
+    assert platser == sorted(platser)
+
+
+def test_efter_p6_beslut_1_provkorningen_och_bytet_sager_var_h1_proven_kors():
+    assert "Orsaken är inte fastställd" not in _avsnitt(PROVKORNING_RUBRIK)
+    assert 'De körs i appen, se "Spärrprovet i kopian", punkt d.' in _avsnitt(PROVKORNING_RUBRIK)
+    assert "`H1-PROVET HOPPAS ÖVER` kan stå" not in _byte_avsnittet()
+    assert "Står `H1-PROVET HOPPAS ÖVER` där: backa inte" in _byte_avsnittet()
+
+
+def test_efter_p6_beslut_2_installera_sager_samma_version_som_filen():
+    text = INSTALLERA.read_text(encoding="utf-8")
+    assert '`"requiredMinimumVersion": "2.1.305"`' in text
+    assert "En Claude Code som är äldre än 2.1.305 startar inte alls." in text
+    # 2.1.295 står bara kvar som dokumentationens krav för onFailure, inte som det filen kräver.
+    kvar = [rad for rad in text.splitlines() if "2.1.295" in rad]
+    assert len(kvar) == 2
+    assert kvar[0].startswith("**Claude Code version 2.1.295 eller senare**")
+    assert "Requires Claude Code v2.1.295 or later" in kvar[1]
+
+
+def test_efter_p6_besluten_star_ordagrant_i_granskning():
+    avsnitt = GRANSKNING.read_text(encoding="utf-8").split("## Hugos beslut 2026-11-05 efter P6", 1)[1]
+    for text in (
+        "1. H1-proven hoppas över i Terminal, inte på grund av sandlådan. Beslut 3 om granskning 34 ändras för dem: "
+        "H1-proven körs i appen, som är där märkningen sätts och där vakten används. Spärrprovet efter installationen "
+        "kontrollerar i appen, inne i sandlådan, att H1-proven går igenom och inte hoppas över. Hoppas de över där behövs "
+        "ett nytt beslut. Grupp D körs fortfarande utanför sandlådan i Terminal.",
+        "2. requiredMinimumVersion höjs till 2.1.305.",
+        "3. Proven utanför sandlådan körs i en kopia av en granskad commit, inte i projektmappen, eftersom de körs med "
+        "Hugos fulla rättigheter.",
+    ):
+        assert text in avsnitt, text
 
 
 @pytest.mark.parametrize(

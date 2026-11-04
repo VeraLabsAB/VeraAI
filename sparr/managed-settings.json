@@ -1,5 +1,5 @@
 {
-  "requiredMinimumVersion": "2.1.295",
+  "requiredMinimumVersion": "2.1.305",
   "allowManagedHooksOnly": true,
   "allowManagedPermissionRulesOnly": true,
   "disableSkillShellExecution": true,
