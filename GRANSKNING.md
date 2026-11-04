@@ -10048,3 +10048,234 @@ Skrivna av Hugo i chatten 2026-11-04, i uppdraget till byggsessionen för steg 9
   (uppmätt på testdatan, och en bedömning för större perioder).
 - **Inte granskad oberoende än.** Kärnan har fått en strängare kontroll, så granskningen bör pröva om den stoppar något flödena
   bygger, och om det går att få ett par godtaget som flödenas egen körning inte har.
+
+## Granskning 31 (av d8a5edc och 0697585) (2026-11-04)
+
+Oberoende granskning av steg 98 (Öppet 40) i en ny session som inte har sett byggsessionen, mot 2a57517. Granskaren ändrade ingen
+kod och ingen rad i CLAUDE.md, SPEC eller vakten, och skrev bara i den här filen, PROGRESS.md och BYGGPLAN.md. Allt annat skrevs i
+scratchpad. Lästes: CLAUDE.md, SPEC.md 7 och 7.1, här "Granskning 30" och "Hugos beslut 2026-11-04 om granskning 30", BYGGPLAN.md
+("Läge nu" och steg 98–100), PROGRESS.md (Öppet 46 och 47), `git show` av båda commitarna, hela `scripts/matcha_bank.py` och
+`scripts/konteringsfloden.py`, de berörda delarna av `scripts/konteringsforslag.py`, `las_bank.py` och `las_underlag.py`, hela
+`test_beslut_granskning_30.py` och ändringarna i `test_beslut_granskning_29.py`.
+
+Ord i den här texten: ett **par** är ett underlag och en bankrad som `matcha_period` har parat ihop. En **period** är den tid en körning
+gäller, till exempel en månad (SPEC 6.1). **Familjen** är som i granskning 29 och 30: ett förslag byggt för hand, förbi flödena, som har
+underlag, har en form flödena aldrig bygger, och godtas med alla kontroller gröna.
+
+### Beslut som redan var tagna (prövades inte om)
+
+Ett förslag med underlag och bankrad ska vara ett par i resultatet från `matcha_period` (Öppet 40). Formerna från steg 97 och (b) rakt av.
+Öppet 46 och 47 är kända: nedan prövas bara om de är större än byggsessionen säger.
+
+### Viktigt först
+
+- **Inget kan bokföras eller godkännas av koden, och ingen spärr har blivit svagare.** d8a5edc lägger bara till ett stopp. Allt nedan
+  gäller förslag, som alltid kräver godkännande av en människa.
+- **Öppet 40 är byggd som beslutet säger, och under samma perioder hittades ingen väg runt den.** Den stoppar inget flödena bygger:
+  flöde a, b och e ger samma 29 förslag, och alla 9 med underlag och bankrad har sitt par i flödenas egen matchning. Rött före är 16
+  med den fördelning byggsessionen säger, och sviten är 4 492 passed.
+- **Datumet 9999-12-31 ändrar inga par.** Inte vid någon kant som provades, och inte i 40 slumpade kopior av testdatan.
+- **Ett fynd på nivån medel, utanför familjen, som fanns före steget (P1).** Öppet 46 är större än byggsessionen säger: det kräver inte kod
+  förbi flödena. Paren beror på hur perioden skärs, och **flödena själva** ger då två betalningar för samma faktura, eller parar en
+  bankrad med en av två fakturor utan att en människa får se valet. SPEC säger att en period kan vara en månad, men inte hur
+  månadskörningar ska sättas ihop.
+
+### Fynd
+
+**P1 – Paren beror på hur perioden skärs, också i flödena (medel, hör till Öppet 46, inte till familjen, fanns före steg 98).**
+Öppet 46 säger att det "kräver kod förbi flödena" och att en smalare bankperiod bara är en bedömning. Båda delarna är nu körda. Alla filer
+är riktigt inlästa, med K1 (saldokontrollen), och alla belopp är i en kopia av testdatan.
+
+| Prov | Uppställning | Hela kvartalet | Smalare period |
+|---|---|---|---|
+| s1, för hand | 009 har 212 kr. Bankrad 81 i januari och 85 i februari är båda LEV-TE, 212 kr, och inom fakturans tidsfönster | Båda stoppas av Öppet 40, raderna är "tvetydig" | Med bara februari, eller bara januari, som bankperiod godtas betalningen med alla kontroller "ok" |
+| s2, **flödena, inget för hand** | Samma | Ingen betalning, två ärenden "tvetydig" | Januari: `F-BETALNING-009` med rad 81. Februari: `F-BETALNING-009` med rad 85. **Två betalningar av samma faktura**, utan ärende |
+| s3, **flödena, inget för hand** | 003 (2025-01-15) och 009 (2025-02-03) har samma belopp, samma motpart och inget fakturanummer som avgör. En betalning, bankrad 26, 2025-02-06. Bankfilen för februari i alla tre körningarna | Underlagen för hela kvartalet: inget par och ingen betalning | Underlagsperioden bara februari: raden paras med 009. Bara januari: raden paras med 003. **Samma bankrad blir betalning av olika fakturor**, utan att någon ser valet |
+
+*Varför det spelar roll.* SPEC 6.1 säger "En **period** är den tid som stäms av, till exempel en månad". Tidsfönstret för fakturor är 40
+dagar, alltså längre än en månad, i testbutikens `matchning.json`. Hur en månadskörning ska ta med fakturor från månaden före, och bankrader
+från månaden efter, står inte någonstans (`grep` i SPEC och DESIGN-regelbok.md efter månadskörningar ger inget om det). Kontrollen i steg 98 är
+inte fel: den frågar samma funktion med samma perioder, precis som beslutet säger. Men "samma perioder som flödena" är bara så säkert
+som perioderna.
+
+*Fanns före steget* (körd): s2 och s3 är gröna också mot `git archive` av 2a57517. s1 är röd där bara för att hela perioden inte stoppades
+förut. Steg 98 har alltså inte orsakat det.
+
+*Vad som redan täcker en del.* Hugos beslut 2026-11-04 om granskning 30, beslut 5 (samma underlag eller bankrad får inte bokföras i två
+förslag, före piloten) skulle stoppa den andra betalningen i s2 och den andra fakturan i s3, om beslutet gäller över körningar.
+Det stoppar inte den första, där en människa aldrig fick veta att raden var tvetydig. *Läst, inte kört:* K4, dubblettkontrollen, körs
+också bara på underlagen i perioden (`las_underlag.py` rad 644–646), så steg 99 ärver samma gräns. Allvar: medel, eftersom det kan
+hända utan kod förbi flödena, men en människa godkänner alltid, och beloppen stämmer. Inget här är en bedömning av bokföringsregler.
+
+**P2 – Felet säger "ärendet saknat underlag" om en rad som bara väntar (låg, hör inte till familjen).** Prov d5b (körd): vid
+bedömningsdatumet 2025-02-28 väntar bankrad 110 i flödet (`arende_efter` 2025-02-28, inget ärende). Ett förslag för hand mot den raden
+stoppas, vilket är rätt, men felet säger "matchningen gör bankraden till ärendet 'saknat underlag'". Det stämmer med kontrollens eget
+datum, inte med flödet. Bara texten är fel, utfallet är rätt. Den som läser felet kan tro att ett underlag är sent, fast raden ännu är
+inom sina 7 dagar.
+
+**P3 – Tiden växer snabbare än den gamla koden (låg, hör till Öppet 47 a, inte till familjen).** Körd med syntetiska perioder där antalet
+bankrader, underlag och par är lika, på `kontera_period` före och efter steget:
+
+| Antal par | Före (2a57517), sekunder | Efter (0697585), sekunder | Gånger långsammare |
+|---|---|---|---|
+| 50 | 0,11 | 0,19 | 1,7 |
+| 100 | 0,27 | 0,66 | 2,4 |
+| 200 | 0,78 | 2,72 | 3,5 |
+| 400 | 2,54 | 13,73 | 5,4 |
+| 800 | 8,98 | 75,94 | 8,5 |
+
+Öppet 47 a stämmer alltså i riktningen. Testbutiken har 12 par och märker inget. *Bedömning, inte körd:* vid matchningens gräns på 20 000
+bankrader skulle en körning ta flera dygn. Ett litet företag kommer inte nära det. Ingen gräns är nådd i dag.
+
+**P4 – Små saker i testfilen (låg, test, hör inte till familjen).** (a) Ingen test täcker en smalare bankperiod, bara en smalare
+underlagsperiod. s1 visar att det är samma gräns. (b) Kommentaren i `test_beslut_granskning_30.py` rad 378 hänvisar till "Beslut som behövs" i
+PROGRESS.md, men det som avses heter Öppet 46. (c) Variabeln `sextio` på rad 180 och 182 är bankrad 26. (d) Texten i Öppet 46, "Kräver kod
+förbi flödena", stämmer inte efter P1. Inget rättat här, utom en hänvisning under Öppet 46 i PROGRESS.md.
+
+### Svar på uppdragets punkter
+
+**1. Koden mot beslutet: stämmer** (läst, och körd där det står).
+
+- `matcha_period` används själv, med `import` från `matcha_bank.py`, utan kopierad logik. Ett förslag med både underlag och bankrad prövas sist
+  i `skapa_konteringsforslag`, efter formerna, som garanterar att det finns exakt ett av varje, så `[0]` är säkert.
+- **Bara stopp tillagda.** `git show d8a5edc` visar i `konteringsforslag.py` bara tillagda rader, utom två rader i en docstring.
+  Returvärdet är oförändrat: `kontroller` har samma nycklar (körd, alla provens "ok"). Inget gammalt test är försvagat: r5-testet är
+  omgjort från att dokumentera hålet till ett stopp-test, med fler krav på felet.
+- **Inget företagsspecifikt:** `grep` efter 4010, 5460, 2440, 2641, 1940, LEV-TE, AGARE och "import konter" i filen ger inget.
+- **`git diff 2a57517 HEAD` för** CLAUDE.md, SPEC.md, `foretag`, `testforetag`, `testdata`, `sparr`, `konteringsfloden.py`, `matcha_bank.py`,
+  `las_underlag.py` och `las_bank.py` **är tom.**
+
+**2. Datumet 9999-12-31: ändrar inga par** (körd, utom där det står).
+
+- *Läst:* i `matcha_period` används datumet bara i kontrollen att ingen bankrad ligger efter det (rad 320–326) och i valet mellan "väntande"
+  och "saknat underlag" (rad 380). Grenen som bygger `matchningar` läser det inte.
+- *d1:* 40 slumpade kopior av underlagen, med belopp från riktiga bankrader och flyttade datum, sammanlagt 397 par. Sex datum (2025-02-28,
+  2025-03-07, 2025-03-08, 2025-04-15, 2030-01-01 och 9999-12-31): **0 skillnader**, och inget flöde stoppades.
+- *d2 och d3, tidsfönstrets kanter:* faktura 40 dagar, kvitto 3 dagar. Samma dag och sista dagen ger par, dagen före och dagen efter
+  fönstret inget par, på både flödets datum och det fasta. Förslaget för hand godtas eller stoppas i exakt samma fall.
+- *d4, utanför perioderna:* ett underlag efter underlagsperiodens slut stoppas av ursprunget ("finns inte i underlagsperioden"). Ett
+  underlag i perioden men efter bankperiodens sista rad stoppas av Öppet 40.
+- *d5b, väntande rader:* en väntande rad har ingen kandidat och blir aldrig ett par, på något datum. Bara felets text skiljer sig (P2).
+- *d6 och d7, kan datumet få matchningen att stoppa eller krascha:* nej. 9999-12-31 är det sista giltiga datumet, så ingen rad kan ligga efter
+  det, och en rad på just den dagen ger `arende_efter` 9999-12-31 utan fel. **Den enda skillnaden mot flödet:** ett bedömningsdatum före
+  en bankrad stoppar flödet, men aldrig kontrollen. Ett riktigt par godtas för hand i det läget (körd). Det ändrar inga par, så
+  granskaren räknar det inte som ett fynd.
+
+**3. Rött före: 16, fördelningen stämmer** (körd mot `git archive` av 2a57517 i scratchpad). 15 av 24 i `test_beslut_granskning_30.py` och 1
+av 25 i `test_beslut_granskning_29.py`.
+
+| Antal | Varför rött | Vilka |
+|---|---|---|
+| 12 | "DID NOT RAISE", förslaget gick igenom, alltså beteende | r5 i båda filerna, g9, g10, ägaren med rätt motpart, flera underlag, före fakturans datum, kvittot utanför fönstret, en annan fakturas rad, eget par och annan rad, matchningen går inte att göra, kontrollen följer svaret |
+| 1 | `assert 0 == 1`, matchningen anropades inte | `test_kontrollen_fragar_matcha_period_med_samma_perioder_och_regelbok` |
+| 3 | Bara för att funktionen eller texten saknas, bevisar inget beteende | `test_utan_perioderna_stoppas_kontrollen_av_paret` (`AttributeError`), `test_koden_anvander_matcha_period_och_ingen_egen_matchning` och `test_koden_namner_regeln` |
+
+**4. Hela sviten: 4492 passed in 89.88s** (körd, före dokumentationen), 0 röda, samma som byggsessionen. Se också kommando 13 nedan.
+
+**5. Vägar runt Öppet 40** (alla körda, i samma perioder om inget annat står).
+
+| Prov | Vad provet gör | Utfall |
+|---|---|---|
+| v3 | En bankrad som matchningen ger ett annat underlag med samma belopp, fakturanumret avgör | 003 godtas, 009 stoppas: "har parat ihop bankraden med underlaget 003" |
+| r5 och d4 | Ett underlag som matchningen lämnar som oavstämt | Stoppas |
+| v4 | Ägaren bara i bankradens referens, annars rätt | Stoppas: "kräver mänsklig bedömning" |
+| v1 | Paret i kopplingarna är riktigt, men källan på raden är en annan bankrad med samma belopp, och tvärtom | Stoppas av ursprunget |
+| v2 | Båda bankraderna i kopplingarna | Stoppas av ursprunget |
+| v5 | En bankavgift som betalning, samma belopp | Stoppas: "inte kräver något underlag" |
+| v6 | Pengar in som betalning, samma belopp | Stoppas: bankkontot står på fel sida |
+| v7 | Hoppa över underlaget, bankrad 26 på avgiftsregeln, så att kontrollen inte körs | Stoppas av punkt 8: raden passar ingen regel för rader utan underlag |
+| f2 | Varje underlag mot varje bankrad med samma belopp i testdatan | 9 godtas, alla par, **0 godtagna utan par**. De andra 3 av 12 par saknar regel eller är flaggade |
+| v8 | Samma par i två förslag | **Godtas båda.** Känt (Öppet 45, beslut 5) |
+| v9 | K4a och K4b: 009 har 003:s fakturanummer | **Godtas båda betalningarna**, flödena bygger ingen. Öppet 40 ändrar inget, så steg 99 behövs som planerat |
+| v9 | K4c: 003 och 009 med samma motpart, belopp och datum | Stoppas av Öppet 40, eftersom raden blir "tvetydig". Bara det fallet. Steg 99 ersätts inte |
+| s1 | Smalare bankperiod | **Godtas** (P1) |
+
+Inget är ett nytt hål i familjen. *Inte provat:* K4c med samma fakturanummer och olika motpart, och en bankrad "över gräns" (läst: raden når
+aldrig kandidaterna, rad 339–346).
+
+**6. Flöde a, b och e: ja, alla 9 har sitt par** (f1, körd). 16 fakturor, 6 betalningar, 3 kvitton och 4 bankavgifter. Förslagen med underlag och
+bankrad är 003, 005, 006, 007, 008, 009, 010, 011 och 015. Paret finns i flödenas egen matchning och i en som granskaren körde själv på
+flödets datum. Kontrollen anropades 9 gånger, alltid med 9999-12-31. Matchningen har 12 par: 001, 002 och 019 får inget förslag.
+
+**7. Inget annat ändrades** (körd i git och i mappen). Efter 2a57517 finns exakt två commits, d8a5edc och 0697585 (`git log --all` och
+`.git/logs/HEAD`). `git status` är rent, och `git status --ignored` visar bara `.DS_Store`, `.claude/` och `.pytest_cache/`. Sista
+ändringstid i projektmappen är dokumenten 16:33, före commiten 16:35. `.git/worktrees` och `.claude/worktrees` är från 28 och 29 oktober, så ingen
+ny arbetskopia finns. *Iakttagelse:* `.git/FETCH_HEAD` är från 16:28 och pekar på 5263f3c, alltså har något hämtat från GitHub under
+byggsessionen, utan att någon commit ändrades. `git fetch` står inte på listan, så granskarens bedömning är att det inte var agenten, utan
+appen. Det går inte att se härifrån. *Går inte att se härifrån:* vad som hände utanför projektmappen, och själva försöket att starta
+sessionen.
+
+### Vad som är kört och vad som är bedömning
+
+**Kört:** rött före, sviten, alla prov (d, v, s, f och tiden) och `git`-kontrollerna. **Läst, inte kört:** var datumet används i
+`matcha_period`, att K4 bara ser perioden, att raden "över gräns" aldrig blir kandidat, och att underlag i kopplingarna och på raderna måste vara
+samma (`_kontrollera_kopplingar`, samma kod som v1 prövar för bankrader). **Bedömning, inte kört:** allvarsnivåerna, tiden vid 20 000 rader,
+vem som hämtade från GitHub, och om beslut 5 ska gälla över körningar. **Inte upprepat:** byggsessionens mutationsprov och dess mätning 4,15 mot 1,39
+sekunder. Inget här är en bedömning av bokföringsregler: "fel" betyder att något skiljer sig från vad flödena bygger på hela perioden.
+
+### Steg 98
+
+Byggt som beslutet säger. Granskarens bedömning: steg 98 kan räknas som klart. P1 är inte ett fel i steget.
+
+### Testsviten
+
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`:
+**4492 passed in 89.88s**.
+
+### Kommandon i den här granskningen
+
+`<scratch>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/6e1b3512-d462-4775-8461-ab3fd155fd93/scratchpad` och `<python>` är
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Allt kördes från projektmappen, ett kommando i taget.
+
+1. `git status`, `git log --oneline -8`, `git show --stat d8a5edc`, `git show --stat 0697585`, `git show d8a5edc -- scripts/konteringsforslag.py
+   scripts/tests/test_beslut_granskning_29.py`, `git show 0697585` och `git diff 2a57517 HEAD --stat`.
+2. `git diff 2a57517 HEAD -- CLAUDE.md SPEC.md foretag testforetag testdata sparr scripts/konteringsfloden.py scripts/matcha_bank.py
+   scripts/las_underlag.py scripts/las_bank.py` (tom), `grep -n -e 4010 -e 5460 -e 2440 -e 2641 -e 1940 -e LEV-TE -e AGARE -e "import konter"
+   scripts/konteringsforslag.py` (tom) och `git log --format='%h %an %ad %s' --date=iso -5`.
+3. `grep` och `ls` i projektet och stycken av filer med fil-verktyget Read. `cat foretag/syntet-testbutik/matchning.json`, `head -5` och `grep -c ""`
+   på bankfilen, `cat` på underlag 009.
+4. `ls -la`, `ls -la .claude`, `ls -la .claude/worktrees`, `ls -la .git`, `ls -la .git/worktrees`, `ls -lat scripts`, `ls -lat scripts/tests`, `tail -8
+   .git/logs/HEAD`, `cat .git/FETCH_HEAD`, `git log --all --oneline --decorate -6` och `git status --ignored`.
+5. `mkdir -p <scratch>/kopia-fore <scratch>/kopia-nu`, `git archive -o <scratch>/2a57517.tar 2a57517`, `git archive -o <scratch>/0697585.tar 0697585`,
+   `tar -xf <scratch>/2a57517.tar -C <scratch>/kopia-fore` och `tar -xf <scratch>/0697585.tar -C <scratch>/kopia-nu`.
+6. `cp -R scripts/tests/test_beslut_granskning_30.py <scratch>/kopia-fore/scripts/tests/test_beslut_granskning_30.py` och samma för `_29.py`.
+7. Rött före: `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rf <scratch>/kopia-fore/scripts/tests/test_beslut_granskning_30.py` (**15
+   failed, 9 passed**) och samma för `_29.py` (**1 failed, 24 passed**).
+8. Provfilerna `test_granskare_prov31.py` och `test_granskare_tid31.py` skrevs med fil-verktyget Write i `<scratch>/kopia-nu/scripts/tests/`. `<python> -B -m
+   pytest -p no:cacheprovider -q --tb=short -rP <scratch>/kopia-nu/scripts/tests/test_granskare_prov31.py` gav först **3 failed, 25 passed**, alla tre
+   fel i granskarens prov (d5 antog en väntande rad som inte finns, och f2 byggde förslag för underlag utan regel). Rättat med Edit.
+9. Samma med `-k "d4 or d5b or d6 or d7 or v1 or v2 or f2"` (**1 failed, 6 passed**, samma fel i f2, rättat) och med `-rA -k "f2 or v8"` (**2
+   passed**). Hela provfilen: `<python> -B -m pytest -p no:cacheprovider -q --tb=short <scratch>/kopia-nu/scripts/tests/test_granskare_prov31.py` (**27
+   passed**).
+10. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rP <scratch>/kopia-nu/scripts/tests/test_granskare_tid31.py` (**1 passed**, tiderna i P3).
+11. `cp -R` av båda provfilerna till `<scratch>/kopia-fore/scripts/tests/`, `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rP -k "test_s1 or
+    test_s2 or test_s3" <scratch>/kopia-fore/scripts/tests/test_granskare_prov31.py` (**1 failed, 2 passed**: s1 röd, s2 och s3 gröna) och
+    `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rP <scratch>/kopia-fore/scripts/tests/test_granskare_tid31.py` (**1 passed**).
+12. `<python> -B -m pytest -p no:cacheprovider -q scripts/tests` (**4492 passed**).
+13. Efter det här avsnittet och statusraderna: samma kommando igen, `git add GRANSKNING.md PROGRESS.md BYGGPLAN.md`, `git commit -F
+    <scratch>/commit-granskning-31.txt` och `git status`.
+
+Vakten stoppade nio kommandon granskaren skrev i strid med SPEC 7.1, alla bara läsande: ett ihopkopplat med `&&` och åtta `grep` med omvänt
+snedstreck. De ersattes med ett kommando i taget och flera `-e`. `ls --ignore` stoppades inte av vakten, men finns inte i `ls` och gav ett fel.
+Inget utanför projektet ändrades utom scratchpad.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **P1 (Öppet 46):** hur ska perioden för en körning sättas ihop, och när ska det avgöras? Ska till exempel en körning stoppas om
+   perioderna inte täcker tidsfönstret, eller ska underlag och bankrader alltid köras över längre tid än den månad som stäms av? Granskarens
+   bedömning: avgör före piloten, tillsammans med beslut 5 om granskning 30, och säg uttryckligen att beslut 5 gäller över körningar. Det
+   behöver inte stoppa steg 99, 100 eller 96. Vad som är rätt för bokföringen är en **Öppen fråga** för en redovisningskonsult, till exempel
+   vilken faktura en betalning ska räknas mot när flera passar.
+2. **P2 och P4 (Öppet 48), låga:** ska de rättas i samband med steg 96, eller senare? Granskarens bedömning: i samband med steg 96.
+3. **P3 (Öppet 47 a), låg:** räcker det att det är uppmätt, och att det tas upp före en körning med riktigt stora perioder? Granskarens
+   bedömning: ja. Öppet 47 b (SPEC 7) har byggsessionens förslag, dokumentationen för steg 96.
+4. **Steg 98:** får räknas som granskat och klart (granskarens bedömning: ja).
+
+STATUS: gult
+STEG I BYGGPLANEN: 98 – Öppet 40 – klart (granskat i den här granskningen, väntar på besked)
+KAN JAG GÅ VIDARE: ja till steg 99, 100 och 96. Inget kan bokföras, ingen spärr är svagare, Öppet 40 stämmer med beslutet, rött före och sviten
+stämmer, flödena går igenom och ingen väg runt hittades under samma perioder. Gult för att P1, på nivån medel, finns kvar: det bör avgöras före piloten.
+ÄNDRINGAR I CLAUDE.md: inga
+BESLUT SOM BEHÖVS: 1–4 ovan.
+NÄSTA STEG: Hugo eller Casper svarar på 1–4. Sedan steg 99 (Öppet 43), steg 100 (Öppet 44), steg 96 (Öppet 37) och steg 92 (Öppet 26). Steg 15
+(sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
