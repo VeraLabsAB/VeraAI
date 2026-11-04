@@ -9713,3 +9713,280 @@ Uppdraget gav också formerna ("så som flödena bygger dem i dag; stämmer någ
   för steg 96), Öppet 37 (steg 96, hoppas över till efter steg 97 på Hugos uppdrag) och samlingsbetalningar (Öppet 42).
 - **Inte granskad oberoende än.** Kärnan har fått en strängare kontroll, så granskningen bör pröva om kontrollen stoppar
   något flödena bygger, och om något annat än de tre formerna går igenom.
+
+## Granskning 30 (av 4b3f379 och 5263f3c) (2026-11-04)
+
+Oberoende granskning av steg 97 (flödenas former, Öppet 39) i en ny session som inte har sett byggsessionen, mot c9a6cee.
+Granskaren ändrade ingen kod och ingen rad i CLAUDE.md eller SPEC, och skrev bara i den här filen, PROGRESS.md och
+BYGGPLAN.md. Lästes: CLAUDE.md, SPEC.md 7 och 7.1, här "Granskning 29" och "Hugos beslut 2026-11-04 om granskning 29",
+BYGGPLAN.md ("Läge nu" och steg 95–98), `git show` av båda commitarna, hela `scripts/konteringsfloden.py`,
+`scripts/konteringsforslag.py` (bland annat `_kontrollera_ursprung`, `_k5`, `_formens_rader`, `_kontrollera_flodets_form`
+och `_kontrollera_underlagen`), hela `test_beslut_granskning_29.py` och ändringarna i `_26.py` och `_28.py`.
+
+### Beslut som redan var tagna (prövades inte om)
+
+(b) rakt av: exakt en av formerna fakturan, betalningen eller kvittot, allt annat stoppas, också b2, två betalningar i
+samma förslag och samlingsbetalningar. "En bankrad" gäller ordagrant. Rader med beloppet 0 ingår inte i formen. P2 i
+granskning 29 (Öppet 40) byggs i steg 98. Med **familjen** menas som i granskning 29: ett förslag byggt för hand, förbi
+flödena, som har underlag, har en form flödena aldrig bygger, och godtas med alla kontroller gröna.
+
+### Viktigt först
+
+- **Inget kan bokföras eller godkännas av koden, och ingen spärr har blivit svagare.** 4b3f379 lägger bara till stopp.
+  Allt nedan gäller förslag, som alltid kräver godkännande av en människa, och bara kod förbi flödena kan bygga dem.
+- **Formerna är rätt byggda, och inget nytt hål i familjen hittades.** Formerna stämmer fält för fält med vad flödena
+  bygger. 39 egna prov hittade inget som flödena bygger och kontrollen stoppar, och ingen rad utanför formen som går igenom
+  i ett förslag med underlag. Rött före är 22 och sviten 4 468, som byggsessionen säger.
+- **Tre fynd på nivån medel, alla utanför familjen och alla fanns före steget** (proven är gröna också mot c9a6cee). Formen
+  säger hur raderna ska se ut, inte vilket underlag eller vilken bankrad som får användas, och den gäller bara förslag med
+  underlag. P1: ett underlag som K4 har flaggat godtas för hand. P2: ett förslag utan underlag har ingen form alls. P3:
+  Öppet 40 är bredare än r5, också ett kvitto och en bankrad mot ägaren går igenom.
+
+### Fynd
+
+**P1 – Ett underlag som K4 har flaggat godtas för hand (medel, hör inte till familjen).** K4 är kontrollen för dubbletter.
+Prov g11 (körd): i en kopia får 009 samma fakturanummer som 003, så att K4 flaggar paret ("K4a och K4b"). Flödena bygger
+inget förslag för något av dem, som de ska. Men fakturan för hand, i exakt flödets form, godtas med alla kontroller "ok",
+både för 003 och för 009. **Hugos beslut 2026-10-30 om granskning 22, punkt 3,** säger "får inget förslag alls, samma
+linje som K5 och K8" (rad 7685–7686), och K5 och K8 ligger i `skapa_konteringsforslag`, men K4 prövas bara i
+`kontera_period` (`konteringsfloden.py` rad 525–527). I `konteringsforslag.py` står K4 bara i en feltext (rad 653). En
+K4-dublett som är borttagen ur perioden kan inte nås, men de underlag som flaggas och står kvar kan. Det är inte familjen,
+eftersom formen är flödets, men det är något flödena aldrig bygger och kontrollen godtar. Sökningen i den här filen och i
+PROGRESS.md efter K4 tillsammans med `skapa_konteringsforslag` ger inget, så det ser inte ut att vara känt. Allvar: medel,
+samma skäl som Öppet 39 (kod förbi flödena och en människa som godkänner), och det kan ge en dubbelbokad faktura.
+
+**P2 – Ett förslag utan underlag har ingen form (medel, hör inte till familjen, eftersom den kräver underlag).** Hugos
+uppdrag säger att förslag utan underlag inte berörs, så **steg 97 är inte fel**. Men samma slag av hål som Öppet 39 finns
+kvar där. Alla prov går igenom med "K2" och "ursprung" "ok" (kört):
+
+| Prov | Förslaget | Vad flödena gör |
+|---|---|---|
+| n1 | Bankavgiften (bankrad 117) på 2440 i stället för 6570, 1940 i kredit | 6570 |
+| n4 | Swish in (pengar in) med 1940 i debet och 2440 i kredit, under `R-BANK-SWISH` | Inget förslag än (flöde d) |
+| n5 | Kortinlösen med 1940 i debet och 6570 i kredit, alltså en insättning som minskad avgift | Inget förslag än (flöde d) |
+| n6 | Bankavgift över regelns gräns (i en kopia av regelboken med gränsen 100 kr) | Ärende "över gräns" |
+| n7 | Bankavgift på en regel utan `flode` (i en kopia av regelboken) | Ärende "regeln saknar flöde", nivå D |
+| n8 | Testfilens Z 1001 med Swish på 2440 i stället för 1581 | Inget flöde bygger Z-rapporter än |
+
+*Orsaken (läst i koden):* punkt 8 (`_kontrollera_regeln`) godtar varje konto som står i regeln eller har en roll i
+kontoplanen, och beloppsgränsen och `flode` prövas bara i `_bankrad_utan_underlag`. *Stoppas ändå:* avgiften på
+momskontot (n2). *Godtas och är inte fel i sig:* Swish på regelns konto 1581 (n3). Allvar: medel, och det blir viktigare i
+uppgift 5, som bygger flöde c och d. Beslutet "det som flödena inte bygger stoppas" gäller i dag bara förslag med underlag.
+
+**P3 – Öppet 40 är bredare än r5 (medel, hör till Öppet 40, inte till familjen).** Formen är rätt men källan fel, som P2 i
+granskning 29. Båda är körda:
+
+- *g9, ett kvitto:* i en kopia har kvittot 015 beloppet 748,75 kr. Kvittots form med bankrad 8 i februari (LEV-TELE) godtas.
+  Flödena bygger inget förslag för det.
+- *g10, en bankrad mot ägaren:* i en kopia har 009 beloppet 748,75 kr och bankrad 8 har texten AGARE-1
+  (`ar_bankrad_mot_agare_eller_narstaende` säger ja). Betalningens form godtas, och flödena bygger ingen sådan betalning.
+  Det var "inte provat, bara bedömning" i granskning 29, P1. K7 prövar bara underlagets motpart, inte bankradens.
+
+BYGGPLAN steg 98 säger bara "r5 stoppas, och flöde a och b går igenom". Granskarens bedömning: g9 och g10 bör tas med i
+steg 98:s test. Samma matchning borde stoppa båda, men det är inte byggt och inte provat.
+
+**P4 – Text, förslagets id och motiveringen ingår inte i formen (låg, hör inte till familjen).** g12 (körd): 003:s betalning
+med texten "Hyra för januari", id `F-KVITTO-SYNT-U-2025-015` och motiveringen "Godkänn utan att läsa." godtas. Flödena
+skriver texten själva, och K4c-märkningen i motiveringen (SPEC 7, Öppet 29) behövs inte heller för hand. Beslut 1 och formerna
+i uppdraget talar bara om rader. Det spelar roll när godkännandekortet visar texten.
+
+**P5 – Samma betalning i två förslag godtas var för sig (låg, hör inte till familjen).** g13 (körd): flödets betalning
+skapas igen för hand och godtas. Formen prövas per förslag, och inget jämför förslagen med varandra. Granskarens bedömning:
+det hör hemma där förslag sparas och godkänns, och det steget finns inte än. Inget provat utöver det.
+
+**P6 – Texter som formen har gjort gamla (låg, dokumentation).** Inte rättat, enligt uppdraget.
+
+- SPEC 7, Öppet 34 säger att `underlag_ore` och `moms_ore` "räknas bara med `lika` eller `summa`", och samma sak står i
+  koden. I ett förslag med underlag stoppar formen nu `summa` (g5d). Stycket är inte fel som villkor, men det ser ut som ett
+  tillstånd, och det står under "Hugos beslut 2026-10-30 om granskning 26", som inte säger det (punkt 5 nedan).
+- SPEC 7 säger "Ett förslag med flera underlag som har olika regler kräver ett nytt beslut". Nu stoppas alla förslag med
+  flera underlag.
+- SPEC 7 säger att formerna inte säger något om Öppet 40 och Öppet 41, men inte att de inte säger något om K4 (P1).
+- Statusraden överst i SPEC slutar vid besluten om granskning 23, och Öppet 31–39 står inte där.
+- Att Öppet 36 saknas i SPEC 7 (P6 i granskning 29) är känt: det rättas i steg 96. Noterat, inte rättat. Stycket "Flödenas
+  former" hänvisar till Öppet 36 utan att det är beskrivet.
+
+**P7 – Två små saker i testfilen (låg, test).** (a) Rubriken i `test_beslut_granskning_29.py` rad 286 och `form_direkt` säger
+att en Z-rapport inte går att nå med en inläst period. Det går: g14 (körd) är fakturan plus två rader från Z 1001 på 2440,
+och den når formen och stoppas med rätt fel. Kontrollen är alltså rätt, men testet går förbi den riktiga vägen, och det
+saknas ett test av vägen. (b) Av de 22 röda är 18 röda för att förslaget gick igenom ("DID NOT RAISE": 15 i fil 29, 2 i fil
+28 och 1 i fil 26). De andra 4 är röda bara för att funktionen eller texten inte fanns (3 med `AttributeError` och
+`test_koden_namner_regeln`), så de bevisar inte att beteendet ändrades. Siffran 22 stämmer ändå.
+
+### Svar på uppdragets punkter
+
+**1. Formerna mot flödena, fält för fält** (läst i `konteringsfloden.py` rad 373–382, 395–421 och 424–441 och
+`konteringsforslag.py` rad 1335–1409, och körd: prov f1 räknar raderna utan koden i `konteringsforslag.py`).
+
+| Fält | Fakturan | Betalningen | Kvittot | Stämmer? |
+|---|---|---|---|---|
+| Typ av underlag | `leverantorsfaktura` | `leverantorsfaktura` | `kvitto` | Ja, samma som `_FLODEN` och `las_underlag.TYPER` |
+| Antal underlag och Z-rapporter | 1 och 0 | 1 och 0 | 1 och 0 | Ja |
+| Antal bankrader | 0 | 1 | 1 | Ja |
+| Kostnad i debet | `konton[sats]` från samma `kontrollera_underlag`, per momsrad | Ingen | Som fakturan | Ja |
+| Moms i debet | Rollen `ingaende_moms` på verifikationens datum | Ingen | Som fakturan | Ja |
+| Rad med beloppet 0 | Tas inte med | Hela beloppet har en rad | Tas inte med | Ja, `if momsrad[falt]` på båda ställena |
+| Leverantörsskulderna | Kredit, `belopp_ore` | Debet, `belopp_ore` | Ingen | Ja |
+| Bankkontot | Ingen | Kredit, bankraden | Kredit, bankraden | Ja, se nedan |
+| Sätt att räkna | `lika`, en källa | `lika`, en källa | `lika`, en källa | Ja |
+| Källorna | `kalla`, `id`, `falt`, och `momssats` på delarna | Samma | Samma | Ja |
+
+Enda skillnaden i koden: flödet tar bankkontots belopp ur bankraden (`-bankrad["belopp_ore"]`) och formen ur underlaget.
+De är lika, eftersom matchningen kräver samma belopp (`matcha_bank.py` rad 230). Datumet för rollerna är verifikationens
+datum på båda ställena, och kontot per sats kommer från regeln på underlagets datum på båda ställena.
+
+*Något flödena bygger som kontrollen stoppar?* Inget hittat. f2 kör flödena på 36 kopior av underlagen med andra momsrader
+för alla LEV-KAFFE-fakturor (delade på 12 % och 25 % i slumpad ordning, en rad med 0 på 25 %, och en rad med bara 1 öre moms).
+f3 kör varje tillåtet värde för datumvalen i regelboken minst en gång (3 kombinationer av 12 möjliga). Formen stoppade ingenting, och raderna stämmer med granskarens egen räkning.
+*Något kontrollen godtar som flödena aldrig bygger?* I en annan form: inget. I rätt form: P1 och P3, och r5. Se också P4 och P5.
+
+**2. Bara stopp tillagda: ja** (läst och körd). `git show 4b3f379` visar bara tillagda rader i `konteringsforslag.py`, utom
+en rad i en docstring som fick en fortsättning. Ingen gammal kontroll är borttagen och returvärdet är oförändrat.
+**Inget företagsspecifikt:** `grep` efter 4010, 5460, 2440, 2641, 1940 och LEV-TE i filen ger inget. `leverantorsfaktura` och
+`kvitto` är kärnans egna typer. **Inget importeras från `konteringsfloden.py`:** importerna står på rad 252–265, och namnet
+finns bara i text (rad 26 och 1368). `git diff c9a6cee 5263f3c` för CLAUDE.md, `foretag`, `testforetag`, `testdata`, `sparr`,
+`konteringsfloden.py` och `las_underlag.py` är tom.
+
+**3. Rött före: 22, som byggsessionen säger** (körd mot `git archive` av c9a6cee i scratchpad): 19 av 25 i fil 29, 2 av 9 i
+fil 28 och 1 av 22 i fil 26. De 6 gröna i fil 29 är de fem skydden och r5. Se P7 (b).
+
+**4. Hela sviten: 4 468 passed**, 0 röda, 73,17 sekunder (körd), samma som byggsessionen.
+
+**5. "Momsen summerad över två satser" var inte ett beslut av Hugo.** Det var en granskares förslag och iakttagelse och
+byggsessionens eget skydd:
+
+- GRANSKNING.md rad 8578: granskning 26:s **förslag** till regel ("bara räknas med `lika` eller `summa`").
+- Rad 8725: Hugos beslut är ordagrant "Ja, i samma steg". Rad 8729–8732: "Vilken regel som ska stänga Öppet 34 är inte sagt
+  i beslutet", och byggsessionen följer förslaget.
+- Rad 8860–8861: granskning 27:s **iakttagelse** ("summerade kostnader och summerad moms är tillåtet").
+- PROGRESS.md rad 329: byggsessionens skydd ("`summa` är tillåtet").
+- Rad 9651–9654: Hugos beslut 1, "Allt annat stoppas". Flödena bygger en momsrad per sats (`konteringsfloden.py` rad 377–381).
+
+Så det gick inte emot något beslut att göra om testet, och byggsessionen sa det själv (rad 9698–9700). De två andra omgjorda
+testen, b2 och två betalningar, står uttryckligen i beslut 1. Omgörningarna är inte försvagade: alla tre är röda före och
+kontrollerar vilket fel som kommer. Ordet "Hugos beslut" framför `summa` i SPEC 7 är fel person, se P6.
+
+**6. Byggsessionens tre val: inget öppnar ett hål eller stoppar ett riktigt flöde** (körda där det står, annars bedömning).
+
+- *Raderna i valfri ordning.* Alla 120 ordningar av 020:s fem rader godtas (v1). Raderna räknas med antal, så en rad två
+  gånger räknas inte som två olika (v1b, som K2 stoppar först; delkontrollens eget test finns i fil 29).
+- *En ny typ stoppas.* Det kan inte stoppa ett flöde, eftersom flödena bara bygger för typerna i `_FLODEN` (rad 533) och
+  `las_underlag.TYPER` har samma två. Felet går åt rätt håll: kreditnotan i Ö8 tas inte för en faktura. Läst, och typen
+  prövas direkt av byggsessionens test, eftersom den inte går att läsa in.
+- *Kontrollen efter alla underlag.* Har förslaget flera underlag stoppas det på antalet innan `konton` används. Ett kvitto
+  och en faktura stoppas redan av regeln (v3, punkt 8), så två underlag som når formen har samma regel. Flödena har alltid ett
+  underlag.
+
+**7. Vägar runt formerna** (alla körda).
+
+| Prov | Vad provet gör | Utfall | Familjen? |
+|---|---|---|---|
+| g1 | Två momsrader med samma sats | Stoppas vid inläsningen | – |
+| g2 | Momsfri faktura utan momsrad, och med en momsrad på 0 | Utan: godtas, det är flödets form. Med: K2 stoppar | – |
+| v1 | 020:s momsrader i en annan ordning | Godtas, samma kontering | Nej |
+| g4 | Rätt rader och en extra rad på 0 | K2 stoppar | – |
+| g5a, g5b | `summa` av en enda källa, på en kostnad och på bankraden | Ursprunget stoppar | – |
+| g5c | Bruttot som `summa` på 4010 | Öppet 33 stoppar | – |
+| g5d | Kostnaden summerad över två satser, rätt konto | **Formen stoppar**, grön förut | – |
+| g6a–c | Extra nyckel i källan eller på raden, momssats 12.0 | Stoppas | – |
+| g7 | Kontona bytta mellan satserna | Öppet 32 stoppar | – |
+| g8 | Kvitto mot pengar in med rätt belopp | Punkt 6 stoppar | – |
+| h1, h2 | Betalningen med fel konto, fel sida eller fel källa, eller en annan bankrad med annat belopp | Stoppas | – |
+| g14 | Fakturan plus rader från en Z-rapport | **Formen stoppar**, grön förut | – |
+| g9, g10 | Kvitto och betalning mot en annan bankrad med samma belopp | **Godtas** | Nej, Öppet 40 (P3) |
+| g11 | Faktura i rätt form för ett underlag K4 har flaggat | **Godtas** | Nej (P1) |
+| g12, g13 | Fel text och id, och samma betalning två gånger | **Godtas** | Nej (P4, P5) |
+| n1, n4–n8 | Förslag utan underlag | **Godtas** | Nej, inget underlag (P2) |
+
+**8. Flöde a, b och e: varje förslag har exakt en form** (f1, körd): **16 fakturor, 6 betalningar och 3 kvitton**, och 4
+förslag utan underlag (bankavgifterna), totalt 29.
+
+**9. SPEC 7:** formerna står rätt, fält för fält. Det som är gammalt står i P6. Inget rättat.
+
+### Vad som är kört och vad som är bedömning
+
+**Kört:** rött före, sviten, alla prov (f, v, g, n och h) och `git`-kontrollerna. Provfilen körd också mot c9a6cee: bara g5d och
+g14 är röda där, de två som formen stoppar. Alla hål i P1–P5 är alltså gröna också före steget. **Läst, inte kört:** att K4 inte
+prövas i `skapa_konteringsforslag` utöver provet, och jämförelsen av koden i punkt 1. **Bedömning, inte kört:** att hålen kräver
+kod förbi flödena (stöds av f1 och f2, men bevisas inte för framtida kod), allvarsnivåerna, att matchningen stoppar g9 och g10
+när steg 98 är byggt, och var P5 hör hemma. **Inte upprepat:** byggsessionens mutationsprov. **Inte provat:** ett riktigt
+regelbyte eller kontobyte mellan fakturadatum och betaldatum (läst: båda sidor använder samma datum). Inget här är en bedömning
+av bokföringsregler: "fel" betyder att raderna säger något annat än vad flödena bygger.
+
+### Steg 97
+
+Byggt som beslutet säger, och formerna håller. Granskarens bedömning: steg 97 kan räknas som klart. P1–P3 är inte fel i steget.
+
+### Testsviten
+
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`:
+**4468 passed in 73.17s**.
+
+### Kommandon i den här granskningen
+
+`<scratch>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/6ecb5ada-2340-441f-a8e2-a160e9f96f79/scratchpad`
+och `<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Allt kördes från projektmappen, ett
+kommando i taget.
+
+1. `git status`, `git show --stat 4b3f379`, `git show --stat 5263f3c`, `git show 4b3f379 -- scripts/konteringsforslag.py
+   scripts/tests/test_beslut_granskning_26.py scripts/tests/test_beslut_granskning_28.py`, `git diff c9a6cee 5263f3c --stat` och
+   `git diff c9a6cee 5263f3c -- CLAUDE.md foretag testforetag testdata sparr scripts/konteringsfloden.py scripts/las_underlag.py`
+   (tom).
+2. `grep` med `-n`, `-i`, `-w`, `-E`, `-e`, `-A` och `--max-count` och `ls` i projektet; stycken av filer med fil-verktyget Read.
+   `grep -n -e 4010 -e 5460 -e 2440 -e 2641 -e 1940 -e LEV-TE -e konteringsfloden -e "import konter" scripts/konteringsforslag.py`
+   (punkt 2).
+3. `mkdir -p <scratch>/kopia-c9a6cee <scratch>/kopia-5263f3c`, `git archive -o <scratch>/c9a6cee.tar c9a6cee`, `git archive -o
+   <scratch>/5263f3c.tar 5263f3c`, `tar -xf <scratch>/c9a6cee.tar -C <scratch>/kopia-c9a6cee` och `tar -xf <scratch>/5263f3c.tar -C
+   <scratch>/kopia-5263f3c`.
+4. `cp -R scripts/tests/test_beslut_granskning_29.py <scratch>/kopia-c9a6cee/scripts/tests/test_beslut_granskning_29.py`, och samma
+   för `_28.py` och `_26.py`.
+5. `<python> -B -m pytest -p no:cacheprovider -q --tb=no -rfE <scratch>/kopia-c9a6cee/scripts/tests/test_beslut_granskning_29.py`
+   (**19 failed, 6 passed**), samma för `_28.py` (**2 failed, 7 passed**) och `_26.py` (**1 failed, 21 passed**), och fil 29 igen med
+   `--tb=line` (samma antal, för att se skälen, P7). Skälen för de tre omgjorda: `<python> -B -m pytest -p no:cacheprovider -q
+   --tb=line -k "b2_en_fakturas or tva_betalningar_i_ett or momsen_summerad" <scratch>/kopia-c9a6cee/scripts/tests` (**3 failed,
+   4504 deselected**, alla "DID NOT RAISE").
+6. `<python> -B -m pytest -p no:cacheprovider -q scripts/tests` (**4468 passed**).
+7. Provfilen `test_granskare_prov30.py` skrevs med fil-verktyget Write i `<scratch>/kopia-5263f3c/scripts/tests/`. Första körningen
+   stannade på ett fel i granskarens prov (fel namn på felklassen, rättat med Edit). `<python> -B -m pytest -p no:cacheprovider -q
+   --tb=short -rA <scratch>/kopia-5263f3c/scripts/tests/test_granskare_prov30.py` (**38 passed**).
+8. n8 lades till med Edit. Samma kommando med `--tb=short -rP -k n8` (**1 passed, 38 deselected**). g11 fick också 009 med Edit.
+9. Samma fil med `--tb=short -rf` (**39 passed**).
+10. `cp -R <scratch>/kopia-5263f3c/scripts/tests/test_granskare_prov30.py <scratch>/kopia-c9a6cee/scripts/tests/test_granskare_prov30.py`
+    och `<python> -B -m pytest -p no:cacheprovider -q --tb=no -rf <scratch>/kopia-c9a6cee/scripts/tests/test_granskare_prov30.py`
+    (**2 failed, 37 passed**: g5d och g14).
+11. `<python> -B -m pytest -p no:cacheprovider -q -k byggplan_progress scripts/tests` efter att det här avsnittet och statusraderna
+    skrivits.
+12. `git add GRANSKNING.md PROGRESS.md BYGGPLAN.md`, `git commit -F <scratch>/commit-granskning-30.txt` och `git status`. Granskaren
+    räknade sedan om sina egna siffror i det här avsnittet och rättade dem, med `git add` av samma filer och `git commit --amend -F`
+    på samma meddelandefil, före någon push.
+
+Vakten stoppade sexton kommandon granskaren skrev i strid med SPEC 7.1, alla bara läsande: ett ihopkopplat med `&&`, fyra `grep`
+med omvänt snedstreck och elva `grep` med `|` i mönstret. De ersattes med ett kommando i taget och flera `-e`. Inget utanför projektet
+ändrades utom scratchpad.
+
+**Iakttagelse om GitHub:** i början sa `git status` att `main` låg 24 commits före `origin/main`, och före commiten sa det att de
+är i fas (`git log --oneline -3 origin/main` står på 5263f3c). Ingen commit har tillkommit lokalt under sessionen. Granskaren
+pushade inte, så det gjordes utanför den här sessionen. Vem som gjorde det går inte att se härifrån, och uppgiften är inte
+kontrollerad mot GitHub (`git fetch` står inte på listan). Raderna om vad som är opushat i BYGGPLAN.md och PROGRESS.md är rättade
+efter det.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **P1 (K4):** ska `skapa_konteringsforslag` stoppa ett underlag som K4 har flaggat, så att "inget förslag alls" gäller också
+   för hand, med samma regler som flödena (K4a och K4b båda, K4c bara det flaggade)? Granskarens bedömning: ja, före uppgift 5.
+2. **P2 (förslag utan underlag):** ska också de ha fasta former, och när? Flöde e finns i dag, och flöde c och d kommer i uppgift
+   5. Granskarens bedömning: samma väg som (b), en form för flöde e nu eller tillsammans med uppgift 5, innan c och d får anropa
+   `skapa_konteringsforslag`.
+3. **P3 (Öppet 40):** ska g9 (kvittot) och g10 (bankraden mot ägaren) ingå i steg 98:s krav? Granskarens bedömning: ja.
+4. **P4 och P5:** ska texten och dubbla förslag tas upp nu, eller när godkännandekortet byggs? Granskarens bedömning: senare.
+5. **Steg 97:** får räknas som granskat och klart (granskarens bedömning: ja).
+
+STATUS: gult
+STEG I BYGGPLANEN: 97 – Flödenas former – klart (granskat i den här granskningen)
+KAN JAG GÅ VIDARE: ja till steg 98 och de andra stegen före uppgift 5. Inget kan bokföras, ingen spärr är svagare, formerna
+stämmer med flödena, rött före och sviten stämmer, flödena går igenom och inget nytt hål i familjen hittades. Nej till uppgift 5
+(steg 23) förrän P1 och P2 är avgjorda. Gult för att tre hål på nivån medel finns kvar utanför formerna (P1–P3).
+ÄNDRINGAR I CLAUDE.md: inga
+BESLUT SOM BEHÖVS: 1–5 ovan.
+NÄSTA STEG: Hugo eller Casper svarar på 1–5. Sedan steg 98 (Öppet 40), steg 96 (Öppet 37, och SPEC 7 i dess dokumentation) och
+steg 92 (Öppet 26). Steg 15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
