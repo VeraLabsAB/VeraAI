@@ -990,15 +990,27 @@ def test_att_soka_efter_ordet_path_gar_igenom(vakt, mappar, kommando):
 # sökvägar som testet anger ägs av root, genom att byta ut vaktens _sakert_agd. Rättigheterna prövas
 # ändå på riktigt: en sådan sökväg som gruppen eller andra får skriva i (till exempel 777) godtas inte.
 # Allt annat prövas som vanligt, så en fil eller mapp som testet inte anger är fortfarande användarens.
+#
+# Undantag (steg 15): mapparna ovanför testets egen tillfälliga mapp hör till datorn, inte till provet. Deras
+# rättigheter prövas inte när testet låtsas att de ägs av root. I sandlådan ligger den tillfälliga mappen under
+# /private/tmp, som alla får skriva i, och vakten stoppar med rätta allt där (se test_rotagd_ger_samma_svar_...).
+# Testets egen mapp och allt i den prövas på riktigt (test_rotagd_provar_rattigheterna_i_testets_egen_mapp).
 
 @pytest.fixture
-def rotagd(vakt, monkeypatch):
+def rotagd(vakt, monkeypatch, tmp_path):
     sakra = set()
     vanlig = vakt._sakert_agd
+    datorns = set()
+    for form in {os.path.normpath(str(tmp_path)), os.path.realpath(str(tmp_path))}:
+        while form != os.path.dirname(form):
+            form = os.path.dirname(form)
+            datorns.add(form)
 
     def sakert_agd(sokvag):
         if sokvag not in sakra:
             return vanlig(sokvag)
+        if sokvag in datorns:
+            return True
         try:
             return not os.stat(sokvag).st_mode & 0o022
         except OSError:
@@ -1036,6 +1048,61 @@ def test_rotagd_galler_bara_det_testet_anger(vakt, tmp_path, rotagd):
     os.chmod(mapp, 0o777)
     assert not vakt._saker_plats(str(mapp))
     os.chmod(mapp, 0o755)
+
+
+# Steg 15, provkörningen i sandlådan 2026-11-04. I sandlådan ligger pytests tillfälliga mapp under /private/tmp, som
+# alla får skriva i (1777). Testerna nedan ska ge samma svar där som utanför sandlådan. Ett eget pytest körs med en
+# tillfällig mapp under en mapp med samma rättigheter, så provet behöver varken sandlådan eller /private/tmp.
+NODER_MED_ROTAGD_SOM_SLAPPER_IGENOM = [
+    "test_beslut_granskning_13.py::test_p2_kedja_dar_varje_lank_ags_av_root_slapps_igenom",
+    "test_beslut_granskning_13.py::test_p2_for_lang_kedja_stoppas",
+    "test_granskning_14.py::test_lang_kedja_dar_varje_lank_ligger_i_en_rotmapp_slapps_igenom",
+    "test_granskning_14.py::test_kedja_med_relativa_lankar_och_tva_punkter",
+    "test_granskning_14.py::test_ring_som_programmet_i_en_saker_mapp_valjs_inte",
+    "test_kommandosparr.py::test_fil_som_inte_far_koras_hoppas_over_som_skalet_gor",
+    "test_kommandosparr.py::test_rotagd_galler_bara_det_testet_anger",
+    "test_kommandosparr.py::test_beslut_1_pytest_formerna_gar_igenom_med_python_i_en_mapp_som_root_ager",
+    "test_kommandosparr.py::test_beslut_3_fil_som_root_ager_i_en_rotmapp_gar_igenom",
+    "test_kommandosparr.py::test_beslut_3_lank_i_en_rotmapp_till_systemets_program_gar_igenom",
+]
+# Samma körning, de tester där en mapp i testet ägs av användaren och kommandot ska stoppas av just det.
+NODER_MED_ROTAGD_SOM_STOPPAR = [
+    "test_beslut_granskning_13.py::test_p2_relativ_lank_i_mitten_i_anvandarens_mapp_stoppas",
+    "test_granskning_14.py::test_lang_kedja_med_en_lank_i_en_anvandarmapp_stoppas",
+    "test_kommandosparr.py::test_beslut_3_fil_som_anvandaren_ager_i_en_rotmapp_stoppas",
+    "test_kommandosparr.py::test_beslut_3_lank_i_en_rotmapp_till_en_fil_som_anvandaren_ager_stoppas",
+]
+
+
+def test_rotagd_ger_samma_svar_under_en_mapp_som_alla_far_skriva_i(tmp_path):
+    alla = tmp_path / "alla-far-skriva"
+    alla.mkdir()
+    os.chmod(alla, 0o1777)
+    testmapp = Path(__file__).resolve().parent
+    resultat = subprocess.run(
+        [sys.executable, "-B", "-m", "pytest", "-p", "no:cacheprovider", "-q", "--tb=line"]
+        + [str(testmapp / nod) for nod in NODER_MED_ROTAGD_SOM_SLAPPER_IGENOM + NODER_MED_ROTAGD_SOM_STOPPAR],
+        cwd=tmp_path,
+        env=dict(os.environ, PYTEST_DEBUG_TEMPROOT=str(alla)),
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    assert resultat.returncode == 0, resultat.stdout + resultat.stderr
+    # 18 som ska släppas igenom och 11 som ska stoppas. Antalet visar att alla kördes.
+    assert "29 passed" in resultat.stdout, resultat.stdout
+
+
+def test_rotagd_provar_rattigheterna_i_testets_egen_mapp(vakt, tmp_path, rotagd):
+    # Bara mapparna ovanför testets egen mapp hör till datorn. Testets egen mapp och allt i den prövas på riktigt.
+    mapp = tmp_path / "rot"
+    mapp.mkdir()
+    rotagd(mapp)
+    assert vakt._sakert_agd(str(tmp_path))
+    os.chmod(tmp_path, 0o777)
+    assert not vakt._sakert_agd(str(tmp_path))
+    assert not vakt._saker_plats(str(mapp))
+    os.chmod(tmp_path, 0o700)
 
 
 # Beslut 1 (alternativ c): .venv flyttas till en mapp som root äger. Pytest-kommandona i listan pekar dit.
