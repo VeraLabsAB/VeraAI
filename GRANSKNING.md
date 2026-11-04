@@ -10524,3 +10524,38 @@ KAN JAG GÅ VIDARE: ja till steg 100 och 96. Inget kan bokföras, ingen spärr �
 ÄNDRINGAR I CLAUDE.md: inga
 BESLUT SOM BEHÖVS: 1–3 ovan.
 NÄSTA STEG: Hugo eller Casper svarar på 1–3. Sedan steg 100 (Öppet 44), steg 96 (Öppet 37 och 48), steg 101 (registret, designsteg) och steg 92 (Öppet 26). Steg 15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
+
+## Hugos beslut 2026-11-04 om granskning 32
+
+Skrivna av Hugo i chatten 2026-11-04, i uppdraget till byggsessionen för steg 100. Ordagrant:
+
+    "HUGOS BESLUT 2026-11-04 OM GRANSKNING 32:
+    1. P1 och P2 (Öppet 49): märkningen i kontrollen lämnas som den är. Krav på godkännandekortet (beslut 4 om granskning 30): kortet för ett original räknar själv fram kopplingen till den möjliga dubbletten ur K4:s ärenden, eftersom motiveringen inte visas och en fri text inte går att göra säker med en textjämförelse.
+    2. P4 (Öppet 49): testet och hjälpfunktionen rättas i steg 96.
+    3. Steg 99 är granskat och klart.
+    4. Öppet 47 b: SPEC 7 ska beskriva de nya kontrollerna (Öppet 36, 40, 43 och formerna). Görs i dokumentationen för steg 96."
+
+### Hugos svar i chatten om steg 100 (2026-11-04)
+
+Byggsessionen stannade, som uppdraget säger, eftersom tre test prövade mer än själva förslaget. Hugo valde i chatten, båda enligt byggsessionens förslag:
+
+- **Z-kopplingen i `test_4c_z_1001`:** "Behåll, pröva direkt". Testet blir ett stopp-test, och att Z-rapportens koppling får rapportdatum och kassafilens kontrollsumma ur läsningen av kassan prövas genom att anropa `_kontrollera_ursprung` direkt.
+- **En bankavgift utan underlagsperiod:** "Ja, båda perioderna krävs". Går det inte att pröva raden mot matchningen stoppas förslaget, som i Öppet 40. Testerna `test_period_som_inte_anvands_far_vara_none` och `test_p1_ett_forslag_utan_underlag_behover_ingen_momsfil` får underlagsperioden och prövar fortfarande att momsfilen (och i det första testet kassaperioden) får vara None. Flödena skickar alltid båda perioderna.
+
+### Byggsessionen för steg 100 (2026-11-04)
+
+- **Byggt** i 40b1ec1: `_kontrollera_forslag_utan_underlag` i `scripts/konteringsforslag.py`, som `skapa_konteringsforslag` anropar allra sist, efter K4. Ett förslag utan underlag ska ha flöde e:s form: inga Z-rapporter, exakt en bankrad med pengar ut, raden bland `kraver_inte_underlag` i matchningen, regeln från `regel_for_bankrad` med flödet bankavgift och samma regel i kopplingarna, beloppet inom regelns `hogst_belopp_ore`, och exakt två rader (regelns kostnadskonto i debet och bankkontot i kredit, båda med `lika`, bankraden som enda källa och samma belopp). Bara nya stopp, returvärdet oförändrat, inget företagsspecifikt, inget importerat från `konteringsfloden.py`, flödena inte ändrade. `FLODE_BANKAVGIFT` kommer från `las_regelbok`, som flödena använder.
+- **Formen i uppdraget stämde med koden** (läst i `_bankrad_utan_underlag`, och körd: det oberoende skyddet i `test_beslut_granskning_32.py` räknar 4 förslag utan underlag, alla med formen). Flöde a, b och e stoppas inte, och körningen ger 16 fakturor, 6 betalningar, 3 kvitton och 4 bankavgifter som förut.
+- **Byggsessionens tolkning av "samma körning av matcha_period som Öppet 40, inte en till".** Öppet 40 kör inte matchningen för ett förslag utan underlag, så det finns ingen körning att dela. Kontrollen gör samma anrop (samma perioder, regelbok och `_SENT_BEDOMNINGSDATUM`), och inget förslag kör den två gånger: Öppet 40 bara med underlag, den här bara utan. Körd: en spion räknar exakt ett anrop för en bankavgift och en betalning, och inget för en faktura. `_kontrollera_bankradens_par` är inte ändrad.
+- **Rött före: 34** (körd mot `git archive` av feba3ad): 25 av 39 i `test_beslut_granskning_32.py`, 8 omgjorda i `test_konteringsforslag.py` och 1 omgjord i `test_beslut_granskning_30.py`. Av de 34 är **25 röda för att förslaget gick igenom** ("DID NOT RAISE": 17 i fil 32 och alla 8 omgjorda), **2 för att matchningen inte kördes**, och **7 bara för att koden saknas** (4 anrop av kontrollen direkt och 3 kodtest), så de 7 bevisar inget beteende. De 14 gröna i fil 32 är skydd. **Sviten efter: 4 592 passed** (4 552, 39 nya och ett test i fil 30 delat i två).
+- **Två av proven i uppdraget var redan stoppade när de står ensamma.** En bankrad som matchningen har parat med ett underlag och en bankrad mot ägaren stoppas av ursprunget punkt 8, före den nya kontrollen, och de testen (`test_skydd_...`) är gröna också före. Röda före blir de när raden bakas in i en Z-rapports förslag, där regeln gäller Z-rapporter och punkt 8 inte prövar bankraden. Att matchningen har parat en rad som har en regel för bankrader utan underlag går bara att nå med ett påhittat svar från matchningen, eftersom sådana rader aldrig blir kandidater (läst i `matcha_period`).
+- **Omgjorda test, alla i `test_konteringsforslag.py` utom två:**
+  - Stopp-test, med kommentar om beslut 2 om granskning 30: `test_4c_z_1001` (Z-kopplingen prövas direkt, Hugos svar), `test_4d_kortinlosen_med_avgiften_som_skillnad`, `test_summa_av_flera_bankrader`, `test_tackningen_godtar_totalsumman_mot_betalsatten`.
+  - Delvis stopp-test: `test_period_som_inte_anvands_far_vara_none` (Hugos svar), `test_tackningen_godtar_samma_del_i_debet_och_kredit`, `test_z_rapport_med_ett_annat_kassaregisters_regel_stoppas`, `test_regeln_godtar_rollkontona_och_regelns_egna_konton`.
+  - `test_p1_ett_forslag_utan_underlag_behover_ingen_momsfil` i `test_beslut_granskning_22.py`: får underlagsperioden (Hugos svar). Inte ett stopp-test: bankavgiften godtas som förut.
+  - `test_skydd_en_faktura_och_en_bankavgift_behover_ingen_matchning` i `test_beslut_granskning_30.py`: delat i `test_skydd_en_faktura_behover_ingen_matchning` och `test_skydd_en_bankavgift_fran_flodet_godtas_igen_med_en_enda_matchning`. Testets kommentar sa själv att bankavgiften skulle ändras i steg 100.
+  - Formen prövas sist, så att ett stopp med Öppet 44 visar att K2, ursprunget och täckningen redan har godtagit förslaget. Det täckningstesten bevisade finns alltså kvar.
+- **Mutationsprov, 15 ändringar i en kopia, en i taget.** 13 gav rött direkt. **Två överlevde:** att ta bort `saknas` eller `andra` ur radjämförelsens villkor. Med exakt två rader säger de samma sak, så en av dem var överflödig i villkoret. Villkoret är förenklat till `saknas` och antalet rader, och `andra` står bara kvar i feltexten. Efter det gav de två nya ändringarna (ta bort `saknas`, ta bort antalet rader) rött. Alla kommandon står i PROGRESS.md, "Läge 2026-11-04, steg 100 byggt".
+- **Följder som är värda att känna till.** (1) Exemplen 4c och 4d i DESIGN-regelbok.md går inte att skapa förrän flöde c och d finns med sina former, och Z-delen i ursprungskontrollen nås bara av `test_4c_z_1001` direkt och av stoppen, tills dess. (2) Formen säger inget om verifikationens datum (Öppet 41): en avgift med ett annat datum än bankradens godtas så länge regeln gäller (dokumenterad i `test_kvar_verifikationens_datum_ingar_inte_i_formen`). (3) Samma bankrad i två förslag stoppas inte, det hör till steg 101. (4) Bedömning, inte uppmätt: fyra matchningar till per körning av flödena, för bankavgifterna. Det hör till tiden i Öppet 47 a.
+- **Inte byggt, enligt uppdraget:** steg 96 och 101. SPEC är inte ändrad, så SPEC 7 säger fortfarande att förslag utan underlag inte berörs (se Öppet 47 b, steg 96).
+- **Inte granskad oberoende än.** Kärnan har fått en strängare kontroll, så granskningen bör pröva om den stoppar något flödena bygger och om det finns ett förslag utan underlag som flödena inte bygger och som ändå godtas.
