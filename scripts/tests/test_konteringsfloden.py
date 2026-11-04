@@ -345,7 +345,7 @@ def test_lev_tillbehor_far_faktura_och_betalning_pa_4010(korning):
 # LEV-TELE (001), LEV-EL (002) och HYRESVARD (021).
 @pytest.mark.parametrize("id_", ["SYNT-U-2025-001", "SYNT-U-2025-002", "SYNT-U-2025-021"])
 def test_hyresvard_el_och_tele_ar_fortfarande_nya_motparter(korning, id_):
-    # Kontona för hyra, el och telefon finns inte i kontoplanen än (PROGRESS.md, Öppet). Vera gissar inget.
+    # Kontona för hyra, el och telefon finns inte i kontoplanen än (PROGRESS.md, Öppet). Kassio gissar inget.
     arende, = korning.arenden_for(id_)
     assert arende["typ"] == "ny motpart" and korning.forslag_for(id_) == []
 
@@ -382,7 +382,7 @@ def test_028_blir_k8_niva_d_och_far_inget_forslag(korning):
     assert arende["regel"] == "R-RESTAURANG-1"
     # 2025-03-16 är en söndag, då butiken har stängt (regelbokens oppettider).
     assert arende["flaggor"] == (STANGD_DAG,)
-    # Vera föreslår ingen fördelning mellan avdragsgill och icke avdragsgill del: inget belopp i ärendet.
+    # Kassio föreslår ingen fördelning mellan avdragsgill och icke avdragsgill del: inget belopp i ärendet.
     assert "föreslår inte hur stor del" in arende["text"]
     utan_namn = arende["text"].replace(arende["regel"], "").replace("K8", "")
     assert not any(tecken.isdigit() for tecken in utan_namn), utan_namn

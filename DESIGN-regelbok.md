@@ -6,7 +6,7 @@
 | Gäller | Steg 4 i arbetsflödet (SPEC avsnitt 4): kontera enligt företagets regelbok, och kontrollerna K2, K5, K8 och K9 |
 | Exempel | Bara Syntet Testbutik AB och testdatan för 2025-Q1. **Allt är SYNTETISKT** |
 
-Det här dokumentet föreslår hur Vera ska gå från "bankrad och underlag hör ihop" (det som matchningen
+Det här dokumentet föreslår hur Kassio ska gå från "bankrad och underlag hör ihop" (det som matchningen
 redan gör) till "så här ska det bokföras" (ett **konteringsförslag**). Det svarar på åtta frågor, en per
 avsnitt.
 
@@ -94,7 +94,7 @@ godkännaren ser vilken regel som användes (SPEC avsnitt 4, steg 4).
   överlappande datum) stoppar regelboken redan när den läses in, som i `matchning.json`. Om ett underlag
   ändå passar flera regler (till exempel för att motparten står två gånger i en bankrad) blir det ett
   ärende, "flera regler". Det är det planterade felet i september.
-- **Ingen regel passar** betyder ny eller okänd motpart. Då gissar Vera inte ett konto. Det blir ett ärende
+- **Ingen regel passar** betyder ny eller okänd motpart. Då gissar Kassio inte ett konto. Det blir ett ärende
   (avsnitt 5).
 - Varje konto i regelboken måste finnas i kontoplanen, och varje varugrupp i momsfilen. Annars stoppas
   regelboken.
@@ -560,7 +560,7 @@ En verifikation:
 - **SYNT-U-2025-019**, BUTIK-STAD med 12 %: regeln har bara varugruppen `ovrigt` (25 %). K5 ger ett
   ärende, nivå D (avsnitt 6).
 - **SYNT-U-2025-028**, RESTAURANG-1, 2 146,00 kr en söndag: regeln är avdragsbegränsad. K8 ger ett ärende,
-  nivå D. Vera föreslår ingen fördelning mellan avdragsgill och icke avdragsgill del.
+  nivå D. Kassio föreslår ingen fördelning mellan avdragsgill och icke avdragsgill del.
 - **`bank_2025-02.csv` radnummer 85**, kortköp 351,00 kr utan kvitto: inget förslag. Matchningen gör det
   till "saknat underlag" efter 7 dagar (K3).
 
@@ -679,7 +679,7 @@ Alla skäl skrivs in i `nivans_skal`, så att godkännaren ser varför en post h
 | **C** | Belopp över `b_hogst_ore` eller över regelns gräns. Första gången en regel används. Ovanligt belopp (K9). Rättelse (motverifikation). Invändning från granskaren. Möjlig dublett eller samma fakturanummer med olika belopp eller datum (K4a, K4b, K4c). Bankrad med flera möjliga underlag ("tvetydig"). Avgift utan underlag (kortinlösen) | Hyran 45 000 kr ligger över B-gränsen 40 000 kr i exemplet. Kortavgiften |
 | **D** | Ägare och närstående (K7). Avdragsbegränsat (K8). Fel momssats eller sats som saknas för datumet (K5). Saknad Z-rapport (6.2). Fel period (K6). Bokslutspost och periodisering. Text som försöker styra agenten (K17). Oklar post | SYNT-U-2025-019 (K5), SYNT-U-2025-028 (K8), Z 1011 som saknas, försäkringen |
 
-**Ny motpart** (ingen regel passar): Vera har inget konto att föreslå och får inte gissa. Därför blir det
+**Ny motpart** (ingen regel passar): Kassio har inget konto att föreslå och får inte gissa. Därför blir det
 inget förslag utan ett ärende på nivå C, där människan väljer konto. Svaret används för just den posten,
 och blir ett regelförslag som en människa kan lägga in i regelboken. Agenten lägger aldrig in det själv.
 
@@ -722,7 +722,7 @@ expertfråga.
 ### K8: avdragsbegränsat
 
 **Definition.** Ett förslag är avdragsbegränsat om regeln som används har `"avdragsbegransad": true`. Då
-blir det alltid ett ärende på nivå D, och Vera föreslår bara vilket underlag och vilken bankrad det gäller,
+blir det alltid ett ärende på nivå D, och Kassio föreslår bara vilket underlag och vilken bankrad det gäller,
 aldrig hur stor del som får dras av.
 
 Dessutom en **varningssignal**, som inte själv avgör: ett kvitto daterat en dag då företaget har stängt
@@ -803,7 +803,7 @@ FIKTIVT_FORETAG.md (Ö-T) står det.
 | D12 | **Restaurangkvitto och representation:** hur stor del av kostnaden och momsen får dras av, vilket underlag krävs (till exempel vilka som deltog och syftet), och hur bokförs ett köp av privat karaktär (som fordran på ägaren eller på annat sätt, K7)? |
 | D13 | **Bankavgifter:** har de moms, och räcker bankraden som underlag tills specifikationen finns (Ö11)? |
 | D14 | **Datum på verifikationen:** fakturadatum, kvittodatum, transaktionsdag eller bankens bokföringsdag, för varje flöde |
-| D15 | **Vad en verifikation måste innehålla** enligt bokföringslagen, och om Veras förslag plus underlaget och bankraden räcker, när den importeras som SIE-fil till kundens program |
+| D15 | **Vad en verifikation måste innehålla** enligt bokföringslagen, och om Kassios förslag plus underlaget och bankraden räcker, när den importeras som SIE-fil till kundens program |
 | D16 | **Kreditnotor** (Ö8, Ö-T21): hur bokförs de och kopplas till originalfakturan? Formatet för dem bestämmer Hugo, bokföringen kräver en expert |
 
 **Antaget för testföretaget (Hugos beslut 2026-10-29), D1, D2, D4, D13 och D14.** Valen är påhittade, gäller bara

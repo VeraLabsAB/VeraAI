@@ -1,6 +1,6 @@
 """Konteringsförslaget: en verifikation som ännu inte är bokförd, med kontrollerna K2 och ursprunget.
 
-Ett konteringsförslag är en verifikation som Vera föreslår, plus det som en människa behöver för att
+Ett konteringsförslag är en verifikation som Kassio föreslår, plus det som en människa behöver för att
 förstå och godkänna den (DESIGN-regelbok.md avsnitt 3). Förslaget är aldrig en bokföring. Det har
 inget fält för att vara bokfört eller godkänt, och inget här skriver till kundens bokföringsprogram
 eller till en SIE-fil. Det sker först efter godkännande (SPEC avsnitt 4, steg 9).
@@ -1186,7 +1186,7 @@ def kontrollera_underlag(underlag, regel, regelbok, momssatser):
                                   " avgör vilken moms som gäller."))
     if regel["villkor"].get("avdragsbegransad") is True:
         fynd.append(Underlagsfynd(
-            _K8, _AVDRAGSBEGRANSAT, "Regeln " + regel["id"] + " är avdragsbegränsad (K8). Inget förslag görs, och Vera"
+            _K8, _AVDRAGSBEGRANSAT, "Regeln " + regel["id"] + " är avdragsbegränsad (K8). Inget förslag görs, och Kassio"
             " föreslår inte hur stor del av kostnaden eller momsen som får dras av. En människa avgör det, med stöd"
             " av en redovisningskonsult."))
     return Underlagskontroll(None if fynd else konton, tuple(fynd))

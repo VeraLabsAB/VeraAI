@@ -1,11 +1,11 @@
-# OVERLAMNING – Vera-projektet, till Casper
+# OVERLAMNING – Kassio-projektet, till Casper
 
 | | |
 |---|---|
 | Datum | 2026-10-27 |
 | Till | Casper |
 | Från | Hugo |
-| Gäller | Vera-projektet: bokföringsagenten i den här mappen. Inte något riktigt företags bokföring |
+| Gäller | Kassio-projektet: bokföringsagenten i den här mappen. Inte något riktigt företags bokföring |
 | Mål | Att du ska kunna göra exakt samma saker i projektet som Hugo gör, med samma underlag och samma regler |
 
 Det här dokumentet är en karta. Det beskriver vad projektet är, var allt ligger, hur arbetet går till, var
@@ -17,16 +17,16 @@ dokumentet ska rättas.
 
 ---
 
-## 1. Vad Vera är
+## 1. Vad Kassio är
 
-Vera är en **bokföringsagent**: ett program som tar över det löpande bokföringsarbetet åt småföretag utan
-ekonomiavdelning. Hon läser **underlag** (kontoutdrag, kassarapporter, kvitton och fakturor), föreslår hur
+Kassio är en **bokföringsagent**: ett program som tar över det löpande bokföringsarbetet åt småföretag utan
+ekonomiavdelning. Den läser **underlag** (kontoutdrag, kassarapporter, kvitton och fakturor), föreslår hur
 varje händelse ska bokföras enligt företagets egen **regelbok**, kör fasta kontroller och tar fram en
 rapport. **Inget bokförs förrän en människa hos företaget har godkänt.** Det gäller i båda lägena som
 kunden kan välja mellan: granskat läge (kunden godkänner varje transaktion löpande) och automatiskt läge
 (kunden godkänner hela veckans arbete på söndagen).
 
-Version 1 är en referensprodukt som ska visa för investerare och första kunder vad Vera kan. Den gäller
+Version 1 är en referensprodukt som ska visa för investerare och första kunder vad Kassio kan. Den gäller
 aktiebolag och byggs och testas bara på påhittade företag. Se SPEC.md avsnitt 1 och 4.
 
 Själva bygget görs i **Claude Code**, med Claude som programmerare. Hugo (och nu du) beställer uppgifter,
@@ -42,11 +42,11 @@ gjorts.
 | **origin** | Namnet på kopian av repot som ligger på GitHub |
 | **Kärnan** | Koden i `scripts/`. Den är gemensam för alla företag och får aldrig innehålla något som gäller ett enskilt företag |
 | **Konfiguration** | Allt som gäller ett enskilt företag: regelbok, kontoplan, momssatser, bank- och kassaformat. Ligger i `foretag/<namn>/` |
-| **Kontering** | Att bestämma på vilka konton en händelse ska bokföras och med vilka belopp. Ett **konteringsförslag** är Veras förslag, aldrig en bokföring |
+| **Kontering** | Att bestämma på vilka konton en händelse ska bokföras och med vilka belopp. Ett **konteringsförslag** är Kassios förslag, aldrig en bokföring |
 | **Z-rapport** | Kassans dagsavslut: dagens försäljning per momssats, momsen och hur kunderna betalade. Varje Z-rapport har ett löpnummer, **Z-numret** |
 | **Kontroll (K1, K2 …)** | En fast kontroll som körs i Python-kod, aldrig av modellen. Listan står i SPEC.md avsnitt 6 |
 | **Spärr** | Ett skydd som gör att något inte kan hända, till exempel att bokföra utan godkännande |
-| **Ärende** | Något som inte går att avgöra med en regel och därför går till en människa. Vera improviserar aldrig |
+| **Ärende** | Något som inte går att avgöra med en regel och därför går till en människa. Kassio improviserar aldrig |
 | **Nivå A–D** | Hur noga ett förslag ska godkännas. D är alltid ett ärende. SPEC.md avsnitt 5 |
 | **Kontrollsumma (hash)** | Ett "fingeravtryck" av en fil. Ändras ett enda tecken i filen ändras summan |
 | **Test** | En liten kodbit som kontrollerar att koden gör rätt. Testsviten är alla tester tillsammans |
@@ -117,7 +117,7 @@ och `origin/main` på samma commit, `3f0e2da`.
 | `SPEC.md`, `DESIGN-regelbok.md`, `GRANSKNING.md`, `CLAUDE.md`, `OVERLAMNING.md` | Dokumentationen | Ja |
 | `requirements.txt` | Vilka Python-paket som behövs (bara pytest 8.4.2) | Ja |
 | `.gitignore` | Listan över filer som git aldrig ska ta med (avsnitt 11) | Ja |
-| `inkorg/`, `arkiv/`, `forslag/`, `godkant/`, `arenden/`, `rapporter/`, `logg/` | Arbetsmappar där Vera ska ta emot underlag och skriva förslag, ärenden, rapporter och logg. Tomma i dag | **Nej**, aldrig |
+| `inkorg/`, `arkiv/`, `forslag/`, `godkant/`, `arenden/`, `rapporter/`, `logg/` | Arbetsmappar där Kassio ska ta emot underlag och skriva förslag, ärenden, rapporter och logg. Tomma i dag | **Nej**, aldrig |
 | `sparr/` | Vakten för kommandolistan, de låsta inställningarna och `INSTALLERA.md` | Ja |
 
 Projektets egen Python med pytest ligger **inte** i projektet, utan i
@@ -331,7 +331,7 @@ Säkerhetsgrunderna står i SPEC.md avsnitt 7. De viktigaste:
   regelförslag som en människa själv lägger in.
 - **Dolda tecken, riktningstecken och förväxlingstecken** stoppar filen. Det hindrar att en text ser ut som
   något annat än den är, till exempel att ett namn ser ut som ägarens men jämförs som ett annat.
-- **Bara läsrätt** till bank, mejl och bokföringsprogram när Vera hämtar underlag.
+- **Bara läsrätt** till bank, mejl och bokföringsprogram när Kassio hämtar underlag.
 - **Loggen ska inte kunna skrivas om**, och rättelser görs bara med en motverifikation, aldrig genom att
   ändra eller radera.
 - **Spärrtester** ska köras vid varje ändring: bokföra utan godkännande, ändra efter godkännande, för stort
@@ -383,7 +383,7 @@ Två sorters frågor:
 - **Riktiga underlag:** kontoutdrag, kvitton, fakturor, Z-rapporter, inskannade dokument och bilder, och
   exporterad bokföring (SIE-filer).
 - **Arbetsmapparna** `inkorg/`, `arkiv/`, `forslag/`, `godkant/`, `arenden/`, `rapporter/` och `logg/`. Där
-  kan riktiga kunduppgifter hamna när Vera används på riktigt.
+  kan riktiga kunduppgifter hamna när Kassio används på riktigt.
 - **Datorns egna filer:** Python-cache, Claude Codes lokala inställningar och macOS-filer.
 
 `.gitignore` stoppar det mesta av detta automatiskt, med mönster för hemligheter, underlag och

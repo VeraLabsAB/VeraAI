@@ -43,7 +43,7 @@ bankraden som underlag tills bankens specifikation finns (Ö11). Gränserna stå
 aldrig här: matchningsformatets hogst_belopp_ore och regelns eget hogst_belopp_ore i villkoren.
 
   regeln saknar flöde (beslut c): pengar ut på en regel utan 'flode'. Inget annat flöde tar pengar ut
-     från banken utan underlag, så Vera gissar inte: ett ärende med nivå D och "kräver mänsklig
+     från banken utan underlag, så Kassio gissar inte: ett ärende med nivå D och "kräver mänsklig
      bedömning" (som allt annat från banken, D13), inget förslag. Pengar in på en regel utan 'flode'
      (kortinlösen, Swish och kontanter) hör till flöde d (uppgift 5) och får varken förslag eller
      ärende här.
@@ -78,7 +78,7 @@ Kontrollerna för varje underlag, innan något förslag görs:
        K4 (dublett): dubletten är redan borttagen ur perioden, och originalet får sitt förslag som förut.
      Svaret på ett ärende går sedan genom samma kontroller som ett nytt förslag (SPEC 4).
   Regeln: regelboken ger regeln för underlagets typ och motpart på underlagets datum. Ingen regel
-     betyder en ny motpart: ett ärende, "ny motpart", och Vera gissar inget konto.
+     betyder en ny motpart: ett ärende, "ny motpart", och Kassio gissar inget konto.
   K7, K5 och K8 körs av konteringsforslag.kontrollera_underlag, samma kod som skapa_konteringsforslag
      kör på varje förslag med underlag (Hugos beslut 2026-10-30, granskning 22, P1). Flödena anropar
      den före förslaget för att göra ärenden i stället för förslag. Vad kontrollerna prövar står i
@@ -309,7 +309,7 @@ def _underlagets_arenden(underlag, regel, korning, bankrader):
     id_, regelbok = underlag["id"], korning.regelbok
     if regel is None:
         return None, [_arende(_REGELBOKEN, _NY_MOTPART, "Ingen regel i regelboken passar underlaget (" + underlag["typ"]
-                              + ") på " + underlag["datum"] + ". Vera gissar inget konto. En människa väljer konto,"
+                              + ") på " + underlag["datum"] + ". Kassio gissar inget konto. En människa väljer konto,"
                               " och svaret kan bli ett förslag till en ny regel.", id_, bankrader,
                               kraver=regelbok.ar_agare_eller_narstaende(underlag["motpart"]))]
     kontroll = kontrollera_underlag(underlag, regel, regelbok, korning.momssatser)
@@ -467,7 +467,7 @@ def _bankrad_utan_underlag(rad, namn, korning):
         return [], [_arende(
             _REGELBOKEN, _SAKNAR_FLODE, "Bankraden med radnummer " + str(rad["radnr"]) + " passar regeln " + repr(namn)
             + " för bankrader utan underlag, och regeln " + regel["id"] + " i regelboken gäller pengar ut men säger"
-            " inte vilket flöde den hör till (nyckeln 'flode'). Vera gissar inte. Inget förslag görs. En människa"
+            " inte vilket flöde den hör till (nyckeln 'flode'). Kassio gissar inte. Inget förslag görs. En människa"
             " avgör vad raden är, och regelboken behöver nyckeln.", bankrader=[rad["id"]], regel=regel["id"],
             niva=_NIVA_D, kraver=True)]
     if rad[_BELOPPSFALT] > 0:

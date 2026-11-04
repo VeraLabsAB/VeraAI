@@ -115,7 +115,7 @@ Formaten är Hugos beslut D17 (DESIGN-regelbok.md avsnitt 2 och 8). Båda filern
 - ett **dolt tecken** var som helst i filen, även i nycklar och anteckningar: styrtecken (till exempel tabb och radbrytning), osynliga tecken (till exempel U+200B, osynligt mellanslag), riktningstecken, ovanliga blanksteg (till exempel hårt mellanslag) och tecken som ser tomma ut. Det gäller också tecken som skrivits som kod i JSON, till exempel `"​"`. Vanligt mellanslag är tillåtet,
 - en fil som inte är UTF-8, inte är giltig JSON eller har en nyckel två gånger.
 
-Ett **uppslag** (till exempel "vilken sats har livsmedel den 10 februari?") görs alltid för ett datum. Finns inget svar för datumet stoppas uppslaget med ett fel. Vera gissar aldrig ett konto eller en sats.
+Ett **uppslag** (till exempel "vilken sats har livsmedel den 10 februari?") görs alltid för ett datum. Finns inget svar för datumet stoppas uppslaget med ett fel. Kassio gissar aldrig ett konto eller en sats.
 
 ## kontoplan.json
 
@@ -238,7 +238,7 @@ Regelboken ligger där agenten kan skriva. Tills spärrsteget flyttar den till e
 
 ## Konteringsförslaget och konfigurationen
 
-Ett **konteringsförslag** är en verifikation som Vera föreslår men som ännu inte är bokförd (DESIGN-regelbok.md avsnitt 3). Det är ingen fil här, utan skapas av kärnan med `skapa_konteringsforslag` i `scripts/konteringsforslag.py`. Funktionen läser ingen fil själv. Den tar emot regelboken (`las_regelbok`), kontoplanen (`las_kontoplan`), momsfilen (`las_momssatser`) och perioderna med underlag, bankrader och Z-rapporter, och kör alltid K2 och ursprungskontrollen, och för ett förslag som bygger på underlag också K5, K7 och K8 (Hugos beslut 2026-10-30 om granskning 22, P1): ett underlag med fel moms, från en ägare eller med en avdragsbegränsad regel kan inte bli ett förslag, oavsett vilken kod som bygger det. Allt som inte går ihop stoppar förslaget med ett tydligt fel, och inget förslag skapas.
+Ett **konteringsförslag** är en verifikation som Kassio föreslår men som ännu inte är bokförd (DESIGN-regelbok.md avsnitt 3). Det är ingen fil här, utan skapas av kärnan med `skapa_konteringsforslag` i `scripts/konteringsforslag.py`. Funktionen läser ingen fil själv. Den tar emot regelboken (`las_regelbok`), kontoplanen (`las_kontoplan`), momsfilen (`las_momssatser`) och perioderna med underlag, bankrader och Z-rapporter, och kör alltid K2 och ursprungskontrollen, och för ett förslag som bygger på underlag också K5, K7 och K8 (Hugos beslut 2026-10-30 om granskning 22, P1): ett underlag med fel moms, från en ägare eller med en avdragsbegränsad regel kan inte bli ett förslag, oavsett vilken kod som bygger det. Allt som inte går ihop stoppar förslaget med ett tydligt fel, och inget förslag skapas.
 
 - **K2 (debet = kredit):** minst två rader, varje belopp ett heltal i öre (aldrig decimaltal, `True` eller `False`, och aldrig negativt), exakt ett av debet och kredit på varje rad, summan av debet lika med summan av kredit, och varje konto finns i kontoplanen och gäller på verifikationens datum.
 - **Ursprunget:** varje rad säger var beloppet kommer ifrån (ett värde i ett underlag, en bankrad eller en post i en Z-rapport) och hur det räknas (`lika`, `summa` eller `skillnad`). Kärnan räknar själv om beloppet ur källorna, och det ska bli exakt radens belopp. Så kan ingen enskild siffra komma från modellen. Ingen avrundning görs: det är bara addition och subtraktion av heltal.

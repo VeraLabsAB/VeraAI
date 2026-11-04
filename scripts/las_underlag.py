@@ -1,6 +1,6 @@
 """Läser underlag (kvitton och leverantörsfakturor) och kontrollerar dem, med K4 (dubbletter).
 
-Ett underlag är ett kvitto eller en leverantörsfaktura i Veras interna form: en JSON-fil per
+Ett underlag är ett kvitto eller en leverantörsfaktura i Kassios interna form: en JSON-fil per
 dokument, med uppgifterna som har lästs ur kvittot eller fakturan. Formen är densamma för alla
 företag och beskrivs därför här, inte i foretag/<namn>/. Filen ska ha exakt de här nycklarna,
 inga fler och inga färre (NYCKLAR):

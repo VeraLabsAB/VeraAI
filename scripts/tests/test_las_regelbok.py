@@ -211,7 +211,7 @@ def test_testforetagets_fil_laddas():
     assert regelbok.regel_for_underlag("kvitto", "RESTAURANG-1", datum)["villkor"]["avdragsbegransad"] is True
     assert regelbok.regel_for_z_rapport("TB-KASSA-1", datum)["id"] == "R-Z-TB-KASSA-1"
     assert regelbok.regel_for_bankrad("bankens-avgifter", datum)["villkor"]["hogst_belopp_ore"] == 25000
-    # Ny motpart: ingen regel. Det blir ett ärende senare, Vera gissar inget konto.
+    # Ny motpart: ingen regel. Det blir ett ärende senare, Kassio gissar inget konto.
     assert regelbok.regel_for_underlag("leverantorsfaktura", "HYRESVARD", datum) is None
     # Före regelns första dag finns ingen regel.
     assert regelbok.regel_for_underlag("leverantorsfaktura", "LEV-TE", "2024-12-31") is None
