@@ -9642,3 +9642,74 @@ BESLUT SOM BEHÖVS: 1–5 ovan.
 NÄSTA STEG: Hugo eller Casper svarar på 1–5. Sedan (b) som eget steg före uppgift 5, steg 96 (Öppet 37) och steg 92 (Öppet
 26). SPEC 7 rättas i dokumentationen för steg 96. Steg 15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers
 dator) i helgen vecka 44.
+
+## Hugos beslut 2026-11-04 om granskning 29
+
+Skrivna av Hugo i chatten 2026-11-04, i uppdraget till byggsessionen för steg 97. Ordagrant:
+
+    "HUGOS BESLUT 2026-11-04 OM GRANSKNING 29:
+    1. Villkoret från beslutet om granskning 28 är uppfyllt (P1 är ett nytt hål i familjen). Vi går över till (b) rakt
+       av: ett förslag med underlag måste ha exakt en av flödenas tre former, fakturan, betalningen eller kvittot. Allt
+       annat stoppas, också b2 och två betalningar i samma förslag. Det som flödena inte bygger stoppas och läggs till
+       uttryckligen om det behövs, som vaktens kommandolista.
+    2. P2 (Öppet 40): bankraden ska kontrolleras mot underlaget med samma matchning som flödena använder. Eget steg 98,
+       efter steg 97.
+    3. P3: "en bankrad" gäller ordagrant. Delbetalningar läggs till som en egen form senare, om ett riktigt företag
+       behöver det.
+    4. P5 (Öppet 41): datumet ska prövas mot det datum flödena skulle ha valt. Senare, låg prioritet.
+    5. Steg 95 är granskat och klart.
+    6. Beslutet om att godta b2 (granskning 28) ersätts av beslut 1. Öppet 38 (redovisningskonsulten) står kvar: säger
+       konsulten ja kan formen "faktura + annan fakturas betalning" läggas till uttryckligen.
+    7. Ny punkt under Öppet: samlingsbetalningar (en bankrad som betalar flera fakturor) stoppas nu, men är vanliga hos
+       riktiga företag. De ska byggas som en egen form före piloten med Shop and Go."
+
+Uppdraget gav också formerna ("så som flödena bygger dem i dag; stämmer något inte med koden, STANNA och fråga"):
+
+    "- Fakturan (underlag av typen leverantorsfaktura): exakt ett underlag, inga bankrader. Rader: för varje momsrad i
+       underlaget kostnaden (underlag_ore) och momsen (moms_ore, bara om den inte är 0), båda i debet, och en rad på
+       leverantörsskulderna i kredit med belopp_ore. Inga andra rader.
+     - Betalningen (leverantorsfaktura): exakt ett underlag och exakt en bankrad. Exakt två rader: leverantörsskulderna
+       i debet med belopp_ore, och bankkontot i kredit med bankraden som enda källa.
+     - Kvittot (underlag av typen kvitto): exakt ett underlag och exakt en bankrad. Rader: kostnaden och momsen i debet
+       som i fakturan, och bankkontot i kredit med bankraden som enda källa. Inga andra rader.
+     Förslag utan underlag (till exempel bankavgiften i flöde e) berörs inte."
+
+**Byggsessionen stannade och frågade, och Hugo svarade i chatten 2026-11-04:**
+
+1. *Formerna mot koden.* Enda avvikelsen: uppdraget säger "momsen bara om den inte är 0", men `_kostnad_och_moms`
+   hoppar över varje rad med beloppet 0, också kostnaden. En momsrad med `underlag_ore` 0 går att läsa in, och K2
+   förbjuder rader med beloppet 0. Ordagrant skulle flödets eget förslag stoppas och hela körningen stanna. **Hugos
+   svar: "Följ koden".** Formen kräver en rad bara när beloppet inte är 0, för både kostnaden och momsen.
+2. *Uppdraget slutade vid punkt 3 under GÖR*, utan något om sviten, dokumenten eller commit. **Hugos svar: "Dokumentera
+   och committa".** Sviten, ett mutationsprov, besluten här, PROGRESS.md, BYGGPLAN.md och ett stycke i SPEC 7, och commit
+   men ingen push.
+
+### Byggsessionen för steg 97 (2026-11-04)
+
+- **Byggt** i 4b3f379: `_kontrollera_flodets_form` i `scripts/konteringsforslag.py`, som anropas allra sist i
+  `_kontrollera_underlagen`, efter alla underlag och efter Öppet 36. Formen räknas fram ur underlaget (`_formens_rader`),
+  och raderna jämförs exakt: konto, belopp, sida, sättet att räkna och källorna. Bara stopp tillagda, returvärdet
+  oförändrat, inget företagsspecifikt. Öppet 31–36 står kvar och prövas först, så att deras fel inte ändras. Felet
+  namnger formen, raderna som saknas och raderna som inte hör till formen.
+- **Tre val som uppdraget inte sa:** (1) raderna får stå i vilken ordning som helst, eftersom ordningen inte ändrar
+  konteringen; (2) en ny typ av underlag stoppas tills dess form är tillagd, så att kreditnotan i Ö8 inte tas för en
+  faktura; (3) kontrollen körs efter alla underlag, inte per underlag, så att Öppet 36:s fel för två belopp på en
+  bankkontorad står kvar.
+- **Ett skyddstest utöver uppdraget är omgjort:** `test_skydd_momsen_summerad_over_tva_satser_godtas` i
+  `test_beslut_granskning_26.py` är nu ett stopp-test, eftersom flödena bygger en momsrad per sats och beslut 1 säger att
+  allt annat stoppas. Provet i en kopia visade att bara det, b2 och två betalningar i samma förslag gick emot beslutet.
+- **Ett kvitto utan bankrad och fakturans form på ett kvitto är samma förslag**, eftersom ett kvitto utan bankrad bara går
+  ihop med leverantörsskulderna i kredit. De prövas i ett test, och betalningens form på ett kvitto i ett annat.
+- **"En faktura med en bankrad":** en bankrad som bara står i kopplingarna stoppas redan av punkt 4 (grönt skydd). Det
+  som gick igenom förut är fakturans rader plus bankraden som källa på leverantörsskulderna och bankkontot, som nu stoppas.
+- **Rött före:** 22 test mot `git archive` av c9a6cee: 19 av 25 i `test_beslut_granskning_29.py`, de 2 omgjorda i
+  `test_beslut_granskning_28.py` och det omgjorda i `test_beslut_granskning_26.py`. De 6 gröna i den nya filen är skydd,
+  eller r5, som dokumenterar att hålet är kvar. **Sviten efter: 4 468 passed.** Alla kommandon står i PROGRESS.md,
+  "Läge 2026-11-04, steg 97 byggt".
+- **Mutationsprov:** nio ändringar i en kopia. Åtta gav rött direkt. En överlevde: kravet att ingen rad får saknas, som
+  via `skapa_konteringsforslag` inte kan nås, eftersom K2 redan stoppar en form som saknar en rad. Ett direkt test lades
+  till, och då gav också den rött.
+- **Kvar, inte en del av steget:** P2 (Öppet 40, steg 98), P5 (Öppet 41), P6 (SPEC 7 nämner inte Öppet 36, dokumentationen
+  för steg 96), Öppet 37 (steg 96, hoppas över till efter steg 97 på Hugos uppdrag) och samlingsbetalningar (Öppet 42).
+- **Inte granskad oberoende än.** Kärnan har fått en strängare kontroll, så granskningen bör pröva om kontrollen stoppar
+  något flödena bygger, och om något annat än de tre formerna går igenom.
