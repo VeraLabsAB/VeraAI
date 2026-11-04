@@ -123,7 +123,7 @@ from types import MappingProxyType
 from typing import NamedTuple
 
 from belopp import formatera_ore as _kronor
-from konteringsforslag import kontrollera_underlag, skapa_konteringsforslag
+from konteringsforslag import MARKNING_K4C, kontrollera_underlag, skapa_konteringsforslag
 from las_kontoplan import Kontoplan
 from las_momssatser import Momssatser
 from las_regelbok import FLODE_BANKAVGIFT, VECKODAGAR, Regelbok, RegelbokFel
@@ -133,9 +133,6 @@ ARENDE_NYCKLAR = ("kontroll", "typ", "text", "niva", "kraver_mansklig_bedomning"
                   "flaggor")
 # Flaggan i ett ärende från K8 när underlaget är daterat en dag då företaget har stängt (DESIGN avsnitt 6).
 STANGD_DAG = "köpt en dag då företaget har stängt"
-# Början på märkningen i motiveringen för originalets förslag när K4c har flaggat ett annat underlag som möjlig
-# dublett av det (Hugos beslut 2026-10-30 om granskning 23, Öppet 29).
-MARKNING_K4C = "Märkning K4c"
 # K4-kontrollerna i underlagsperioden (las_underlag.py) som stoppar båda underlagen i paret (Öppet 29). Skiljer
 # både beloppet och datumet är kontrollen "K4a och K4b".
 _K4A = "K4a"

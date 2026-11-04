@@ -252,6 +252,22 @@ K5, K7 och K8, efter ursprunget, för varje underlag som förslaget bygger på (
   inte att göra stoppas förslaget. Flödena använder samma funktion på samma perioder och berörs inte. Kontrollen vet
   bara om de perioder den får, inte vad hela perioden är. Förslag utan underlag berörs inte (Öppet 44, steg 100).
 
+  Underlag som K4 har flaggat (Öppet 43, steg 99, granskning 30, P1, Hugos beslut 2026-11-04 om granskning 30, beslut 1).
+  Prövas allra sist, efter Öppet 40, för ett förslag med underlag, med samma regler som flödena (Hugos beslut 2026-10-30 om
+  granskning 22, punkt 3, "inget förslag alls", och om granskning 23, Öppet 29). Kontrollen läser K4:s ärenden ur
+  underlagsperioden och har ingen egen K4-logik:
+
+    K4a, K4b och "K4a och K4b"  ett förslag med något av de två underlagen i paret stoppas.
+    K4c                         ett förslag med det flaggade underlaget stoppas. Ett förslag med originalet godtas bara om
+                                motiveringen har K4c-märkningen (MARKNING_K4C) för alla underlag som K4c har flaggat mot det,
+                                i samma ordning som ärendena.
+    K4 (dublett)                dubletten finns inte i perioden, så ursprunget stoppar förslaget först. Originalet godtas.
+
+  Annars godtogs fakturan för hand, i exakt flödets form, för båda underlagen i ett flaggat par (granskarens g11). Märkningen
+  prövas till och med orden "är flaggat", inte resten av meningen, och inte vad som står runt omkring den. Flödena bygger
+  inget flaggat underlag och skriver märkningen själva, så de berörs inte. K4 körs på underlagen i perioden, så kontrollen vet
+  inget om underlag utanför den (Öppet 46). Ett förslag utan underlag berörs inte.
+
 Kopplingarna i förslaget får kontrollsummorna för regelboken, kontoplanen, momsfilen och
 matchningsformatet, och kontrollsumman för varje fil förslaget bygger på (underlaget, bankfilen och
 Z-filen). Summorna kommer från inläsningen, aldrig från indata: de som står i indata jämförs bara (K2).
@@ -355,9 +371,23 @@ _OPPET_40 = ("Bankraden i en betalning eller ett kvitto ska vara den som matchni
              " använder, har parat ihop med underlaget (Öppet 40, steg 98, Hugos beslut 2026-11-04 om granskning 29,"
              " beslut 2, och om granskning 30, beslut 3).")
 
+# Början på märkningen i motiveringen för originalets förslag när K4c har flaggat ett annat underlag som möjlig
+# dublett av det (Hugos beslut 2026-10-30 om granskning 23, Öppet 29). Står här, inte i konteringsfloden.py, eftersom
+# flödena importerar den här modulen: flödena skriver märkningen och kontrollen läser den, med samma konstant.
+MARKNING_K4C = "Märkning K4c"
+# K4-kontrollerna i underlagsperioden (las_underlag.py) som stoppar båda underlagen i paret (Öppet 29). Skiljer
+# både beloppet och datumet är kontrollen "K4a och K4b". Samma som i flödena, och ett test håller dem lika.
+_K4A = "K4a"
+_K4B = "K4b"
+_K4C = "K4c"
+_STOPPAR_BADA = (_K4A, _K4B, _K4A + " och " + _K4B)
+_OPPET_43 = ("Ett underlag som K4 har flaggat får inget förslag (Öppet 43, steg 99, Hugos beslut 2026-11-04 om granskning"
+             " 30, beslut 1, och Hugos beslut 2026-10-30 om granskning 22, punkt 3, och om granskning 23, Öppet 29). Det ska"
+             " vara ett ärende, som flödena gör.")
+
 
 class KonteringsforslagFel(Exception):
-    """Förslaget skapades inte. kontroll är "indata", "K2" eller "ursprung", efter vad som slog larm."""
+    """Förslaget skapades inte. kontroll är "indata", "K2", "ursprung", K5, K7, K8 eller en K4-kontroll, efter vad som slog larm."""
 
     def __init__(self, meddelande, kontroll):
         super().__init__(meddelande)
@@ -1522,6 +1552,40 @@ def _kontrollera_bankradens_par(kopplingar, regelbok, underlagsperiod, bankperio
                + _OPPET_40)
 
 
+def _k4c_markningens_borjan(flaggade):
+    """Märkningens början, som flödena skriver den (_markning_k4c i konteringsfloden.py). Ett test håller dem lika."""
+    return (MARKNING_K4C + ": " + ("underlaget " if len(flaggade) == 1 else "underlagen ")
+            + ", ".join(map(repr, flaggade)) + " är flaggat")
+
+
+def _kontrollera_k4(kopplingar, motivering, underlagsperiod):
+    """Öppet 43: inget förslag för ett underlag som K4 har flaggat. Se "Underlag som K4 har flaggat" överst i filen.
+
+    kopplingar är de kontrollerade kopplingarna och motivering förslagets motivering. Samma regler som flödena i
+    kontera_period: det flaggade underlaget stoppas alltid, originalet vid K4a och K4b, och vid K4c ska originalets
+    motivering ha märkningen. Originalet till en dublett (K4) godtas.
+    """
+    for post in kopplingar["underlag"]:
+        id_ = post["id"]
+        k4c_flaggade = []
+        for k4 in underlagsperiod.arenden:
+            kontroll, flaggat, original = k4["kontroll"], k4["id"], k4["jamfort_med"]
+            if flaggat == id_:
+                raise _fel(kontroll, "underlaget " + repr(id_) + " är flaggat av K4-kontrollen " + repr(kontroll)
+                           + " i underlagsperioden mot underlaget " + repr(original) + ": " + k4["text"] + ". " + _OPPET_43)
+            if original == id_ and kontroll in _STOPPAR_BADA:
+                raise _fel(kontroll, "underlaget " + repr(id_) + " är originalet i ett par som K4-kontrollen " + repr(kontroll)
+                           + " har flaggat i underlagsperioden, med det flaggade underlaget " + repr(flaggat) + ": "
+                           + k4["text"] + ". Båda stoppas, eftersom båda inte kan vara rätt. " + _OPPET_43)
+            if original == id_ and kontroll == _K4C:
+                k4c_flaggade.append(flaggat)
+        if k4c_flaggade and _k4c_markningens_borjan(k4c_flaggade) not in motivering:
+            raise _fel(_K4C, "underlaget " + repr(id_) + " är originalet till " + ", ".join(map(repr, k4c_flaggade))
+                       + ", som K4-kontrollen 'K4c' har flaggat som möjlig dublett. Förslaget för originalet godtas bara med"
+                       " K4c-märkningen i motiveringen, som flödena skriver den, så att den som godkänner ser kopplingen."
+                       " Motiveringen ska ha: " + repr(_k4c_markningens_borjan(k4c_flaggade)) + ". " + _OPPET_43)
+
+
 # --- Förslaget ---
 
 def _frys(varde):
@@ -1624,8 +1688,8 @@ def skapa_konteringsforslag(forslag, regelbok, kontoplan, momssatser=None, under
     las_underlagsperiod, bankperiod från las_bankfil eller sla_ihop_bankperioder och kassaperiod från
     las_kassaperiod. En period som förslaget inte använder får vara None, och momsfilen får vara None
     bara när förslaget inte bygger på något underlag (K5, K7 och K8 gäller underlag). Ett förslag med både
-    underlag och bankrad ska dessutom vara ett par i matcha_period (Öppet 40). Allt som inte går ihop
-    stoppar förslaget med ett KonteringsforslagFel.
+    underlag och bankrad ska dessutom vara ett par i matcha_period (Öppet 40), och ett underlag som K4 har
+    flaggat stoppas (Öppet 43). Allt som inte går ihop stoppar förslaget med ett KonteringsforslagFel.
     """
     _kontrollera_indatans_typer(regelbok, kontoplan, momssatser, underlagsperiod, bankperiod, kassaperiod)
     nytt = _kontrollera_formen(forslag)
@@ -1637,6 +1701,7 @@ def skapa_konteringsforslag(forslag, regelbok, kontoplan, momssatser=None, under
     kontroller.update(_kontrollera_underlagen(kopplingar, nytt["verifikation"], regelbok, kontoplan, momssatser,
                                               kallorna))
     _kontrollera_bankradens_par(kopplingar, regelbok, underlagsperiod, bankperiod)
+    _kontrollera_k4(kopplingar, nytt["motivering"], underlagsperiod)
     return Konteringsforslag(_FORSLAGSNYCKEL, {
         "forslag_id": nytt["forslag_id"],
         "verifikation": nytt["verifikation"],
