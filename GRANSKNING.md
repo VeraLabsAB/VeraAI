@@ -9438,3 +9438,207 @@ per belopp. b2 godtas och räknas inte som ett hål. (2) Öppet 37 är steg 96 i
   ett skydd, grönt. Sviten efter: **4 443 passed**. Kommandona står i PROGRESS.md, "Läge 2026-11-04, Öppet 36 byggd".
 - **Flöde a, b och e** går igenom (skydd i den nya testfilen och i steg 94:s).
 - **Inte granskad oberoende än.** Förslag: en kort granskning i en ny session, som för steg 94.
+
+## Granskning 29 (av 0708667 och 2418288) (2026-11-04)
+
+Kort oberoende granskning av steg 95 (Öppet 36) i en ny session som inte har sett byggsessionen, mot 3f36f6b.
+Granskaren ändrade ingen kod och ingen rad i CLAUDE.md, och skrev bara i den här filen, PROGRESS.md och BYGGPLAN.md.
+Lästes: CLAUDE.md, SPEC.md 7 och 7.1, här "Granskning 28" och "Hugos beslut 2026-11-04 om granskning 28", BYGGPLAN.md
+("Läge nu", steg 95 och 96), `git show` av båda commitarna, `scripts/konteringsforslag.py` rad 640–1464 (bland annat
+`_kontrollera_bankkonto`, `_kontrollera_regeln`, `_kontrollera_ursprung`, `_kontrollera_beloppssidan` och
+`_kontrollera_underlagen`), `scripts/konteringsfloden.py` (de relevanta raderna), `test_beslut_granskning_28.py`
+(hela) och ändringarna i `test_beslut_granskning_27.py`.
+
+### Beslut som redan var tagna (prövades inte om)
+
+Öppet 36 enligt (a), att b2 godtas (Öppet 38) och att vi går över till (b) om ett nytt hål hittas i familjen Öppet
+31–36. Med **familjen** menas här: ett förslag byggt för hand, förbi flödena, som har underlag, har en form flödena
+aldrig bygger, och godtas med alla kontroller gröna. Varje fynd nedan säger om det hör till familjen.
+
+### Viktigt först
+
+- **Inget kan bokföras eller godkännas av koden, och ingen spärr har blivit svagare.** 0708667 lägger bara till stopp.
+  Allt nedan gäller förslag, som alltid kräver godkännande av en människa, och bara kod förbi flödena kan bygga dem.
+- **Öppet 36 är byggd som beslutet säger, med en avvikelse i ordalydelsen (P3).** b1 och b3 stoppas, rött före är 4 av
+  9, sviten är 4 443, och parningen ger samma svar i alla radordningar.
+- **Ett nytt hål i familjen: P1 (medel).** En bankrad får fortfarande stå som källa på kostnadskontot. Det ger tillbaka
+  två gamla fel, nu med alla kontroller gröna: fakturan med hela beloppet och utan moms (LUCKA-provet från granskning
+  26) och fakturan baklänges (h1). **Hugos villkor för att gå över till (b) är alltså uppfyllt.** Hålet fanns före
+  0708667. b3 stoppas bara för att raden med beloppet i debet saknade en egen bankkontorad, inte för att bankraden
+  stod på fel konto.
+- **Innan (b) byggs behövs ett besked:** (b) rakt av stoppar också b2, som Hugo har beslutat ska godtas, och (b)
+  stoppar inte P2 (en annan leverantörs bankrad med samma belopp). Se "Beslut som behövs".
+
+### Fynd
+
+**P1 – En bankrad som källa på kostnadskontot godtas i ett förslag med underlag (medel, hör till familjen).** Fem prov
+går igenom med alla fem kontrollerna "ok". Alla är körda mot en kopia av 2418288 och är gröna också mot 3f36f6b, så
+hålet fanns före steget. Nettot är öre per konto i utskriften, här i kronor.
+
+- *r16, två rader, ett underlag, en bankrad:* 4010 debet 16 730,56 kr med bankrad 26 som källa, 2440 kredit samma
+  belopp med 003:s `belopp_ore` som källa. Netto: hela beloppet med moms på 4010 och ingen rad på 2641, alltså 1 792,56
+  kr ingående moms som försvinner in i kostnaden. Det är granskning 26:s LUCKA-prov, med en bankrad som källa i stället
+  för `belopp_ore`. Ingen rad har `underlag_ore` eller `moms_ore` som källa, så Öppet 32 och 33 ser inget.
+- *r6, h1 tillbaka:* 003 baklänges (2440 debet `belopp_ore`, 4010 kredit `underlag_ore`, 2641 kredit `moms_ore`), plus
+  4010 debet och 1940 kredit, båda med bankrad 26 som källa. Täckningen tillåter en källa en gång i debet och en gång i
+  kredit, och raden med beloppet i debet har nu sin egen bankkontorad. Netto: 2440 +16 730,56, 1940 −16 730,56, 4010
+  +1 792,56 och 2641 −1 792,56, alltså betalningen plus momsen flyttad till kostnaden.
+- *r7:* 003:s riktiga betalning plus 4010 debet och 1940 kredit med bankrad 8 i februari (LEV-TELE, 748,75 kr). Teleräkningen
+  bokförs som inköp av te under regeln R-LEV-TE.
+- *r8:* 003:s riktiga faktura plus samma två rader med bankrad 8.
+- *r9:* 003:s riktiga betalning plus 1940 debet och 4010 kredit med bankrad 1 i januari (Swish in, 323,00 kr). Pengar
+  in bokförs som minskad kostnad.
+
+*Orsaken (läst i koden):* punkt 6 (`_kontrollera_bankkonto`) säger bara vad bankkontot får ha som källa, inte var en
+bankrad får stå, och `_kontrollera_regeln` prövar bara källorna av den sort regeln gäller, så i ett förslag under en
+regel för underlag prövas ingen bankrad mot någon regel. *Flödena berörs inte:* inget förslag med underlag i körningen
+har en bankrad som källa utanför bankkontot (prov f1). *Allvar:* medel, som M1 i granskning 28: kräver kod förbi
+flödena och en människa som godkänner, men ger fel bokföring med alla kontroller gröna, och bör stängas före uppgift 5.
+*Inte provat, bara bedömning:* en bankrad mot en ägare borde gå igenom på samma sätt, eftersom `_kallans_regel` inte
+anropas för bankraden. Testdatan för januari och februari har ingen sådan rad, så det är inte kört.
+
+**P2 – En annan leverantörs bankrad med samma belopp godtas som betalning (medel, hör till familjen i sak, men (b)
+stoppar den inte).** *r5*, i en kopia av underlagen där 009 har beloppet 748,75 kr: 2440 debet 009 `belopp_ore`, 1940
+kredit bankrad 8 i februari, som är betalningen till LEV-TELE, inte till LEV-TE. Godtas med alla kontroller "ok", också
+mot 3f36f6b. Regeln (a) är uppfylld ordagrant: rätt konto, samma belopp, en bankrad. Formen är precis flöde a:s
+betalning, så **(b) ändrar inget här**. Det som saknas är en kontroll av att bankraden hör till underlaget, som
+matchningen gör i flödena men `skapa_konteringsforslag` inte. Kräver ett sammanträffande i belopp.
+
+**P3 – Flera bankrader som tillsammans blir beloppet godtas, fast beslutet säger "en bankrad" (låg, avvikelse från
+beslutets ordalydelse, hör till familjen).** *r3*, i en kopia där 009 har beloppet 31 767,68 kr: 2440 debet 009
+`belopp_ore`, 1940 kredit räknad med `summa` av bankrad 26 och 84. Godtas med alla kontroller "ok", också mot 3f36f6b.
+Beslut 1 och BYGGPLAN steg 95 säger "en bankrad som källa", medan koden, commitmeddelandet och GRANSKNING ("bara
+bankrader som källor") godtar flera. Nettot är en riktig betalning, och en delbetalning kan vara rimlig, men flödena
+bygger den aldrig. (b) stoppar den. Granskaren gissar inte om delbetalningar ska få finnas.
+
+**P4 – Fakturan baklänges ihop med en annan fakturas delar godtas (låg, hör till familjen).** *r11*, i kopian där 009
+har 003:s belopp: 003 baklänges, 009:s kostnad och moms i debet, och bankrad 26 i kredit på 1940. Godtas, också mot
+3f36f6b. Nettot är exakt 003:s betalning, men raderna säger något annat, och 009:s `belopp_ore` står inte med. Samma
+slag som b2, men inte det b2-beslutet handlar om, eftersom det här inte är flöde a:s två förslag. (b) stoppar den.
+
+**P5 – Verifikationens datum behöver inte stämma med bankraden (låg, hör inte till familjen).** *r10:* 003:s betalning
+för hand med datumet 2025-01-02. Bankraden är från 2025-02-06 och fakturan från 2025-01-07, så betalningen står före
+fakturan. Godtas, också mot 3f36f6b. Punkt 8 prövar bara att datumet ligger inom regelns giltighet. Flödena tar datumet
+ur regelbokens `bokforing`. Egen fråga, varken Öppet 36 eller (b) rör den.
+
+**P6 – SPEC 7, "Sidan för beloppet", nämner inte Öppet 36 (låg, dokumentation, hör inte till familjen).** Stycket säger
+fortfarande bara "minst en bankrad i kopplingarna". Byggsessionen sa det själv (PROGRESS.md). Inte rättat, enligt
+uppdraget: det görs i dokumentationen för steg 96.
+
+### Svar på uppdragets punkter
+
+1. **Koden mot beslutet: ja, utom P3** (läst i koden och körd). För varje rad med `belopp_ore` i debet krävs en egen
+   rad på bankkontot i kredit, med samma belopp, och varje sådan rad paras högst en gång. **Bara stopp tillagda:**
+   `git show 0708667` visar att de borttagna raderna är docstrings, signaturen, en omskriven rad och Öppet 35:s `raise`,
+   som står kvar med samma text under ett omvänt villkor. Ingen kontroll är borttagen och returvärdet är oförändrat.
+   **Inget företagsspecifikt:** `grep` efter kontonummer och testnamn i kärnan ger bara ordet "SYNTETISK" i två
+   docstrings från förut. **Argumentet `kontoplan`:** funktionen anropas på tre ställen (`konteringsforslag.py` rad 1340
+   och `test_beslut_granskning_27.py` rad 174 och 191), alla med rätt ordning.
+2. **Rött före: 4 av 9, inte 5** (körd mot `git archive` av 3f36f6b): b1, b3, den delade bankkontoraden och texttestet
+   är röda; b2:s skydd, ordningstestet, de två skydden och flödestestet är gröna. Siffran 5 gällde medan b2 var skrivet
+   som ett stopp. Då var b2 rött både före och efter rättelsen, så det bevisade aldrig regeln. Sedan Hugos beslut är b2
+   ett skydd, grönt före och efter. Rätt siffra är 4 av 9, som 0708667, BYGGPLAN och PROGRESS säger; "5 av 9" i uppdraget
+   är den gamla siffran. Iakttagelse: ordningstestet är grönt också före, eftersom "Öppet 36" då inte finns i någon
+   feltext, så det bevisar ordningen först nu.
+3. **Hela sviten: 4 443 passed**, 0 röda, 74,57 sekunder (körd), samma som byggsessionen.
+4. **Parningen är säker: radordningen ändrar inte utfallet** (körd). Två betalningar med olika belopp godtas i alla 24
+   ordningar (p1). Två med samma belopp, 199,00 kr i en kopia, godtas i alla 24, och samma två mot en enda bankkontorad
+   stoppas av Öppet 36 i alla 120 ordningar (p3). b1 stoppas i alla 120 (p2). 500 slumpade radlistor, var och en blandad
+   5 gånger, ger alltid största möjliga antal par (p4). Skälet: raden paras bara med exakt samma belopp, så rader med
+   samma belopp är utbytbara, som docstringen säger. Det enda som beror på ordningen är vilken rad felet namnger.
+5. **Vägar runt Öppet 36.** Stoppas: bankrad med annat belopp (r1, av beräkningen), bankrad som inte finns i kopplingarna
+   (r2, av punkt 4), bankraden i kredit på leverantörsskulderna (r4b, av Öppet 36; den godtogs före 0708667). **Ett annat
+   konto med rollen bank går inte att skapa:** kontoplanen har exakt ett konto per roll, och två konton stoppas när filen
+   läses (r4). Går igenom: flera bankrader (r3, P3), en annan leverantörs bankrad (r5, P2), bankraden på kostnadskontot
+   bredvid en egen bankkontorad (r6–r9 och r16, P1), och r11 (P4).
+6. **Skyddstestet är minst lika strängt som f4.** Granskarens provfil från granskning 28 finns inte kvar, så jämförelsen
+   görs mot beskrivningen av f4 ovan: exakt en rad på bankkontot i kredit med samma belopp. Testet prövar det, och
+   dessutom att källorna bara är bankrader. Det är inte tomt: 6 rader med beloppet i debet prövas (f1), och det slår larm
+   på b1, b3 och en källa som inte är en bankrad (s1, körd). Den gamla versionen i 3f36f6b släppte igenom dem (s1 röd
+   där), vilket är L1 i granskning 28.
+7. **Flöde a, b och e går igenom** (byggsessionens skydd i sviten och f1, körda): 16 fakturor, 6 betalningar och 3
+   kvitton, och bankavgiften utan underlag. **Filerna:** 0708667 rör bara `konteringsforslag.py` och två testfiler,
+   2418288 bara BYGGPLAN.md, GRANSKNING.md och PROGRESS.md. `git diff 3f36f6b..2418288` för CLAUDE.md, SPEC.md,
+   `foretag`, `testforetag`, `testdata`, `sparr`, `konteringsfloden.py` och `las_underlag.py` är tom.
+8. **SPEC 7:** noterat i P6, inte rättat.
+
+### Vad som är kört och vad som är bedömning
+
+**Kört:** rött före, sviten, alla prov ovan (p, r, f och s) och `git`-kontrollerna. **Bedömning, inte kört:** att
+hålen kräver kod förbi flödena (stöds av f1, men bevisas inte för framtida kod), att (b) stoppar r3, r6–r9, r11 och r16
+men inte r5 och r10 ((b) är inte byggd), att en bankrad mot en ägare går igenom, och allvarsnivåerna. Inget här är en
+bedömning av bokföringsregler: "fel bokföring" betyder att raderna säger något annat än underlaget och flödena.
+
+### Steg 95
+
+Byggt som beslutet säger, med avvikelsen i P3. Att P1 hittades ändrar inte det, men enligt Hugos beslut leder det till
+(b). Granskarens bedömning: steg 95 kan räknas som klart, och (b) blir ett eget steg före uppgift 5 (steg 23).
+
+### Testsviten
+
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`:
+**4443 passed in 74.57s**.
+
+### Kommandon i den här granskningen
+
+`<scratch>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/df143fbb-f15f-4370-9133-41cef0a7aada/scratchpad`
+och `<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Allt kördes från projektmappen, ett
+kommando i taget.
+
+1. `git status`, `git show --stat 0708667`, `git show --stat 2418288`, `git show 0708667`, `git show 2418288 -- BYGGPLAN.md`,
+   `git diff 3f36f6b..2418288 --stat` och `git diff 3f36f6b..2418288 -- CLAUDE.md SPEC.md foretag testforetag testdata
+   sparr scripts/konteringsfloden.py scripts/las_underlag.py` (tom).
+2. `grep` med `-n`, `-r`, `-A`, `-B`, `-e` och `--include`, `--exclude-dir`, samt `ls`, `head` och `wc -l` i projektet;
+   stycken av filer med fil-verktyget Read. `grep -n -r -e 4010 -e 5460 -e 2440 -e 2641 -e 1940 -e SYNT -e syntet -e
+   Syntet -e LEV-TE --include='*.py' --exclude-dir=tests scripts` (punkt 1).
+3. `mkdir -p <scratch>/kopia-3f36f6b` och `mkdir -p <scratch>/kopia-2418288`.
+4. `git archive -o <scratch>/3f36f6b.tar 3f36f6b` och `git archive -o <scratch>/2418288.tar 2418288`.
+5. `tar -xf <scratch>/3f36f6b.tar -C <scratch>/kopia-3f36f6b` och `tar -xf <scratch>/2418288.tar -C <scratch>/kopia-2418288`.
+6. `cp -R scripts/tests/test_beslut_granskning_28.py <scratch>/kopia-3f36f6b/scripts/tests/test_beslut_granskning_28.py`
+   och `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rA
+   <scratch>/kopia-3f36f6b/scripts/tests/test_beslut_granskning_28.py` (**4 failed, 5 passed**, rött före).
+7. `<python> -B -m pytest -p no:cacheprovider -q scripts/tests` (**4443 passed**).
+8. Provfilen `test_granskare_prov29.py` skrevs med fil-verktyget Write i `<scratch>/kopia-2418288/scripts/tests/`.
+   `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rA
+   <scratch>/kopia-2418288/scripts/tests/test_granskare_prov29.py` (först **2 failed, 17 passed**: p2 och p3, ett fel i
+   granskarens prov, som kapade feltexten före "Öppet 36"; rättat med Edit).
+9. Samma kommando med `-k 'p2 or p3 or r7 or r8 or r9 or r10 or r11 or r16 or f1'` (**9 passed, 10 deselected**, med
+   de rättade p2 och p3). De övriga tio ändrades inte av rättelsen och var gröna i körning 8, så **alla 19 är gröna, men
+   inte i en och samma körning**.
+10. `cp -R <scratch>/kopia-2418288/scripts/tests/test_granskare_prov29.py <scratch>/kopia-3f36f6b/scripts/tests/test_granskare_prov29.py`
+    och `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rfE
+    <scratch>/kopia-3f36f6b/scripts/tests/test_granskare_prov29.py` (**5 failed, 14 passed**: p2, p3, r4b och s1 röda,
+    det 0708667 stänger; p4 röd eftersom funktionen inte fanns; r3, r5–r11 och r16 gröna, de hålen fanns före).
+11. `<python> -B -m pytest -p no:cacheprovider -q -k byggplan_progress scripts/tests` efter att det här avsnittet och
+    statusraderna skrivits.
+12. `git add GRANSKNING.md PROGRESS.md BYGGPLAN.md`, `git commit -F <scratch>/commit-granskning-29.txt` och `git status`.
+
+Vakten stoppade fyra kommandon granskaren skrev i strid med SPEC 7.1, alla bara läsande: ett ihopkopplat med `&&` och
+tre `grep` med omvänt snedstreck. De ersattes med ett kommando i taget och `grep -e`. Inget utanför projektet ändrades
+utom scratchpad.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **Gå över till (b), och vad som då gäller b2.** P1 hör till familjen, så Hugos villkor är uppfyllt. Men (b) som den
+   står i granskning 28 ("flödenas två former rakt av") stoppar också b2, som Hugo har beslutat ska godtas, och två
+   betalningar i samma förslag, som ett skyddstest i dag säger ska godtas. Dessutom bygger flödena tre former med underlag,
+   inte två: fakturan, betalningen och kvittot (kostnad och moms i debet, bankraden i kredit). Frågan: ska (b) stoppa b2
+   och två betalningar i samma förslag (och skyddstesten skrivas om), eller ska (b) ha undantag för dem?
+   Granskarens iakttagelse, inte ett förslag att ändra beslutet: en smalare regel, att en bankrad i ett förslag med
+   underlag bara får stå som källa på bankkontot, skulle enligt granskarens bedömning stoppa P1 och låta b2 vara kvar, men
+   inte P3 och P4. Den är inte provad.
+2. **P2 (Öppet 40):** ska `skapa_konteringsforslag` kontrollera att bankraden hör till underlaget? (b) räcker inte för det.
+3. **P3:** ska en betalning få räknas ur flera bankrader, eller gäller "en bankrad" ordagrant? Med (b) rakt av är det en.
+4. **P5 (Öppet 41):** ska verifikationens datum prövas mot källorna i `skapa_konteringsforslag`? Egen fråga.
+5. **Steg 95:** får räknas som granskat och klart (granskarens bedömning: ja).
+
+STATUS: gult
+STEG I BYGGPLANEN: 95 – Öppet 36 – klart (granskat i den här granskningen)
+KAN JAG GÅ VIDARE: ja till steg 96 och de andra stegen före uppgift 5. Inget kan bokföras, ingen spärr är svagare, Öppet
+36 är byggd som beslutet säger, rött före och sviten stämmer, parningen håller och flödena går igenom. Nej till uppgift 5
+(steg 23) förrän P1 är stängd. Gult för att ett nytt hål i familjen hittades (P1), så att (b) ska byggas enligt Hugos beslut.
+ÄNDRINGAR I CLAUDE.md: inga
+BESLUT SOM BEHÖVS: 1–5 ovan.
+NÄSTA STEG: Hugo eller Casper svarar på 1–5. Sedan (b) som eget steg före uppgift 5, steg 96 (Öppet 37) och steg 92 (Öppet
+26). SPEC 7 rättas i dokumentationen för steg 96. Steg 15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers
+dator) i helgen vecka 44.
