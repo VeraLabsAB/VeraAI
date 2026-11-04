@@ -1,10 +1,12 @@
 # Förslag: BYGGPLAN.md avstämd mot Kassio-specen
 
-Skrivet 2026-11-04 i planeringssessionen (Hugos beslut 2026-11-04 om granskning 33, beslut 6). **Det här är ett förslag. Hugo eller Casper bestämmer.** BYGGPLAN.md är inte omskriven.
+**Besluten är fattade 2026-11-04.** De står ordagrant i `GRANSKNING.md`, "Hugos beslut 2026-11-04 om planen (PLAN-KASSIO-FORSLAG.md)". Kravkällan är `KASSIO-KRAV.md`, och planen som gäller är `BYGGPLAN.md`. Den här filen är underlaget för besluten, kompletterad med kravlistan.
+
+Skrivet 2026-11-04 i planeringssessionen (Hugos beslut 2026-11-04 om granskning 33, beslut 6). Kompletterat samma dag med `KASSIO-KRAV.md`: avsnitt B, storlekarna i C, och E. Datumen i D är inte ändrade.
 
 ## Läs det här först
 
-1. **Kassio-specen i uppdraget är avklippt.** Texten tar slut mitt i en mening: "Bank: läskoppling med BankID och uppladdning av kontoutdrag. Kassasystem: direkt". Resten finns inte i projektmappen. Alla krav efter det är alltså oprövade. Uppdraget nämner lön, fakturor, bokslut, inkasso och Skatteverket, så de står med i planen, men märkta "inte läst". **Storlekarna och datumen för de delarna är därför osäkrast.** Klistra in resten, så kompletterar jag avsnitt B–F.
+1. **Kassio-specen i uppdraget var avklippt** mitt i en mening, efter "Kassasystem: direkt". Resten finns nu i `KASSIO-KRAV.md`, och B, C och E är kompletterade.
 2. **Säkerhet: inget i förslaget lättar på regeln att inget bokförs utan godkännande.** Men två Kassio-krav krockar med de spärrar som precis har byggts: att kunden får ändra ett förslag mot en varning, och att ett saknat kvitto ändå ger ett förslag. De måste designas innan de byggs, så att de inte blir en väg runt godkännandet (fråga 4 och 5 i avsnitt F).
 3. **Riktiga kunduppgifter är förbjudna i dag** (CLAUDE.md, "Aldrig"). En pilot med en riktig kund kräver ett uttryckligt beslut om var uppgifterna får ligga, och att juristfrågorna i steg 53 är besvarade. Det gäller alla tre alternativen i avsnitt D.
 4. **Det viktigaste jag hittade:** koden har i dag ingen koppling till Fortnox, BankID eller en språkmodell. Den kan inte heller läsa ett riktigt kvitto, utan bara färdiga JSON-filer (en strukturerad textfil). BYGGPLAN.md har inget eget steg för att göra ett foto eller en PDF till sådan data, och ingen plats där kundens uppgifter ska ligga (SPEC Ö1).
@@ -69,7 +71,7 @@ Första commiten är från 2026-10-24, så inget hände 21–23 oktober. Datumet
 
 ## B. Kassio-specen mot BYGGPLAN.md
 
-"Krockar" betyder att BYGGPLAN.md, SPEC.md eller DESIGN-regelbok.md säger något annat än specen. "Inte läst" betyder att kravet ligger efter att texten klipptes.
+"Krockar" betyder att BYGGPLAN.md, SPEC.md eller DESIGN-regelbok.md säger något annat än specen. Tabellen visar läget i de filerna före besluten 2026-11-04, och rader som "krockar" kan alltså vara avgjorda av besluten. Raderna som förut hette "inte läst" är bedömda mot `KASSIO-KRAV.md`, och kraven efter klippet är tillagda sist. Steg från 103 och uppåt är de nya stegen i `BYGGPLAN.md`.
 
 ### Från specen till byggplanen
 
@@ -113,15 +115,37 @@ Första commiten är från 2026-10-24, så inget hände 21–23 oktober. Datumet
 | Utlägg via appen | – | saknas | Eget flöde, och utlägg från en ägare berör K7 |
 | Bank: läskoppling med BankID | 58 | krockar | Steg 58 läser via Fortnox, fråga 8 |
 | Bank: uppladdning av kontoutdrag | 3 | delvis | Ett antaget CSV-format (SPEC Ö5). Ingen uppladdning i någon app |
-| Kassasystem: "direkt", sedan klippt | 23, 43, 64, 85 | inte läst | |
-| Lön (frågan i onboardingen) | 63, 79 | inte läst | Byggplanen kontrollerar lön ovanpå Fortnox Lön. Om specen kräver mer vet jag inte |
-| Fakturor (frågan i onboardingen) | 60, 70 | inte läst | |
-| Lager eller tillgångar (frågan i onboardingen) | 72, 76 | inte läst | Lager saknas som eget steg |
-| Bokslut | 73, 76, 77, 78 | inte läst | Nämnt i uppdraget |
-| Inkasso | – | inte läst | Nämnt i uppdraget. Inget steg |
-| Skatteverket | 61, 79, 82 | inte läst | Nämnt i uppdraget |
+| Kassan: direkt koppling som hämtar dagsavsluten | 23, 43, 64, 85, nytt 111 | delvis | Z-rapporter läses bara som filer i dag. Ingen koppling finns. **Öppen fråga:** går pilotkundens kassasystem att koppla? |
+| Lön: räkna ut lönen, lönespecar, förbereda utbetalning, semester, frånvaro, utbetalning den 25:e | 63, 79, nytt 133 | krockar | Byggplanen kontrollerar bara lön ovanpå Fortnox Lön, och SPEC 10 lägger löneberäkning utanför version 1. Kassio flyttar aldrig pengar |
+| Kundfakturor: formulär, snygg faktura som laddas ner eller mejlas | 70, nytt 134 | krockar | Steg 70 går via Fortnox och Bokio, och SPEC 10 lägger fakturering utanför version 1 |
+| Följa fakturan till betalning, påminnelsefakturor | 70, nytt 135 | delvis | Tidslinjen saknas |
+| Leverantörsfakturor: fusk och dubbletter, påminnelser, attest, förbereda betalning, företaget betalar själv | 60 | täckt | |
+| Lager och tillgångar: inventarier, avskrivningar, varulager, lager per artikel, periodisering | 72, 73, 76, nytt 136 | delvis | Lager saknas som eget steg |
+| Årets slut: bokslut, skatt och skatteförslag, K2, INK2 | 73, 76, 77, 78 | täckt | |
+| Årsstämmoprotokoll | nytt 137 | saknas | |
+| Inkasso | nytt 135 | saknas | **Öppen fråga till jurist:** inkasso åt andra kräver som regel tillstånd enligt kravlistan. Troligen förbereder Kassio och lämnar över |
+| Deklarationer: först förbereder Kassio och kunden lämnar in. Målet är inlämning efter kundens BankID-signering | 61, 79, 82, nytt 145 | delvis | Stämmer med regel 3 så länge kunden signerar. Automatisk inlämning saknas |
+| Alla kontroller: bank mot bokföring, skattekontot, kassa mot bank, dubbletter, luckor i nummerserien | 36, 43, 45, K4, K12 | delvis | K12 gäller bara Z-numren |
+| Vid en skillnad letar Kassio själv förklaringen, annars stoppas utkastet | 36 | delvis | Steg 36 stämmer av men säger inget om att leta förklaring |
+| Köp från utlandet och valutor, fullt ut från start | nytt 138 | saknas | Reglerna ska komma från lagregistret, och inget får gissas |
+| Fel i det som förts över till Fortnox: ny verifikation efter godkännande, inget raderas | 27, nytt 131, SPEC 7 | delvis | Steg 27 gäller bara stängda månader |
+| Ägarens privata köp: flagga, förklara, föreslå, kunden bestämmer | K7, 24 | delvis | K7 ger ärende och nivå D. Förklaring och förslag saknas |
+| Aldrig kontakta kundens kunder utan godkännande | Regel 1, nytt 135 | täckt | |
+| Chatt kopplad till alla funktioner, bifoga filer, föreslagna frågor | 75 | delvis | Steg 75 är bara frågor om böckerna |
+| Chattens gränser: om företagets ekonomi, hänvisar tunga frågor till revisor eller jurist | nytt 141 | saknas | |
+| Startsidan: att göra, tidslinje, vad Kassio gjort, nyckeltal som kunden anpassar | 68, nytt 140 | delvis | Tidslinje och nyckeltal saknas |
+| Rapporter: månadens resultat, likviditet, skatt att betala, resultat- och balansräkning | 62, 74 | täckt | |
+| Roller: ägare/admin, godkännare, anställd, bara läsa | 68, 69 | delvis | Steg 68 säger bara "roller och ersättare" |
+| Flera bolag: bolagsväljare, lägga till, hantera | nytt 146 | saknas | |
+| Ton och utseende | nytt 140 | saknas | Inget steg säger något om dem |
+| Så mycket som möjligt krypterat, bara kunden och agenten läser, inte personalen | nytt 114, 139 | saknas | **Öppen fråga:** hur Anthropic hanterar datan måste kontrolleras innan löftet formuleras |
+| När kunden slutar: exportera, radera eller betala för att Kassio sparar | 66 | delvis | Bara export finns som steg |
+| Ansvar: formellt kundens efter godkännande | SPEC 3, 53 | täckt | |
+| Målen: 90 % godkänns utan ändring efter en månad, 75 % mindre tid | 50 | delvis | Steg 50 räknar godkännanden. Att fråga kunden om tiden saknas |
+| Valfri import av tidigare bokföring | 65 | delvis | **Öppen fråga:** behövs den när Kassio kan läsa historiken i Fortnox? |
+| Köp på hemsidan, återbetalning första månaden, 30 dagars uppsägning | nytt 147 | saknas | Behövs inte före en gratis pilot |
 
-**Summering, 45 krav:** 12 täckta, 7 delvis, 6 saknas, 13 krockar och 7 inte lästa.
+**Summering, 67 krav efter `KASSIO-KRAV.md`:** 17 täckta, 21 delvis, 14 saknas och 15 krockar. Inget krav är kvar som "inte läst". Antalen är räknade ur tabellen med en provfil i den tillfälliga mappen. Förut var det 45 krav, varav 7 "inte lästa".
 
 ### Det specen förutsätter men inte räknar upp
 
@@ -134,7 +158,7 @@ Inget av det här har ett eget steg, och utan det går ingen pilot:
 
 ### Från byggplanen till specen: behövs inte före piloten
 
-Bedömning utifrån texten jag har. Resten av specen kan flytta tillbaka något.
+Bedömning utifrån kravtexten. Efter `KASSIO-KRAV.md` flyttar tillbaka: 74 och 75 (rapporter och chatt, byggs under piloten) och kassan 43 och 64 (pilotkunden har troligen ett kassasystem). 85 väntar fortfarande.
 
 | Steg | Varför det kan vänta |
 |---|---|
@@ -169,15 +193,17 @@ Bedömning utifrån texten jag har. Resten av specen kan flytta tillbaka något.
 | 3 | Kassios krav i kärnan | N: kvitto saknas. N: kundändrat förslag med varning. N: utlägg. 49. Öppet 42. N: kontantmetoden om den ska finnas | M–L | 8–16 | Krockar med spärrarna, så design först | 0, och delar av 2 |
 | 4 | Fortnox | 55, 56, tunn kedja först | L | 8–14 | Okänd omvärld, och skrivning till ett riktigt system kräver spärrtest | 0, 1. Extern väntan, se E |
 | 5 | Godkännandet | 31, 32, 33, 47 | M | 5–9 | Hjärtat i säkerheten | 2 (delar), 4 |
-| 6 | Underlag in | N: läsare för foto och PDF. 59 eller N: mejlkoppling. 58 eller N: bankkoppling. Uppladdning. Kassasystem | L | 10–18 | Modellen kommer in här, med K17 | 28, 1 |
+| 6 | Underlag in | N: läsare för foto och PDF. 59 eller N: mejlkoppling. 58 eller N: bankkoppling. Uppladdning. Kassasystem | L | 10–18 | Modellen kommer in här, med K17. **Kassan, efter `KASSIO-KRAV.md`:** bedömning 2–6 av omgångarna om pilotkundens kassasystem går att koppla eller ger en fil. Går det inte är storleken okänd (öppen fråga) | 28, 1 |
 | 7 | Appen och driften | N: driftmiljö (Ö1). 68. N: sms. 65. N: tre frågor, uppslag, rundtur. 66, 69 | L | 15–25 | Helt nytt, och människor måste prova det | 5, och jurist för riktig data |
 | 8 | Moms och månaden | 44, 45, 46, 48, 61, 62 | M | 6–10 | Bygger på avstämningen i 36 | 36, 4 |
-| 9 | Lön | 63, 79 | M | 4–8 | Kravtext saknas | 4, 7 |
-| 10 | Fakturor | 60, 70 | M | 4–8 | Kravtext saknas. Inkasso inte medräknat | 4, 5 |
-| 11 | Bokslut | 72, 73, 76, 77, 78, N: lager | L | 10–18 | Kräver konsult. Kan inte provas på riktigt före ett årsskifte | 8, steg 54 |
+| 9 | Lön | 63, 79, N: lönekörning | L | 10–18 | Ändrat efter `KASSIO-KRAV.md` (förut M, 4–8): kravet är hela lönekörningen med lönespecar, semester och frånvaro, inte bara en kontroll ovanpå Fortnox Lön | 4, 7 |
+| 10 | Fakturor | 60, 70, N: fakturaformulär, N: tidslinje, påminnelser och inkasso som lämnas över | M–L | 8–14 | Ändrat efter `KASSIO-KRAV.md` (förut M, 4–8): formulär, egen faktura och tidslinje är nya. Inkasso beror på juristens svar | 4, 5 |
+| 11 | Bokslut | 72, 73, 76, 77, 78, N: lager, N: årsstämmoprotokoll | L | 12–22 | Ändrat efter `KASSIO-KRAV.md` (förut 10–18): årsstämmoprotokoll och lager per artikel. Kräver konsult. Kan inte provas på riktigt före ett årsskifte | 8, steg 54 |
 | 12 | Genrep | 67, skuggvecka | S | 3–5 | Sista spärrtestet | Allt |
 
 **Parallellt från första dagen:** jurist (steg 53), redovisningskonsult (steg 54), Fortnox-avtalet och samtalet med pilotkunden. De kostar få omgångar men har längst väntan.
+
+**Krav utan grupp i tabellen, storleken inte bedömd:** utländska köp och valutor, chatten, startsidan, flera bolag, kryptering och arkivet. De står under "Under piloten" och "Efter piloten" i `BYGGPLAN.md`.
 
 ---
 
@@ -209,6 +235,7 @@ Till det läggs 2 veckor för julen, om datumet passerar den, och 2 veckors skug
 
 - Mina datum ligger efter "troligt" av två skäl: 2027-03-29 är annandag påsk, och 2026-12-21 är rakt in i julen. 2027-03-01 ger B en liten marginal.
 - Bokslut i A kan bara provas på syntetisk data, eftersom kundens första bokslut kommer först vid räkenskapsårets slut.
+- **Efter `KASSIO-KRAV.md` är datumen inte ändrade.** Med de nya storlekarna i C blir A i stället 113–199 omgångar (uppskattning), men A är inte valt, så datumen för A är inte räknade om. B och C innehåller inte lön, fakturor och bokslut, så de berörs inte. Kassan ligger kvar inom grupp 6. Går pilotkundens kassasystem inte att koppla eller ge en fil kan det flytta datumen för B och C.
 
 **Min rekommendation: C från 2027-01-11, och sedan B från 2027-03-01.** Resten byggs under piloten, vilket stämmer med specens "byggs vidare utifrån vad piloten visar". Det som mest kan stoppa C i januari är juristen, eftersom riktig data kräver svaren i steg 53, och Fortnox-avtalet.
 
@@ -220,26 +247,30 @@ Till det läggs 2 veckor för julen, om datumet passerar den, och 2 veckors skug
 
 | Vem | Vad som behövs | Kontrollerat? | Påverkan på datumen |
 |---|---|---|---|
-| **Jurist** (steg 53) | Penningtvättslagen, kundavtal, ansvar, personuppgiftsavtal, överföring till USA (BYGGPLAN steg 53) | Inte kontrollerat | **Stoppar alla tre alternativen.** Börja nu, oavsett val |
+| **Jurist** (steg 53) | Penningtvättslagen, kundavtal, ansvar, personuppgiftsavtal, överföring till USA (BYGGPLAN steg 53). Efter `KASSIO-KRAV.md` också: riktig data i skuggpiloten, pilotkundens skriftliga godkännande för siffror i marknadsföring, ekonomiansvariges två roller, och om krypteringslöftet håller | Inte kontrollerat | **Stoppar alla tre alternativen.** Hugo eller Casper kontaktar juristen den här veckan (beslut 14) |
 | **Fortnox** | Registrera sig som utvecklare och acceptera App Partner-avtalet. Fortnox granskar programmet, kopplingen, landningssidan, kontaktuppgifter, pris och användaravtal innan kunder kan aktivera det | Ja, men sidan säger inget om tider, kostnad eller testmiljö | **Stoppar grupp 4.** Öppen fråga till Fortnox: gäller hela granskningen också en enda gratis pilotkund? Steg 55 räknar med en testdatabas, som inte är bekräftad |
-| **Redovisningskonsult** (steg 54) | D1–D16, Ö3, Ö4, Öppet 38, moms när kvitto saknas, utlägg, bokslut och INK2 | Inte kontrollerat | Behövs för pilotkundens egna val redan i C, och för alla bokföringsbeslut i B. Stoppar grupp 11 |
+| **Redovisningskonsult** (steg 54) | D1–D16, Ö3, Ö4, Öppet 38, moms när kvitto saknas, utlägg, bokslut och INK2. Efter `KASSIO-KRAV.md` också: utländska köp och valutor, lön och semester, varulager, och årsstämmoprotokollet. Hugo eller Casper kontaktar konsulten den här veckan (beslut 14) | Inte kontrollerat | Behövs för pilotkundens egna val redan i C, och för alla bokföringsbeslut i B. Stoppar grupp 11 |
 | **BankID** | Inloggning i appen. Vilket avtal det kräver är en öppen fråga | Inte kontrollerat | Stoppar inte om appen startar med annan inloggning, som steg 68:s tvåstegsverifiering |
-| **Bankkoppling** | Att läsa kundens konton är en reglerad verksamhet som kan kräva tillstånd eller en leverantör som har det. **Öppen fråga till jurist** | Inte kontrollerat | Kan bli lång väntan. Därför börjar B och C med uppladdade kontoutdrag |
-| **Skatteverket** | Steg 61 går via Fortnox, och steg 82 är ett eget ombudsavtal. **Öppen fråga** om moms via Fortnox räcker | Inte kontrollerat | Stoppar inte om det går via Fortnox. Kontrollera. Steg 78 har ett datum: e-tjänsten för INK2 stängs 2026-12-29 (BYGGPLAN) |
-| **Inkasso** | Om Kassio får göra det själv eller måste lämna över är en **öppen fråga till jurist** | Inte kontrollerat, kravtext saknas | Föreslås utanför piloten: påminnelser ja, inkasso nej |
-| **Språkmodell** | Villkor för kunddata. Steg 53 noterar att Anthropic inte har någon EU-region, vilket bör prövas igen | Inte kontrollerat | Ingår i juristens svar |
-| **Pilotkunden** | Pilotavtal, en person som godkänner, tillgång till Fortnox, och vilja att vara med i en skuggpilot | – | Måste frågas nu. Bestämmer också om kassasystem behövs |
+| **Bankkoppling** | Att läsa kundens konton är en reglerad verksamhet som kan kräva tillstånd eller en leverantör som har det. **Öppen fråga till jurist** | Inte kontrollerat | Kan bli lång väntan. Piloten använder uppladdade kontoutdrag, och BankID-kopplingen kommer senare (beslut 8) |
+| **Skatteverket** | Steg 61 går via Fortnox, och steg 82 är ett eget ombudsavtal. Enligt `KASSIO-KRAV.md` förbereder Kassio först och kunden lämnar in, och målet är inlämning efter kundens BankID-signering. **Öppen fråga** om moms via Fortnox räcker | Inte kontrollerat | Stoppar inte i piloten, där kunden lämnar in själv. Steg 78 har ett datum: e-tjänsten för INK2 stängs 2026-12-29 (BYGGPLAN) |
+| **Inkasso** | Kravlistan säger att inkasso åt andra som regel kräver tillstånd, och att Kassio troligen förbereder och lämnar över till ett inkassobolag. **Öppen fråga till jurist** | Inte kontrollerat | Byggs under piloten: påminnelser först, inkasso först efter juristens svar |
+| **Språkmodell** | Villkor för kunddata. Kravlistan säger att hur Anthropic hanterar datan måste kontrolleras innan krypteringslöftet formuleras. Steg 53 noterar att Anthropic inte har någon EU-region, vilket bör prövas igen | Inte kontrollerat | Ingår i juristens svar. **Stoppar skuggpiloten**, som skickar riktig data till modellen när underlag läses |
+| **Pilotkunden** | Pilotavtal, en person som godkänner, tillgång till Fortnox, vilja att vara med i en skuggpilot, bokföringsmetod (beslut 10), kassasystem, och skriftligt godkännande för siffror i marknadsföring | – | Måste frågas nu. Bestämmer också om kassasystem behövs |
+| **Kassasystemet** | Om pilotkundens kassasystem går att koppla, och vilka kassasystem som är vanligast (öppen fråga i `KASSIO-KRAV.md`) | Inte kontrollerat | Kan stoppa kassadelen i piloten om varken koppling eller fil finns |
+| **Bolagsuppgifter** | Var namn, bolagsform, adress, momsregistrering och F-skatt hämtas när kunden skriver organisationsnumret | Inte kontrollerat | Stoppar inte piloten, där uppgifterna kan fyllas i för hand |
 | **Mejl, sms, driftmiljö** | Leverantörer väljs i grupp 6 och 7 | Inte kontrollerat | Bedömning: korta väntetider |
 
 ---
 
 ## F. Frågor till Hugo innan BYGGPLAN.md skrivs om
 
+**Besvarade 2026-11-04:** Hugos beslut 15 säger att alla svar är enligt rekommendationerna nedan, med de andra besluten som svar där de säger något annat.
+
 Min rekommendation står efter varje fråga.
 
-1. **Resten av specen:** kan du klistra in den? *Behövs för B–E. Allt efter "Kassasystem: direkt" är oläst.*
+1. **Resten av specen:** kan du klistra in den? *Behövs för B–E. Allt efter "Kassasystem: direkt" är oläst.* Besvarad: `KASSIO-KRAV.md`.
 2. **Omfång och datum:** A, B eller C? *C från 2027-01-11, sedan B från 2027-03-01.*
-3. **Vem är pilotkunden?** Är det Shop and Go (Öppet 42 säger "piloten med Shop and Go")? *Viktigt för kassa, samlingsbetalningar och regeln om arkivmappen. Var ska en riktig kunds uppgifter ligga? Aldrig i det här repot.*
+3. **Vem är pilotkunden?** Namnet skrivs inte i någon fil (Hugos uppdrag 2026-11-04). *Viktigt för kassa, samlingsbetalningar och regeln om arkivmappen. Var ska en riktig kunds uppgifter ligga? Aldrig i det här repot.*
 4. **Kunden ändrar ett förslag:** vad får kunden bestämma över? *Kunden får välja konto och text mot en varning, men ett förslag ska alltid gå ihop (K2), en stängd period ska förbli stängd, och inget skrivs före godkännandet. Designas först, med en egen form, och granskas som säkerhet.*
 5. **Saknat kvitto:** ska det bli ett förslag ändå, i stället för ett ärende (K3)? *Ja, som specen säger, med en egen form och märkning. Hur moms ska hanteras då är en **Öppen fråga** till redovisningskonsult eller Skatteverket.*
 6. **Nivåerna A–D:** ska de finnas kvar när kunden bara ser två lägen? *Ja, men bara för att sortera och flagga. SPEC 5 skrivs om, och nivå D förblir "alltid människan".*
@@ -253,4 +284,4 @@ Min rekommendation står efter varje fråga.
 14. **Steg 14, Caspers dator:** den var planerad till helgen vecka 44, som är förbi (i dag är det vecka 45), och står som inte klar. Är den gjord? *Behöver ett nytt datum annars.*
 15. **Jurist och konsult:** vem kontaktar dem, och vilken budget finns? *Hugo eller Casper, den här veckan. Jag kan förbereda frågorna.*
 
-**Efter svaren:** en session skriver om BYGGPLAN.md och de delar av SPEC som krockar. Fram till dess gäller BYGGPLAN.md som den är.
+**Efter svaren:** BYGGPLAN.md skrivs om i samma session som den här kompletteringen. SPEC.md, CLAUDE.md och namnbytet görs i nästa session.
