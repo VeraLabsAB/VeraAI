@@ -8,7 +8,7 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet arbetar mot skuggpiloten (SPEC avsnitt 9 och `BYGGPLAN.md`). Än finns ett testföretag, Syntet Testbutik AB.
 Inget i koden kan i dag bokföra något.
 
-Testsviten: **4 612 passed, 11 skipped**, 0 misslyckade (körd senast 2026-11-04 i sessionen för steg 15, i projektmappen med
+Testsviten: **4 612 passed, 11 skipped**, 0 misslyckade (körd senast 2026-11-04 i granskning 34, i projektmappen med
 kommandot i SPEC 7.1. De 11 är spärrtestet, som hoppas över tills sandlådan är installerad). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
 borttagen.
@@ -24,6 +24,28 @@ borttagen.
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
 
+## Läge 2026-11-04, granskning 34 av sandlådan
+
+Steg i byggplanen: 15 (pågår)
+
+- **Säkerhet först: installera inte `903909fe…`.** Granskning 34 är **röd** (`GRANSKNING.md`, "Granskning 34"). P1, hög: efter beslut 6 kan en testfil i sandlådan skriva `.git/commondir` eller en fil `sub/.git`, och då kör `git status` utanför sandlådan koden, med Hugos fulla rättigheter. Inget namnbyte av `.git` behövs. Prövat med riktig git och en modell av sandlådan, inte med den riktiga Claude Code. Inget är installerat, och ingen kod eller inställningsfil är ändrad.
+- **Fynd:** P1 hög, blockerar. P2 hög, blockerar tills det är prövat: att flytta `.git` lyckas i en kopia, stoppas i projektet enligt modellen, och är inte prövat på riktigt. P3 medel: en testfil kan dölja en ändring med `git commit --amend`, så att `git status` och `git diff` blir tomma. P4 medel: `/sandbox` i punkt 6.2 öppnas troligen inte. P5 medel: de smalare kontrollerna av INSTALLERA.md, där en tillagd `sudo rm -rf` inte gav något rött. P6–P9 låga: H1-proven, de sex nycklarna, ordningen i punkt 4 och 6, och vaktens prov av rättigheter.
+- **Påståendet om fil-verktygen stämmer:** vakten prövar `Write` och `Edit`, och stoppar dem i hela `.git` och i varje `.venv`.
+- **`managed-settings.json` stämmer med beslut 1–7, och summan med filen.** `Edit(//**/.git)` kan inte stå kvar, eftersom det i modellen stoppar `git add`. Förslag till 14 nya förbud står i P1, och i modellen stoppar de vägarna utan att stoppa `git add` och `git commit`.
+- **Beslut som behövs:** Hugo eller Casper om P1, P2 och P3, och om P7. Sedan byggsession och ny oberoende granskning, före installationen.
+- **Körningar** (`<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`, `<S>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/64d76806-8e2a-422f-b035-fd30949d4049/scratchpad`). Från projektmappen, ett kommando i taget. Provfilerna skrevs med fil-verktygen i `<S>/prov`, och de kör `/usr/bin/sandbox-exec` och `/usr/bin/git` i testets tillfälliga mapp. `<S>/kopia` gjordes med `git archive --format=tar -o <S>/kopia.tar HEAD`, `mkdir -p <S>/kopia` och `tar -xf <S>/kopia.tar -C <S>/kopia`.
+  1. `<python> -B -m pytest -p no:cacheprovider -q --tb=short <S>/prov/test_git_hal.py` (3 passed, tabellen över vägarna i `resultat.json`).
+  2. `<python> -B -m pytest -p no:cacheprovider -q --tb=short <S>/prov/test_git_hal2.py` (3 passed: länkar och `/.vol`, historiken, vaktens svar).
+  3. `<python> -B -m pytest -p no:cacheprovider -q --tb=short <S>/prov/test_git_hal3.py` (3 passed: förslaget, `git add` och provenance).
+  4. `<python> -B -m pytest -p no:cacheprovider -q --tb=short <S>/prov/test_summor.py` (1 passed: summorna).
+  5. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests` (**4612 passed, 11 skipped**, utan sandlåda).
+  6. Mutation i `<S>/kopia/scripts/tests/test_kommandosparr.py`, undantaget i `rotagd` borttaget, utvidgat, och rättigheterna aldrig prövade: `<python> -B -m pytest -p no:cacheprovider -q --tb=line -k test_rotagd_ <S>/kopia/scripts/tests/test_kommandosparr.py` (1, 1 respektive 3 failed).
+  7. Mutation i `<S>/kopia/sparr/kommandosparr.py`, kravet på rättigheter borttaget: `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rf <S>/kopia/scripts/tests/test_kommandosparr.py` (544 passed, 1 skipped) och `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rf <S>/kopia/scripts/tests` (2 failed, 4609 passed, 12 skipped).
+  8. Mutation i `<S>/kopia/sparr/INSTALLERA.md`, `sudo rm -rf`, `curl` och versionen flyttad: samma kommando mot `<S>/kopia/scripts/tests` (**4612 passed, 11 skipped**).
+  9. Mutation i `<S>/kopia/sparr/managed-settings.json`: `<python> -B -m pytest -p no:cacheprovider -q --tb=no -rf <S>/kopia/scripts/tests/test_sandladan.py` (4 failed, 14 passed, 11 skipped).
+- **Verifierat med körning:** ovan. **Läst i dokumentationen:** code.claude.com/docs/en/sandboxing.md, settings.md, settings-reference.md (de delar om nycklarna), permissions.md, permission-modes.md, sandbox-environments.md, och källkoden till anthropics/sandbox-runtime. **Min bedömning:** att appen kör git utanför sandlådan, och att orsaken till H1 är Terminal.
+- **Opushat:** som nedan, och commiten med den här texten. Sessionen pushar inte.
+
 ## Läge 2026-11-04, sandlådan byggd, inte installerad och inte granskad
 
 Steg i byggplanen: 15 (pågår)
@@ -37,6 +59,7 @@ Steg i byggplanen: 15 (pågår)
   - Grupp C (7): "assert False". `test_beslut_granskning_13::test_p2_for_lang_kedja_stoppas`, `test_granskning_14::test_lang_kedja_dar_varje_lank_ligger_i_en_rotmapp_slapps_igenom[3,4,5,8]`, `::test_kedja_med_relativa_lankar_och_tva_punkter`, `test_kommandosparr::test_rotagd_galler_bara_det_testet_anger`.
   - Grupp D (2): PermissionError när testet skapar `<temp>/hem/projekt/.git` (`test_beslut_granskning_17::test_h6_en_lank_till_git_stoppas`) och `.venv` (`test_kommandosparr::test_beslut_1_gamla_venv_i_projektet_stoppas`).
   - Testernas tillfälliga mapp låg i sandlådan under `/private/tmp/claude-501/pytest-of-hugolindholmer/`.
+- **Hugos provkörning 2026-11-04 23:18, efter rättelsen** (Terminal, med `--settings` och sandlådan påslagen, de låsta inställningarna fortfarande den gamla versionen): **2 failed, 4604 passed, 17 skipped.** De två röda är grupp D: `test_beslut_granskning_17::test_h6_en_lank_till_git_stoppas` och `test_kommandosparr::test_beslut_1_gamla_venv_i_projektet_stoppas`. Av de 17 är 11 spärrtestet och 6 H1-prov i `test_beslut_granskning_17.py`, som kräver `com.apple.provenance`. Precis det INSTALLERA.md väntade sig. `git status` var tom efteråt.
 - **Orsaken till grupp A-C, visad med körning: testernas miljö, inte vakten.** Hugos hypotes stämmer, med en precisering. Fixturen `rotagd` låtsas att en mapp och mapparna ovanför ägs av root, men prövar rättigheterna på riktigt. `/private/tmp` har 1777, alla får skriva, så provet faller där. Vakten svarar `False` för `/private/tmp`, och det ska den. När pytests tillfälliga mapp läggs under `/private/tmp`, utan sandlåda, blir **exakt de 18 testerna** röda. I sandlådan var också testerna som ska stoppas gröna av fel skäl. De stoppas nu av mappen i testet.
 - **Rättelsen, commit 1 (b6ce680):** bara fixturen `rotagd`. Mapparna ovanför testets egen tillfälliga mapp hör till datorn, och deras rättigheter prövas inte när testet låtsas att de ägs av root. Testets egen mapp och allt i den prövas på riktigt.
 - **Före och efter, ändrade tester.** Grupp A-C (18): testernas text är oförändrad, och de prövar samma sak. Före: rött under `/private/tmp`. Efter: grönt både under `/private/tmp` och utanför.
@@ -1983,6 +2006,7 @@ fattade och byggda, se avsnittet ovan.)
 56. **Sex nycklar som försvagar sandlådan** (steg 15). Dokumentationen säger att de går att sätta på från användarens inställningar eller `--settings`, och att de bör sättas till false i de låsta inställningarna om de inte ska användas: `enableWeakerNestedSandbox`, `enableWeakerNetworkIsolation`, `network.allowAllUnixSockets`, `network.allowLocalBinding`, `allowAppleEvents` och `allowNestedUserNamespaces`. Hugos svar 2026-11-04: bygg som beslutat, utan dem. **Öppen. Väntar på beslut.**
 57. **Fil-verktyget Read kan läsa utanför projektet** (steg 15). `Read(~/.ssh/**)` stänger `~/.ssh`, men vakten prövar inte sökvägar för Read, och sandlådan gäller inte fil-verktygen. Dokumentationen har också `permissions.blockWritesOutsideWorkingDirectories` (v2.1.314) för skrivning, som inte är prövad eller beslutad. **Öppen.**
 58. **SPEC 7.1 stämmer inte längre på två punkter efter steg 15** (Hugos uppdrag: ändra inte listan). "Ett test kontrollerar att de är samma som i inställningarna", och att en egen testfil stoppas av sandlådan. Rättas efter granskningen, med Hugos eller Caspers OK. **Öppen.**
+59. **Fynden i granskning 34** (steg 15, `GRANSKNING.md`). P1 och P2 blockerar installationen, P3 kräver ett beslut, P4 och P5 rättas i samma byggsession, och P6–P9 är låga (P9 ligger utanför steget). **Öppen. Väntar på beslut.**
 
 ## Nästa steg i byggordningen
 
