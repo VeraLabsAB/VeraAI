@@ -10279,3 +10279,39 @@ stämmer, flödena går igenom och ingen väg runt hittades under samma perioder
 BESLUT SOM BEHÖVS: 1–4 ovan.
 NÄSTA STEG: Hugo eller Casper svarar på 1–4. Sedan steg 99 (Öppet 43), steg 100 (Öppet 44), steg 96 (Öppet 37) och steg 92 (Öppet 26). Steg 15
 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
+
+## Hugos beslut 2026-11-04 om granskning 31
+
+Skrivna av Hugo i chatten 2026-11-04, i uppdraget till byggsessionen för steg 99. Ordagrant:
+
+    "HUGOS BESLUT 2026-11-04 OM GRANSKNING 31:
+    1. P1 (Öppet 46): ett eget designsteg före piloten, ihop med beslut 5 om granskning 30 och Öppet 47: ett register över vad som redan är bokfört, som varje körning läser. Inget underlag och ingen bankrad får bokföras två gånger, varken i samma körning eller över körningar. Kassio körs vecka för vecka och tidsfönstret är längre än en vecka, så det här är kärnan i produkten, inte ett undantag. När flera fakturor passar samma betalning blir det ett ärende där kunden väljer (Kassio stannar och frågar). Det behöver ingen redovisningskonsult.
+    2. P2 och P4 (Öppet 48): rättas i steg 96.
+    3. P3 (Öppet 47 a): det räcker att tiden är uppmätt. Tas med i designsteget i beslut 1.
+    4. Steg 98 är granskat och klart."
+
+### Byggsessionen för steg 99 (2026-11-04)
+
+- **Byggt** i 95afce1: `_kontrollera_k4` i `scripts/konteringsforslag.py`, som `skapa_konteringsforslag` anropar allra sist, efter Öppet 40. Kontrollen
+  läser K4:s ärenden ur `underlagsperiod.arenden`, utan egen K4-logik, med samma regler som `kontera_period` (Hugos beslut 2026-10-30 om granskning 22,
+  punkt 3, och om granskning 23, Öppet 29). K4a, K4b och "K4a och K4b": båda underlagen stoppas. K4c: det flaggade stoppas, och originalet godtas bara
+  med märkningen för alla underlag K4c har flaggat mot det. K4 (dublett): kan inte nås, och originalet godtas. Bara nya stopp, returvärdet oförändrat, inget
+  företagsspecifikt. `MARKNING_K4C` är flyttad till `konteringsforslag.py` och importeras i `konteringsfloden.py`, som inte har någon annan ändring.
+- **Punkt 3 och 4 i uppdraget utlöstes inte:** flyttningen av konstanten räckte, flöde a, b och e stoppas inte, och inget befintligt test gick sönder, också
+  med testdatans planterade dubblett 004.
+- **Rött före: 46 av 60** (körd mot `git archive` av 344a8d2). 41 är röda för att förslaget gick igenom ("DID NOT RAISE"). 5 är röda bara för att koden saknas
+  (kodtesten), så de bevisar inget beteende. De 14 gröna är skydd. **Sviten efter: 4 552 passed** (4 492 och 60 nya).
+- **Mutationsprov, tio ändringar i en kopia, alla ger rött.** Alla kommandon står i PROGRESS.md, "Läge 2026-11-04, steg 99 byggt".
+- **Fyra saker som kontrollen inte gör, eller som är byggsessionens val:**
+  1. *Märkningen prövas till och med orden "är flaggat".* Resten av meningen och texten runt omkring prövas inte, så "inte Märkning K4c: underlaget 'X' är
+     flaggat" godtas (inte provat, läst i koden). Beslut 4 om granskning 30 säger att godkännandekortet inte ska visa motiveringen, vilket är det egentliga skyddet.
+  2. *Orden "underlaget", "underlagen" och "är flaggat" står både i kontrollen och i flödena.* Konstanten är en, men resten av märkningen byggs i
+     `_markning_k4c`, och uppdraget tillåter ingen annan ändring i flödena. Glider de isär stoppas flödenas egna förslag, och skyddstesten blir röda (mutation
+     10, körd). Samma sak gäller `_K4C` och `_STOPPAR_BADA`, som ett test håller lika.
+  3. *Felets `kontroll` är K4-kontrollens namn*, till exempel "K4a och K4b", inte "ursprung". Samma mönster som K5, K7 och K8.
+  4. *K4 ser bara underlagen i perioden.* Slutar perioden före det andra underlaget i paret flaggas inget, och förslaget godtas (körd, dokumenterad i
+     `test_kvar_k4_ser_bara_underlagen_i_perioden`). Det är gränsen i Öppet 46 och hör till steg 101.
+- **Vad testerna visar om K4c:** med samma motpart och samma datum får fakturanumret inte avgöra (`_kan_avgora` i `matcha_bank.py`), så bankraden är tvetydig och
+  Öppet 40 stoppar betalningen först. K4-kontrollen hörs bara när Öppet 40 godtar, till exempel samma nummer och olika motpart. Stopp blir det i båda fallen.
+- **Inte byggt, enligt uppdraget:** steg 96, steg 100 och registret. SPEC är inte ändrad, så SPEC 7 beskriver inte Öppet 43 (PROGRESS.md, Öppet 47 b).
+- **Inte granskad oberoende än.**
