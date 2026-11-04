@@ -1,15 +1,15 @@
 # PROGRESS – Veras bokföringsagent
 
 Uppdaterad 2026-11-04. Specifikation: `SPEC.md`. Byggordning: `DESIGN-regelbok.md` avsnitt 7.
-Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12: vakten installerades på Hugos dator 2026-10-28. Steg 12 är klart igen 2026-10-29: den nya versionen av inställningsfilen, där läget Auto tillåts igen (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Auto tillåts igen"), är installerad och kontrollerad (`GRANSKNING.md`, "Kontroll efter bytet av inställningsfil, 2026-10-29"). Auto får användas på Hugos dator, med villkoren tills steg 15 är klart. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Steg 13 är klart**: provet med en vakt som fallerar (steg 8 i kontrollen) är gjort och grönt 2026-10-29. **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4", och **D13 och D14** under "D13 och D14 beslutade" (baec52b). **Uppgift 4 är byggd** 2026-10-29 (4269f76, f6ed99e och e4cc538): flöde a, b och e med K5 och K8 i `scripts/konteringsfloden.py`, och den nya nyckeln `bokforing` i regelboken (Hugos OK i chatten 2026-10-29). Granskad i granskning 22 (e4d8cd7), gult: P1 och P2 kvar, 7 frågor väntar på Hugo. Pushad (`main` på GitHub står vid d127c3e). **Hugos beslut efter uppgift 4 (a–f)** står i `GRANSKNING.md`, "Beslut efter uppgift 4 (2026-10-29)" (48e7ed3), och är byggda 2026-10-29 i ded669d (c: nyckeln `flode`, reserverade namn och regeln `bankens-avgifter`) och 5753890 (f och e). Pushade 2026-10-29 (`main` på GitHub står på 7d8cae9). **Hugos beslut 2026-10-30 om granskning 22** (`GRANSKNING.md`, "Hugos beslut 2026-10-30 om granskning 22") är byggda 2026-10-30: K5, K7 och K8 ligger i `skapa_konteringsforslag` (P1), ett underlag som K4 flaggar får inget förslag och K4-ärendet följer med (P2), reserverade ord stoppar alla namn i konfigurationen vid exakt träff (Öppet 27, stängd) och `flode` stoppas på regler för pengar in (Öppet 28, stängd). **Granskade i granskning 23** (269d641, gult): P1 hade en lucka (K5 och K8 prövades mot förslagets regel, inte underlagets), P3 två namn som inte prövades. **Hugos beslut 2026-10-30 om granskning 23** (`GRANSKNING.md`, "Hugos beslut 2026-10-30 om granskning 23") är byggda 2026-10-30 i 13126d2 (P1) och 35afa8b (P3 och Öppet 29, stängd), och **granskade i granskning 24** (6dfcdcd, grönt): byggda som besluten säger, inget blockerande. **Steg 22 är klart** 2026-10-30: granskat i granskning 23 och 24 (Hugos beslut 2026-10-30 om granskning 24, beslut 3). **Öppet 31 är rättad** 2026-10-30 i bbb183a (förslagets regel ska vara underlagets egen regel, beslut 1) och **granskad i granskning 25** (grönt: byggd som beslutet säger, inget blockerande; en lucka inom regeln kvar som Öppet 32, väntar på beslut), och **Öppet 30 är stängd** (beslut 2). **Öppet 32 är rättad** 2026-10-30 (kostnadsraden i ett förslag med underlag står på det konto K5 ger för momssatsen, annars stoppas förslaget, Hugos beslut 2026-10-30 om granskning 25, beslut 1; committad 2026-10-30 som steg 91 i BYGGPLAN.md) och **granskad i granskning 26** (gult: byggd som beslutet säger, inget blockerande; ett hål kvar i samma familj, kostnaden räknad ur `belopp_ore` i stället för `underlag_ore`, som Öppet 34, väntar på beslut), och **Öppet 31 räknas som granskad och klar** (beslut 2). **Hugos beslut 2026-10-30 om byggsessionen för Öppet 32** (`GRANSKNING.md`): momsraden är Öppet 33, ett eget steg efter Öppet 32 (a), och Öppet 32 och Öppet 26 är steg 91 och 92 (b). **Öppet 33 och Öppet 34 är byggda** 2026-10-30 som steg 93 i BYGGPLAN.md (Hugos beslut 2026-10-30 om granskning 26, "Ja, i samma steg"; commit 7801a64: momsraden står på kontot för ingående moms, beloppet att betala räknas bara med `lika`, står bara på leverantörsskulderna och på högst en rad, och `underlag_ore` och `moms_ore` räknas aldrig med `skillnad`), och **granskade i granskning 27** (gult: byggda som beslutet säger, H7 och de fyra LUCKA-proven stoppas; två hål kvar i en ny familj, beloppet i debet på leverantörsskulderna utan bankrad, som Öppet 35, väntar på beslut). **Regeln om högst en rad är beslutad av Hugo 2026-10-31** (uppdraget till granskning 27, `GRANSKNING.md`). **Öppet 35 är rättad** 2026-10-31 som steg 94 i BYGGPLAN.md (Hugos beslut 2026-10-31 om granskning 27; commit 109fdcf: ett underlags `belopp_ore` står i debet bara när förslaget har en bankrad, och i kredit bara när underlagets delar inte står i kredit), och **granskad i granskning 28** (2026-11-04, gult: byggd som beslutet säger, h1 och h2 stoppas; kravet på bankrad gäller per förslag, inte per underlag, så h1 och h2 går igenom ihop med en annan fakturas betalning eller en bankrad på fel konto, Öppet 36, väntar på beslut; ett underlag med belopp 0 stannar hela körningen, Öppet 37, utanför steget). **Steg 94 är klart.** Nästa steg: se "Nästa steg i byggordningen". Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
+Byggplan för hela produkten: `BYGGPLAN.md` (Hugos beslut 2026-10-29, rättad 2026-10-29 efter den här filen). Steg 12: vakten installerades på Hugos dator 2026-10-28. Steg 12 är klart igen 2026-10-29: den nya versionen av inställningsfilen, där läget Auto tillåts igen (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Auto tillåts igen"), är installerad och kontrollerad (`GRANSKNING.md`, "Kontroll efter bytet av inställningsfil, 2026-10-29"). Auto får användas på Hugos dator, med villkoren tills steg 15 är klart. Caspers dator är steg 14. Spärrtestet är klart och grönt (2026-10-29). **Steg 13 är klart**: provet med en vakt som fallerar (steg 8 i kontrollen) är gjort och grönt 2026-10-29. **Q2, Q2b, Q3 och Q4 är klara och granskade** (Q2: 3e3c18c och d7d38e0, Q2b: 1dcf769, Q3: bd851ba, Q4: 2bc9762, Hugos beslut 2026-10-29 om Q2–Q4). **Granskning 21 (3bbcbe4) är gjord och grön**: inget allvarligt och inget på nivån medel, tre låga fynd (L1–L3) som är rättade i dokumentationen 2026-10-29 (L3 som exempel i SPEC Ö5). **Q7 är stängd**: pusha som det är, historiken skrivs inte om, och repot på GitHub förblir privat (Hugos beslut 2026-10-29, `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd"). Pushat 2026-10-29. **Besluten inför uppgift 4 (B1–B3)** står i `GRANSKNING.md`, "Beslut 2026-10-29 – inför uppgift 4", och **D13 och D14** under "D13 och D14 beslutade" (baec52b). **Uppgift 4 är byggd** 2026-10-29 (4269f76, f6ed99e och e4cc538): flöde a, b och e med K5 och K8 i `scripts/konteringsfloden.py`, och den nya nyckeln `bokforing` i regelboken (Hugos OK i chatten 2026-10-29). Granskad i granskning 22 (e4d8cd7), gult: P1 och P2 kvar, 7 frågor väntar på Hugo. Pushad (`main` på GitHub står vid d127c3e). **Hugos beslut efter uppgift 4 (a–f)** står i `GRANSKNING.md`, "Beslut efter uppgift 4 (2026-10-29)" (48e7ed3), och är byggda 2026-10-29 i ded669d (c: nyckeln `flode`, reserverade namn och regeln `bankens-avgifter`) och 5753890 (f och e). Pushade 2026-10-29 (`main` på GitHub står på 7d8cae9). **Hugos beslut 2026-10-30 om granskning 22** (`GRANSKNING.md`, "Hugos beslut 2026-10-30 om granskning 22") är byggda 2026-10-30: K5, K7 och K8 ligger i `skapa_konteringsforslag` (P1), ett underlag som K4 flaggar får inget förslag och K4-ärendet följer med (P2), reserverade ord stoppar alla namn i konfigurationen vid exakt träff (Öppet 27, stängd) och `flode` stoppas på regler för pengar in (Öppet 28, stängd). **Granskade i granskning 23** (269d641, gult): P1 hade en lucka (K5 och K8 prövades mot förslagets regel, inte underlagets), P3 två namn som inte prövades. **Hugos beslut 2026-10-30 om granskning 23** (`GRANSKNING.md`, "Hugos beslut 2026-10-30 om granskning 23") är byggda 2026-10-30 i 13126d2 (P1) och 35afa8b (P3 och Öppet 29, stängd), och **granskade i granskning 24** (6dfcdcd, grönt): byggda som besluten säger, inget blockerande. **Steg 22 är klart** 2026-10-30: granskat i granskning 23 och 24 (Hugos beslut 2026-10-30 om granskning 24, beslut 3). **Öppet 31 är rättad** 2026-10-30 i bbb183a (förslagets regel ska vara underlagets egen regel, beslut 1) och **granskad i granskning 25** (grönt: byggd som beslutet säger, inget blockerande; en lucka inom regeln kvar som Öppet 32, väntar på beslut), och **Öppet 30 är stängd** (beslut 2). **Öppet 32 är rättad** 2026-10-30 (kostnadsraden i ett förslag med underlag står på det konto K5 ger för momssatsen, annars stoppas förslaget, Hugos beslut 2026-10-30 om granskning 25, beslut 1; committad 2026-10-30 som steg 91 i BYGGPLAN.md) och **granskad i granskning 26** (gult: byggd som beslutet säger, inget blockerande; ett hål kvar i samma familj, kostnaden räknad ur `belopp_ore` i stället för `underlag_ore`, som Öppet 34, väntar på beslut), och **Öppet 31 räknas som granskad och klar** (beslut 2). **Hugos beslut 2026-10-30 om byggsessionen för Öppet 32** (`GRANSKNING.md`): momsraden är Öppet 33, ett eget steg efter Öppet 32 (a), och Öppet 32 och Öppet 26 är steg 91 och 92 (b). **Öppet 33 och Öppet 34 är byggda** 2026-10-30 som steg 93 i BYGGPLAN.md (Hugos beslut 2026-10-30 om granskning 26, "Ja, i samma steg"; commit 7801a64: momsraden står på kontot för ingående moms, beloppet att betala räknas bara med `lika`, står bara på leverantörsskulderna och på högst en rad, och `underlag_ore` och `moms_ore` räknas aldrig med `skillnad`), och **granskade i granskning 27** (gult: byggda som beslutet säger, H7 och de fyra LUCKA-proven stoppas; två hål kvar i en ny familj, beloppet i debet på leverantörsskulderna utan bankrad, som Öppet 35, väntar på beslut). **Regeln om högst en rad är beslutad av Hugo 2026-10-31** (uppdraget till granskning 27, `GRANSKNING.md`). **Öppet 35 är rättad** 2026-10-31 som steg 94 i BYGGPLAN.md (Hugos beslut 2026-10-31 om granskning 27; commit 109fdcf: ett underlags `belopp_ore` står i debet bara när förslaget har en bankrad, och i kredit bara när underlagets delar inte står i kredit), och **granskad i granskning 28** (2026-11-04, gult: byggd som beslutet säger, h1 och h2 stoppas; kravet på bankrad gäller per förslag, inte per underlag, så h1 och h2 går igenom ihop med en annan fakturas betalning eller en bankrad på fel konto, Öppet 36, väntar på beslut; ett underlag med belopp 0 stannar hela körningen, Öppet 37, utanför steget). **Steg 94 är granskat och klart** (Hugos beslut 2026-11-04 om granskning 28, beslut 3). **Öppet 36 är rättad** 2026-11-04 som steg 95 i BYGGPLAN.md (Hugos beslut 2026-11-04 om granskning 28, beslut 1, granskarens (a); commit 0708667: varje rad med ett underlags `belopp_ore` i debet har en egen rad på bankkontot i kredit med samma belopp ur en bankrad, och varje bankkontorad räknas bara en gång). Granskarens b1 och b3 stoppas. b2 godtas: konteringen är identisk med flöde a:s två förslag i samma förslag (Hugos beslut 2026-11-04, 1); att en faktura och en annan fakturas betalning står i samma förslag ska kontrolleras med en redovisningskonsult (Öppet 38). **Öppet 37 är steg 96** (beslut 2), inte byggd. Nästa steg: se "Nästa steg i byggordningen". Caspers dator installeras i helgen (vecka 44, Öppet, punkt 15).
 
 Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **4 434 passed**, 0 misslyckade (körd senast 2026-11-04 i granskning 28, i projektmappen med kommandot i
-SPEC 7.1: 4 421 från förut och 13 från steg 94 i `scripts/tests/test_beslut_granskning_27.py`). Sedan installationen
+Testsviten: **4 443 passed**, 0 misslyckade (körd senast 2026-11-04 i steg 95, i projektmappen med kommandot i
+SPEC 7.1: 4 434 från förut och 9 från steg 95 i `scripts/tests/test_beslut_granskning_28.py`). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
 borttagen.
 
@@ -23,6 +23,62 @@ borttagen.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-11-04, Öppet 36 byggd
+
+Steg i byggplanen: 95 (klart)
+
+- **Vilket steg:** Öppet 36 (granskning 28, M1), eget steg med nästa lediga nummer, 95, efter steg 94. **Hugos beslut
+  2026-11-04 om granskning 28**, skrivna i chatten i uppdraget till den här sessionen, står ordagrant i
+  `GRANSKNING.md` under "Hugos beslut 2026-11-04 om granskning 28": (1) Öppet 36 enligt granskarens (a), med
+  tillägget att varje bankkontorad räknas bara en gång; hittar nästa granskning ett nytt hål i familjen Öppet 31–36
+  går vi över till (b); (2) Öppet 37 blir ett ärende för just det underlaget, byggs som steg 96, inte här; (3) steg 94
+  är granskat och klart. Byggt i 0708667 (kod och test) och dokumentationscommiten efter den.
+- **Byggt** i `_kontrollera_beloppssidan`, i grenen för debet, efter Öppet 35:s krav på någon bankrad alls: varje
+  rad med ett underlags `belopp_ore` i debet paras i radordning med den första lediga raden på bankkontot (rollen
+  `bank`) i kredit som har exakt samma belopp och bara bankrader som källor, och varje bankkontorad paras högst en
+  gång. En rad utan partner stoppar förslaget. Bara stopp tillagda, returvärdet oförändrat, inget företagsspecifikt.
+  Felet namnger raden, kontot, underlaget, beloppet, raderna på bankkontot (och vilken rad som redan tagit dem) och
+  Öppet 36. Granskarens b1 (fakturan spegelvänd ihop med 009:s betalning) och b3 (bankraden på kostnadskontot)
+  stoppas, och två belopp i debet får inte dela en bankkontorad. Docstringarna säger att regeln måste prövas igen
+  när Ö8 (kreditnotor) byggs.
+- **Nytt argument:** `_kontrollera_beloppssidan` tar kontoplanen (för rollen `bank`). De två testerna i
+  `test_beslut_granskning_27.py` som anropar den direkt skickar nu `korning.kontoplan` (Hugos OK 2026-11-04, 2).
+- **Sessionen stannade och frågade (uppdragets punkt 3):** b2 går igenom med regeln enligt beslut 1. Bankrad 26 är
+  003:s betalning och står på bankkontot i kredit mot 003:s belopp i debet, så (a) är uppfylld; 009:s belopp står i
+  kredit med delarna i debet. Konteringen är identisk med flöde a:s två förslag (009:s faktura och 003:s betalning)
+  i samma förslag. **Hugos beslut 2026-11-04 (i chatten, ordagrant i `GRANSKNING.md`):** b2 godtas under (a), inte
+  felaktig bokföring, inte ett nytt hål i familjen; b2-testet är ett skydd som visar att formen godtas och att
+  konteringen per konto är samma som flöde a:s två förslag; att en faktura och en annan fakturas betalning står i
+  samma förslag ska kontrolleras med en redovisningskonsult och tas upp när godkännandekortet i appen byggs (Öppet
+  38).
+- **Skyddstestet** `test_skydd_varje_belopp_i_debet_i_flodena_har_en_bankrad` (granskning 28, L1) prövar nu
+  granskarens f4: exakt en rad på bankkontot i kredit med samma belopp och bara bankrader som källor.
+- **Tester:** 9 nya i `scripts/tests/test_beslut_granskning_28.py`: b1, b3, den delade bankkontoraden, ordningen
+  (Öppet 35 före 36), b2 som skydd, två skydd till (fakturan och betalningen för hand, två betalningar med var sin
+  bankkontorad), flöde a, b och e, och texten i koden. **Röda före:** 4 av 9 mot koden i 3f36f6b (b1, b3 och den
+  delade raden "DID NOT RAISE", texttestet), körda i projektmappen innan `konteringsforslag.py` ändrades. Då var b2
+  skrivet som ett stopp: 5 röda före, och efter kodändringen 1 röd (b2), vilket var frågan till Hugo.
+- **Kommandon** (från projektmappen, ett i taget):
+  1. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line
+     -rA -k granskning_28 scripts/tests` före kodändringen (**5 failed, 4 passed**, rött före, med b2 som stopp).
+  2. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short
+     -rA -k "granskning_28 or granskning_27" scripts/tests` efter kodändringen (först 2 failed, 20 passed: b1:s test
+     väntade sig tusentalsavstånd i beloppet, rättat till `kronor`; sedan **1 failed, 21 passed**, b2).
+  3. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q
+     scripts/tests`: **1 failed, 4 442 passed** (b2), före frågan till Hugo.
+  4. Samma som 1 med `--tb=short` efter att b2 skrivits om till skydd: **9 passed**. Samma som 3: **4 443 passed**.
+  5. `git add scripts/konteringsforslag.py scripts/tests/test_beslut_granskning_27.py
+     scripts/tests/test_beslut_granskning_28.py` och `git commit -F` med meddelandet i scratchpad (0708667).
+  6. `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q -k
+     byggplan_progress scripts/tests` efter dokumentationen.
+- **Dokumentation** (den här commiten): `GRANSKNING.md` ("Hugos beslut 2026-11-04 om granskning 28", med alla sex
+  besluten ordagrant), BYGGPLAN.md (steg 95 och 96, steg 94 granskat och klart, "Läge nu") och den här filen (Öppet
+  36 stängd, Öppet 37 som steg 96, Öppet 38 ny). SPEC 7.1 är inte rörd. SPEC 7 (stycket "Sidan för beloppet") är
+  inte uppdaterad med Öppet 36 i den här sessionen, eftersom uppdraget sa att inget utanför de nämnda filerna rörs.
+- **Opushat:** d5b2fba, 269d641, 13126d2, 35afa8b, aecccdf, 6dfcdcd, bbb183a, 277ca90, 7c1f148, c479915, d1ab489,
+  994bcdf, 5b4aa83, 7801a64, 68e86bb, granskning 27, 109fdcf, f10c65b, granskning 28, 0708667 och den här commiten.
+  `main` på GitHub står på 7d8cae9.
 
 ## Läge 2026-11-04, granskning 28 av Öppet 35
 
@@ -1086,6 +1142,7 @@ fattade och byggda, se avsnittet ovan.)
 | Granskning 27 (av 7801a64 och 68e86bb): Öppet 33 och 34 är byggda som beslutet säger, H7 och de fyra LUCKA-proven stoppas, gult. M1: beloppet i debet på leverantörsskulderna utan bankrad (fakturan spegelvänd, eller två lika stora fakturor mot varandra) godtas, för ett förslag förbi flödena (Öppet 35, väntar på beslut). Hugos beslut 2026-10-31: regeln om högst en rad behålls. Bara dokumentation | commiten "Granskning 27" |
 | Hugos beslut 2026-10-31 om granskning 27: Öppet 35 byggd som steg 94. Ett underlags `belopp_ore` står i debet bara när förslaget har en bankrad, och i kredit bara när underlagets `underlag_ore` och `moms_ore` inte står i kredit (`_kontrollera_beloppssidan`, sist efter Öppet 33). Granskarens prov h1 och h2 stoppas. Kreditnotor kan inte läsas in i dag, så regeln stoppar ingen (test). 5 av 13 nya tester röda mot koden i b7d9fac. Granskat i granskning 28 (gult: byggt som beslutet säger, h1 och h2 stoppas; kravet på bankrad gäller per förslag, Öppet 36) | 109fdcf, f10c65b |
 | Granskning 28 (av 109fdcf och f10c65b): Öppet 35 är byggd som beslutet säger ordagrant, h1 och h2 stoppas, "rött före" och sviten stämmer, gult. M1: kravet på bankrad gäller per förslag, inte per underlag, så h1 och h2 godtas ihop med en annan fakturas betalning eller en bankrad på fel konto, för ett förslag förbi flödena (Öppet 36, väntar på beslut). M2, utanför steget: ett underlag med belopp 0 stannar hela körningen (Öppet 37, väntar på beslut). Bara dokumentation | commiten "Granskning 28" |
+| Hugos beslut 2026-11-04 om granskning 28: Öppet 36 byggd som steg 95 enligt granskarens (a). Varje rad med ett underlags `belopp_ore` i debet har en egen rad på bankkontot i kredit med samma belopp ur en bankrad, och varje bankkontorad räknas bara en gång (`_kontrollera_beloppssidan`, som fick kontoplanen som argument). Granskarens b1 och b3 stoppas; b2 godtas (konteringen är identisk med flöde a:s två förslag i samma förslag, Hugos beslut 2026-11-04 i chatten, Öppet 38 för redovisningskonsulten). Skyddstestet från steg 94 skärpt till f4 (L1). 4 av 9 nya tester röda mot koden i 3f36f6b. Steg 94 granskat och klart (beslut 3). Öppet 37 är steg 96 (beslut 2), inte byggd | 0708667, och dokumentationen efter den |
 | Beslut f och e: `R-BUTIK-FORBRUKNING` (5460) och `R-LEV-TILLBEHOR` (4010), nivå B, i testbutikens regelbok, och testregeln för DESIGN 4b borttagen. SPEC 7 nämner `kontera_period` | 5753890 |
 | Granskning 11, Q7 (Hugos beslut 2026-10-29): pusha som det är. Historiken skrivs inte om, och ingen tagg byts eller pushas. Repot på GitHub är privat och får inte göras publikt utan en ny genomgång av hela historiken först. `GRANSKNING.md`, "Beslut 2026-10-29 – Q7 stängd". Bara dokumentation | commiten "Q7 stängd: pusha som det är, repot förblir privat" |
 
@@ -1344,7 +1401,7 @@ fattade och byggda, se avsnittet ovan.)
     inte i beslutet och är inte byggt. Kreditnotor kan inte läsas in i dag; när Ö8 byggs måste regeln prövas igen.
     **Granskad i granskning 28** (gult: byggd som beslutet säger ordagrant, h1 och h2 stoppas; kravet på bankrad
     gäller per förslag, inte per underlag, Öppet 36).
-36. **Kravet på bankrad i Öppet 35 gäller per förslag, inte per underlag, så h1 och h2 går igenom ihop med en
+36. ~~**Kravet på bankrad i Öppet 35 gäller per förslag, inte per underlag, så h1 och h2 går igenom ihop med en
     bankrad som inte hör till underlaget, för ett förslag byggt förbi flödena** (granskning 28, M1, nivå medel).
     `_kontrollera_beloppssidan` frågar bara om förslaget har någon använd bankrad alls, var som helst och med vilket
     belopp som helst. Granskarens prov: (b1) 003 spegelvänd (beloppet i debet, delarna i kredit) i samma förslag som
@@ -1356,14 +1413,31 @@ fattade och byggda, se avsnittet ovan.)
     Hugo eller Casper att välja: (a) för varje rad med ett underlags `belopp_ore` i debet ska förslaget ha en rad på
     bankkontot i kredit med samma belopp, räknad ur en bankrad; (b) flödenas två former rakt av; (c) lämna till
     uppgift 5. Hänger ihop med Ö8 som Öppet 35. Bör avgöras före uppgift 5, som eget steg. **Öppen, inte byggd.
-    Väntar på Hugos eller Caspers beslut** (granskning 28, "Beslut som behövs", 1).
+    Väntar på Hugos eller Caspers beslut** (granskning 28, "Beslut som behövs", 1).~~ **Stängd:** Hugos beslut
+    2026-11-04 om granskning 28, beslut 1 (granskarens (a), med uppdragets tillägg att varje bankkontorad räknas bara
+    en gång), byggt 2026-11-04 som steg 95 i BYGGPLAN.md, i 0708667 (`_kontrollera_beloppssidan`, grenen för debet,
+    med kontoplanen som nytt argument), se "Läge 2026-11-04, Öppet 36 byggd". b1 och b3 stoppas. **b2 godtas** (Hugos
+    beslut 2026-11-04 i chatten): bankrad 26 är 003:s betalning och står mot 003:s belopp, så (a) är uppfylld, och
+    konteringen är identisk med flöde a:s två förslag (009:s faktura och 003:s betalning) i samma förslag. Räknas
+    inte som ett nytt hål i familjen; frågan om samma förslag är Öppet 38. Kreditnotor: när Ö8 byggs måste regeln
+    prövas igen. **Inte granskad oberoende än.**
 37. **Ett underlag med `belopp_ore` 0 stannar hela körningen** (granskning 28, M2, nivå medel, utanför steg 94).
     `las_underlag` stoppar negativa tal men inte 0, och K13 går ihop (0 + 0 = 0). Flöde a hoppar över momsrader med 0
     och bygger en faktura med en enda rad (leverantörsskulderna med 0 i kredit), som K2 stoppar, och
     `kontera_period` fångar inte felet, så inget förslag görs för någon i perioden och felet säger inte vilket
     underlag det gäller. Säker riktning, men körningen stannar. Fanns före 109fdcf. Beslut som behövs: stoppa ett
     sådant underlag när det läses (som negativa tal), eller göra ett ärende. Eget steg, inte en del av Öppet 36.
-    **Öppen. Väntar på Hugos eller Caspers beslut** (granskning 28, "Beslut som behövs", 2).
+    **Öppen. Väntar på Hugos eller Caspers beslut** (granskning 28, "Beslut som behövs", 2). **Avgjort** (Hugos
+    beslut 2026-11-04 om granskning 28, beslut 2, `GRANSKNING.md`): ett underlag med `belopp_ore` 0 ska bli ett
+    ärende för just det underlaget, och resten av perioden ska fortsätta. Byggs som eget steg 96 i BYGGPLAN.md, inte
+    i sessionen för steg 95. **Öppen, inte byggd.**
+38. **En faktura och en annan fakturas betalning i samma förslag** (Hugos beslut 2026-11-04 i chatten, i sessionen
+    för steg 95, `GRANSKNING.md`, "Hugos beslut 2026-11-04 om granskning 28"). Granskarens b2 från granskning 28
+    (009:s faktura och 003:s betalning i en verifikation) godtas av Öppet 36 enligt (a), eftersom konteringen är
+    identisk med flöde a:s två förslag. Hugos beslut 3, ordagrant: "Att en faktura och en annan fakturas betalning
+    står i samma förslag ska kontrolleras med en redovisningskonsult (en verifikation per affärshändelse?), och tas
+    upp igen när godkännandekortet i appen byggs." Flödena bygger aldrig så; bara kod förbi flödena kan. **Öppen.
+    Väntar på en redovisningskonsult, och på steg 33 (godkännandet) i BYGGPLAN.md.**
 
 ## Nästa steg i byggordningen
 
@@ -1395,7 +1469,10 @@ fattade och byggda, se avsnittet ovan.)
    **Öppet 35 byggd 2026-10-31 som steg 94** (Hugos beslut 2026-10-31 om granskning 27; 109fdcf), **granskad i
    granskning 28** (gult: byggd som beslutet säger ordagrant, h1 och h2 stoppas; kravet på bankrad gäller per
    förslag, inte per underlag, Öppet 36; ett underlag med belopp 0 stannar hela körningen, Öppet 37, utanför
-   steget). Kvar: Öppet 36 och 37 (väntar på beslut), och steg 92, Öppet 26 (konton för hyra, el och telefon)
+   steget). **Steg 94 granskat och klart** (Hugos beslut 2026-11-04 om granskning 28, beslut 3). **Öppet 36 byggd
+   2026-11-04 som steg 95** (beslut 1, granskarens (a); 0708667): b1 och b3 stoppas, b2 godtas (Hugos beslut
+   2026-11-04 i chatten, Öppet 38 för redovisningskonsulten). Inte granskad oberoende än. Kvar: Öppet 37 som steg 96
+   (beslut 2, inte byggd), Öppet 38 (redovisningskonsult), och steg 92, Öppet 26 (konton för hyra, el och telefon)
    (Hugos beslut 2026-10-30 om byggsessionen för Öppet 32, b). Pushad till 7d8cae9. DESIGN 7 säger oberoende granskning efter uppgift 3 och 6, inte efter 4. Det som var förutsättningarna:
    flöde a, b och e (leverantörsfakturor, kvitton och bankavgifter)
    med K5 och K8 (BYGGPLAN steg 22). Förutsättningar, Hugos beslut 2026-10-29 (`GRANSKNING.md`, "Beslut

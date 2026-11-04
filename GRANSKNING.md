@@ -9371,3 +9371,70 @@ före uppgift 5. Dessutom M2 (Öppet 37), utanför steget: ett underlag med belo
 BESLUT SOM BEHÖVS: 1–3 ovan.
 NÄSTA STEG: Hugo eller Casper svarar på 1–3. Sedan Öppet 36 (eget steg) och steg 92 (Öppet 26) före uppgift 5. Steg
 15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
+
+## Hugos beslut 2026-11-04 om granskning 28
+
+Skrivna av Hugo i chatten 2026-11-04, i uppdraget till byggsessionen för Öppet 36 (steg 95). Ordagrant:
+
+    "HUGOS BESLUT 2026-11-04 OM GRANSKNING 28:
+    1. Öppet 36 byggs enligt granskarens (a): för varje rad med ett underlags belopp_ore i debet ska förslaget ha
+       en egen rad på bankkontot (rollen bank i kontoplanen) i kredit, med samma belopp, och med en bankrad som
+       källa. Hittar nästa granskning ett nytt hål i samma familj (Öppet 31–36) går vi över till (b), flödenas
+       former rakt av.
+    2. Öppet 37: ett underlag med belopp_ore 0 ska bli ett ärende för just det underlaget, och resten av perioden
+       ska fortsätta. Byggs som eget steg 96, inte i den här sessionen.
+    3. Steg 94 är granskat och klart."
+
+Uppdraget sa också: två rader med `belopp_ore` i debet och samma belopp får inte dela en och samma rad på
+bankkontot (varje bankkontorad räknas bara en gång); lägg bara till stopp, ändra inte returvärdet; skärp skyddstestet
+enligt L1 till granskarens f4; och stanna och fråga om b2 går igenom med regeln enligt beslut 1, eller om flöde a, b
+eller e stoppas.
+
+**Byggsessionen stannade och frågade:** b2 går igenom med regeln enligt beslut 1. Bankrad 26 är 003:s betalning och
+står på bankkontot i kredit mot just 003:s `belopp_ore` i debet, med samma belopp, så (a) är uppfylld för 003, och
+009:s belopp står i kredit med delarna i debet (fakturans form). Granskarens påstående att (a) stoppar b2 utgick från
+att bankrad 26 är "främmande", men för koden har en bankrad ingen ägare. Konteringen i b2 är identisk med flöde a:s
+två förslag (009:s faktura och 003:s betalning) i samma verifikation. Byggsessionen föreslog fyra sätt utan att välja
+(godta b2 under (a); gå över till (b); en smalare regel att ett belopp i debet inte får stå ihop med ett annat
+underlags belopp i kredit; ett underlag per förslag när beloppet står i debet). Hugos svar, skrivet i chatten
+2026-11-04, ordagrant:
+
+    "BESLUT FRÅN HUGO 2026-11-04:
+    1. b2 godtas under (a). Det är inte felaktig bokföring: konteringen är identisk med flöde a:s två förslag
+       (009:s faktura och 003:s betalning), bara i samma förslag. Skriv om b2-testet till ett skydd som visar att
+       formen godtas, med en kommentar om varför. Räknas inte som ett nytt hål i familjen, så vi går inte över
+       till (b).
+    2. Det nya argumentet kontoplan i _kontrollera_beloppssidan är OK.
+    3. Lägg till i GRANSKNING.md under mina beslut: "Att en faktura och en annan fakturas betalning står i samma
+       förslag ska kontrolleras med en redovisningskonsult (en verifikation per affärshändelse?), och tas upp igen
+       när godkännandekortet i appen byggs." Lägg samma sak som en punkt under Öppet i PROGRESS.md."
+
+Att en faktura och en annan fakturas betalning står i samma förslag ska kontrolleras med en redovisningskonsult (en
+verifikation per affärshändelse?), och tas upp igen när godkännandekortet i appen byggs. (Hugos beslut 2026-11-04,
+3; PROGRESS.md, Öppet 38.)
+
+**Vad det betyder för "Beslut som behövs" ovan:** (1) Öppet 36 byggd enligt (a), med tillägget om en bankkontorad
+per belopp. b2 godtas och räknas inte som ett hål. (2) Öppet 37 är steg 96 i BYGGPLAN.md, inte byggd. (3) Steg 94
+är granskat och klart.
+
+### Byggsessionen för Öppet 36 (2026-11-04, steg 95)
+
+- **Öppet 36 rättad** i 0708667: `_kontrollera_beloppssidan` i `scripts/konteringsforslag.py` tar nu kontoplanen och
+  parar, i radordning, varje rad med ett underlags `belopp_ore` i debet med den första lediga raden på bankkontot
+  (rollen `bank`) i kredit som har exakt samma belopp och bara bankrader som källor (`_para_beloppen_med_bankkontot`,
+  `_bankkontorader_i_kredit`). En rad på bankkontot paras högst en gång. En rad utan partner stoppar förslaget, efter
+  Öppet 35:s krav på att förslaget har någon bankrad alls, så h1 och h2 får samma fel som förut. Bara stopp tillagda,
+  returvärdet oförändrat, inget företagsspecifikt. Felet namnger raden, kontot, underlaget, beloppet, raderna på
+  bankkontot i kredit (och vilken rad som redan tagit var och en) och Öppet 36. Docstringarna säger att regeln måste
+  prövas igen när Ö8 (kreditnotor) byggs.
+- **Nytt argument:** `_kontrollera_beloppssidan(id_, kontoplan, kopplingar, verifikation)`. De två testerna i
+  `test_beslut_granskning_27.py` som anropar den direkt skickar nu `korning.kontoplan` och prövar samma sak som
+  förut (Hugos OK, beslut 2 ovan).
+- **Skyddstestet** `test_skydd_varje_belopp_i_debet_i_flodena_har_en_bankrad` (granskning 28, L1) prövar nu
+  granskarens f4: exakt en rad på bankkontot i kredit med samma belopp och bara bankrader som källor.
+- **Rött före:** 4 av 9 nya tester i `scripts/tests/test_beslut_granskning_28.py` röda mot koden i 3f36f6b (b1, b3
+  och den delade bankkontoraden "DID NOT RAISE", texttestet), körda i projektmappen innan koden ändrades. Då var b2
+  skrivet som ett stopp och rött både före och efter rättelsen (5 röda före, 1 röd efter); efter Hugos beslut är b2
+  ett skydd, grönt. Sviten efter: **4 443 passed**. Kommandona står i PROGRESS.md, "Läge 2026-11-04, Öppet 36 byggd".
+- **Flöde a, b och e** går igenom (skydd i den nya testfilen och i steg 94:s).
+- **Inte granskad oberoende än.** Förslag: en kort granskning i en ny session, som för steg 94.
