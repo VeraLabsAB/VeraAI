@@ -10559,3 +10559,225 @@ Byggsessionen stannade, som uppdraget säger, eftersom tre test prövade mer än
 - **Följder som är värda att känna till.** (1) Exemplen 4c och 4d i DESIGN-regelbok.md går inte att skapa förrän flöde c och d finns med sina former, och Z-delen i ursprungskontrollen nås bara av `test_4c_z_1001` direkt och av stoppen, tills dess. (2) Formen säger inget om verifikationens datum (Öppet 41): en avgift med ett annat datum än bankradens godtas så länge regeln gäller (dokumenterad i `test_kvar_verifikationens_datum_ingar_inte_i_formen`). (3) Samma bankrad i två förslag stoppas inte, det hör till steg 101. (4) Bedömning, inte uppmätt: fyra matchningar till per körning av flödena, för bankavgifterna. Det hör till tiden i Öppet 47 a.
 - **Inte byggt, enligt uppdraget:** steg 96 och 101. SPEC är inte ändrad, så SPEC 7 säger fortfarande att förslag utan underlag inte berörs (se Öppet 47 b, steg 96).
 - **Inte granskad oberoende än.** Kärnan har fått en strängare kontroll, så granskningen bör pröva om den stoppar något flödena bygger och om det finns ett förslag utan underlag som flödena inte bygger och som ändå godtas.
+
+## Granskning 33 (av 40b1ec1 och ab17064) (2026-11-04)
+
+Oberoende granskning av steg 100 (Öppet 44, formen för flöde e) i en ny session som inte har sett byggsessionen, mot feba3ad. Granskaren ändrade ingen kod och ingen rad i CLAUDE.md, SPEC eller vakten, och skrev bara i den här filen, PROGRESS.md och BYGGPLAN.md. Allt annat skrevs i scratchpad. Lästes: CLAUDE.md, SPEC.md 7 och 7.1, här "Granskning 30", "Hugos beslut 2026-11-04 om granskning 30", "Granskning 32" och "Hugos beslut 2026-11-04 om granskning 32" (hela), BYGGPLAN.md ("Läge nu" och steg 96, 100 och 101), `git show` av båda commitarna, `_bankrad_utan_underlag` och slutet av `kontera_period`, kontrollerna för Öppet 40 och 44, `matcha_period`, `regel_for_bankrad` och `test_beslut_granskning_32.py` med ändringarna i de tre andra testfilerna.
+
+Ord i den här texten: **flöde e** är den del av flödena som gör ett förslag av en bankavgift. **Formen** är exakt hur raderna i ett sådant förslag ska se ut. **Ett handbyggt förslag** är ett som kod förbi flödena lämnar till `skapa_konteringsforslag`. **Rött före** betyder att ett nytt test underkänns av den gamla koden. **Mutationsprov** betyder att granskaren ändrar koden med flit, i en kopia, och ser om testerna larmar. **Familjen** är här, som uppdraget säger, Öppet 31–44: ett handbyggt förslag som flödena aldrig bygger och som ändå godtas med alla kontroller gröna.
+
+### Beslut som redan var tagna (prövades inte om)
+
+Ett förslag utan underlag måste ha flöde e:s form, och allt annat utan underlag stoppas tills dess flöde finns. Båda perioderna krävs för en bankavgift. Z-kopplingen i `test_4c_z_1001` prövas direkt i `_kontrollera_ursprung`. Datumet (Öppet 41) och samma bankrad i två förslag (steg 101) är kända. P1 nedan prövar inte om beslutet om Öppet 41, utan visar en följd som inte stod där.
+
+### Viktigt först
+
+- **Inget kan bokföras eller godkännas av koden, och ingen spärr har blivit svagare.** 40b1ec1 lägger bara till stopp. Allt nedan gäller förslag, som alltid kräver godkännande av en människa.
+- **Öppet 44 är byggd som beslutet säger.** Formen stämmer punkt för punkt med `_bankrad_utan_underlag`. I 5 456 handbyggda försök med alla bankrader under alla regler godtas bara de 4 avgifter flödet bygger, och i 450 försök med alla konton bara 6570 i debet och 1940 i kredit.
+- **Flödena stoppas inte.** Utfallet från `kontera_period` är identiskt byte för byte före och efter steget, i 69 uppställningar. Testdatan ger 16 fakturor, 6 betalningar, 3 kvitton och 4 bankavgifter.
+- **Rött före och sviten stämmer:** 34 röda (25 beteende, 2 matchningen, 7 bara för att koden saknas) och **4 592 passed**.
+- **Inget äldre stopp har försvunnit ur testerna.** Med fyra äldre kontroller avstängda, en i taget, larmar lika många eller fler test nu som före steget. Bara en liten kontroll av bankradens radnummer har försvunnit (P3).
+- **Ett fynd på nivån medel, och det är den kända luckan i datumet (P1).** Verifikationens datum väljer vilken regel som gäller, så ett handbyggt förslag kan välja regel, och därmed gräns, kostnadskonto och flöde, genom sitt datum. Bankavgiften över gränsen i januari godtas om den dateras i februari. Det kräver en regelbok där regeln ändras över tid, vilket testbutiken inte har i dag. Besked behövs om Öppet 41 ska flyttas fram.
+- **Övriga fynd är låga** (P2–P6), och inget av dem hör till familjen.
+
+### Fynd
+
+**P1 – Datumet väljer regeln, så gränsen, kontot och flödet går att välja för hand (medel, hör till familjen via Öppet 41).** Koden gör som beslutet säger: regeln kommer från `regel_for_bankrad(namn, datum)`. Men flödet tar datumet ur bankraden (`bokforing.verifikationsdatum.bankrad`), och kontrollen tar det ur förslaget. Byggsessionen skriver att ett annat datum godtas "så länge regeln gäller", och `test_kvar_verifikationens_datum_ingar_inte_i_formen` visar det för en enda regel. Det som inte står någonstans är följden när regelboken har olika regler på olika datum. Körda i kopior av regelboken, med riktiga bankrader från testdatan:
+
+| Prov | Regelboken | Vad flödet gör | Handbyggt förslag | Utfall |
+|---|---|---|---|---|
+| c1 | Januari högst 100 kr, från februari högst 250 kr | Bankrad 117 (125 kr, 2025-01-31) blir ärendet "över gräns" | Samma rad, daterad 2025-02-15, under februariregeln | **Godtas** |
+| c2 | Januari 6570, från februari 6071 | Januariavgifterna på 6570 | Januariavgiften på 6071, daterad 2025-02-15 | **Godtas** |
+| c3 | Januariregeln saknar `flode`, februariregeln har det | Januariraderna blir ärendet "saknar flöde" | Bankrad 117, daterad 2025-02-15 | **Godtas** |
+| c4 | Regeln gäller bara januari | Februariraderna får inget förslag | Bankrad 129 från februari, daterad 2025-01-31 | **Godtas** |
+| d1 | Testbutikens, en regel | Datumet är 2025-01-31 | Bankrad 117 daterad 2025-01-01, 2025-02-15, 2030-12-31 eller 2099-12-31 | **Godtas** (före regelns början, 2024-12-31, stoppas) |
+
+På bankradens eget datum stoppas c1 och c3, som de ska. n6 och n7 från granskning 30 är alltså stoppade på det datum flödet väljer, men inte på ett datum som den som bygger förslaget väljer.
+
+*Varför medel:* samma förutsättningar som P1–P3 i granskning 30 (kod förbi flödena och en människa som godkänner), och det går runt gränsen på 250 kr som är Hugos skydd mot att en stor betalning bokförs som en avgift. Beslutet om Öppet 41 ("Senare, låg prioritet") togs innan datumet kunde välja något i formen. *Bedömning:* det är ett skäl att göra Öppet 41 för flöde e före uppgift 5, men det är Hugos eller Caspers val.
+
+*Provat i en kopia, inte byggt:* en rad som kräver samma datum som flödet väljer. c1–c4 och d1 stoppas, och utfallet från flödena är identiskt byte för byte med det utan raden, i samma 69 uppställningar. I `test_beslut_granskning_32.py` blir 2 av 39 röda: `test_kvar_...`, som dokumenterar luckan, och `test_ingen_regel_pa_datumet_...`, som använder ett datum före regeln. *Inte provat:* samma sak för förslag med underlag.
+
+**P2 – Två test heter något annat än det de prövar (låg, test, hör inte till familjen).** `test_en_bankrad_som_matchningen_har_parat_med_ett_underlag_stoppas` och `test_en_bankrad_mot_agaren_stoppas` bakar in raden i en Z-rapports förslag. Stoppet kommer då av att förslaget har en Z-rapport, redan innan matchningen körs, och inte av att raden är parad eller mot ägaren. Körd: båda felen säger "förslaget har inget underlag men en Z-rapport". Mutationsprov (körd): när kontrollen av matchningens svar tas bort är båda testen fortfarande gröna. Det är `test_kontrollen_foljer_matchningen_...` och `test_en_bankrad_over_matchningens_grans_stoppas` som larmar (och ett kodtest, bara för att granskarens ändring innehöll ett regelnamn). Skyddet finns, och raderna stoppas i proven nedan, men de två testen visar det inte. Siffran 25 stämmer ändå: de var röda för att förslaget gick igenom före steget. *Bedömning:* de bör anropa kontrollen direkt, som de andra testen med `direkt`.
+
+**P3 – En liten kontroll försvann i omgörningen (låg, test, hör inte till familjen).** `test_summa_av_flera_bankrader` prövade att den andra bankraden i kopplingarna får rätt radnummer. Mutationsprov, samma ändring i båda versionerna: radnumret blir fel för varje bankrad utom den första. Med testen i feba3ad blir 1 test rött, med testen nu inget (1 170 och 1 210 test körda). Det går inte att nå i dag, eftersom varje form har högst en bankrad, men flöde d kommer att behöva det. På samma sätt prövar summan i `test_4c_z_1001` nu bara testets egen data, och `test_4d` prövar inte längre `z_rapporter` för ett förslag som har både Z-rapport och bankrad (läst, inte körd).
+
+**P4 – Tiden: varje bankavgift kör hela matchningen (låg, hör till Öppet 47 a, steg 101, inte till familjen).** Byggsessionens bedömning om fyra matchningar till stämmer, nu uppmätt (9 blir 13). Median av `kontera_period`, före och efter steget. Syntetiska bankfiler och testdatans underlag:
+
+| Bankrader | Avgiftsförslag | Före, sekunder | Efter, sekunder | Gånger långsammare |
+|---|---|---|---|---|
+| 248 (testdatan) | 4 | 0,27 | 0,33 | 1,2 |
+| 300 | 22 | 0,07 | 0,39 | 5,6 |
+| 3 000 | 8 | 0,31 | 1,43 | 4,6 |
+| 1 000 | 86 | 0,28 | 4,62 | 16,5 |
+| 1 000 | 337 | 0,78 | 20,96 | 26,9 |
+| 3 000 | 242 | 1,24 | 40,02 | 32,3 |
+
+*Bedömning:* ett företag har få avgifter, så raden med 3 000 bankrader och 8 avgifter är den närmaste verkligheten, och den märks knappt. Inget behöver göras nu. Siffrorna hör till designen i steg 101.
+
+**P5 – Regelboken godtar en bankavgift med kostnaden på bankkontot, och då stannar hela körningen (låg, hör inte till familjen, fanns före steget enligt koden).** Körd i en kopia av regelboken med `kostnad` = 1940: `las_regelbok` godtar den, och `kontera_period` stannar med ett KonteringsforslagFel från ursprungskontrollen, utan ärende. Samma slag av stopp som Öppet 37. Det gäller bara en felaktig regelbok, som en människa har skrivit. Inte körd mot feba3ad: kontrollen som stoppar (`_kontrollera_bankkonto`) är inte ändrad i steget.
+
+**P6 – Små saker i dokumentationen (låg, hör inte till familjen).** (a) BYGGPLAN steg 96 räknar upp "Öppet 36, 40, 43 och formerna", och att Öppet 44 hör dit är byggsessionens läsning (PROGRESS.md, Öppet 47). SPEC 7 säger fortfarande "Förslag utan underlag berörs inte". (b) Kommentaren i `test_konteringsforslag.py` rad 221 säger "så att felet kommer visar att", där ett ord är fel. (c) Docstringen om Öppet 44 säger att datumet inte ingår i formen, men inte att datumet väljer regeln (P1).
+
+### Svar på uppdragets punkter
+
+**1. Formen mot `_bankrad_utan_underlag`: stämmer punkt för punkt** (läst, och körd i svepen i punkt 6).
+
+| Punkt | Flöde e | Kontrollen | Stämmer? |
+|---|---|---|---|
+| En bankrad | `bankrader=[rad["id"]]` | Exakt en, inga Z-rapporter | Ja |
+| Pengar ut | Pengar in ger inget förslag | `>= 0` stoppar | Ja. En rad på 0 kr har ingen regel, och flödet bygger inget (körd) |
+| Bland rader utan krav på underlag | Går igenom `matchning.kraver_inte_underlag` | Samma lista, samma anrop som Öppet 40 | Ja |
+| Regeln | `regel_for_bankrad(namn, datum)` | Samma funktion | Ja, utom **datumet**: bankradens i flödet, förslagets i kontrollen (P1) |
+| Flödet | `regel.get("flode") != FLODE_BANKAVGIFT` ger ärende | Samma villkor stoppar, och förslagets regel ska vara den | Ja |
+| Gränsen | `grans is not None and belopp > grans` | Samma | Ja. En regel utan gräns stoppas redan av `las_regelbok` (körd), så `is not None` nås inte, på båda ställena |
+| Raderna | Kostnadskontot i debet, bankkontot i kredit, `lika`, bankraden som enda källa | Exakt de två, i valfri ordning | Ja |
+
+- **Bara stopp tillagda:** `git show 40b1ec1` visar i `konteringsforslag.py` nya rader, en utökad import och omskrivna rader i docstrings. Ingen gammal kontroll är borttagen. Returvärdet är oförändrat: `{"K2": "ok", "ursprung": "ok"}` för en bankavgift.
+- **Inget företagsspecifikt:** `grep` efter 6570, 1940, 2440, R-BANK, bankens-avgifter och "import konter" i filen ger inget.
+- **Oförändrat:** `git diff feba3ad ab17064` är tom för CLAUDE.md, SPEC.md, `foretag`, `testforetag`, `testdata`, `sparr`, `konteringsfloden.py`, `las_underlag.py`, `matcha_bank.py`, `las_bank.py` och `las_regelbok.py`.
+
+**2. De tio omgjorda testen: inget äldre stopp har försvunnit.** Bara ett av testen prövade ett stopp förut, och det stoppet står kvar.
+
+| Test | Prövade förut | Prövar nu | Försvunnet? |
+|---|---|---|---|
+| `test_4c_z_1001` | Godtas, kontona, kopplingen | Stopp sist, kopplingen direkt | Summan prövar bara testets data (P3) |
+| `test_4d_kortinlosen_...` | Godtas, kontona, `z_rapporter` | Stopp sist | `z_rapporter` för Z och bankrad (P3) |
+| `test_summa_av_flera_bankrader` | Godtas, andra radens radnummer | Stopp sist | **Radnumret (P3, körd)** |
+| `test_period_som_inte_anvands_...` | Perioder får vara None | Samma, Z når sista kontrollen, bankavgiften får underlagsperioden | Nej, Hugos svar |
+| `test_tackningen_godtar_samma_del_...` | Täckningen godtar | Stopp sist, alltså godkänd av täckningen | Nej |
+| `test_tackningen_godtar_totalsumman_...` | Täckningen godtar | Samma | Nej |
+| `test_z_rapport_med_ett_annat_kassaregisters_...` | Godtas med rätt regel, **stoppas med fel regel** | Stopp sist med rätt regel, **samma stopp och text med fel regel** | Nej |
+| `test_regeln_godtar_rollkontona_...` | Alla fem godtas | Tre godtas, två stopp sist | Nej |
+| `test_p1_..._behover_ingen_momsfil` | Utan momsfil och underlagsperiod | Utan momsfil | Nej, Hugos svar |
+| `test_skydd_en_faktura_och_en_bankavgift_...` | Ingen matchning för någon av dem | Delat: fakturan ingen, bankavgiften exakt en | Nej, ändrat av beslutet |
+
+*Stoppas förslaget nu bara av Öppet 44, så att skyddet inte syns?* Nej. Testen kräver texten "Öppet 44", och den kontrollen ligger sist, så ett tidigare stopp ger ett annat fel och testet blir rött. Det visade granskaren också med ändringar i koden, samma i båda versionerna, en i taget:
+
+| Äldre kontroll avstängd | Röda med testen i feba3ad (1 170 test) | Röda med testen nu (1 210 test) |
+|---|---|---|
+| Täckningen | 7 | 7 |
+| Regeln, punkt 8 | 14 | 16 |
+| Momskontot | 5 | 5 |
+| Bankkontot | 8 | 9 |
+| Andra bankradens radnummer | 1 | **0** (P3) |
+
+**3. Förenklingen: ingenting godtas som stoppades förut** (körd). Det första villkoret finns inte i git, så det är rekonstruerat ur PROGRESS.md: `saknas or andra or len(former) != len(vantade)`. Provet räknar det för sig och jämför med kontrollen för varje lista. 2 960 listor med 0–4 rader, byggda av 14 olika rader (fel belopp, rad på 0, `summa`, två källor, annan bankrad, fel konto, fel sida, ingen källa): **0 skillnader, 0 krascher**, och `skapa_konteringsforslag` godtar bara rätt två rader i de två ordningarna. Det stämmer med skälet i kodens kommentar: de två väntade raderna är olika, eftersom beloppet är större än 0 och den ena står i debet och den andra i kredit.
+
+| Förslag | Utfall |
+|---|---|
+| Två rader, rätt | Godtas |
+| Omvänd ordning | Godtas |
+| Tre rader, en rad på 0 | Stoppas (K2) |
+| En rad rätt och en rad på 0 | Stoppas (K2) |
+| Samma rad två gånger | Stoppas (K2) |
+| En rad | Stoppas (K2) |
+| Fyra rader, två gånger rätt | Stoppas i svepet |
+
+**4. Rött före: 34, fördelningen stämmer** (körd mot `git archive` av feba3ad i scratchpad).
+
+| Fil | Utfall |
+|---|---|
+| `test_beslut_granskning_32.py` | 25 failed, 14 passed |
+| `test_konteringsforslag.py` | 8 failed, 184 passed |
+| `test_beslut_granskning_30.py` | 1 failed, 24 passed |
+| `test_beslut_granskning_22.py` | 34 passed |
+
+| Antal | Varför rött | Vilka |
+|---|---|---|
+| 25 | "DID NOT RAISE", förslaget gick igenom | 17 nya och 8 omgjorda. Två av dem, se P2 |
+| 2 | Matchningen kördes inte (`assert 0 == 1`) | Fil 32 rad 309 och fil 30 rad 380 |
+| 7 | Bara för att koden saknas, bevisar inget beteende | 4 `AttributeError` på direkta anrop, `KeyError`, `AttributeError` på `_KOSTNAD`, och en text som saknas |
+
+*Inte upprepat:* byggsessionens 15 mutationsprov.
+
+**5. Hela sviten: 4592 passed in 98.89s** (körd före dokumentationen), 0 röda, samma siffra som byggsessionen. Se också kommando 16.
+
+**6. Vägar runt Öppet 44** (alla körda, i testbutikens regelbok om inget annat står).
+
+| Prov | Vad provet gör | Utfall |
+|---|---|---|
+| Svep 1 | Alla 248 bankrader, alla regler, regelns konton och 6570, 5 456 försök | 5 173 stoppas tidigare, 279 av Öppet 44, **4 godtas: flödets 4 avgifter** |
+| Svep 2 | Bankrad 117 och 118 med varje par av de 15 kontona i testbutikens kontoplan, 450 försök | **Bara 6570 i debet och 1940 i kredit godtas**. Rätt regel med fel kostnadskonto stoppas |
+| b | Bankrad "BANK AVGIFT LEV-TE" på 125 kr och en faktura från LEV-TE på 125 kr | Avgiften godtas, som flödet gör. Betalningen av fakturan mot samma rad stoppas (Öppet 40). Regeln går före underlaget, i flödet också |
+| b2 | Avgiftens form på en vanlig betalning, utan avgiftens text | Stoppas (punkt 8) |
+| c1–c4, d1 | Regel som gäller ett annat datum, annat datum än bankradens | **Godtas, P1** |
+| e1 | Gränsen: regeln exakt 125,00 kr, och 124,99 kr | Godtas, och stoppas med "gränsen" |
+| e2 | Gränsen: 250,00 kr, och 250,01 kr | Godtas och flödet bygger den. Stoppas som "över gräns" och flödet bygger den inte |
+| f | Ägaren i text och referens, 7 stavningar (AGARE-1, agare-1, ÄGARE-1, AVG-AGARE-1, AGARE 1, AGARE1, A G A R E - 1) | Alla känns igen. Handbyggt stoppas och flödet bygger inget, i alla 7 |
+| g | Extra nycklar på rad, ursprung och källa, decimaltal, konto som tal, belopp som text, `LIKA`, fel `falt`, fel regel-id, bankrad två gånger, annan bankrad, underlag eller Z-post som källa | 14 av 14 stoppas |
+| h | Z-rader utan koppling, och rätt Z-rapport | Stoppas |
+| i | Underlagsperiod med 0 underlag, en tom mapp och ett annat kvartal | Bankavgiften godtas. Matchningen av en sådan rad läser inga underlag, så kravet på perioden prövar bara att en period finns. Beslutat, ingen ändring |
+| j | Bankrad på 0,00 kr med avgiftens text | Läses in, flödet bygger inget, handbyggt stoppas (K2) |
+
+*Inte provat:* en period byggd för hand med den privata nyckeln, eftersom SPEC 7 redan säger att medveten kod inte kan bevisas bort. En riktig ändring av kontoplanens roller över tid.
+
+**7. Flöde a, b och e: samma förslag som förut, och inget stoppas** (körd). Utfallet (förslag, verifikation, kopplingar, motivering, kontroller och ärenden) skrevs till en fil för både `git archive` av feba3ad och ab17064, i 69 uppställningar: de nio nedan och 60 slumpade bankfiler med sammanlagt 1 248 förslag, varav 288 bankavgifter, och inget stopp. **Filerna är identiska** (2 642 777 byte var, `diff -q` tom).
+
+| Uppställning | Fakturor | Betalningar | Kvitton | Bankavgifter | Ärenden |
+|---|---|---|---|---|---|
+| Testdatan | 16 | 6 | 3 | 4 | 10 |
+| Bokföringsdagen som datum | 16 | 6 | 3 | 4 | 10 |
+| Gräns 199,00 kr | 16 | 6 | 3 | 4 | 10 |
+| Gräns 198,99 kr | 16 | 6 | 3 | 2 | 12 |
+| Gräns 125,00 kr | 16 | 6 | 3 | 2 | 12 |
+| Gräns 124,99 kr | 16 | 6 | 3 | 0 | 14 |
+| Regel utan `flode` | 16 | 6 | 3 | 0 | 14 |
+| Två regler över tid | 16 | 6 | 3 | 4 | 10 |
+| Regeln slutar 2025-01-31 | 16 | 6 | 3 | 2 | 12 |
+
+**Tiden:** se P4. En körning på testdatan: 268,7 ms före och 325,4 ms efter (median av 15). I en första körning 270,8 och 317,2 ms.
+
+**8. Familjen:** P1 hör till familjen genom Öppet 41: ett handbyggt förslag med ett datum flödet aldrig väljer, som godtas med alla kontroller gröna. Det är inget nytt hål i formen. P2–P6 hör inte till familjen.
+
+### Vad som är kört och vad som är bedömning
+
+**Kört:** rött före, sviten, alla prov, jämförelsen med `diff`, mutationsproven och `git`-kontrollerna. **Läst, inte kört:** att raderna i tabellen i punkt 1 är samma rad för rad (men svepen prövar utfallet), att `test_4d` och `test_4c` har förlorat de delar P3 säger, och att P5 fanns före steget. **Bedömning, inte kört:** alla allvarsnivåer, att Öppet 41 bör göras före uppgift 5, att 3 000 bankrader och 8 avgifter är närmast verkligheten, och hur testen i P2 bör skrivas. **Inte upprepat:** byggsessionens mutationsprov. Inget här är en bedömning av bokföringsregler: "rätt" betyder samma som flödena gör.
+
+### Steg 100
+
+Byggt som beslutet säger. Granskarens bedömning: steg 100 kan räknas som granskat och klart. P1 är inte fel i steget, utan den kända luckan i datumet, som nu har en större följd.
+
+### Testsviten
+
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`: **4592 passed in 98.89s**.
+
+### Kommandon i den här granskningen
+
+`<scratch>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/f7ff607d-1a06-4c6e-aafc-6fe7f8f933e2/scratchpad` och `<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Allt kördes från projektmappen, ett kommando i taget.
+
+1. `git status`, `git log --oneline -8`, `git show 40b1ec1 --stat`, `git show ab17064`, `git show 40b1ec1 -- scripts/konteringsforslag.py scripts/tests/test_beslut_granskning_22.py scripts/tests/test_beslut_granskning_30.py scripts/tests/test_konteringsforslag.py`, `git diff feba3ad ab17064 --stat` och `git diff feba3ad ab17064 -- CLAUDE.md SPEC.md foretag testforetag testdata sparr scripts/konteringsfloden.py scripts/las_underlag.py scripts/matcha_bank.py scripts/las_bank.py scripts/las_regelbok.py` (tom).
+2. `grep` och `ls` i projektet, `head -3 testdata/syntet-testbutik/2025-Q1/bank_2025-01.csv`, och stycken av filer med fil-verktyget Read. `grep -n -e 6570 -e 1940 -e 2440 -e R-BANK -e bankens-avgifter -e "import konter" scripts/konteringsforslag.py` (tom).
+3. `mkdir -p <scratch>/kopia-fore <scratch>/kopia-nu`, `git archive -o <scratch>/feba3ad.tar feba3ad`, `git archive -o <scratch>/ab17064.tar ab17064`, `tar -xf <scratch>/feba3ad.tar -C <scratch>/kopia-fore` och `tar -xf <scratch>/ab17064.tar -C <scratch>/kopia-nu`.
+4. `cp -R scripts/tests/test_beslut_granskning_32.py scripts/tests/test_beslut_granskning_30.py scripts/tests/test_beslut_granskning_22.py scripts/tests/test_konteringsforslag.py <scratch>/kopia-fore/scripts/tests/`.
+5. Rött före: `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rf <scratch>/kopia-fore/scripts/tests/test_beslut_granskning_32.py` (**25 failed, 14 passed**), samma för `test_konteringsforslag.py` (**8 failed, 184 passed**), `test_beslut_granskning_30.py` (**1 failed, 24 passed**) och `test_beslut_granskning_22.py` (**34 passed**). Skälen: fil 32 med `-qq --tb=line -rN -k "direkt or kontrollen_sjalv or test_koden or kostnadens_nyckel"` (7 röda och 1 grönt).
+6. `<python> -B -m pytest -p no:cacheprovider -q scripts/tests` (**4592 passed**).
+7. Provfilerna `test_granskare_prov33.py` och `test_granskare_flode33.py` skrevs med fil-verktyget Write i `<scratch>/kopia-nu/scripts/tests/`, och `cp -R` av flödesfilen till `<scratch>/kopia-fore/scripts/tests/`.
+8. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rP <scratch>/kopia-nu/scripts/tests/test_granskare_prov33.py` (först **1 failed, 17 passed**, fel i granskarens prov: `las_regelbok` stoppar en regel utan gräns, så provet stannade. Rättat med Edit), och samma med `--tb=line -rP -k "test_typer or test_datum"` och `-k "test_regeln_valjs or test_kontot_valjs or test_flodet_valjs or test_regeln_slutar"` för den del av utskriften som klipptes.
+9. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rP <scratch>/kopia-nu/scripts/tests/test_granskare_flode33.py`, och samma mot `kopia-fore`: båda först **1 failed, 2 passed**, samma fel i provet, och en hjälpfunktion hade ett namn som pytest tog för ett test. Rättat med Edit, `cp -R` igen, och samma körningar (**2 passed** vardera; 133,87 och 14,09 sekunder). Tiderna i P4 kommer från de här körningarna.
+10. `diff -q <scratch>/utfall-kopia-fore.json <scratch>/utfall-kopia-nu.json` (tom) och `wc -c` på båda (2 642 777 byte var).
+11. `mkdir -p <scratch>/kopia-gammal <scratch>/kopia-mut`, `tar -xf <scratch>/feba3ad.tar -C <scratch>/kopia-gammal` och `tar -xf <scratch>/ab17064.tar -C <scratch>/kopia-mut`.
+12. Mutationsprov i punkt 2 och P3: en ändring i taget med fil-verktyget Edit i `<scratch>/kopia-gammal/scripts/konteringsforslag.py` och `<scratch>/kopia-mut/scripts/konteringsforslag.py`, och efter varje `<python> -B -m pytest -p no:cacheprovider -q --tb=no -rN -k "konteringsforslag or konteringsflod or beslut_granskning" <kopian>/scripts/tests` (täckningen med `-qq`, radnumret med `-rf`). Antal röda i punkt 2.
+13. Mutationsprov i P2: kontrollen av matchningens svar borttagen i `kopia-mut`, `<python> -B -m pytest -p no:cacheprovider -q --tb=no -rf <scratch>/kopia-mut/scripts/tests/test_beslut_granskning_32.py` (**3 failed, 36 passed**).
+14. Provet med datumet i P1: raden tillagd i `kopia-mut` med Edit, `cp -R` av båda provfilerna, `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rP -k "test_regeln_valjs or test_kontot_valjs or test_flodet_valjs or test_regeln_slutar or test_datum" <scratch>/kopia-mut/scripts/tests/test_granskare_prov33.py` (**5 passed**, alla stoppade utom rätt datum), `-k "test_utfallet"` på flödesfilen (**1 passed**), `diff -q <scratch>/utfall-kopia-mut.json <scratch>/utfall-kopia-nu.json` (tom) och samma pytest utan `-k` på `test_beslut_granskning_32.py` med `--tb=no -rf` (**2 failed, 37 passed**).
+15. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rP -k "test_regel_utan_grans" <scratch>/kopia-nu/scripts/tests/test_granskare_prov33.py` (**1 passed**) och hela provfilen med `-q --tb=short` (**18 passed**).
+16. Efter det här avsnittet och statusraderna: `<python> -B -m pytest -p no:cacheprovider -q scripts/tests` (**4592 passed**), `git add GRANSKNING.md PROGRESS.md BYGGPLAN.md`, `git commit -F <scratch>/commit-granskning-33.txt` och `git status`.
+
+Vakten stoppade åtta kommandon granskaren skrev i strid med SPEC 7.1, alla bara läsande: ett ihopkopplat med `&&`, fyra `grep` med omvänt snedstreck, ett `grep` med `|` i mönstret, ett med `*` och ett med `?` utan citattecken. De ersattes med ett kommando i taget och flera `-e`. Inget utanför projektet ändrades utom scratchpad.
+
+### Beslut som behövs (Hugo eller Casper)
+
+1. **P1 (Öppet 41), medel:** ska datumet i ett förslag utan underlag prövas mot det datum flödet väljer före uppgift 5, i stället för "senare, låg prioritet"? Granskarens bedömning: ja, eftersom datumet nu kan välja gräns, konto och flöde, och provet i kopian visar att flödena inte påverkas. Samma fråga för förslag med underlag är inte provad.
+2. **P2 och P3, låga:** ska de två testen göras om och radnumret läggas tillbaka, i samband med steg 96 (P2) och flöde d (P3)? Granskarens bedömning: ja.
+3. **P5, låg:** ska `las_regelbok` stoppa en bankavgiftsregel med kostnaden på bankkontot? Granskarens bedömning: ja, men det kan vänta.
+4. **P6 a, låg:** gäller beslut 4 om granskning 32 ("formerna") också Öppet 44, så att SPEC 7 beskriver den i steg 96? Granskarens bedömning: ja, som byggsessionen läser det.
+5. **Steg 100:** får räknas som granskat och klart (granskarens bedömning: ja).
+
+P4 behöver inget beslut. Siffrorna hör till designen i steg 101.
+
+STATUS: gult
+STEG I BYGGPLANEN: 100 – Öppet 44 – klart (granskat i den här granskningen, väntar på besked)
+KAN JAG GÅ VIDARE: ja till steg 96 och 101. Inget kan bokföras, ingen spärr är svagare, formen stämmer med flödet, rött före och sviten stämmer, flödena ger samma förslag, och inget äldre stopp har försvunnit ur testerna. Nej till uppgift 5 (steg 23) förrän P1 är avgjord. Gult för ett fynd på nivån medel, P1.
+ÄNDRINGAR I CLAUDE.md: inga
+BESLUT SOM BEHÖVS: 1–5 ovan.
+NÄSTA STEG: Hugo eller Casper svarar på 1–5. Sedan steg 96 (Öppet 37, 48, 49 P4 och SPEC 7), steg 101 (registret, designsteg) och steg 92 (Öppet 26). Steg 15 (sandlådan) ska vara klar före steg 23, och steg 14 (Caspers dator) i helgen vecka 44.
