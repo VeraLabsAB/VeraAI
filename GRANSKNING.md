@@ -11102,3 +11102,37 @@ Allt i "Modell" ovan på den riktiga Claude Code. Att sandlådan körs i skrivbo
 4. Hugo installerar, och spärrtestet i P2 körs direkt, före annat arbete.
 
 Ett alternativ, som kräver att Hugo ändrar ett beslut, så jag bara nämner det: att behålla hela förbudet för `.git` och i stället ta `git add` och `git commit` ut ur sandlådan med `excludedCommands`. I modellen stoppar de gamla förbuden allt i P1, P2 och P3, men det går emot beslut 2. Det är inte prövat, och `excludedCommands` kör de kommandona utan sandlåda.
+
+## Hugos beslut 2026-11-05 om granskning 34
+
+Skrivna av Hugo i chatten 2026-11-05, i uppdraget för byggsessionen. Ordagrant:
+
+    "1. Beslut 6 om sandlådan återkallas. Förbuden för .git och .venv blir som före steg 15: Edit(//**/.git/**), Edit(//**/.git) och Edit(//**/.venv/**). Granskarens 14 nya förbud byggs inte, eftersom de bara täcker kända vägar (samma mönster som Öppet 31–39).
+    2. När sandlådan är installerad committar agenten inte. Varje session slutar med färdiga kommandon, ett i taget (git add med namngivna filer, sedan git commit -m), som Hugo kör själv med ! i sessionen eller i Terminal. Det gäller från installationen av steg 15.
+    3. Prov som inte kan köras i sandlådan (grupp D och H1-proven) hoppas över där med ett tydligt meddelande. Hugo kör dem utanför sandlådan, i Terminal, varje gång vakten eller de låsta inställningarna ändras. P6-provet görs först, så att orsaken till H1-proven är bekräftad.
+    4. P2: spärrtestet efter installationen prövar att inget i sandlådan kan skriva i .git, skapa en fil eller mapp med namnet .git, skriva .git/commondir eller byta namn på .git. Det använder en kopia som Hugo förbereder utanför sandlådan i ~/VERA/sparrprov (undantag från regeln "Prov och test", bara för spärrtestet) och rör aldrig projektets riktiga .git. Lyckas något av det backar Hugo direkt.
+    5. P3 stängs av beslut 1: ingenting i sandlådan kan ändra git-historiken.
+    6. P7: de sex nycklarna sätts så att sandlådan blir så sträng som möjligt. En nyckel som får något tillåtet att gå sönder tas upp som ett eget beslut i stället.
+    7. P4, P5 och P8 rättas i det här bygget. P9 läggs under Öppet.
+    8. Öppet 55 godtas: en testfil kan skriva i projektmappen, men det syns i git, och git-historiken är nu skyddad (beslut 5). Öppet 57 blir ett eget ärende efter steg 15."
+
+### Så är det byggt (795f848), och vad som inte är avgjort
+
+Byggsessionens egna val, som granskningen ska titta på:
+
+- **Proven utanför sandlådan körs i en kopia av en granskad commit, inte i projektmappen.** Beslut 3 säger "i Terminal". I projektmappen kan en testfil ha lagts av agenten (beslut 8), och i Terminal körs den utan sandlåda, med Hugos rättigheter. Det skulle öppna vägen som beslut 1 stänger. Granskning 34, P6, föreslog samma sak.
+- **Grupp D och H1-proven hoppas över när datorn säger nej, inte när testet tror sig vara i sandlådan.** Grupp D: bara `PermissionError` när mappen `.git` eller `.venv` skapas. H1: bara när en ny fil saknar `com.apple.provenance`. Så bygger inget på orsaken i P6.
+- **Spärrtestet körs både i Terminal och i skrivbordsappen.** Att sandlådan körs i appen är inte bekräftat, och appen är där agenten används. Texten `HOPPAS ÖVER` räknas som fel där, eftersom provet då inte körs i sandlådan.
+- **`git clone --no-hardlinks`** för båda kopiorna, så att kopian inte delar filer med projektets `.git`.
+
+**P6 är inte avgjord.** Provet är skickat till Hugo, med ett tillägg: körningen också utan Claude, eftersom beslut 3 kräver att proven går att köra där. I den här appsessionen, utan sandlåda, går alla `test_h1_` igenom (31 passed, körning). Min bedömning, inte provad: filer som skapas från Terminal får inte uppgiften, och då går H1-proven inte att köra i Terminal alls. Då fungerar beslut 3 inte som det står för H1, och det blir ett eget beslut. "Prov utanför sandlådan" i INSTALLERA.md säger "inte avgjort" tills svaret finns.
+
+**De sex nycklarna, läst i dokumentationen** ([settings-reference.md](https://code.claude.com/docs/en/settings-reference.md), [sandboxing.md](https://code.claude.com/docs/en/sandboxing.md)): `enableWeakerNestedSandbox`, `enableWeakerNetworkIsolation`, `allowAppleEvents` och `allowNestedUserNamespaces` står direkt under `sandbox`, och `allowAllUnixSockets` och `allowLocalBinding` under `sandbox.network`. Standardvärdet är `false` för alla sex, så att sätta dem ändrar inget mot det som provkördes 2026-11-04. Ingen stoppar vakten, eftersom hooks körs utanför sandlådan. Koden nämner inte socklar, localhost eller `osascript` (`grep`, körning). Ingen nyckel krävde därför ett eget beslut. Det är dokumentation och bedömning, inte en körning med nycklarna satta. `allowManagedReadPathsOnly` och `allowManagedDomainsOnly` omfattas inte av beslut 6 och är inte satta.
+
+**Version.** `allowNestedUserNamespaces` kräver v2.1.305 enligt dokumentationen, och filens `requiredMinimumVersion` är 2.1.295. Filens krav är oförändrat, eftersom inget beslut nämner det. INSTALLERA.md säger minst 2.1.305 inför bytet. Att höja kravet i filen är ett eget beslut.
+
+**P4, läst i dokumentationen:** `/sandbox` skriver ett fel i stället för att öppna sin panel när låsta inställningar sätter sandlådans nycklar ([sandboxing.md](https://code.claude.com/docs/en/sandboxing.md), felsökningen). Punkt 6.2 kontrollerar nu Hugos egna inställningsfiler med `grep`. Tabellen under "Hugos beslut 2026-11-04 om sandlådan" nämner `/sandbox`. Den står kvar som historik och gäller inte längre på den punkten. **P8, läst i dokumentationen:** omläsningen gäller också låsta inställningar i en session som körs ([settings.md](https://code.claude.com/docs/en/settings.md), "When edits take effect").
+
+**Spärrtestet har aldrig körts i en riktig sandlåda.** Provat utan sandlåda i en påhittad kopia i scratchpad: alla 30 försök lyckades, testen blev röda och inget blev kvar i kopian (körning). Det visar att testen slår larm och städar, inte att sandlådan stoppar. Det visas först efter installationen. Stöd finns från Hugos provkörning 2026-11-04, med samma förbud: `git status` fungerade och `git add` stoppades.
+
+**Inte visat:** att de 14 förbuden behövs eller inte (beslut 1 gör dem överflödiga enligt modellen i granskning 34), en bar git-mapp i en undermapp, där `git status` bara slår till om man står i den mappen (bedömning, inte provad), och allt som bara går att visa efter installationen.

@@ -47,6 +47,8 @@ NÄSTA STEG: ...
 - En granskningssession uppdaterar också `PROGRESS.md` och "Läge nu" i `BYGGPLAN.md`, inte bara `GRANSKNING.md` (Hugos beslut 2026-10-29). Testet `scripts/tests/test_byggplan_progress.py` kontrollerar att de stämmer.
 - En granskningssession uppdaterar statusraderna i `PROGRESS.md` och `BYGGPLAN.md` i samma commit som granskningen. Om ett uppdrag säger "ändra ingen annan fil" gäller ändå CLAUDE.md (Hugos beslut 2026-10-30 om granskning 24, P10).
 - Körningar mot en kopia av koden (till exempel "rött före" eller ett mutationstest) och körningar av enskilda testfiler skrivs in i sessionens post i `PROGRESS.md` med exakt kommando, så att det går att se i efterhand vad som kördes (Hugos beslut 2026-10-30 om granskning 23, P7).
+- När sandlådan är installerad committar agenten inte. Varje session slutar med färdiga kommandon, ett i taget (`git add` med namngivna filer, sedan `git commit -m`), som Hugo kör själv med `!` i sessionen eller i Terminal. Det gäller från installationen av steg 15 (Hugos beslut 2026-11-05 om granskning 34, beslut 2).
+- Prov som inte kan köras i sandlådan (grupp D och H1-proven) hoppas över där med ett tydligt meddelande. Hugo kör dem utanför sandlådan, i Terminal, varje gång vakten eller de låsta inställningarna ändras (`sparr/INSTALLERA.md`, "Prov utanför sandlådan"). Det gäller från installationen av steg 15 (Hugos beslut 2026-11-05 om granskning 34, beslut 3).
 - Om något rör säkerhet eller kan leda till bokföring utan godkännande: säg det tydligt först och prioritera det.
 
 ## Vem som ger OK
