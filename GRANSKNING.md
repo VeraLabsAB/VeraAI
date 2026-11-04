@@ -10842,3 +10842,71 @@ Skrivet av Hugo i chatten 2026-11-04, i uppdraget till steg 104. Ordagrant:
 Skrivet av Hugo i chatten 2026-11-04, i uppdraget om namnbytet i BYGGPLAN.md. Ordagrant:
 
     "1. "Vera" byts också i BYGGPLAN.md:s gällande text: "Vera" blir "Kassio" och "Vera Labs" blir "Kassio Labs". Undantag: titlarna på de två researchrapporterna från 2026-10-29 (dokumentnamn), och raderna som beskriver själva namnbytet (rad 11 skrivs om till att namnbytet är gjort, och steg 104:s rad står kvar). PLAN-KASSIO-FORSLAG.md ändras inte, eftersom den är historik."
+
+## Hugos beslut 2026-11-04 om sandlådan (steg 15)
+
+Skrivna av Hugo i chatten 2026-11-04, i uppdraget för steg 15. Ordagrant:
+
+    "1. Sandlådan ligger i de låsta inställningarna, som vakten, och installeras av Hugo med administratörslösenordet.
+    2. Sandlådan är obligatorisk: inga kommandon får köras utanför den (allowUnsandboxedCommands false), och Claude Code ska inte starta om sandlådan inte fungerar (failIfUnavailable true). Inga undantag (excludedCommands tom).
+    3. autoAllowBashIfSandboxed är false: sandlådan ändrar inte vilka kommandon som körs utan att fråga.
+    4. Skrivning bara i projektmappen, i den tillfälliga mapp som sandlådan ger, och i scratchpad. Förbjudet att skriva i appen, appens Claude Code och ~/.local/share/claude (Öppet 4 och 8), även om de skulle ligga inom en tillåten mapp.
+    5. Vakten är oförändrad. Sandlådan är ett lager till, inte en ersättning.
+    6. Förbudet för .git i de låsta inställningarna smalnas av till .git/hooks, .git/config och .git/info, och förbudet för .venv till bara projektmappens egen .venv, så att git add och git commit fungerar i sandlådan. Det lättar på en spärr för fil-verktygen och granskas därför särskilt.
+    7. Sandlådan förbjuder läsning av ~/.ssh."
+
+### Hugos svar i chatten 2026-11-04, när dokumentationen gick delvis emot beslut 2 och 4, och om beslut 7
+
+Sessionen stannade och frågade, som uppdraget säger. Hugos val, ordagrant:
+
+- Listorna går inte att låsa i de låsta inställningarna, och sex nycklar som försvagar sandlådan bör enligt dokumentationen sättas till false: "Bygg som beslutat (Recommended)". Filen får bara nycklarna i uppdraget. Begränsningen skrivs här och i `sparr/INSTALLERA.md`, och de sex nycklarna är ett öppet beslut (PROGRESS.md, Öppet 56).
+- `denyRead` stoppar inte fil-verktyget Read: "Lägg till regeln (Recommended)". `Read(~/.ssh/**)` står under `permissions.deny`, utöver `denyRead`.
+
+### Vad sandlådan täcker och inte täcker
+
+Källor: code.claude.com/docs/en/sandboxing.md och settings-reference.md, lästa med WebFetch 2026-11-04. Dokumentationen säger: "The sandbox covers shell commands only. Claude's file tools, MCP servers, and hooks run outside it."
+
+| Vad | Täcks av sandlådan? | Var det hör hemma |
+|---|---|---|
+| Bash och processer som startas från den (också en egen testfil med pytest) | **Ja** | Sandlådan |
+| Fil-verktygen Write och Edit | **Nej** ("follow permission rules") | Vakten, regel 2 b, och `Edit(...)`-förbuden |
+| Fil-verktyget Read | **Nej** ("A `denyRead` entry doesn't stop the Read tool") | `Read(~/.ssh/**)` för `~/.ssh`. Annan läsning utanför projektet är öppen (Öppet 57) |
+| WebFetch och WebSearch | **Nej** | Vaktens lista över verktyg (WebSearch stoppas där) |
+| Hooks, också vakten | **Nej**, de körs med full åtkomst | Att root äger vakten och inställningarna |
+| MCP-servrar | **Nej** | Vaktens lista över verktyg, som stoppar dem |
+| Kommandon du själv skriver efter `!` | **Oftast nej** | Hugo och Casper. Inte en väg för agenten |
+| `excludedCommands` och `allowWrite` i `~/.claude/settings.json` eller `--settings`, och `--add-dir` | **Går inte att låsa** ("no managed-only lock covers this list" om `excludedCommands`) | Agenten får inte skriva i `~/.claude` (förbuden). Hugo lägger inte till dem, och kontrollerar i `/sandbox` (INSTALLERA.md) |
+
+**Öppet 4 och 8, punkt för punkt:**
+
+| Punkt | Täcks? | Var resten hör hemma |
+|---|---|---|
+| Öppet 4: egen testfil skriver **utanför** projektet | **Ja** enligt dokumentationen. Spärrtestet prövar det efter installationen | – |
+| Öppet 4: egen testfil skriver eller raderar **i** projektet | **Nej.** Projektmappen är skrivbar (beslut 4). Bara `.git/hooks`, `.git/config`, `.git/info`, `.claude`, `.mcp.json` och projektets startfiler är stängda | Git-historiken och människans granskning. Öppet 55, beslut behövs. Öppet 4 sa att sandlådan stoppar det |
+| Öppet 4: skrivning i appen, appens Claude Code och `~/.local/share/claude` | **Ja** (`denyWrite`) | Spärrtestet prövar det efter installationen |
+| Öppet 8: `trap` i en startfil | **Delvis.** Hemmappen är inte skrivbar, så en ny rad kan inte läggas dit från ett kommando. Sandlådan ser inte en rad som redan finns | Förbuden för startfilerna och kontrollen i INSTALLERA.md, steg 4 g, som inte ser `trap` (S4). Öppet 8 kvar för det som redan står |
+| Öppet 8: `hash` i en startfil | **Delvis**, som `trap` | Som `trap` |
+| Öppet 8: en funktion som heter `builtin` i en startfil | **Delvis**, som `trap` | Som `trap` |
+
+Dokumentationen nämner inte `trap`, `hash` eller `builtin` i de delar som är lästa. "Delvis" ovan är en bedömning utifrån vilka mappar som är skrivbara, inte ett påstående ur dokumentationen.
+
+### Nycklarna och versioner
+
+Nycklarna citerade exakt: `sandbox.enabled`, `sandbox.failIfUnavailable`, `sandbox.allowUnsandboxedCommands`, `sandbox.autoAllowBashIfSandboxed`, `sandbox.excludedCommands`, `sandbox.filesystem.denyWrite`, `sandbox.filesystem.denyRead`. Ingen av dem har en egen rad med lägsta version i settings-reference.md. Brödtexten nämner v2.1.224 (avslutande snedstreck) och v2.1.285 (att `allowUnsandboxedCommands` håller mot ett projekt). Filens krav, 2.1.295, är nyare än båda och ändras inte. Provkörningen gjordes med 2.1.314.
+
+**Så tolkas mönstren.** Fil-verktygens regler (permissions.md): `//path` är från datorns rot, `~/path` från hemmappen, `/path` från inställningskällan, och `path` eller `./path` från arbetsmappen. Tabellen för `/path` har ingen rad för de låsta inställningarna, så den formen används inte. Därför är förbudet för projektets `.venv` skrivet `Edit(~/VERA/agent/.venv/**)`. På en dator där projektet ligger någon annanstans blir det en ny version. Sandlådans listor (settings-reference.md, "Sandbox path prefixes"): `/` från roten, `~/` från hemmappen, och `//path` "also works". `*`, `?` och `**` fungerar i alla fyra listorna på macOS. Enligt settings-reference.md läggs `Edit(...)`-förbud till i `denyWrite` och `Read(...)`-förbud i `denyRead`. Provkörningen visade det också: `.git/index.lock` och en ny mapp `.git` stoppades av `Edit(//**/.git/**)` och `Edit(//**/.git)`.
+
+### Inte bekräftat
+
+- Att sandlådan körs i skrivbordsappens flik Code. Sidan desktop.md nämner det inte i de 100 000 tecken som är lästa, av 218 340. Provet är INSTALLERA.md, "Byte till versionen med sandlåda", punkt 6.
+- Att git add och git commit fungerar med de nya förbuden. Det går bara att visa efter installationen. Delen med kopian av repot är provkörd utan sandlåda.
+- Att scratchpad ligger inom sandlådans tillfälliga mapp. Allt pekar på det (båda under `/private/tmp/claude-501/`), och kontrollen efter bytet prövar det.
+- Att `.GIT/hooks` stoppas som `.git/hooks`. Spärrtestet prövar det.
+- Vilka de 6 överhoppade testerna i provkörningen är, och varför.
+
+### Till den oberoende granskningen av beslut 6 (särskilt)
+
+- **Vad som faktiskt lättar.** Vakten är oförändrad, så fil-verktygen stoppas fortfarande i hela `.git` och i varje `.venv`, av vakten. Det som ändras är kommandon i sandlådan, som utan beslut 6 inte kan köra git add. Claude Codes egna `Edit(...)`-förbud är smalare, men vakten prövas före dem.
+- **Att flytta hela `.git`** (min bedömning, inte provkört, och dokumentationen nämner det inte). Förbuden gäller `.git/hooks`, `.git/config` och `.git/info`, inte `.git` självt. Ett kommando kanske kan flytta `.git`, ändra `hooks` under det nya namnet och flytta tillbaka. I projektmappen finns dessutom sandlådans inbyggda skydd för `hooks` och `config` i `.git`. Om det stoppar flytten är okänt. Spärrtestet prövar bara att `hooks` inte går att flytta. Att pröva hela `.git` i det riktiga projektet bryter regeln i CLAUDE.md, och görs inte utan ett beslut.
+- **En fil `.git`** (granskning 12, P5). Inställningarna skyddar den inte längre. Vakten gör det för fil-verktygen, men inte för kommandon i sandlådan. I en worktree-session är `.git` en fil. Kommandon körs alltid i sandlådan, också en hook som git startar där.
+- **SPEC 7.1 är inte ändrad**, enligt uppdraget. Två meningar stämmer inte längre: "ett test kontrollerar att de är samma som i inställningarna" (testet kontrollerar nu samma lista utom de avsmalnade), och att en egen testfil stoppas av sandlådan (bara utanför projektet). Öppet 58.

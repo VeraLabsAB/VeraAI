@@ -8,8 +8,8 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet arbetar mot skuggpiloten (SPEC avsnitt 9 och `BYGGPLAN.md`). Än finns ett testföretag, Syntet Testbutik AB.
 Inget i koden kan i dag bokföra något.
 
-Testsviten: **4 592 passed**, 0 misslyckade (körd senast 2026-11-04 i sessionen för steg 104, i projektmappen med
-kommandot i SPEC 7.1: 4 552 från förut, 39 från steg 100 i `scripts/tests/test_beslut_granskning_32.py` och ett test i `test_beslut_granskning_30.py` delat i två). Sedan installationen
+Testsviten: **4 612 passed, 11 skipped**, 0 misslyckade (körd senast 2026-11-04 i sessionen för steg 15, i projektmappen med
+kommandot i SPEC 7.1. De 11 är spärrtestet, som hoppas över tills sandlådan är installerad). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
 borttagen.
 
@@ -23,6 +23,48 @@ borttagen.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-11-04, sandlådan byggd, inte installerad och inte granskad
+
+Steg i byggplanen: 15 (pågår)
+
+- **Säkerhet:** ingenting är installerat, inget sudo är kört, och inget utanför projektmappen och scratchpad är ändrat. `sparr/kommandosparr.py` och kommandolistan i SPEC 7.1 är oförändrade. **Innan installationen: oberoende granskning, med beslut 6 särskilt.**
+- **Besluten** står ordagrant i `GRANSKNING.md`, "Hugos beslut 2026-11-04 om sandlådan (steg 15)", med tabellen över vad sandlådan täcker. Första sessionen för steg 15 stannade innan något skrevs. Beslut 1-5 kom i chatten i den här sessionen, när den frågade efter dem.
+- **Provkörningen 2026-11-04** (Hugo, i Terminal, Claude Code 2.1.314, de låsta inställningarna oförändrade, med `--settings '{"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false,"autoAllowBashIfSandboxed":false,"excludedCommands":[]}}'`):
+  - `git status` fungerar. `git add PROGRESS.md` stoppas: "fatal: Unable to create '.git/index.lock': Operation not permitted".
+  - Testsviten: **4566 passed, 20 failed, 6 skipped**. Utan sandlåda var den 4592 passed samma kväll (steg 104).
+  - Grupp A (9) och B (2): vakten säger att programmet eller mappen "kan bytas ut/läggas där utan administratörslösenord". `test_beslut_granskning_13::test_p2_kedja_dar_varje_lank_ags_av_root_slapps_igenom`, `test_kommandosparr::test_beslut_3_fil_som_root_ager_i_en_rotmapp_gar_igenom`, `::test_beslut_3_lank_i_en_rotmapp_till_systemets_program_gar_igenom`, `::test_beslut_1_pytest_formerna_gar_igenom_med_python_i_en_mapp_som_root_ager` (6 varianter), `test_granskning_14::test_ring_som_programmet_i_en_saker_mapp_valjs_inte`, `test_kommandosparr::test_fil_som_inte_far_koras_hoppas_over_som_skalet_gor`.
+  - Grupp C (7): "assert False". `test_beslut_granskning_13::test_p2_for_lang_kedja_stoppas`, `test_granskning_14::test_lang_kedja_dar_varje_lank_ligger_i_en_rotmapp_slapps_igenom[3,4,5,8]`, `::test_kedja_med_relativa_lankar_och_tva_punkter`, `test_kommandosparr::test_rotagd_galler_bara_det_testet_anger`.
+  - Grupp D (2): PermissionError när testet skapar `<temp>/hem/projekt/.git` (`test_beslut_granskning_17::test_h6_en_lank_till_git_stoppas`) och `.venv` (`test_kommandosparr::test_beslut_1_gamla_venv_i_projektet_stoppas`).
+  - Testernas tillfälliga mapp låg i sandlådan under `/private/tmp/claude-501/pytest-of-hugolindholmer/`.
+- **Orsaken till grupp A-C, visad med körning: testernas miljö, inte vakten.** Hugos hypotes stämmer, med en precisering. Fixturen `rotagd` låtsas att en mapp och mapparna ovanför ägs av root, men prövar rättigheterna på riktigt. `/private/tmp` har 1777, alla får skriva, så provet faller där. Vakten svarar `False` för `/private/tmp`, och det ska den. När pytests tillfälliga mapp läggs under `/private/tmp`, utan sandlåda, blir **exakt de 18 testerna** röda. I sandlådan var också testerna som ska stoppas gröna av fel skäl. De stoppas nu av mappen i testet.
+- **Rättelsen, commit 1 (b6ce680):** bara fixturen `rotagd`. Mapparna ovanför testets egen tillfälliga mapp hör till datorn, och deras rättigheter prövas inte när testet låtsas att de ägs av root. Testets egen mapp och allt i den prövas på riktigt.
+- **Före och efter, ändrade tester.** Grupp A-C (18): testernas text är oförändrad, och de prövar samma sak. Före: rött under `/private/tmp`. Efter: grönt både under `/private/tmp` och utanför.
+  - Nytt: `test_rotagd_ger_samma_svar_under_en_mapp_som_alla_far_skriva_i` kör de 18 och 11 tester som ska stoppa i ett eget pytest, under en mapp med 1777. Rött före (18 F, 11 gröna), grönt efter.
+  - Nytt: `test_rotagd_provar_rattigheterna_i_testets_egen_mapp`. Mutation i kopian: undantaget utvidgat till testets egen mapp ger rött.
+  - `test_installningarna_nekar_sudo_su_och_att_skriva_i_git`. Före: `Edit(//**/.git/**)` finns. Efter: `Edit(//**/.git/hooks/**)` och `Edit(//**/.git/config)` finns.
+  - `test_installningarna_nekar_bade_mappen_git_och_filen_git` heter nu `test_vakten_nekar_bade_mappen_git_och_filen_git_och_installningarna_de_avsmalnade`. Före: båda reglerna i inställningarna. Efter: båda i vakten, de gamla borta ur inställningarna och de fem nya där.
+  - `test_installningarna_nekar_hugos_nya_forbud`. Före: `Edit(//**/.venv/**)`. Efter: `Edit(~/VERA/agent/.venv/**)`.
+  - `test_git_regeln_galler_varje_git_mapp_pa_datorn`. Före: en regel. Efter: exakt de fem.
+  - `test_h6_vakten_har_samma_forbud_som_installningarna` heter nu `..._utom_de_avsmalnade`. Före: listorna lika. Efter: lika utom de tre i `AVSMALNADE_FORBUD`, i samma ordning.
+  - `_installationskommandon` och `test_installera_ar_kortare_an_fore_granskning_15`. Före: hela INSTALLERA.md. Efter: utan de två nya avsnitten, som prövas i `test_sandladan.py`, också varje `sudo`-rad. **Här är testen smalare än förut, och det ska granskaren titta på.**
+- **Commit 2 (19010e8):** `sparr/managed-settings.json` med `sandbox` (fem nycklar, `denyWrite` och `denyRead`), `Read(~/.ssh/**)` (Hugos svar i chatten) och de avsmalnade förbuden: `Edit(//**/.git/hooks/**)`, `Edit(//**/.git/hooks)`, `Edit(//**/.git/config)`, `Edit(//**/.git/info/**)`, `Edit(//**/.git/info)` och `Edit(~/VERA/agent/.venv/**)`. Ny summa: `903909fe24769eb358ba42082c993f4ce5b70d62359672f4b2777c04ac23607e`. Nytt: `scripts/tests/test_sandladan.py`, och två avsnitt i `sparr/INSTALLERA.md` (provkörningen och bytet, med backning).
+- **Spärrtestet hoppas över** med texten `SPÄRRTESTET HOPPAS ÖVER` tills sandlådan är installerad och pytest körs i den (11 tester). Det har **aldrig körts på riktigt**. Delen med kopian av repot är provkörd utan sandlåda. "Hela sviten grön i sandlådan" prövas med hela svitens körning i INSTALLERA.md, punkt 6.
+- **Körningar** (`<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`, `<S>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/a24ffc34-cbb4-4958-bf96-6642916ccdc1/scratchpad`). Från projektmappen, ett kommando i taget, `<S>/kopia` gjord med `git archive`, `mkdir -p` och `tar -xf`. `<S>/kopia/scripts/tests/conftest.py` satte `PYTEST_DEBUG_TEMPROOT` under `/private/tmp`.
+  1. `<python> -B -m pytest -p no:cacheprovider -q -rA <S>/kopia/scripts/tests/test_prov_orsaken.py` (visar rättigheterna uppåt: `/private/tmp` 1777, vakten `False`).
+  2. `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rf <S>/kopia/scripts/tests` före rättelsen (**18 failed, 4575 passed**, exakt grupp A-C).
+  3. `<python> -B -m pytest -p no:cacheprovider -q --tb=line -k test_rotagd_ger_samma scripts/tests` före rättelsen (**1 failed**, rött före).
+  4. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -k test_rotagd_ scripts/tests` (3 passed).
+  5. Samma kopia som i 2, efter rättelsen (**4595 passed**).
+  6. `<python> -B -m pytest -p no:cacheprovider -q --tb=short scripts/tests` efter commit 1 (**4594 passed**).
+  7. Mutation i kopian: `<python> -B -m pytest -p no:cacheprovider -q --tb=line <S>/kopia/scripts/tests/test_kommandosparr.py -k test_rotagd_` (**1 failed, 2 passed**).
+  8. `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rs -k test_sandladan scripts/tests` mot den gamla inställningsfilen (**13 failed, 2 passed, 11 skipped**, rött före). De två gröna visar att vakten är oförändrad och fortfarande stoppar.
+  9. `<python> -B -m pytest -p no:cacheprovider -q -rA <S>/kopia/scripts/tests/test_prov_summa.py` (summan).
+  10. `<python> -B -m pytest -p no:cacheprovider -q --tb=short <S>/prov-git/test_prov_git.py` (kopian av repot, git add och commit utan sandlåda, **2 passed**).
+  11. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rf scripts/tests` efter commit 2 (**4612 passed, 11 skipped**).
+- **Verifierat med körning:** ovan. **Läst i dokumentationen:** code.claude.com/docs/en/sandboxing.md, settings-reference.md, permissions.md och desktop.md (delvis). **Min bedömning:** "Delvis" för Öppet 8, flytten av `.git` och var scratchpad ligger (`GRANSKNING.md`).
+- **Efter bytet väntas:** grupp D och git add gröna. Det går inte att visa före installationen.
+- **Opushat:** 40b1ec1, ab17064, 33efbe4, 01aa499, a6feeb1, 78f146f, 3e1651e, 933d809, 136a2ed, 43d8c0f, c764101, 7ca8ebd, ddfe43d, b6ce680, 19010e8 och commiten med den här texten. Sessionen pushar inte.
 
 ## Läge 2026-11-04, namnbytet i BYGGPLAN.md
 
@@ -1576,7 +1618,7 @@ fattade och byggda, se avsnittet ovan.)
    inställningar (planen står i `GRANSKNING.md` under "Granskning 11 – plan för Q1", bygget under "Bygget av
    vakten för Q1"). Vakten kan inte stoppa
    en egen testfil som körs med pytest och raderar eller skriver i projektet. Det stoppas av en **sandlåda**
-   (ett skydd i macOS som gör att kommandon bara kan skriva i vissa mappar). **Öppen, inte byggd.** Hugos
+   (ett skydd i macOS som gör att kommandon bara kan skriva i vissa mappar). **Byggd 2026-11-04 (steg 15), inte installerad och inte granskad. Skrivning i projektet stoppas inte, Öppet 55.** Hugos
    beslut 2026-10-28: sandlådan byggs i spärrsteget, men ska vara klar **före uppgift 5, eller före första
    hela körningen på riktiga underlag om den kommer först**. Hugos beslut 2026-10-28 efter granskning 15:
    **sandlådan görs direkt efter installationen**, och ska också täcka det som står i punkt 8. **Sandlådan ska förbjuda skrivning i appen
@@ -1617,7 +1659,7 @@ fattade och byggda, se avsnittet ovan.)
    med kommandot `trap` (till exempel `trap '…' DEBUG`, som körs före varje kommando), skalets tabell över
    program (`hash`, till exempel `hash git=…`, som får `git` att köra en annan fil oavsett `PATH`), och en funktion som heter
    `builtin` och härmar kontrollens svar. Alla tre kräver en rad i en startfil, som har förbud. De ska täckas
-   av **sandlådan** (punkt 4). **Öppen, inte byggd.**
+   av **sandlådan** (punkt 4). **Delvis täckt av steg 15, som inte är installerat: nya rader i startfiler stoppas, men en rad som redan står där syns inte (`GRANSKNING.md`, tabellen under "Hugos beslut 2026-11-04 om sandlådan"). Öppen för det.**
 9. **De låga fynden i granskning 16** (av abd0745, `GRANSKNING.md`). Stoppregeln: de stoppar inte
    installationen. G1: de elva raderna i INSTALLERA.md steg 4 h är aldrig provkörda i agentens riktiga skal.
    G2: steg 4 h saknar meningen "inte exakt de elva raderna: stoppa och fråga". G3: `grep -R` följer länkar ut
@@ -1937,6 +1979,10 @@ fattade och byggda, se avsnittet ovan.)
 52. **Momsen när kvittot saknas** (samma beslut, 5): **Öppen fråga** till redovisningskonsulten. Kassio gissar inte.
 53. **Öppna frågor ur `KASSIO-KRAV.md`** (samma beslut, 1). Pilotkundens ekonomiansvarige har två roller. Är priset inklusive eller exklusive moms? Vad räknas som färdigt för funktioner som kräver avtal eller extern hjälp? Behövs import av tidigare bokföring? När byggs mobilappen? Går pilotkundens kassasystem att koppla, och vilka kassasystem är vanligast? Ska lönedagen kunna ändras per företag? Inkasso åt andra kräver som regel tillstånd enligt kravlistan: kontrolleras med jurist. Hur hanterar Anthropic datan, innan krypteringslöftet formuleras? **Öppna.**
 54. **Vad "pengar" betyder i beslut 3** (Hugos beslut 2026-11-04 om planen, beslut 3). BYGGPLAN.md, regel 10, läser det som betalningar, utbetalningar och belopp kunden ska betala, till exempel lön, utlägg och moms att betala, inte varje belopp i bokföringen. Läser man det bredare ska nästan varje steg granskas för sig. Planeringssessionens tolkning, inte ett beslut. **Öppen. Väntar på Hugos eller Caspers besked.**
+55. **En egen testfil kan fortfarande skriva och radera i projektet** (steg 15). Projektmappen är skrivbar i sandlådan (beslut 4). Punkt 4 sa att sandlådan stoppar det, men den stoppar bara skrivning utanför. Regelbok och kod går att ändra. Kvar som skydd: git-historiken och människans granskning. **Öppen. Väntar på beslut.**
+56. **Sex nycklar som försvagar sandlådan** (steg 15). Dokumentationen säger att de går att sätta på från användarens inställningar eller `--settings`, och att de bör sättas till false i de låsta inställningarna om de inte ska användas: `enableWeakerNestedSandbox`, `enableWeakerNetworkIsolation`, `network.allowAllUnixSockets`, `network.allowLocalBinding`, `allowAppleEvents` och `allowNestedUserNamespaces`. Hugos svar 2026-11-04: bygg som beslutat, utan dem. **Öppen. Väntar på beslut.**
+57. **Fil-verktyget Read kan läsa utanför projektet** (steg 15). `Read(~/.ssh/**)` stänger `~/.ssh`, men vakten prövar inte sökvägar för Read, och sandlådan gäller inte fil-verktygen. Dokumentationen har också `permissions.blockWritesOutsideWorkingDirectories` (v2.1.314) för skrivning, som inte är prövad eller beslutad. **Öppen.**
+58. **SPEC 7.1 stämmer inte längre på två punkter efter steg 15** (Hugos uppdrag: ändra inte listan). "Ett test kontrollerar att de är samma som i inställningarna", och att en egen testfil stoppas av sandlådan. Rättas efter granskningen, med Hugos eller Caspers OK. **Öppen.**
 
 ## Nästa steg i byggordningen
 
