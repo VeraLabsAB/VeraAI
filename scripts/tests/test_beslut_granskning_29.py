@@ -18,8 +18,9 @@ Formerna, så som flödena bygger dem (konteringsfloden.py, _kostnad_och_moms, _
 
 Förslag utan underlag (bankavgiften i flöde e) berörs inte.
 
-Granskarens prov ur granskning 29 (P1, P3 och P4) stoppas. r5 (P2, Öppet 40) har flöde a:s form och går fortfarande
-igenom: det hålet är kvar till steg 98 (beslut 2). P5 (Öppet 41) rör datumet och ingår inte (beslut 4).
+Granskarens prov ur granskning 29 (P1, P3 och P4) stoppas av formen. r5 (P2, Öppet 40) har flöde a:s form och stoppas
+sedan steg 98 av kontrollen att bankraden hör till underlaget (beslut 2, test_beslut_granskning_30.py). P5 (Öppet 41) rör
+datumet och ingår inte (beslut 4).
 
 Allt körs mot testbutikens SYNTETISKA konfiguration och testdatan för 2025-Q1. Allt som ändras skrivs i testets
 tillfälliga mapp. Testerna var röda mot koden i c9a6cee (före rättelsen): 19 av 25 här, och de 6 gröna är skydd eller
@@ -323,20 +324,18 @@ def test_en_z_rapport_i_ett_forslag_med_underlag_stoppas(korning):
     assert "Z-rapport" in str(fel.value) and OPPET_39 in str(fel.value)
 
 
-# --- P2 (Öppet 40): hålet är kvar till steg 98 ---
+# --- P2 (Öppet 40): stängt i steg 98 ---
 
-def test_oppet_40_r5_en_annan_leverantors_bankrad_gar_fortfarande_igenom_till_steg_98(korning_tele):
-    # Dokumenterar ett känt hål, inte ett önskat beteende. r5 i kopian där 009 har 748,75 kr: 2440 debet 009 'belopp_ore',
-    # 1940 kredit bankrad 8 i februari, som är betalningen till LEV-TELE, inte till LEV-TE. Formen är flöde a:s betalning,
-    # så (b) ändrar inget. Bankraden ska kontrolleras mot underlaget med samma matchning som flödena använder (beslut 2).
-    # När steg 98 byggs ska det här testet skrivas om till ett stopp-test.
+def test_oppet_40_r5_en_annan_leverantors_bankrad_stoppas(korning_tele):
+    # r5 i kopian där 009 har 748,75 kr: 2440 debet 009 'belopp_ore', 1940 kredit bankrad 8 i februari, som är betalningen
+    # till LEV-TELE, inte till LEV-TE. Formen är flöde a:s betalning, så (b) ändrar inget. Dokumenterade hålet i steg 97 och
+    # är ett stopp-test sedan steg 98: bankraden kontrolleras mot underlaget med samma matchning som flödena (beslut 2).
     nio, atta = underlaget(korning_tele, ANDRA), korning_tele.bankrad(2, 8)
     assert -atta["belopp_ore"] == nio["belopp_ore"]
-    forslag = skapa(korning_tele, forslag_med(korning_tele, ANDRA, [
+    stoppas(korning_tele, forslag_med(korning_tele, ANDRA, [
         rad(roll(korning_tele, LEVERANTORSSKULDER), nio["belopp_ore"], 0, "lika", kalla(ANDRA, "belopp_ore")),
         rad(roll(korning_tele, BANK), 0, nio["belopp_ore"], "lika", bankkalla(atta)),
-    ], "r5", atta["transaktionsdag"], [ANDRA], [atta]))
-    assert forslag.kontroller == ALLA_KONTROLLER
+    ], "r5", atta["transaktionsdag"], [ANDRA], [atta]), "ursprung", repr(ANDRA), repr(atta["id"]), "Öppet 40")
 
 
 # --- Rätt former godtas ---

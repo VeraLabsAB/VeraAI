@@ -242,6 +242,16 @@ K5, K7 och K8, efter ursprunget, för varje underlag som förslaget bygger på (
   kontrollerar inte att bankraden hör till underlaget (Öppet 40, steg 98) eller verifikationens datum (Öppet
   41). En ny typ av underlag stoppas tills dess form är tillagd: när Ö8 (kreditnotor) byggs behövs en egen form.
 
+  Bankraden hör till underlaget (Öppet 40, steg 98, granskning 29, P2, och granskning 30, P3, Hugos beslut 2026-11-04 om
+  granskning 29, beslut 2, och Hugos beslut 2026-11-04 om granskning 30, beslut 3). Prövas efter formerna, sist av allt,
+  för ett förslag med både underlag och bankrad: paret ska finnas bland matchningarna från matcha_period, samma
+  funktion som flödena använder, körd här med samma perioder och samma regelbok som förslaget kontrolleras mot. Annars
+  gick rätt form med fel bankrad igenom: en annan leverantörs bankrad med samma belopp (r5), ett kvitto mot en annan
+  motparts bankrad (g9) och en bankrad mot ägaren (g10), som matchningen aldrig gör till en matchning (regel 8 i
+  matcha_bank.py). Kontrollen tar inte emot något matchningsresultat, så inget kan lämnas in handbyggt. Går matchningen
+  inte att göra stoppas förslaget. Flödena använder samma funktion på samma perioder och berörs inte. Kontrollen vet
+  bara om de perioder den får, inte vad hela perioden är. Förslag utan underlag berörs inte (Öppet 44, steg 100).
+
 Kopplingarna i förslaget får kontrollsummorna för regelboken, kontoplanen, momsfilen och
 matchningsformatet, och kontrollsumman för varje fil förslaget bygger på (underlaget, bankfilen och
 Z-filen). Summorna kommer från inläsningen, aldrig från indata: de som står i indata jämförs bara (K2).
@@ -262,6 +272,7 @@ from las_kontoplan import Kontoplan, KontoplanFel
 from las_momssatser import Momssatser, MomssatsFel
 from las_regelbok import Regelbok
 from las_underlag import HELTAL_HOGST_SIFFROR, Underlagsperiod
+from matcha_bank import MatchningFel, matcha_period
 from normalisering import normalisera_for_jamforelse
 
 FORSLAG_NYCKLAR = ("forslag_id", "verifikation", "kopplingar", "motivering")
@@ -335,6 +346,14 @@ _DELARNA = ("Ett underlags 'belopp_ore' räknas som alla dess momsraders '" + _U
             + "', och en Z-rapports försäljning med en sats som försäljningen utan moms plus momsen med samma sats.")
 
 _DATUMFORM = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
+
+# Bedömningsdatumet när kontrollen frågar matcha_period om paret (Öppet 40). Datumet ändrar inte vilka par som finns, bara
+# vilka rader utan underlag som väntar och vilka som är ärenden. Ett fast datum ligger aldrig före någon bankrad, och
+# är en uppgift mindre som kan vara fel.
+_SENT_BEDOMNINGSDATUM = "9999-12-31"
+_OPPET_40 = ("Bankraden i en betalning eller ett kvitto ska vara den som matchningen, samma matcha_period som flödena"
+             " använder, har parat ihop med underlaget (Öppet 40, steg 98, Hugos beslut 2026-11-04 om granskning 29,"
+             " beslut 2, och om granskning 30, beslut 3).")
 
 
 class KonteringsforslagFel(Exception):
@@ -1467,6 +1486,42 @@ def _kontrollera_underlagen(kopplingar, verifikation, regelbok, kontoplan, momss
     return {_K5: "ok", _K7: "ok", _K8: "ok"}
 
 
+def _vad_matchningen_sager(bankradens_id, matchning):
+    """Vad matchningen säger om bankraden, för ett felmeddelande."""
+    for post in matchning.matchningar:
+        if post["bankrad"]["id"] == bankradens_id:
+            return "matchningen har parat ihop bankraden med underlaget " + repr(post["underlag"]["id"])
+    for post in matchning.arenden:
+        if post["bankrad"]["id"] == bankradens_id:
+            return "matchningen gör bankraden till ärendet " + repr(post["typ"])
+    for post in matchning.kraver_inte_underlag:
+        if post["bankrad"]["id"] == bankradens_id:
+            return "matchningen säger att bankraden inte kräver något underlag (regeln " + repr(post["regel"]) + ")"
+    return "matchningen har inget underlag för bankraden"
+
+
+def _kontrollera_bankradens_par(kopplingar, regelbok, underlagsperiod, bankperiod):
+    """Öppet 40: underlaget och bankraden är ett par bland matchningarna från matcha_period.
+
+    Se "Bankraden hör till underlaget" överst i filen. kopplingar är de kontrollerade kopplingarna. Körs efter formerna,
+    som har visat att ett förslag med underlag och bankrad har exakt ett av varje. Saknas en period ger matcha_period ett
+    MatchningFel, och det stoppar förslaget som allt annat som gör att matchningen inte går att göra.
+    """
+    if not kopplingar["underlag"] or not kopplingar["bankrader"]:
+        return
+    id_, bankrad = kopplingar["underlag"][0]["id"], kopplingar["bankrader"][0]
+    paret = "underlaget " + repr(id_) + " och bankraden " + repr(bankrad["id"]) + " (radnummer " + str(bankrad["radnr"]) + ")"
+    try:
+        matchning = matcha_period(bankperiod, underlagsperiod, regelbok, _SENT_BEDOMNINGSDATUM)
+    except MatchningFel as fel:
+        raise _fel(_URSPRUNG, "matchningen kunde inte göras, så det går inte att pröva om " + paret + " hör ihop: "
+                   + str(fel) + " " + _OPPET_40) from None
+    if any(post["underlag"]["id"] == id_ and post["bankrad"]["id"] == bankrad["id"] for post in matchning.matchningar):
+        return
+    raise _fel(_URSPRUNG, paret + " är inte ett par: " + _vad_matchningen_sager(bankrad["id"], matchning) + ". "
+               + _OPPET_40)
+
+
 # --- Förslaget ---
 
 def _frys(varde):
@@ -1568,8 +1623,9 @@ def skapa_konteringsforslag(forslag, regelbok, kontoplan, momssatser=None, under
     kontoplan från las_kontoplan, momssatser från las_momssatser, underlagsperiod från
     las_underlagsperiod, bankperiod från las_bankfil eller sla_ihop_bankperioder och kassaperiod från
     las_kassaperiod. En period som förslaget inte använder får vara None, och momsfilen får vara None
-    bara när förslaget inte bygger på något underlag (K5, K7 och K8 gäller underlag). Allt som inte går
-    ihop stoppar förslaget med ett KonteringsforslagFel.
+    bara när förslaget inte bygger på något underlag (K5, K7 och K8 gäller underlag). Ett förslag med både
+    underlag och bankrad ska dessutom vara ett par i matcha_period (Öppet 40). Allt som inte går ihop
+    stoppar förslaget med ett KonteringsforslagFel.
     """
     _kontrollera_indatans_typer(regelbok, kontoplan, momssatser, underlagsperiod, bankperiod, kassaperiod)
     nytt = _kontrollera_formen(forslag)
@@ -1580,6 +1636,7 @@ def skapa_konteringsforslag(forslag, regelbok, kontoplan, momssatser=None, under
     kontroller = {_K2: "ok", _URSPRUNG: "ok"}
     kontroller.update(_kontrollera_underlagen(kopplingar, nytt["verifikation"], regelbok, kontoplan, momssatser,
                                               kallorna))
+    _kontrollera_bankradens_par(kopplingar, regelbok, underlagsperiod, bankperiod)
     return Konteringsforslag(_FORSLAGSNYCKEL, {
         "forslag_id": nytt["forslag_id"],
         "verifikation": nytt["verifikation"],
