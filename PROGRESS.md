@@ -8,7 +8,7 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet är i **fas 0** (SPEC avsnitt 9): ett testföretag, Syntet Testbutik AB, hela vägen från
 underlag till godkänd rapport. Inget i koden kan i dag bokföra något.
 
-Testsviten: **4 592 passed**, 0 misslyckade (körd senast 2026-11-04 i granskning 33 av steg 100, i projektmappen med
+Testsviten: **4 592 passed**, 0 misslyckade (körd senast 2026-11-04 i planeringssessionen om planen, i projektmappen med
 kommandot i SPEC 7.1: 4 552 från förut, 39 från steg 100 i `scripts/tests/test_beslut_granskning_32.py` och ett test i `test_beslut_granskning_30.py` delat i två). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
 borttagen.
@@ -26,14 +26,25 @@ borttagen.
 
 ## Läge 2026-11-04, Hugos beslut om planen
 
-Steg i byggplanen: 52 (pågår)
+Steg i byggplanen: 103 (klart) och 52 (pågår)
 
 - **Vad:** planeringssession utan kod. Hugos 15 beslut om planen står ordagrant i `GRANSKNING.md`, "Hugos beslut 2026-11-04 om planen (PLAN-KASSIO-FORSLAG.md)". `KASSIO-KRAV.md` är committad som den är och är kravkällan i repot (beslut 1).
 - **Pilotens omfång:** först en skuggpilot (förslag: 2027-01-11) där Kassio tar fram veckoutkast på pilotkundens riktiga data men inget skrivs i Fortnox. Sedan (förslag: 2027-03-01) bokföring, moms och veckoutkast som skrivs i Fortnox efter godkännande. Datumen är uppskattningar (beslut 2).
 - **Säkerhet:** inget i besluten lättar på regeln att inget bokförs utan godkännande. Men en körning på pilotkundens riktiga data är förbjuden i dag (CLAUDE.md, "Aldrig"), tills nästa session har skrivit om regeln och juristens svar finns (Öppet 51).
-- **Ordningen:** BYGGPLAN.md skrivs om i den här sessionen. SPEC.md, CLAUDE.md och namnbytet görs i nästa session.
+- **Ordningen:** BYGGPLAN.md är omskriven i den här sessionen (steg 103). SPEC.md, CLAUDE.md och namnbytet görs i nästa session.
 - **Steg 52** är satt till pågår: beslutet är fattat, och texten i SPEC skrivs i nästa session.
-- **Opushat:** 40b1ec1, ab17064, 33efbe4, 01aa499, a6feeb1 och den här sessionens commitar. `origin/main` står på feba3ad enligt `git status`, inte kontrollerat mot GitHub. Sessionen pushar inte.
+- **BYGGPLAN.md:** inget stegnummer är ändrat och inget steg borttaget, och raderna för klara steg är ordagranna utom steg 100, som fått beslutet om att det är klart. 46 nya steg, 103–148. Delarna heter Klart, Mål 1: Skuggpiloten, Mål 2: Piloten med Fortnox, Under piloten och Efter piloten. "Under piloten" är en egen del, eftersom beslut 2 säger att resten byggs under piloten, inte efter. Rubrikerna börjar med "Fas", eftersom byggplanstestet läser tabellerna under sådana rubriker. Testet är inte ändrat.
+- **Krockar till nästa session, inte rättade.**
+  - **SPEC.md:** rubriken, bolaget och namnet Vera genom hela texten, också "hon" om agenten (beslut 12). Avsnitt 1: målgruppen krögare, butik och hantverkare (`KASSIO-KRAV.md`: nystartade företag). Avsnitt 1.1: referensprodukt, fiktiva företag och tre branscher (beslut 2 och 11). Avsnitt 2: konfigurationen i `foretag/<namn>/`, medan riktiga uppgifter inte får ligga i repot. Avsnitt 2.1: SIE-fil i version 1 och direktkopplingar senare (Fortnox direkt). Avsnitt 3: rollerna (ägare/admin, godkännare, anställd, bara läsa). Avsnitt 4: olika hämtning av underlag i lägena, granskat läge bokför löpande och "inget återstår" på söndagen (beslut 7), och att kundens instruktioner alltid blir ett nytt förslag (beslut 4). Avsnitt 5: nivåerna styr hur godkännandet visas (beslut 6). Avsnitt 6, K3: saknat underlag blir ärende (beslut 5), och K7: alltid ärende mot att Kassio föreslår hantering. Avsnitt 7: "Flödenas former" och förslag utan underlag stoppar allt annat, så kvitto saknas och kundändrat förslag behöver egna former (beslut 4 och 5). Avsnitt 7.1: "Veras egen lista" och sökvägen `ClaudeCode/vera`, som bara kan ändras som ny version av vakten. Avsnitt 8: inga riktiga kunders uppgifter, och Krog och Bygg "ska tas fram" (beslut 2 och 11). Avsnitt 9: faserna 0–4 (beslut 2). Avsnitt 10: egen app, lön, inlämning och fakturering utanför version 1. Avsnitt 11: Ö1, Ö2 (SIE i version 1), Ö5 och Ö7 (beslut 8).
+  - **CLAUDE.md:** rubriken "Veras bokföringsagent". "Aldrig: använd riktiga kunders uppgifter. Bara fiktiva testföretag" (beslut 2, säkerhet, Öppet 51). "Allt företagsspecifikt ligger i `foretag/<namn>/`". "Läs och skriv bara filer inom den här mappen" (driftmiljön). "Samma sak gäller när Casper arbetar": Casper kör inga sessioner före steg 14 (beslut 13, Öppet 15). Beslut 3 om granskning står inte där, och inte heller regeln om pilotkundens namn. Meningen om den gamla arkivmappen nämner ett företagsnamn. "Kör kommandon utanför den fasta listan (läggs till i SPEC.md när den finns)" är gammal: listan finns.
+- **Körningar av enskilda testfiler** (`<scratch>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/9f41baa9-03a7-46d7-aaf6-a918c59a031d/scratchpad` och `<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`). Allt från projektmappen, ett kommando i taget:
+  1. `<python> -B -m pytest -p no:cacheprovider -q -k test_byggplan_progress scripts/tests` före commit 1 och efter omskrivningen (**8 passed, 4 584 deselected** båda gångerna, och körd igen före commit 3 efter den här texten).
+  2. `mkdir -p <scratch>/kopia-fore`, `git archive -o <scratch>/plan-fore.tar a6feeb1 BYGGPLAN.md` och `tar -xf <scratch>/plan-fore.tar -C <scratch>/kopia-fore`.
+  3. `<python> -B -m pytest -p no:cacheprovider -q -rP <scratch>/kopia-fore/test_rakna_avsnitt_b.py` (**1 passed**, 67 krav i avsnitt B).
+  4. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rP <scratch>/kopia-fore/test_plan_kontroll.py` (först **7 passed**, sedan med ett test till **8 passed**): stegen 1–148 finns, de klara raderna är ordagranna utom steg 100, historiken i "Läge nu" och reglerna är kvar utom regel 8, varje steg som inte är klart har granskningsnivå och villkor, och varje beroende står före steget. Provfilen läser bara.
+  5. `<python> -B -m pytest -p no:cacheprovider -q scripts/tests` (**4592 passed**) före den här texten.
+- **Vakten stoppade** tre läsande kommandon som sessionen skrev i strid med SPEC 7.1: ett med `&&` och två `grep` med `|` i mönstret. De ersattes med ett kommando i taget.
+- **Opushat:** 40b1ec1, ab17064, 33efbe4, 01aa499, a6feeb1, 78f146f, 3e1651e och commiten med den här texten. `origin/main` står på feba3ad enligt `git status`, inte kontrollerat mot GitHub. Sessionen pushar inte.
 
 ## Läge 2026-11-04, Hugos beslut om granskning 33 och planeringssessionen
 
@@ -1876,6 +1887,7 @@ fattade och byggda, se avsnittet ovan.)
 51. **Riktiga kunduppgifter före skuggpiloten** (Hugos beslut 2026-11-04 om planen, beslut 2, säkerhet). Skuggpiloten körs på pilotkundens riktiga data, men CLAUDE.md, "Aldrig", och SPEC 8 förbjuder riktiga kunders uppgifter, och kärnan läser allt företagsspecifikt ur `foretag/<namn>/` i repot. Före första körningen krävs: regeln omskriven (nästa session), juristens svar, en driftmiljö skild från repot och sandlådan. Inga riktiga kunduppgifter och inte pilotkundens namn får finnas i repot. **Öppen.**
 52. **Momsen när kvittot saknas** (samma beslut, 5): **Öppen fråga** till redovisningskonsulten. Kassio gissar inte.
 53. **Öppna frågor ur `KASSIO-KRAV.md`** (samma beslut, 1). Pilotkundens ekonomiansvarige har två roller. Är priset inklusive eller exklusive moms? Vad räknas som färdigt för funktioner som kräver avtal eller extern hjälp? Behövs import av tidigare bokföring? När byggs mobilappen? Går pilotkundens kassasystem att koppla, och vilka kassasystem är vanligast? Ska lönedagen kunna ändras per företag? Inkasso åt andra kräver som regel tillstånd enligt kravlistan: kontrolleras med jurist. Hur hanterar Anthropic datan, innan krypteringslöftet formuleras? **Öppna.**
+54. **Vad "pengar" betyder i beslut 3** (Hugos beslut 2026-11-04 om planen, beslut 3). BYGGPLAN.md, regel 10, läser det som betalningar, utbetalningar och belopp kunden ska betala, till exempel lön, utlägg och moms att betala, inte varje belopp i bokföringen. Läser man det bredare ska nästan varje steg granskas för sig. Planeringssessionens tolkning, inte ett beslut. **Öppen. Väntar på Hugos eller Caspers besked.**
 
 ## Nästa steg i byggordningen
 
