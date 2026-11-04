@@ -57,14 +57,18 @@ GAMLA_PYTEST = f".venv/bin/python {PYTEST_FAST}"
 # var det ligger. Testerna använder datorns egna mappar för program, som ägs av systemet (root).
 SYSTEMETS_SOKVAG = "/usr/bin:/bin"
 
-# Hugos beslut 2026-11-04 om sandlådan, beslut 6: förbuden i de låsta inställningarna är avsmalnade, så att git add och
-# git commit fungerar i sandlådan. Vakten är oförändrad (beslut 5) och har kvar de gamla, bredare förbuden. Här står
-# skillnaden: vaktens förbud till vänster, och vad det blir i inställningarna till höger. Allt annat är lika.
-AVSMALNADE_FORBUD = {
-    "//**/.git/**": ["//**/.git/hooks/**", "//**/.git/hooks", "//**/.git/config", "//**/.git/info/**", "//**/.git/info"],
-    "//**/.git": [],
-    "//**/.venv/**": ["~/VERA/agent/.venv/**"],
-}
+
+def gor_mapp_eller_hoppa_over(sokvag):
+    """Grupp D (Hugos beslut 2026-11-05 om granskning 34, beslut 3). I sandlådan får ingen mapp som heter .git eller
+    .venv skapas, inte heller i testets tillfälliga mapp. Då kan provet inte köras där, och det hoppas över. Utanför
+    sandlådan körs det som vanligt. Bara ett nej från datorn hoppar över, inget annat fel."""
+    try:
+        os.makedirs(sokvag)
+    except PermissionError:
+        pytest.skip(
+            f"GRUPP D HOPPAS ÖVER: datorn nekade att skapa {os.path.basename(sokvag) or sokvag} i testets tillfälliga "
+            'mapp, troligen sandlådan. Provet körs utanför sandlådan, se INSTALLERA.md, "Prov utanför sandlådan".'
+        )
 
 
 @pytest.fixture(scope="module")
@@ -1150,6 +1154,7 @@ def test_beslut_1_pytest_formerna_stoppas_med_python_i_en_mapp_som_anvandaren_ag
 
 def test_beslut_1_gamla_venv_i_projektet_stoppas(vakt, mappar):
     # Också om den finns: den står inte längre på listan.
+    gor_mapp_eller_hoppa_over(os.path.join(mappar["projekt"], ".venv", "bin"))
     _lagg_program(os.path.join(mappar["projekt"], ".venv", "bin"), "python")
     fel = _bedom(vakt, mappar, f"{GAMLA_PYTEST} -q scripts/tests")
     assert fel is not None and LISTAN in fel, fel
@@ -1602,23 +1607,18 @@ def test_installationsfilen_startar_vakten_med_hela_sokvagar_och_stoppar_om_den_
 
 def test_installningarna_nekar_sudo_su_och_att_skriva_i_git():
     neka = _installningar()["permissions"]["deny"]
-    for regel in ["Bash(sudo *)", "Bash(su *)", "Bash(su)", "Edit(//**/.git/hooks/**)", "Edit(//**/.git/config)"]:
+    for regel in ["Bash(sudo *)", "Bash(su *)", "Bash(su)", "Edit(//**/.git/**)"]:
         assert regel in neka
 
 
-def test_vakten_nekar_bade_mappen_git_och_filen_git_och_installningarna_de_avsmalnade(vakt):
+def test_installningarna_nekar_bade_mappen_git_och_filen_git():
     # Granskning 12, P5 (Hugos beslut 2026-10-28): i en worktree är .git en fil, inte en mapp. Båda ska
     # vara förbjudna, på varje djup. //**/.git utan /** på slutet gäller en fil med det namnet var den än
     # ligger, som Read(//**/.env) i code.claude.com/docs/en/permissions ("How deep a pattern matches").
-    # Hugos beslut 2026-11-04 om sandlådan, beslut 6: i inställningarna är förbuden avsmalnade till .git/hooks,
-    # .git/config och .git/info. Vakten är oförändrad (beslut 5), och där gäller P5 fortfarande för fil-verktygen.
-    assert "//**/.git/**" in vakt.SKRIVFORBUD
-    assert "//**/.git" in vakt.SKRIVFORBUD
+    # Hugos beslut 2026-11-05 om granskning 34, beslut 1, återkallar avsmalningen från steg 15.
     neka = _installningar()["permissions"]["deny"]
-    assert "Edit(//**/.git/**)" not in neka
-    assert "Edit(//**/.git)" not in neka
-    for regel in AVSMALNADE_FORBUD["//**/.git/**"]:
-        assert f"Edit({regel})" in neka
+    assert "Edit(//**/.git/**)" in neka
+    assert "Edit(//**/.git)" in neka
 
 
 def test_installningarna_stanger_av_skalkommandon_i_skills():
@@ -1647,8 +1647,7 @@ NYA_FORBUD = [
     "Edit(~/bin/**)",
     "Edit(~/.local/bin/**)",
     "Edit(//opt/homebrew/**)",
-    # Hugos beslut 2026-11-04 om sandlådan, beslut 6: bara projektmappens egen .venv.
-    "Edit(~/VERA/agent/.venv/**)",
+    "Edit(//**/.venv/**)",
 ]
 
 
@@ -1670,7 +1669,7 @@ def test_git_regeln_galler_varje_git_mapp_pa_datorn():
     # en hemmapp i sig.
     neka = _installningar()["permissions"]["deny"]
     git_regler = [regel for regel in neka if "/.git/" in regel]
-    assert git_regler == [f"Edit({regel})" for regel in AVSMALNADE_FORBUD["//**/.git/**"]]
+    assert git_regler == ["Edit(//**/.git/**)"]
     text = INSTALLNINGAR.read_text(encoding="utf-8")
     assert "/Users/" not in text and "hugolindholmer" not in text
 

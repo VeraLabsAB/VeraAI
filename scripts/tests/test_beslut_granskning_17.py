@@ -40,7 +40,6 @@ from test_beslut_granskning_15 import (
     inget_zsh,
 )
 from test_kommandosparr import (  # noqa: F401 (fixturerna används av pytest via namnen)
-    AVSMALNADE_FORBUD,
     INSTALLERA,
     PROJEKTET,
     _bedom,
@@ -50,6 +49,7 @@ from test_kommandosparr import (  # noqa: F401 (fixturerna används av pytest vi
     _installningar,
     _spec_7_1,
     _steg,
+    gor_mapp_eller_hoppa_over,
     mappar,
     vakt,
 )
@@ -116,12 +116,19 @@ def _ls(fil):
 
 @pytest.fixture
 def provfil(tmp_path):
-    """En fil i testets tillfälliga mapp med exakt en extra uppgift, com.apple.provenance."""
+    """En fil i testets tillfälliga mapp med exakt en extra uppgift, com.apple.provenance.
+
+    Hugos beslut 2026-11-05 om granskning 34, beslut 3 och P6: provet går bara att köra när nya filer får uppgiften av
+    sig själva. Varför de ibland inte får den är inte fastställt (sandlådan eller Terminal), så testet frågar filen och
+    gissar inte."""
     fil = tmp_path / "provfil"
     fil.write_text("x\n", encoding="utf-8")
     rader = _ls(fil).splitlines()
     if not (len(rader) == 2 and rader[0].split()[0].endswith("@") and rader[1].split() == [PROVENANCE, "11"]):
-        pytest.skip(f"filer i testets tillfälliga mapp har inte exakt {PROVENANCE} på den här datorn: {rader}")
+        pytest.skip(
+            f"H1-PROVET HOPPAS ÖVER: nya filer i testets tillfälliga mapp har inte exakt {PROVENANCE} här: {rader}. "
+            'Provet behöver köras där de får den, se INSTALLERA.md, "Prov utanför sandlådan".'
+        )
     return fil
 
 
@@ -339,7 +346,7 @@ def test_h6_andra_forbud_galler_oavsett_bokstaver(vakt, mappar, sokvag):
 
 def test_h6_en_lank_till_git_stoppas(vakt, mappar):
     # Länken och målet ligger båda i testets tillfälliga mapp.
-    os.mkdir(os.path.join(mappar["projekt"], ".git"))
+    gor_mapp_eller_hoppa_over(os.path.join(mappar["projekt"], ".git"))
     os.symlink(os.path.join(mappar["projekt"], ".git"), os.path.join(mappar["projekt"], "ser-oskyldig-ut"))
     fel = _skriv(vakt, mappar, "<P>/ser-oskyldig-ut/hooks/pre-commit")
     assert fel is not None and FORBJUDEN in fel, fel
@@ -395,14 +402,9 @@ def test_h6_samma_namn_skrivet_pa_olika_satt_jamfors_lika(vakt):
     assert vakt._jamforbar("café") == vakt._jamforbar("café") == vakt._jamforbar("CAFÉ")
 
 
-def test_h6_vakten_har_samma_forbud_som_installningarna_utom_de_avsmalnade(vakt):
-    # Hugos beslut 2026-11-04 om sandlådan, beslut 5 och 6: inställningarna har avsmalnade förbud för .git och .venv,
-    # och vakten är oförändrad. Skillnaden står i AVSMALNADE_FORBUD. Allt annat är lika, i samma ordning.
+def test_h6_vakten_har_samma_forbud_som_installningarna(vakt):
     edit = [r[len("Edit("):-1] for r in _installningar()["permissions"]["deny"] if r.startswith("Edit(")]
-    forvantade = []
-    for regel in vakt.SKRIVFORBUD:
-        forvantade += AVSMALNADE_FORBUD.get(regel, [regel])
-    assert edit == forvantade
+    assert list(vakt.SKRIVFORBUD) == edit
 
 
 def test_h6_vakten_provar_alla_skrivverktyg(vakt):

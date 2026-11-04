@@ -9,6 +9,14 @@
     "allowUnsandboxedCommands": false,
     "autoAllowBashIfSandboxed": false,
     "excludedCommands": [],
+    "enableWeakerNestedSandbox": false,
+    "enableWeakerNetworkIsolation": false,
+    "allowAppleEvents": false,
+    "allowNestedUserNamespaces": false,
+    "network": {
+      "allowAllUnixSockets": false,
+      "allowLocalBinding": false
+    },
     "filesystem": {
       "denyWrite": [
         "/Applications/Claude.app",
@@ -25,11 +33,8 @@
       "Bash(su *)",
       "Bash(su)",
       "Read(~/.ssh/**)",
-      "Edit(//**/.git/hooks/**)",
-      "Edit(//**/.git/hooks)",
-      "Edit(//**/.git/config)",
-      "Edit(//**/.git/info/**)",
-      "Edit(//**/.git/info)",
+      "Edit(//**/.git/**)",
+      "Edit(//**/.git)",
       "Edit(//**/.ugrep)",
       "Edit(~/.ugrep)",
       "Edit(~/.zshrc)",
@@ -78,7 +83,7 @@
       "Edit(~/Library/Application Support/Claude/**)",
       "Edit(//Applications/Claude.app/**)",
       "Edit(//opt/homebrew/**)",
-      "Edit(~/VERA/agent/.venv/**)"
+      "Edit(//**/.venv/**)"
     ]
   },
   "hooks": {

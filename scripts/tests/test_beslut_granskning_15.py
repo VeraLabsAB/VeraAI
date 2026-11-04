@@ -614,7 +614,9 @@ def test_skriptet_visar_zdotdir(tmp_path):
 @pytest.mark.parametrize("fil", ["sparr/INSTALLERA.md", "SPEC.md"])
 def test_cd_till_projektmappen_ar_vera_agent(fil):
     text = (PROJEKTET / fil).read_text(encoding="utf-8")
-    assert re.findall(r"cd ~/VERA(?!/agent\b)", text) == [], fil
+    # Undantag: kopiorna för spärrprovet och proven utanför sandlådan (Hugos beslut 2026-11-05 om granskning 34, beslut 3
+    # och 4). Deras kommandon prövas exakt i test_sandladan.py.
+    assert re.findall(r"cd ~/VERA(?!/agent\b|/sparrprov\b|/provkopia\b)", text) == [], fil
 
 
 def test_installera_sager_cd_vera_agent_fore_claude_i_terminal():
