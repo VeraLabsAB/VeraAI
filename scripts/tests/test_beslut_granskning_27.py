@@ -161,17 +161,18 @@ def test_o35_ordningen_oppet_33_provas_fore_oppet_35(korning):
 
 # --- Öppet 35: beloppet i kredit bara när delarna inte står i kredit ---
 
-def test_o35_beloppet_i_kredit_med_delarna_i_kredit_stoppas_av_den_nya_kontrollen():
+def test_o35_beloppet_i_kredit_med_delarna_i_kredit_stoppas_av_den_nya_kontrollen(korning):
     # Den andra halvan av beslutet. I ett helt förslag stoppar täckningen (punkt 7) eller Öppet 34 det här först,
     # eftersom 'belopp_ore' redan räknar med alla delarna på sin sida, så kontrollen prövas här direkt, med raderna
-    # ensamma.
+    # ensamma. Kontoplanen är ett argument sedan steg 95 (Öppet 36 behöver rollen bank).
     verifikation = {"datum": "2025-01-07", "rader": [
         rad("4010", 1493800, 0, "lika", kalla(PROV_B, "underlag_ore", 12)),
         rad("2641", 0, 179256, "lika", kalla(PROV_B, "moms_ore", 12)),
         rad("2440", 0, 1673056, "lika", kalla(PROV_B, "belopp_ore")),
     ]}
     with pytest.raises(KonteringsforslagFel) as fel:
-        konteringsforslag._kontrollera_beloppssidan(PROV_B, {"bankrader": [{"id": "B"}]}, verifikation)
+        konteringsforslag._kontrollera_beloppssidan(PROV_B, korning.kontoplan, {"bankrader": [{"id": "B"}]},
+                                                    verifikation)
     text = str(fel.value)
     assert fel.value.kontroll == "ursprung"
     for del_ in ("rad 3 (konto 2440)", "'" + PROV_B + "'", "'belopp_ore'", "i kredit", "rad 2 (konto 2641)",
@@ -179,7 +180,7 @@ def test_o35_beloppet_i_kredit_med_delarna_i_kredit_stoppas_av_den_nya_kontrolle
         assert del_ in text, text
 
 
-def test_o35_beloppet_i_kredit_med_delarna_i_debet_godtas_av_den_nya_kontrollen():
+def test_o35_beloppet_i_kredit_med_delarna_i_debet_godtas_av_den_nya_kontrollen(korning):
     # Fakturan som flöde a bygger den: kontrollen säger ingenting, med eller utan bankrad.
     verifikation = {"datum": "2025-01-07", "rader": [
         rad("4010", 1493800, 0, "lika", kalla(PROV_B, "underlag_ore", 12)),
@@ -187,7 +188,8 @@ def test_o35_beloppet_i_kredit_med_delarna_i_debet_godtas_av_den_nya_kontrollen(
         rad("2440", 0, 1673056, "lika", kalla(PROV_B, "belopp_ore")),
     ]}
     for bankrader in ([], [{"id": "B"}]):
-        assert konteringsforslag._kontrollera_beloppssidan(PROV_B, {"bankrader": bankrader}, verifikation) is None
+        assert konteringsforslag._kontrollera_beloppssidan(PROV_B, korning.kontoplan, {"bankrader": bankrader},
+                                                           verifikation) is None
 
 
 # --- Rätt förslag godtas: flödena och förslag för hand med rätt form ---
@@ -219,8 +221,11 @@ def test_skydd_flode_b_kvittot_med_bankrad_gar_igenom(korning):
 
 def test_skydd_varje_belopp_i_debet_i_flodena_har_en_bankrad(korning):
     # Skydd (grönt också före rättelsen): i hela körningen har varje förslag med ett underlags 'belopp_ore' i debet
-    # en bankrad, och ingen rad med 'belopp_ore' i kredit har underlagets delar i kredit. Det är därför flödena inte
-    # berörs.
+    # exakt en rad på bankkontot i kredit, med samma belopp som raden i debet och med bara bankrader som källor
+    # (granskarens f4 i granskning 28; skärpt i steg 95 efter L1, förut prövades bara att förslaget hade någon
+    # bankrad), och ingen rad med 'belopp_ore' i kredit har underlagets delar i kredit. Det är därför flödena inte
+    # berörs av Öppet 35 och 36.
+    kontoplan = korning.kontoplan
     med_underlag = [forslag for forslag in korning.resultat.forslag if forslag.kopplingar["underlag"]]
     assert med_underlag
     for forslag in med_underlag:
@@ -231,6 +236,12 @@ def test_skydd_varje_belopp_i_debet_i_flodena_har_en_bankrad(korning):
                     continue
                 if rad_["debet_ore"] > 0:
                     assert forslag.kopplingar["bankrader"], forslag.forslag_id
+                    pa_bankkontot = [annan for annan in rader
+                                     if annan["kredit_ore"] > 0 and ("bank", None) in kontoplan.kontots_roller(annan["konto"])]
+                    assert len(pa_bankkontot) == 1, forslag.forslag_id
+                    assert pa_bankkontot[0]["kredit_ore"] == rad_["debet_ore"], forslag.forslag_id
+                    assert all(kalla2["kalla"] == "bankrad" for kalla2 in pa_bankkontot[0]["ursprung"]["fran"]), \
+                        forslag.forslag_id
                 else:
                     assert not any(annan["kredit_ore"] > 0 and kalla2["kalla"] == "underlag"
                                    and kalla2["id"] == kalla_["id"] and kalla2["falt"] != "belopp_ore"

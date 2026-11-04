@@ -208,6 +208,17 @@ K5, K7 och K8, efter ursprunget, för varje underlag som förslaget bygger på (
   stoppas i dag redan av täckningen eller Öppet 34. Flödena bygger betalningen med bankraden och
   fakturan med kostnaden och momsen i debet, så de berörs inte.
 
+  Bankraden för beloppet i debet (Öppet 36, granskning 28, M1, Hugos beslut 2026-11-04, granskarens
+  (a)). Prövas i samma kontroll som Öppet 35, för varje underlag: för varje rad med underlagets
+  'belopp_ore' i debet ska förslaget ha en egen rad på bankkontot (rollen bank i kontoplanen) i
+  kredit, med samma belopp och med bankrader som källor, och varje rad på bankkontot räknas bara en
+  gång (två rader med 'belopp_ore' i debet och samma belopp får inte dela en rad på bankkontot).
+  Annars räckte det att förslaget hade någon bankrad alls, var som helst och med vilket belopp som
+  helst: fakturan spegelvänd gick igenom ihop med en annan fakturas betalning, och beloppet i debet
+  gick igenom mot en bankrad på kostnadskontot (granskarens prov b1 och b3). Det är så flöde a bygger
+  betalningen (beloppet i debet, bankraden på bankkontot i kredit med samma belopp), så flödena berörs
+  inte. När Ö8 (kreditnotor) byggs måste regeln prövas igen, som Öppet 35.
+
 Kopplingarna i förslaget får kontrollsummorna för regelboken, kontoplanen, momsfilen och
 matchningsformatet, och kontrollsumman för varje fil förslaget bygger på (underlaget, bankfilen och
 Z-filen). Summorna kommer från inläsningen, aldrig från indata: de som står i indata jämförs bara (K2).
@@ -1173,8 +1184,55 @@ def _kontrollera_momsraderna(id_, kontoplan, verifikation):
                    " beslut 2026-10-30 om byggsessionen för Öppet 32, a).")
 
 
-def _kontrollera_beloppssidan(id_, kopplingar, verifikation):
-    """Öppet 35: underlagets 'belopp_ore' i debet bara med en bankrad, och i kredit bara när delarna inte står i kredit.
+def _bankkontorader_i_kredit(kontoplan, rader):
+    """(radnummer, raden) för varje rad på bankkontot (rollen bank) i kredit med bara bankrader som källor.
+
+    Punkt 6 har redan stoppat en rad på bankkontot med någon annan källa, så villkoret om källorna är
+    bara ett skydd om ordningen ändras.
+    """
+    return [(nummer, rad) for nummer, rad in enumerate(rader, start=1)
+            if rad["kredit_ore"] > 0 and (_BANK, None) in kontoplan.kontots_roller(rad["konto"])
+            and all(kalla["kalla"] == "bankrad" for kalla in rad["ursprung"]["fran"])]
+
+
+def _para_beloppen_med_bankkontot(kontoplan, rader):
+    """{radnummer: radnummer på bankkontot} för raderna med ett underlags 'belopp_ore' i debet (Öppet 36).
+
+    Varje sådan rad paras, i radordning, med den första lediga raden på bankkontot i kredit som har
+    exakt samma belopp, och en rad på bankkontot paras högst en gång. Rader med samma belopp är
+    utbytbara, så ordningen spelar ingen roll för om alla får en partner. En rad utan partner saknas
+    i svaret.
+    """
+    lediga = _bankkontorader_i_kredit(kontoplan, rader)
+    par = {}
+    for nummer, rad in enumerate(rader, start=1):
+        if rad["debet_ore"] <= 0 or not any(kalla["kalla"] == "underlag" and kalla["falt"] == _BELOPPSFALT
+                                             for kalla in rad["ursprung"]["fran"]):
+            continue
+        for plats, (bankens_nummer, bankens_rad) in enumerate(lediga):
+            if bankens_rad["kredit_ore"] == rad["debet_ore"]:
+                par[nummer] = bankens_nummer
+                del lediga[plats]
+                break
+    return par
+
+
+def _visa_bankkontoraderna(kontoplan, rader, par):
+    """Raderna på bankkontot i kredit i ett felmeddelande, med vilken betalning var och en redan hör till."""
+    bankens = _bankkontorader_i_kredit(kontoplan, rader)
+    if not bankens:
+        return "Förslaget har ingen rad på bankkontot i kredit."
+    tagna = {bankens_nummer: nummer for nummer, bankens_nummer in par.items()}
+    return "Raderna på bankkontot i kredit är " + "; ".join(
+        "rad " + str(nummer) + " (konto " + rad["konto"] + "), " + kronor(rad["kredit_ore"])
+        + (", redan betalningen för rad " + str(tagna[nummer]) + " (konto " + rader[tagna[nummer] - 1]["konto"] + ")"
+           if nummer in tagna else "")
+        for nummer, rad in bankens) + "."
+
+
+def _kontrollera_beloppssidan(id_, kontoplan, kopplingar, verifikation):
+    """Öppet 35 och 36: underlagets 'belopp_ore' i debet bara med en egen rad på bankkontot, och i kredit bara när
+    delarna inte står i kredit.
 
     Flödena har 'belopp_ore' i debet bara i betalningen, tillsammans med bankraden, och i kredit bara i
     fakturan, med kostnaden och momsen i debet. Utan den här kontrollen godtogs fakturan spegelvänd
@@ -1185,20 +1243,39 @@ def _kontrollera_beloppssidan(id_, kopplingar, verifikation):
     (punkt 7), eftersom 'belopp_ore' räknar med alla delarna på sin sida, eller av Öppet 34 om en del
     dras ifrån med 'skillnad', men ligger här så att beslutet står på ett ställe. Prövas sist, efter
     Öppet 33.
+
+    Öppet 36 (granskning 28, M1, Hugos beslut 2026-11-04, granskarens (a)): kravet på bankrad gällde
+    per förslag, så fakturan spegelvänd gick igenom ihop med en annan fakturas betalning (b1), och
+    beloppet i debet gick igenom mot en bankrad på kostnadskontot (b3). Nu ska varje rad med
+    underlagets 'belopp_ore' i debet ha en egen rad på bankkontot (rollen bank i kontoplanen) i
+    kredit, med samma belopp och med bankrader som källor, och varje rad på bankkontot räknas bara
+    en gång. Felet för Öppet 35 (ingen bankrad alls) kommer först, så att h1 och h2 får samma fel som
+    förut. Kreditnotor (Ö8) finns inte än, så regeln stoppar ingen kreditnota i dag: när Ö8 byggs
+    måste regeln prövas igen, eftersom en kreditnota med beloppet i debet inte har någon betalning.
     """
-    kallor = _underlagets_kallor(id_, verifikation["rader"])
+    datum, rader = verifikation["datum"], verifikation["rader"]
+    kallor = _underlagets_kallor(id_, rader)
+    par = _para_beloppen_med_bankkontot(kontoplan, rader)
     for nummer, rad, kalla in kallor:
         if kalla["falt"] != _BELOPPSFALT:
             continue
         vad = "rad " + str(nummer) + " (konto " + rad["konto"] + ")"
         if rad["debet_ore"] > 0:
-            if kopplingar["bankrader"]:
+            if not kopplingar["bankrader"]:
+                raise _fel(_URSPRUNG, vad + " har underlaget " + repr(id_) + ", '" + _BELOPPSFALT + "' som källa i"
+                           " debet, men förslaget har ingen bankrad. Hela beloppet att betala står i debet bara i"
+                           " betalningen, tillsammans med bankraden: utan bankrad bokför raden fakturan baklänges, som"
+                           " en kreditnota (en egen dokumenttyp som inte finns än, Ö8), eller kvittar den mot en annan"
+                           " faktura (Öppet 35, granskning 27, M1, Hugos beslut 2026-10-31).")
+            if nummer in par:
                 continue
-            raise _fel(_URSPRUNG, vad + " har underlaget " + repr(id_) + ", '" + _BELOPPSFALT + "' som källa i debet,"
-                       " men förslaget har ingen bankrad. Hela beloppet att betala står i debet bara i betalningen,"
-                       " tillsammans med bankraden: utan bankrad bokför raden fakturan baklänges, som en kreditnota"
-                       " (en egen dokumenttyp som inte finns än, Ö8), eller kvittar den mot en annan faktura (Öppet 35,"
-                       " granskning 27, M1, Hugos beslut 2026-10-31).")
+            raise _fel(_URSPRUNG, vad + " har underlaget " + repr(id_) + ", '" + _BELOPPSFALT + "' som källa i debet, "
+                       + kronor(rad["debet_ore"]) + ", men förslaget har ingen egen rad på bankkontot i kredit med"
+                       " samma belopp räknad ur en bankrad. " + _visa_bankkontoraderna(kontoplan, rader, par)
+                       + " Betalningen av ett underlag är hela beloppet i debet på leverantörsskulderna mot samma"
+                       " belopp i kredit på " + _rollens_konto(kontoplan, _BANK, datum) + ", ur bankraden: en bankrad"
+                       " med ett annat belopp, på ett annat konto eller som redan är en annan rads betalning räcker"
+                       " inte (Öppet 36, granskning 28, M1, Hugos beslut 2026-11-04).")
         delarna = sorted({(annan, annan_rad["konto"]) for annan, annan_rad, annan_kalla in kallor
                           if annan_kalla["falt"] != _BELOPPSFALT and annan_rad["kredit_ore"] > 0})
         if delarna:
@@ -1226,7 +1303,9 @@ def _kontrollera_underlagen(kopplingar, verifikation, regelbok, kontoplan, momss
     granskning 26). Sedan står varje momsrad från underlaget på kontot för ingående moms (Öppet 33,
     Hugos beslut 2026-10-30 om byggsessionen för Öppet 32, a). Sist står underlagets 'belopp_ore' i
     debet bara med en bankrad i förslaget, och i kredit bara när delarna inte står i kredit (Öppet 35,
-    granskning 27, M1, Hugos beslut 2026-10-31).
+    granskning 27, M1, Hugos beslut 2026-10-31), och beloppet i debet har en egen rad på bankkontot i
+    kredit med samma belopp ur en bankrad, där varje rad på bankkontot räknas bara en gång (Öppet 36,
+    granskning 28, M1, Hugos beslut 2026-11-04).
     """
     underlagen = [post["id"] for post in kopplingar["underlag"]]
     if not underlagen:
@@ -1258,7 +1337,7 @@ def _kontrollera_underlagen(kopplingar, verifikation, regelbok, kontoplan, momss
         _kontrollera_kostnadsraderna(id_, underlag, regel, kontroll.konton, rader)
         _kontrollera_beloppsraderna(id_, kontoplan, verifikation)
         _kontrollera_momsraderna(id_, kontoplan, verifikation)
-        _kontrollera_beloppssidan(id_, kopplingar, verifikation)
+        _kontrollera_beloppssidan(id_, kontoplan, kopplingar, verifikation)
     return {_K5: "ok", _K7: "ok", _K8: "ok"}
 
 
