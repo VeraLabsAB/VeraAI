@@ -10836,3 +10836,9 @@ Skrivna av Hugo i chatten 2026-11-04, i uppdraget till steg 52. Ordagrant:
 Skrivet av Hugo i chatten 2026-11-04, i uppdraget till steg 104. Ordagrant:
 
     "1. Raden om foretag/<namn>/ i CLAUDE.md står kvar, med tillägget "(testföretagen; pilotkundens konfiguration ligger i driftmiljön, steg 116)"."
+
+## Hugos beslut 2026-11-04 om steg 104
+
+Skrivet av Hugo i chatten 2026-11-04, i uppdraget om namnbytet i BYGGPLAN.md. Ordagrant:
+
+    "1. "Vera" byts också i BYGGPLAN.md:s gällande text: "Vera" blir "Kassio" och "Vera Labs" blir "Kassio Labs". Undantag: titlarna på de två researchrapporterna från 2026-10-29 (dokumentnamn), och raderna som beskriver själva namnbytet (rad 11 skrivs om till att namnbytet är gjort, och steg 104:s rad står kvar). PLAN-KASSIO-FORSLAG.md ändras inte, eftersom den är historik."
