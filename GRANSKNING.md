@@ -12283,3 +12283,26 @@ Allt i en riktig sandlåda: att den nekar den hårda länken, att Read och `cat`
 1. **Inget fynd måste rättas först.** Hugo eller Casper tar ställning till P1, före eller efter installationen. Min rekommendation (bedömning): rätta P1 och P3 samtidigt i nästa byggsession. Det är några ord och ett test, och inga låsta filer.
 2. **Hugo kör provkörningen igen** (`49 skipped`), eftersom proven inte har körts i sandlåda sedan del E.
 3. Hugo installerar från den granskade commiten och kör spärrprovet direkt, med H1-proven i appen.
+
+### Hugos beslut 2026-11-05 om granskning 38
+
+Skrivna ordagrant från chatten.
+
+- P1: Rättas före installationen. En ny fil i .claude/ ska få stoppregeln att slå till.
+- P3: Rättas före installationen. Stoppregeln gäller .gitattributes med alla sorters stora och små bokstäver.
+- SPEC 7.1: Texten rättas nu så att den säger samma sak som CLAUDE.md och INSTALLERA.md (Öppet 66 och P4 i granskning 38). Kommandolistan ändras inte. git add och git commit står kvar i den, enligt Öppet 64.
+- Stoppkriterium: Granskning 39 prövar bara P1, P3 och SPEC 7.1. Blockerar inget där, installerar Hugo. Allt annat som hittas går till Öppet.
+- P2, P5, P6 och P7 i granskning 38: under Öppet.
+
+**Hugos svar i chatten samma dag, på byggsessionens fråga.** Uppdraget sa att varje rad som inte står exakt i det väntade läget ska stoppa. Efter en session visar kommandot också sessionens egna filer, så läst ordagrant skulle varje commit stanna. Frågan: ska de raderna få räknas som väntade? Svaret: "Bara uppräknade (Rekommenderas)". Alternativet, som frågan beskrev och som Hugo valde: väntat är de 11 raderna, `COMMIT_MSG.txt` och en rad per fil som sessionen har räknat upp i `COMMIT_MSG.txt`. Allt annat stoppar. En rad med `.claude/` eller de fyra filnamnen, i alla stavningar, stoppar alltid, också om sessionen har räknat upp den.
+
+**Byggsessionens egna val, att pröva i granskning 39** (körningarna står i `PROGRESS.md`):
+
+- **En rad med `!!` går inte att räkna upp.** Svaret säger inget om det. Annars kunde en session göra en ignorerad fil väntad, till exempel `scripts/kvitto.csv`, genom att skriva namnet i meddelandet. Texten säger därför "men aldrig en rad med `!!`", och de enda väntade `!!`-raderna är de som står i listan.
+- **Meningen "Meddelandet räknar upp varje fil som sessionen har ändrat, skapat eller tagit bort"** står i regeln om commiten, i CLAUDE.md och INSTALLERA.md. Den behövs för att svaret ska gå att följa. Saknar meddelandet en fil stoppar regeln, så ett fel där blir en fråga, inte en commit.
+- **Stoppregeln har två delar.** Att allt annat stoppar räcker inte för `.claude/` och de fyra namnen, eftersom sessionen själv skriver listan. Därför finns de kvar uppräknade, som något som alltid stoppar. Orden "en annan rad med `!!`", "också när sessionen själv har ändrat filen" och "i vilken mapp som helst" står kvar, enligt P5 i granskning 37.
+- **Stavningen gäller alla fem namnen,** inte bara `.gitattributes`, som beslutet nämner, eftersom Macen behandlar dem lika.
+- **SPEC 7.1, ställena jag hittade:** "Det vakten inte stoppar" (status-kommandot), "Prov och test" (undantaget för spärrprovet och undantaget för kopian) och `git commit -F` under "git:" (vem som committar före och efter installationen). Inga andra ställen i 7.1 säger emot. **Utanför 7.1 är inget ändrat,** så "Ändrat 2026-11-04" överst i SPEC.md nämner inte ändringen. Meningen om `git add` och `git commit` står i punkten om `git commit -F`, inte under tabellen. Öppet 64 säger att en mening under tabellen skrivs i nästa version av vakten, och den är kvar.
+- **CLAUDE.md nämner inte undantaget för kopian,** bara SPEC 7.1 och INSTALLERA.md. Uppdraget gällde SPEC 7.1, och CLAUDE.md skulle bara få P1, P3 och stoppkriteriet. Hugo eller Casper bestämmer om det ska läggas till.
+- **Testerna av stoppregeln tolkar orden i texten** med en liten funktion (`_stoppar`). De visar vad orden säger om riktiga rader från `git status`, inte att Hugo följer regeln. Den är fortfarande en regel som en människa läser.
+- **Att kommandolistan, inställningarna och vakten är oförändrade** kan inte ge rött före bygget, eftersom inget är ändrat. Testerna jämför med kontrollsummor räknade i en kopia av 103eb55, och att de blir röda vid en ändring visas med mutationer i en kopia.
