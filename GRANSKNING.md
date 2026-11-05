@@ -11156,3 +11156,305 @@ Körningen som besluten bygger på står i `PROGRESS.md` under steg 15. Byggsess
 - **Testet som jämför filen med den installerade versionen** sätter nu tillbaka 2.1.295 innan summan räknas. Det visar att sandlådan, `Read(~/.ssh/**)` och versionen är det enda som skiljer filerna åt.
 
 **Inte visat:** att H1-proven går igenom inne i sandlådan. De har aldrig körts där med filer som har märkningen: i Hugos provkörning 2026-11-04, i Terminal med sandlåda, hoppades de över. Testernas tillfälliga mapp ligger i sandlådan under `/private/tmp/claude-501/`, och om nya filer där får `com.apple.provenance` visas först i punkt d. Det är därför beslut 1 har ett utfall för att de hoppas över. Sandlådan och spärrtestet har fortfarande aldrig körts i en riktig installation.
+
+## Granskning 35 (av 795f848, fa47738 och b423dd4) (2026-11-05)
+
+Oberoende granskning av steg 15 efter granskning 34, mot b08098b. Inget är installerat, inget sudo är kört, inget i `/Library` är ändrat, och ingen kod, inget test och ingen inställningsfil är ändrad. Egna prov ligger i scratchpad. Uppdraget slutade mitt i punkt 4 ("förrän efter"). Punkterna 1–4 är gjorda, och om uppdraget hade fler punkter är de inte gjorda.
+
+**Dom: gult. Provkörningen kan göras nu. Installera inte förrän P1 är prövad och Hugo har tagit ställning till P2, P3 och P4.** Filen är byggd som besluten säger, och alla vägar från granskning 34 är stängda från projektets rot. Det här bör rättas: spärrprovet försöker inte flytta hela arbetsmappen, och i modellen utan sandlådans inbyggda skydd leder just den flytten till att `git status` kör kod utanför sandlådan (P1).
+
+### Så skiljer jag vad som är visat
+
+- **Körning:** gjort på den här datorn, med riktig git. Vad git kör är alltså riktigt.
+- **Modell:** sandlådan är efterliknad med macOS `sandbox-exec` och en egen regelfil, byggd från de tre förbuden och från källkoden till [sandbox-runtime](https://raw.githubusercontent.com/anthropics/sandbox-runtime/main/src/sandbox/macos-sandbox-utils.ts). Claude Codes riktiga regelfil har jag inte sett. **Ett resultat i modellen är starkt stöd, inte bevis.** Provkörningen nedan prövar det på riktigt.
+- **Dokumentation:** läst med WebFetch, återgiven med egna ord. **Bedömning:** står uttryckligen.
+
+### Punkt 1: fynden i granskning 34
+
+| Fynd | Läge | Så vet jag det |
+|---|---|---|
+| P1, kod utan att flytta `.git` | Stängd av beslut 1 | Körning i modellen: `.git/commondir`, `.git/COMMONDIR`, `.GIT/commondir`, fil, mapp och länk `sub/.git`, `.git/modules`, `.git/worktrees`, `.git/rebase-merge`, tillägg i `.git/config` och `.git/index`, och hård länk stoppas alla |
+| P2, flytta `.git` | Stängd för `.git`, se P1 nedan för arbetsmappen | Körning i modellen: `.git` och `.git/hooks` går inte att byta namn på, och en mapp går inte att byta namn till `.git`. Spärrtestet finns |
+| P3, dölja i historiken | Stängd av beslut 1 | `git add`, `git commit` och `--amend` prövas i spärrprovet, grönt i modellen. Med en annan väg att dölja filer, se P3 nedan |
+| P4, `/sandbox` | Rättad | [Felsökningen](https://code.claude.com/docs/en/sandboxing.md) säger att den visar ett fel under låsta inställningar eller `--settings`. Kontrollen är nu `grep` |
+| P5, smalare kontroller | Rättad, med en rest | Mutation: `chmod -R 777` i en vanlig ruta ger 2 röda. Se P9 nedan för andra sorters rutor |
+| P6, H1-proven | Hanterad enligt beslut efter P6 | Punkt d finns i "Spärrprovet i kopian". Körning i modellen, i appen: `31 passed` |
+| P7, sex nycklar | Stängd | Punkt 2 nedan |
+| P8, öppna sessioner | Rättad | "Avsluta alla öppna sessioner" står före kopieringen (test). `settings.md` är inte omläst av mig |
+| P9 | Öppet 60 | Står där |
+
+**Förbuden för `.git` och `.venv` är exakt desamma som före steg 15** (körning, mot `git show ddfe43d:sparr/managed-settings.json`): alla `Edit`-regler är lika i samma ordning, `Edit(//**/.git/**)`, `Edit(//**/.git)` och `Edit(//**/.venv/**)` står där, `hooks` är lika, och det enda som är nytt är `sandbox`, `Read(~/.ssh/**)` och versionen.
+
+**Summorna** (körning): `sparr/managed-settings.json` `1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da`, filen i ddfe43d `149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2`, `sparr/kommandosparr.py` `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d`, `requirements.txt` `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a`, `sparr/kontrollera-skalet.zsh` `10388d474a555e6d337a9468c5a1f5e2fd0ca04608e36024f73011dc5186d51f`. Alla stämmer med INSTALLERA.md.
+
+**Hela sviten, utan sandlåda (körning): 4691 passed, 39 skipped.** Samma som byggsessionen. De 39 är spärrproven.
+
+### Kvarvarande vägar för en testfil att få git utanför sandlådan att köra kod
+
+Skriven i modellen, sedan körd med riktig git utanför modellen.
+
+| Väg | Stoppas i modellen? | Kör koden? |
+|---|---|---|
+| `git status` i projektets rot, med allt från granskning 34 | Ja | Nej |
+| Bar git-mapp i en undermapp (`HEAD`, `objects`, `refs`, `config`) | **Nej** | **Ja, men bara om git körs i den mappen eller under den.** Från roten: nej (P2) |
+| Flytta hela arbetsmappen, och lägga en bar git-mapp på samma plats | Ja, av det inbyggda skyddet | **Ja, i motfallet utan det skyddet** (P1) |
+| Flytta in en mapp som redan har `.git` | **Nej** | Bara i den mappen, och bara om repot redan har elak `config`. Går inte att skapa i sandlådan (P7) |
+| `.gitattributes` | **Nej** | Bara om Hugos `~/.gitconfig` har ett filter eller liknande (P8) |
+| Kompilerad fil i `__pycache__` | – | **Nej.** Projektets Python läser sin cache i `~/Library/Caches/com.apple.python`, utanför sandlådan (körning) |
+
+### P1, medel, BLOCKERAR TILLS DET ÄR PRÖVAT: spärrprovet försöker inte flytta arbetsmappen
+
+Beslut 4 prövar att byta namn på `.git`, och det stoppas av `Edit(//**/.git)`. Men om hela `~/VERA/agent` går att flytta behövs inget av det. I motfallet, modellen utan sandlådans inbyggda skydd, flyttade provet arbetsmappen till den tillfälliga mappen och flyttade dit en förberedd bar git-mapp under samma namn. Då körde `git status` på samma plats koden (körning, modell).
+
+I modellen med det inbyggda skyddet stoppas flytten, eftersom sandbox-runtime också spärrar flytt av alla mappar ovanför ett förbud utan jokertecken. Det är källkoden. Att Claude Code gör samma sak säger dokumentationen inte, och inget prov försöker det. **Min bedömning är att den stoppas, men det ska prövas, och det går före bytet.** Provkörningen nedan lägger till testet i kopian: grönt i modellen, rött utan sandlåda, och kopian kommer tillbaka (körning). Testet ska också in i `scripts/tests/test_sandladan.py` i en byggsession.
+
+### P2, medel: `git status` i en undermapp kör kod från en bar git-mapp
+
+Beslut 1 stoppar allt med namnet `.git`, men git behöver inte det namnet. En mapp med `HEAD`, `objects`, `refs` och `config` räknas som ett **bart repo** (ett repo utan arbetskopia). Sandlådans inbyggda skydd gäller bara arbetsmappens egen översta nivå.
+
+Provet skrev de filerna i `undermapp/` i modellen. `git status` i roten körde ingen kod och visade `?? undermapp/HEAD` med flera. `git status` i `undermapp/`, och i en mapp under den, körde koden, utan fel och med Hugos rättigheter (körning, modell). Granskning 34:s byggsession hade det som bedömning. Nu är det visat.
+
+Det kräver att git körs där. INSTALLERA.md gör det aldrig, men Hugo kan göra det med `cd`, och om appen kör git i undermappar vet jag inte. **Rättelse, utan ändring i projektet, efter Hugos eller Caspers OK:**
+
+```bash
+git config --global safe.bareRepository explicit
+```
+
+Med inställningen i en egen global fil (körning): koden körs inte, git säger `cannot use bare repository`, och både `git status` i roten och `git clone` fungerar. Agenten kan inte ändra `~/.gitconfig`, och det står kvar i förbuden. Det är inget mönster för en känd väg, utan stänger hela sättet. Inte provat i appen.
+
+### P3, medel: "det syns i git" håller inte fullt ut
+
+Beslut 8 godtar att en testfil skriver i projektet, eftersom det syns i git. En `.gitignore` i en mapp kan dölja sig själv. Provet skrev `scripts/tests/.gitignore` med raderna `conftest.py` och `.gitignore`, och en `conftest.py` som gör varje test grönt, i modellen (körning):
+
+- `git status` och `git diff` var **tomma**.
+- Pytest sa `1 passed` för ett test som säger `assert False`.
+- `git status --ignored` visade båda filerna.
+- I en ren `git clone` sa samma test `1 failed`.
+
+Det körs inte utanför sandlådan, eftersom proven utanför körs i en kopia. Men en senare session, också en granskning som kör sviten i projektmappen, kan se grönt utan att det är sant, och `git status` kan inte avslöja det. **Förslag:** `git status --ignored` i stället för `git status` när en session börjar och slutar, och väntat läge skrivet (i dag `.DS_Store`, `.claude/` och `.pytest_cache/`, körning). Hugos beslut om det ska bli regel.
+
+### P4, medel, INTE PRÖVAT: en session i en worktree
+
+[Dokumentationen](https://code.claude.com/docs/en/sandboxing.md) säger att sandlådan i en worktree också tillåter skrivning i huvudrepots delade `.git`. Bara `hooks` och `config` nämns som stängda. Det är just de filer där P1 i granskning 34 gick in, som `commondir`. I källkoden skrivs förbuden efter det som tillåts, och sista regeln vinner, så `Edit(//**/.git/**)` bör gälla ändå. Det är bedömning, och dokumentationen säger inget om den ordningen.
+
+Spärrprovet körs uttryckligen "inte i en worktree", och kontrollen efter installationen, steg 7, kör bara `git status` där. Appen kan starta sessioner i worktrees. **Förslag:** ett prov i en worktree av kopian, som försöker skriva `.git/commondir`, `.git/worktrees/<namn>/commondir` och `.git/prov` i huvudrepot. Tills det finns: inga sessioner i worktree. Hugos beslut.
+
+### P5, låg: provet för `~/.ssh` är tomt på den här datorn
+
+`~/.ssh` finns inte (körning, bara namnet). Då hoppar `test_sparr_lasning_av_ssh_stoppas` över med texten "finns inte på den här datorn", som inte är någon av texterna INSTALLERA.md letar efter. Beslut 7 prövas alltså aldrig, och provet ser grönt ut. I provkörningen nedan skapas en tom mapp för stunden.
+
+### P6, låg: väntat utfall utan antal
+
+"Spärrprovet i kopian", b och c, säger inget `failed` och inga `HOPPAS ÖVER`. Det stämmer också för `no tests ran`, och för överhoppade prov med en annan text. Bara H1-provet har ett antal. Skriv antalet: **39 tester, 38 passed och 1 skipped** utan `~/.ssh`, och **40 passed** efter P1 och med mappen. Hela sviten i projektet efter bytet: 4697 passed, 33 skipped (30 i kopian, 2 grupp D och `~/.ssh`), räknat, inte kört. Avsnittet bör också säga att utskriften läses i verktygsrutan, inte i agentens sammanfattning, som steg 4 h gör.
+
+### P7, låg: en mapp med `.git` går att flytta in
+
+Provet flyttade ett repo från den tillfälliga mappen till `sub/` i modellen, och det gick (körning). Då finns `sub/.git`, utan att något skrivit under det namnet. Beslut 4 säger att ingen fil eller mapp med namnet ska kunna skapas. Roten visar `?? sub/` och kör inget. Koden kräver att git körs i `sub/`, och att repot redan har en elak `config`, vilket inte går att skapa i sandlådan. Det kan bara vara kvar från före bytet, i `/private/tmp/claude-501`. Till Öppet.
+
+### P8, låg: `.gitattributes` beror på en fil jag inte har läst
+
+Som i granskning 34. Testfilen kan skriva `.gitattributes`, men ett filter måste också stå i en `config`. Hugo kan kontrollera sin egen fil med ett kommando, i provkörningen nedan.
+
+### P9, låg: kontrollen av kodrutor känner bara igen ```
+
+Mutation i en kopia (körning): `chmod -R 777` i en ruta med `~~~` och som indragen rad gav **95 passed, inga röda**, och `git config --global core.hooksPath` i löpande text likaså. I en vanlig ruta: 2 röda. Båda visas som grå rutor för den som kopierar. Filen är genomläst av mig, och inget sådant finns där i dag.
+
+### P10, låg: texter
+
+- SPEC 7.1 listar `git add` och `git commit` som tillåtna, och de stoppas efter bytet (Öppet 58), och säger 2.1.295.
+- CLAUDE.md, "Prov och test", nämner inte undantaget för `~/VERA/sparrprov` i beslut 4.
+- "Provkörning med sandlådan" i INSTALLERA.md tar inte med `filesystem`, och uppdraget säger hela sandlådan. Kommandot nedan har den.
+- "Den ska vara den som granskades": kopian står på senaste commit, och det är granskningens egen. Hugo behöver hashen och en jämförelse av koden, se nedan.
+- `test_sparr_skrivning_i_appen_och_claude_code_stoppas[appen]`: macOS kan säga nej till skrivning i ett program också utan sandlåda, så provet kan vara grönt av fel skäl. Bedömning, inte provad, eftersom ett prov inte ska röra appen.
+
+### Punkt 2: de sex nycklarna
+
+Läst i [settings-reference.md](https://code.claude.com/docs/en/settings-reference.md).
+
+| Nyckel | Plats i filen | Standard | Gäller macOS? | Värde |
+|---|---|---|---|---|
+| `enableWeakerNestedSandbox` | `sandbox` | false | Nej | false |
+| `enableWeakerNetworkIsolation` | `sandbox` | false | Ja | false |
+| `allowAppleEvents` | `sandbox` | false | Ja | false |
+| `allowNestedUserNamespaces` | `sandbox` | false, kräver v2.1.305 | Nej | false |
+| `allowAllUnixSockets` | `sandbox.network` | false | Ja | false |
+| `allowLocalBinding` | `sandbox.network` | false | Ja | false |
+
+**Alla stämmer.** Eftersom alla sex är standardvärdet ändrar de inget mot Hugos provkörning 2026-11-04, där `git status` fungerade och sviten gick igenom. Vakten körs utanför sandlådan enligt [dokumentationen](https://code.claude.com/docs/en/sandboxing.md), så nycklarna når den inte. Körning i modellen, utan nycklarna, eftersom de gäller nätverk och Apple Events: hela sviten **4724 passed, 3 skipped, 3 failed**. De 3 röda kommer av min ändring av konstanten i kopian (de läser INSTALLERA.md mot konstanten), och de 3 överhoppade är grupp D och `~/.ssh`. Att nycklarna inte stör något visas på riktigt i provkörningen.
+
+### Punkt 3: spärrprovet
+
+- **Prövar det rätt saker? Ja.** `test_sparr_kopian_git_gar_inte_att_byta_namn_pa` flyttar `.git` och `.git/hooks`, `test_sparr_kopian_ny_fil_i_git_stoppas` skriver `.git/commondir`, `test_sparr_kopian_fil_eller_mapp_med_namnet_git_stoppas` skapar `sub/.git` som fil och mapp, och flera prov skriver i `.git`. Allt i `~/VERA/sparrprov`.
+- **Har det körts? Nu i modellen.** 34 av de 39, de som bara rör kopian och tillfälliga mappen: **34 passed**. Samma prov utan sandlåda: **33 failed, 1 passed**, och det gröna är `git status`, som ska fungera. Provet slår alltså larm, och kan gå igenom.
+- **Kan det röra projektets riktiga `.git`? Nej, inte vad jag kan hitta.** Fixturen `kopian` använder alltid sökvägen `~/VERA/sparrprov`, aldrig arbetsmappen. Den vägrar om kopian är en länk, om `.git` saknas eller är en länk, och om kopian eller dess `.git` är samma som projektets. Villkoret kräver att arbetsmappen, testfilen och kopian är samma plats. I projektet körs bara `git status`, och läsning. Det enda undantaget från vakterna är en dator där projektet inte ligger i `~/VERA/agent`: då hoppas jämförelsen över, men länkkontrollerna gäller.
+- **Städar det? Ja.** Varje försök tar bort det som lyckades, `undermapp` tas bort efteråt, `kopian` raderas sist. Efter körningen i modellen visade `git status` bara mina två ändringar, och samma commit.
+- **Hur avgör det att sandlådan är installerad?** Två villkor när filen läses in: `/Library/Application Support/ClaudeCode/managed-settings.json` har `sandbox.enabled` true, och den tillfälliga mappen börjar med `/private/tmp/claude-`.
+- **Kan det hoppas över av fel skäl och se grönt ut? Bara delvis.** Hoppar proven över för att sandlådan saknas står texten `HOPPAS ÖVER`, och då ska Hugo backa, så det går åt rätt håll. Om sandlådan saknas men mappen ändå stämmer blir de röda, inte gröna. I den här appsessionen är mappen `/var/folders/…`, så utan sandlåda hoppas de över. Två luckor: P5 och P6.
+- **Vakten släpper igenom kommandona** i en session i `~/VERA/sparrprov` (körning av `bedom`, med en `PATH` som bara har systemets mappar).
+
+### Punkt 4: provkörning före installationen, i Terminal
+
+Förbuden för `.git` är redan installerade, och `--settings` ger resten av sandlådan. Provet hoppar annars över, eftersom den installerade filen inte har `sandbox`. Därför ändras en rad i kopian. Ingenting i projektet eller i `/Library` ändras, och inget kräver lösenord. Sed-raden är prövad på en kopia av testerna (exakt en rad ändras), och det nya testet i modellen. **Allt det här körs ett kommando i taget. Visar något annat än det som står: stoppa och fråga.**
+
+**A. Förbered kopian.**
+
+```bash
+ls -ld ~/VERA/sparrprov
+```
+
+Ska säga `No such file or directory`.
+
+```bash
+git clone --no-hardlinks ~/VERA/agent ~/VERA/sparrprov
+```
+
+```bash
+cd ~/VERA/sparrprov
+```
+
+```bash
+git log -1 --format=%H
+```
+
+Ska vara granskningens commit, som står i slutrapporten.
+
+```bash
+git diff --stat b423dd4 HEAD -- sparr scripts
+```
+
+Ska inte visa någonting: koden är den granskade. Granskningens commit ändrar bara dokument.
+
+```bash
+git config --global --get-regexp '^(filter|diff|merge)[.]'
+```
+
+P8. Ska inte visa någonting. Visas en rad: skicka den, och fortsätt.
+
+```bash
+ls -ld ~/.ssh
+```
+
+Ska säga `No such file or directory` (P5). Finns mappen: hoppa över nästa kommando och `rmdir` sist.
+
+```bash
+mkdir -m 700 ~/.ssh
+```
+
+Sedan raden som låter provet köras före bytet, i kopian:
+
+```bash
+sed -i '' 's|^INSTALLERADE_INSTALLNINGAR = .*|INSTALLERADE_INSTALLNINGAR = "sparr/managed-settings.json"|' scripts/tests/test_kommandosparr.py
+```
+
+Och testet för P1, klistras in som en helhet:
+
+```bash
+cat >> scripts/tests/test_sandladan.py <<'EOF'
+
+
+@kraver_kopian
+def test_sparr_kopian_arbetsmappen_gar_inte_att_flytta(kopian, tmp_path):
+    assert _namnbyte_stoppas(kopian, tmp_path / "flyttad")
+    assert (kopian / ".git").is_dir()
+EOF
+```
+
+```bash
+git diff --stat
+```
+
+Ska sluta med `2 files changed, 7 insertions(+), 1 deletion(-)`.
+
+**B. Provet i Terminal, med hela sandlådan.**
+
+```bash
+~/.local/bin/claude --version
+```
+
+Skriv upp versionen.
+
+```bash
+~/.local/bin/claude --settings '{"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false,"autoAllowBashIfSandboxed":false,"excludedCommands":[],"enableWeakerNestedSandbox":false,"enableWeakerNetworkIsolation":false,"allowAppleEvents":false,"allowNestedUserNamespaces":false,"network":{"allowAllUnixSockets":false,"allowLocalBinding":false},"filesystem":{"denyWrite":["/Applications/Claude.app","~/Library/Application Support/Claude/claude-code","~/.local/share/claude"],"denyRead":["~/.ssh"]}}}'
+```
+
+Svara ja om Claude Code frågar om du litar på mappen. Skriv `/status`: raden **Setting sources** ska nämna `Command line arguments`. Skriv `/sandbox`: det ska komma ett fel om att inställningarna styrs från en högre nivå. Be sedan Claude: "Kör exakt det här kommandot med Bash-verktyget, och ändra ingenting i det:" och klistra in:
+
+```
+'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs -k test_sparr_ scripts/tests
+```
+
+**Väntat, i verktygsrutan: `40 passed`, inget `failed`, inget `skipped`.** Lyckades ett försök (rött): inget är installerat, så inget behöver backas. Spara hela utskriften, gör D, och fråga. Installera inte. Avsluta med `/exit`.
+
+```bash
+git status --porcelain
+```
+
+Ska visa exakt två rader, ` M scripts/tests/test_kommandosparr.py` och ` M scripts/tests/test_sandladan.py`.
+
+**C. Samma prov i skrivbordsappen, före bytet. Inte provat av mig.** Dokumentationen säger att `sandbox.enabled` går att sätta i vilken inställningsfil som helst, så det här bör ge sandlådan i appen utan att något installeras. Det skulle visa två saker tidigt: att sandlådan körs i appen, och att H1-proven går igenom där.
+
+```bash
+mkdir ~/VERA/sparrprov/.claude
+```
+
+```bash
+echo '{"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false,"autoAllowBashIfSandboxed":false,"excludedCommands":[],"enableWeakerNestedSandbox":false,"enableWeakerNetworkIsolation":false,"allowAppleEvents":false,"allowNestedUserNamespaces":false,"network":{"allowAllUnixSockets":false,"allowLocalBinding":false},"filesystem":{"denyWrite":["/Applications/Claude.app","~/Library/Application Support/Claude/claude-code","~/.local/share/claude"],"denyRead":["~/.ssh"]}}}' > ~/VERA/sparrprov/.claude/settings.local.json
+```
+
+Starta en ny session i fliken **Code**, i mappen `sparrprov` i `~/VERA`, inte i en worktree. Be Claude köra samma kommando som i B: väntat `40 passed`. Be sedan Claude köra:
+
+```
+'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rs -k test_h1_ scripts/tests
+```
+
+Väntat: `31 passed`. Står `HOPPAS ÖVER` för spärrproven har sandlådan inte startat i appen på det här sättet, och det betyder inte att den inte gör det från de låsta inställningarna. Skicka utskriften. Arkivera sessionen.
+
+**D. Ta bort kopian.** Det andra kommandot raderar hela mappen, utan papperskorg.
+
+```bash
+cd ~/VERA/agent
+```
+
+```bash
+rm -rf ~/VERA/sparrprov
+```
+
+```bash
+ls -ld ~/VERA/sparrprov
+```
+
+Ska säga `No such file or directory`.
+
+```bash
+rmdir ~/.ssh
+```
+
+**E. Hela sviten i projektet, med hela sandlådan.** Samma `--settings`-kommando som i B, nu i `~/VERA/agent`, och agenten kör:
+
+```
+'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rfs scripts/tests
+```
+
+Väntat: **`4683 passed, 47 skipped`** (räknat, inte kört): 39 spärrprov, 2 grupp D och 6 H1. Avsluta med `/exit`.
+
+**Kan inte provas förrän efter bytet:**
+
+1. Att sandlådan gäller från den låsta filen, och att `/status` visar `Enterprise managed settings (file)`.
+2. Att projektets och Hugos egna filer inte kan lossa på den. `--settings` ska ge samma lås enligt dokumentationen, men den låsta filen går bara att pröva med den låsta filen.
+3. `requiredMinimumVersion`, kontrollsummorna på plats, och backningen.
+4. `Read(~/.ssh/**)` för fil-verktyget Read. Regler från `--settings` räknas inte, eftersom bara låsta regler gäller.
+5. De 9 spärrproven i projektets egen session, och i appen utan `settings.local.json`.
+6. Allt i C, om appen inte tar sandlådan från den filen.
+
+Provet i en worktree (P4) går att göra före bytet, men testet är inte byggt.
+
+### Inte visat
+
+Allt under "Modell" på den riktiga Claude Code, också att det inbyggda skyddet stoppar flytten av arbetsmappen, att förbuden går före i en worktree, att sandlådan körs i appen, att `.claude/settings.local.json` i kopian ger den där, och om appen kör git i undermappar. Om uppdraget hade fler punkter än de fyra.
+
+### Vad som krävs före installationen
+
+1. Hugo kör provkörningen, A–E.
+2. Hugos eller Caspers ställningstagande till P1 (testet in i `test_sandladan.py`), P2 (`safe.bareRepository`), P3 (`git status --ignored`) och P4 (prov, eller inga worktrees). Övriga till Öppet.
+3. Byggsession om något av det ändrar filer. Ändras bara test och INSTALLERA.md är `managed-settings.json` oförändrad, med summan ovan. Det rör spärrar, så en ny oberoende granskning per steg gäller.
+4. Hugo installerar, och spärrprovet körs direkt.

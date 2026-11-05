@@ -8,7 +8,7 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet arbetar mot skuggpiloten (SPEC avsnitt 9 och `BYGGPLAN.md`). Än finns ett testföretag, Syntet Testbutik AB.
 Inget i koden kan i dag bokföra något.
 
-Testsviten: **4 691 passed, 39 skipped**, 0 misslyckade (körd senast 2026-11-05 i byggsessionen efter P6, i projektmappen med
+Testsviten: **4 691 passed, 39 skipped**, 0 misslyckade (körd senast 2026-11-05 i granskning 35, i projektmappen med
 kommandot i SPEC 7.1. De 39 är spärrproven, som hoppas över tills sandlådan är installerad). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
 borttagen.
@@ -23,6 +23,26 @@ borttagen.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-11-05, granskning 35 av sandlådan
+
+Steg i byggplanen: 15 (pågår)
+
+- **Säkerhet först: installera inte än.** Granskning 35 är **gul** (`GRANSKNING.md`, "Granskning 35"). P1, medel, blockerar tills det är prövat: spärrprovet försöker inte flytta hela arbetsmappen, och utan sandlådans inbyggda skydd leder den flytten till att `git status` kör kod utanför sandlådan. Provet går att göra före bytet. Ingenting är installerat, och ingen kod, inget test och ingen inställningsfil är ändrad.
+- **Fynden i granskning 34 är stängda eller hanterade som besluten säger.** Förbuden för `.git` och `.venv` är exakt desamma som i ddfe43d. De sex nycklarna stämmer med dokumentationen.
+- **Nya fynd:** P2 medel: `git status` i en undermapp kör kod från en bar git-mapp, och `safe.bareRepository` stänger det. P3 medel: en `.gitignore` kan dölja en `conftest.py` som gör alla tester gröna, så att `git status` och `git diff` är tomma. P4 medel, inte prövat: en session i en worktree. P5–P10 låga: `~/.ssh` finns inte, så provet är tomt, väntat utfall utan antal, en mapp med `.git` går att flytta in, `.gitattributes`, kodrutor med `~~~` och texter.
+- **Provkörningen före installationen** står exakt i `GRANSKNING.md`, punkt 4, med `--settings` och hela sandlådan. Spärrprovet går att köra i kopian redan nu, med en ändrad rad där.
+- **Beslut som behövs:** Hugo eller Casper om P1–P4. Uppdraget slutade mitt i punkt 4. Hade det fler punkter är de inte gjorda.
+- **Körningar** (`<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`, `<S>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/71070165-896d-4a81-a588-78bcdaea03eb/scratchpad`). Från projektmappen, ett kommando i taget. Provfilerna skrevs med fil-verktygen i `<S>/prov`, och utfallen i `<S>/prov/utfall`. De kör `/usr/bin/sandbox-exec` och `/usr/bin/git` i testets tillfälliga mapp och i `<S>/prov/kor*`.
+  1. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests` (**4691 passed, 39 skipped**, utan sandlåda).
+  2. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfs -k test_sparr_ scripts/tests` (**39 skipped**, 4691 deselected).
+  3. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfs <S>/prov/test_g35.py` (13 passed: filen mot ddfe43d och summorna, kommandot, sed-raden, vakten, `/.vol`, försöken, bar mapp, flytt, det som inte syns, och spärrprovet i modellen, **34 passed**, utan sandlåda **33 failed, 1 passed**).
+  4. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfs <S>/prov/test_g35b.py` (7 passed: `safe.bareRepository`, motfallet med flytten, dold `conftest.py`, `__pycache__`, nya testet, hela sviten i modellen, **4724 passed, 3 skipped, 3 failed**, där de 3 röda kommer av min ändring av konstanten i kopian, H1 i modellen, **31 passed**, och mutationer i INSTALLERA.md).
+  5. `<python> -B -m pytest -p no:cacheprovider -q --tb=short <S>/prov/test_g35c.py` (1 passed: `~/.ssh` finns inte, bara namnet prövat).
+  6. `git status --porcelain --ignored` (`.DS_Store`, `.claude/`, `.pytest_cache/`).
+  7. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -k test_byggplan scripts/tests`, byggplanstestet med statusraderna.
+- **Verifierat med körning:** ovan. **Läst i dokumentationen:** [sandboxing.md](https://code.claude.com/docs/en/sandboxing.md), [settings-reference.md](https://code.claude.com/docs/en/settings-reference.md), och källkoden till sandbox-runtime. **Min bedömning, inte provad:** att flytten av arbetsmappen stoppas i den riktiga Claude Code, att förbuden går före i en worktree, och att `.claude/settings.local.json` ger sandlådan i appen.
+- **Opushat:** som nedan, och b423dd4 och commiten med den här texten. Sessionen pushar inte.
 
 ## Läge 2026-11-05, Hugos beslut efter P6 införda, inte granskade och inte installerade
 
@@ -2058,6 +2078,7 @@ fattade och byggda, se avsnittet ovan.)
 58. **SPEC 7.1 stämmer inte längre på en punkt efter steg 15** (Hugos uppdrag: ändra inte listan). "Ett test kontrollerar att de är samma som i inställningarna" stämmer igen efter Hugos beslut 2026-11-05 om granskning 34, beslut 1. Kvar: att en egen testfil stoppas av sandlådan, vilket bara gäller utanför projektet. Rättas efter granskningen, med Hugos eller Caspers OK. **Öppen.**
 59. **Fynden i granskning 34** (steg 15, `GRANSKNING.md`). **Stängd** av Hugos beslut 2026-11-05 om granskning 34: P1 och P3 av beslut 1, P2 av spärrtestet i beslut 4, P4, P5 och P8 rättade i 795f848, P7 av beslut 6, P9 är nu Öppet 60. P6 väntar på Hugos körning, och det som bara går att visa efter installationen prövas där.
 60. **Vaktens prov av rättigheter testas bara genom kontrollsumman** (granskning 34, P9, nivå låg, utanför steget). Tar man bort kravet `not info.st_mode & SKRIVBAR_FOR_GRUPP_ELLER_ANDRA` i `_sakert_agd` blir bara de två testerna av kontrollsumman röda. `rotagd` byter ut funktionen. Summan stoppar en ändring, så det är inget hål i dag. **Öppen.**
+61. **Fynden i granskning 35** (steg 15, `GRANSKNING.md`). P1–P4, nivå medel, väntar på Hugos eller Caspers besked före installationen. P5–P10, nivå låg: `~/.ssh` finns inte, så provet är tomt, väntat utfall utan antal, en mapp med `.git` går att flytta in, `.gitattributes` beror på Hugos `~/.gitconfig`, kodrutor med `~~~` eller indrag prövas inte, och texterna i SPEC 7.1, CLAUDE.md och INSTALLERA.md. **Öppen.**
 
 ## Nästa steg i byggordningen
 
