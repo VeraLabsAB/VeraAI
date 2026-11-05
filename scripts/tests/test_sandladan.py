@@ -19,7 +19,10 @@ Spärrtestet skriver i testets tillfälliga mapp, och i tre fall utanför den:
   vägrar om kopian är projektet, och rör aldrig projektets riktiga .git.
 """
 
+import ast
 import builtins
+import contextlib
+import errno
 import hashlib
 import json
 import os
@@ -268,7 +271,9 @@ PROVKORNINGENS_NYCKLAR = (
     '{"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false,'
     '"autoAllowBashIfSandboxed":false,"excludedCommands":[],"enableWeakerNestedSandbox":false,'
     '"enableWeakerNetworkIsolation":false,"allowAppleEvents":false,"allowNestedUserNamespaces":false,'
-    '"network":{"allowAllUnixSockets":false,"allowLocalBinding":false}}}'
+    '"network":{"allowAllUnixSockets":false,"allowLocalBinding":false},'
+    '"filesystem":{"denyWrite":["/Applications/Claude.app","~/Library/Application Support/Claude/claude-code",'
+    '"~/.local/share/claude"],"denyRead":["~/.ssh"]}}}'
 )
 
 PROVKORNINGEN = [
@@ -281,7 +286,14 @@ PROVKORNINGEN = [
 # Ordningen är granskning 34, P5: version, summor, spara, kopiera, kontrollera, kontrollen efter bytet, backa. Först
 # git-inställningen (Hugos beslut 2026-11-05 om granskning 35, beslut 2).
 SAFE_BARE = "git config --global --get safe.bareRepository"
-HUGOS_FASTA_KOMMANDON = ["git status --short --ignored -uall", "git add -A", "ls -l COMMIT_MSG.txt", "git commit -F COMMIT_MSG.txt"]
+HUGOS_FASTA_KOMMANDON = [
+    "git status --short --ignored -uall",
+    "git add -A",
+    "ls -l COMMIT_MSG.txt",
+    # Hugos beslut 2026-11-05 om granskning 39, beslut 3.
+    "cat COMMIT_MSG.txt",
+    "git commit -F COMMIT_MSG.txt",
+]
 TITTEN_EFTER_COMMITEN = "git show --stat HEAD"
 BYTET = [
     SAFE_BARE,
@@ -333,8 +345,17 @@ SPARRPROVET = [
     "ls -ld ~/VERA/sparrprov",
 ]
 
-# Bara grupp D (Hugos beslut 2026-11-05 efter P6, beslut 1).
-UTANFOR_K = "test_h6_en_lank_till_git_stoppas or test_beslut_1_gamla_venv_i_projektet_stoppas"
+# Bara grupp D (Hugos beslut 2026-11-05 efter P6, beslut 1, och om granskning 39, beslut 1).
+UTANFOR_K = (
+    "test_h6_en_lank_till_git_stoppas or test_beslut_1_gamla_venv_i_projektet_stoppas"
+    " or test_granskning_37_p4_uall_visar_varje_fil_for_sig or test_granskning_37_p4_utan_uall_doljs_filerna"
+    " or test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott"
+    " or test_granskning_38_det_vantade_laget_ger_inget_stopp"
+    " or test_granskning_38_p1_en_ny_fil_i_en_mapp_i_det_vantade_laget_stoppar"
+    " or test_granskning_38_p3_gitattributes_i_en_ny_mapp_stoppar_i_varje_stavning"
+    " or test_granskning_38_sessionens_uppraknade_filer_ar_vantade_och_inget_annat"
+    " or test_granskning_39_riktiga_rader_stoppar_ocksa_om_de_ar_uppraknade"
+)
 UTANFOR = [
     "ls -ld ~/VERA/provkopia",
     "git clone --no-hardlinks ~/VERA/agent ~/VERA/provkopia",
@@ -512,10 +533,9 @@ def test_summan_i_bytet_ar_den_nya_filens_summa():
     assert _byte_avsnittet().count(summa) == 2
 
 
-def test_provkorningen_har_samma_nycklar_som_filen_utom_filesystem():
-    sandbox = dict(_installningar()["sandbox"])
-    del sandbox["filesystem"]
-    assert json.loads(PROVKORNINGENS_NYCKLAR) == {"sandbox": sandbox}
+def test_provkorningen_har_samma_nycklar_som_filen_ocksa_filesystem():
+    # Hette ..._utom_filesystem före Hugos beslut 2026-11-05 om granskning 39, beslut 2.
+    assert json.loads(PROVKORNINGENS_NYCKLAR) == {"sandbox": _installningar()["sandbox"]}
 
 
 @pytest.mark.parametrize(
@@ -691,12 +711,14 @@ def test_granskning_35_p1_antalen_i_installera_stammer_med_testerna():
         (SPARRPROV_RUBRIK, "`41 passed`"),
         (SPARRPROV_RUBRIK, "flytta hela arbetsmappen"),
         (SPARRPROV_RUBRIK, "`31 passed`"),
-        (PROVKORNING_RUBRIK, "`49 skipped`"),
+        (PROVKORNING_RUBRIK, "`85 skipped`"),
+        (PROVKORNING_RUBRIK, "`GRUPP D HOPPAS ÖVER`: **38** prov"),
         (PROVKORNING_RUBRIK, "`SPÄRRTESTET HOPPAS ÖVER`: **10** prov"),
         (PROVKORNING_RUBRIK, "`SPÄRRPROVET I KOPIAN HOPPAS ÖVER`: **31** prov"),
         (PROVKORNING_RUBRIK, "2.1.318"),
-        (BYTE_RUBRIK, "**33** överhoppade"),
-        (BYTE_RUBRIK, "**35** om `~/.ssh` inte finns"),
+        (BYTE_RUBRIK, "**69** överhoppade"),
+        (BYTE_RUBRIK, "**71** om `~/.ssh` inte finns"),
+        (BYTE_RUBRIK, "`GRUPP D HOPPAS ÖVER` (38 prov)"),
     ],
 )
 def test_granskning_35_p1_installera_har_vantade_antal(rubrik, text):
@@ -769,7 +791,8 @@ def test_granskning_35_p12_commit_msg_star_i_gitignore():
         "Det avgörs av en session som bara läser, som Hugo startar, och som bara tittar på det provet",
         "Sessionen skriver bara commit-meddelandet i filen `COMMIT_MSG.txt` i projektmappen",
         "skriver aldrig ett kommando som Hugo ska klistra in",
-        "`git status --short --ignored -uall`, `git add -A`, `ls -l COMMIT_MSG.txt` och `git commit -F COMMIT_MSG.txt`",
+        "`git status --short --ignored -uall`, `git add -A`, `ls -l COMMIT_MSG.txt`, `cat COMMIT_MSG.txt` och "
+        "`git commit -F COMMIT_MSG.txt`",
         "Hugo kör dem utanför sandlådan, i Terminal, i en kopia av en granskad commit",
         "Hugos beslut 2026-11-05 om granskning 35, beslut 3",
         "Hugos beslut 2026-11-05 om granskning 35, beslut 4",
@@ -970,11 +993,12 @@ def test_granskning_36_p1_ls_star_fore_commiten_med_regeln(plats):
 
 
 def test_granskning_36_p1_i_installera_star_regeln_vid_rutan_och_fyra_kommandon_i_ordning():
+    # Fem kommandon sedan Hugos beslut 2026-11-05 om granskning 39, beslut 3.
     avsnitt = _byte_avsnittet()
-    assert "samma fyra kommandon" in avsnitt and "samma tre kommandon" not in avsnitt
+    assert "samma fem kommandon" in avsnitt and "samma fyra kommandon" not in avsnitt
     rader = _kodrader(avsnitt)
     start = rader.index(HUGOS_FASTA_KOMMANDON[0])
-    assert rader[start:start + 4] == HUGOS_FASTA_KOMMANDON
+    assert rader[start:start + 5] == HUGOS_FASTA_KOMMANDON
     efter_ls = avsnitt.split(f"```bash\n   {LS_KOMMANDOT}\n   ```", 1)[1].split("```bash", 1)[0]
     assert "committa inte, stanna" in efter_ls
 
@@ -1585,7 +1609,7 @@ def test_granskning_37_p3_i_installera_star_titten_i_en_egen_ruta_efter_commiten
     avsnitt = _byte_avsnittet()
     rader = _kodrader(avsnitt)
     start = rader.index(HUGOS_FASTA_KOMMANDON[0])
-    assert rader[start:start + 5] == [*HUGOS_FASTA_KOMMANDON, TITTEN_EFTER_COMMITEN]
+    assert rader[start:start + 6] == [*HUGOS_FASTA_KOMMANDON, TITTEN_EFTER_COMMITEN]
     efter = avsnitt.split(f"```bash\n   {TITTEN_EFTER_COMMITEN}\n   ```", 1)[1].split("```bash", 1)[0]
     assert "pusha inte, fråga" in efter
 
@@ -1639,7 +1663,7 @@ def test_granskning_37_p3_hjalpfunktionen_sager_ja_nar_datorn_nekar(monkeypatch,
     assert _hard_lank_stoppas(tmp_path / "prov", tmp_path / "lank") is True
 
 
-@pytest.mark.parametrize("kommando", [HUGOS_FASTA_KOMMANDON[0], TITTEN_EFTER_COMMITEN, LS_KOMMANDOT])
+@pytest.mark.parametrize("kommando", [HUGOS_FASTA_KOMMANDON[0], TITTEN_EFTER_COMMITEN, LS_KOMMANDOT, "cat COMMIT_MSG.txt"])
 def test_granskning_37_vakten_slapper_igenom_lasande_kommandon(vakt, mappar, kommando):
     assert _bedom(vakt, mappar, kommando) is None
 
@@ -1662,16 +1686,48 @@ def test_granskning_37_p4_varje_plats_har_uall():
     assert {namn for namn, text in _gallande_dokument().items() if NYTT_STATUS in text} == {"CLAUDE.md", "INSTALLERA.md", "SPEC.md"}
 
 
+# Hugos beslut 2026-11-05 om granskning 39, beslut 1: grupp D. Bara Operation not permitted hoppar över, från datorn eller i
+# git:s felmeddelande. Allt annat ger rött, också Permission denied. Utanför sandlådan händer det inte, och kommandot i
+# "Prov utanför sandlådan" visar det: där ska texten nedan inte stå.
+
+OPERATION_NOT_PERMITTED = "Operation not permitted"
+
+
+def _hoppa_over_grupp_d(orsak):
+    pytest.skip(
+        f"GRUPP D HOPPAS ÖVER: {orsak}, troligen sandlådan. Provet körs utanför sandlådan, se INSTALLERA.md, "
+        '"Prov utanför sandlådan".'
+    )
+
+
+@contextlib.contextmanager
+def _grupp_d_om_datorn_nekar():
+    try:
+        yield
+    except PermissionError as fel:
+        if fel.errno != errno.EPERM:
+            raise
+        _hoppa_over_grupp_d(f"datorn nekade: {fel}")
+
+
+def _kontrollera_git(svar):
+    """Git gick bra, eller nekades med Operation not permitted. Ett annat fel från git ger rött."""
+    if svar.returncode != 0 and OPERATION_NOT_PERMITTED in svar.stderr:
+        _hoppa_over_grupp_d(f"git nekades: {svar.stderr.strip()}")
+    assert svar.returncode == 0, svar.stderr
+
+
 def _status(tmp_path, *tillagg):
-    arbetsmapp, miljo = _provrepo(tmp_path)
-    for fil in (".pytest_cache/ny.py", ".venv/x.py", "ny/.gitattributes", "ny/.lfsconfig"):
-        (arbetsmapp / fil).parent.mkdir(parents=True, exist_ok=True)
-        (arbetsmapp / fil).write_text("x\n", encoding="utf-8")
-    (arbetsmapp / "tom").mkdir()
+    with _grupp_d_om_datorn_nekar():
+        arbetsmapp, miljo = _provrepo(tmp_path)
+        for fil in (".pytest_cache/ny.py", ".venv/x.py", "ny/.gitattributes", "ny/.lfsconfig"):
+            (arbetsmapp / fil).parent.mkdir(parents=True, exist_ok=True)
+            (arbetsmapp / fil).write_text("x\n", encoding="utf-8")
+        (arbetsmapp / "tom").mkdir()
     svar = subprocess.run(
         [GIT, "status", "--short", "--ignored", *tillagg], cwd=arbetsmapp, env=miljo, capture_output=True, text=True, timeout=60, check=False
     )
-    assert svar.returncode == 0, svar.stderr
+    _kontrollera_git(svar)
     return svar.stdout.splitlines()
 
 
@@ -1721,31 +1777,34 @@ def _lagg_in(fil, plats, mitt_i, sist):
 
 def test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott(tmp_path):
     # En kopia i testets tillfälliga mapp, med nya poster mitt i och sist i varje fil. Testerna som läser filerna körs där.
+    # Hoppar över bara om datorn nekar själva kopian (Hugos beslut 2026-11-05 om granskning 39, beslut 1). Ett rött test i
+    # kopian ger alltid rött här. De tester i kopian som sandlådan nekar hoppar över sig själva.
     rot = tmp_path / "kopia"
-    rot.mkdir()
-    for mapp in ("scripts", "sparr", "foretag", "testdata", "testforetag"):
-        shutil.copytree(PROJEKTET / mapp, rot / mapp, ignore=shutil.ignore_patterns("__pycache__", ".DS_Store"))
-    for fil in (*PROJEKTET.glob("*.md"), GITIGNORE, PROJEKTET / "requirements.txt"):
-        shutil.copy(fil, rot / fil.name)
-    _lagg_in(
-        rot / "GRANSKNING.md",
-        "\n## Granskning 37 (av abded14",
-        # Så höga nummer att de inte krockar med en verklig granskning, eftersom två med samma nummer ska ge rött.
-        f"\n## Granskning 99998 (påhittad) (2099-01-01)\n\n{PAHITTAD_TEXT}\n",
-        f"\n## Granskning 99999 (påhittad) (2099-01-01)\n\n{PAHITTAD_TEXT}\n",
-    )
-    _lagg_in(
-        rot / "PROGRESS.md",
-        "\n## Läge",
-        f"\n## Läge 2099-01-01, påhittad post\n\nSteg i byggplanen: 15 (pågår)\n\n- {PAHITTAD_TEXT}\n",
-        f"\n## Påhittad rubrik sist\n\n- {PAHITTAD_TEXT}\n",
-    )
-    _lagg_in(
-        rot / "BYGGPLAN.md",
-        "\n## Regler som gäller i hela planen",
-        f"\n## Påhittad post\n\n- {PAHITTAD_TEXT}\n",
-        f"\n## Påhittad rubrik sist\n\n- {PAHITTAD_TEXT}\n",
-    )
+    with _grupp_d_om_datorn_nekar():
+        rot.mkdir()
+        for mapp in ("scripts", "sparr", "foretag", "testdata", "testforetag"):
+            shutil.copytree(PROJEKTET / mapp, rot / mapp, ignore=shutil.ignore_patterns("__pycache__", ".DS_Store"))
+        for fil in (*PROJEKTET.glob("*.md"), GITIGNORE, PROJEKTET / "requirements.txt"):
+            shutil.copy(fil, rot / fil.name)
+        _lagg_in(
+            rot / "GRANSKNING.md",
+            "\n## Granskning 37 (av abded14",
+            # Så höga nummer att de inte krockar med en verklig granskning, eftersom två med samma nummer ska ge rött.
+            f"\n## Granskning 99998 (påhittad) (2099-01-01)\n\n{PAHITTAD_TEXT}\n",
+            f"\n## Granskning 99999 (påhittad) (2099-01-01)\n\n{PAHITTAD_TEXT}\n",
+        )
+        _lagg_in(
+            rot / "PROGRESS.md",
+            "\n## Läge",
+            f"\n## Läge 2099-01-01, påhittad post\n\nSteg i byggplanen: 15 (pågår)\n\n- {PAHITTAD_TEXT}\n",
+            f"\n## Påhittad rubrik sist\n\n- {PAHITTAD_TEXT}\n",
+        )
+        _lagg_in(
+            rot / "BYGGPLAN.md",
+            "\n## Regler som gäller i hela planen",
+            f"\n## Påhittad post\n\n- {PAHITTAD_TEXT}\n",
+            f"\n## Påhittad rubrik sist\n\n- {PAHITTAD_TEXT}\n",
+        )
     svar = subprocess.run(
         [
             sys.executable, "-B", "-m", "pytest", "-p", "no:cacheprovider", "-q", "--tb=line",
@@ -1804,6 +1863,7 @@ FNUTTAT = re.compile(r"`([^`]+)`")
 ALLTID_STOPP = "någon annan rad med"
 ALLA_ANDRA_STOPPAR = "varje rad som inte står exakt i det väntade läget stoppar"
 ALLA_BOKSTAVER = "oavsett stora och små bokstäver"
+CITATTECKEN_STOPPAR = 'varje rad som innehåller ett citattecken (`"`)'
 STYCKENA = {"claude": _claude_md_stycket_om_git_status, "installera": _installera_stycket_om_git_status}
 
 
@@ -1816,11 +1876,13 @@ def _stoppar(stycket, rad, uppraknade=()):
     """Slår stoppregeln till på raden från git status? uppraknade är filerna som sessionen räknar upp i COMMIT_MSG.txt."""
     vantat, regel = _vantat_och_regel(stycket)
     kod, sokvag = rad[:2], rad[3:]
+    if CITATTECKEN_STOPPAR in regel and '"' in rad:
+        return True
     if kod == "!!" and sokvag in vantat:
         return False
     if kod == "!!" and "en annan rad med `!!`" in regel:
         return True
-    namn = [n.rstrip("/") for n in FNUTTAT.findall(regel) if n != "!!"]
+    namn = [n.rstrip("/") for n in FNUTTAT.findall(regel) if n not in ("!!", '"')]
     delar = sokvag.split("/")
     if ALLA_BOKSTAVER in regel:
         namn, delar = [n.lower() for n in namn], [d.lower() for d in delar]
@@ -1841,7 +1903,7 @@ def _git_i_kopian(arbetsmapp, miljo, *argument):
         timeout=60,
         check=False,
     )
-    assert svar.returncode == 0, svar.stderr
+    _kontrollera_git(svar)
     return svar.stdout
 
 
@@ -1851,26 +1913,29 @@ def _statusrader(arbetsmapp, miljo):
 
 def _kopia_med_vantat_lage(tmp_path):
     """En kopia i testets tillfälliga mapp, med projektets .gitignore och det väntade läget. Aldrig projektets .git."""
-    arbetsmapp, miljo = _provrepo(tmp_path)
-    (arbetsmapp / "SPEC.md").write_text("x\n", encoding="utf-8")
-    _git_i_kopian(arbetsmapp, miljo, "add", ".gitignore", "SPEC.md")
-    _git_i_kopian(arbetsmapp, miljo, "commit", "-q", "-m", "prov")
-    for fil in VANTADE_IGNORERADE:
-        (arbetsmapp / fil).parent.mkdir(parents=True, exist_ok=True)
-        (arbetsmapp / fil).write_text("", encoding="utf-8")
+    with _grupp_d_om_datorn_nekar():
+        arbetsmapp, miljo = _provrepo(tmp_path)
+        (arbetsmapp / "SPEC.md").write_text("x\n", encoding="utf-8")
+        _git_i_kopian(arbetsmapp, miljo, "add", ".gitignore", "SPEC.md")
+        _git_i_kopian(arbetsmapp, miljo, "commit", "-q", "-m", "prov")
+        for fil in VANTADE_IGNORERADE:
+            (arbetsmapp / fil).parent.mkdir(parents=True, exist_ok=True)
+            (arbetsmapp / fil).write_text("", encoding="utf-8")
     return arbetsmapp, miljo
 
 
-def _rad_for_ny_fil(tmp_path, fil):
-    """Lägger en ny fil i kopian. Ger den enda nya raden från git status, som den ser ut på riktigt."""
+def _rad_for_ny_fil(tmp_path, fil, sokvag_i_raden=None):
+    """Lägger en ny fil i kopian. Ger den enda nya raden från git status, som den ser ut på riktigt. sokvag_i_raden är
+    namnet som git skriver det, när det inte är filens namn rakt av (inom citattecken)."""
     arbetsmapp, miljo = _kopia_med_vantat_lage(tmp_path)
     fore = _statusrader(arbetsmapp, miljo)
-    (arbetsmapp / fil).parent.mkdir(parents=True, exist_ok=True)
-    (arbetsmapp / fil).write_text("x\n", encoding="utf-8")
+    with _grupp_d_om_datorn_nekar():
+        (arbetsmapp / fil).parent.mkdir(parents=True, exist_ok=True)
+        (arbetsmapp / fil).write_text("x\n", encoding="utf-8")
     nya = _statusrader(arbetsmapp, miljo) - fore
     assert len(nya) == 1, nya
     rad = nya.pop()
-    assert rad[3:] == fil, rad
+    assert rad[3:] == (sokvag_i_raden or fil), rad
     return rad
 
 
@@ -2047,6 +2112,420 @@ def test_granskning_38_installningarna_ar_oforandrade():
 
 def test_granskning_38_vakten_ar_oforandrad():
     assert hashlib.sha256(VAKTEN.read_bytes()).hexdigest() == VAKTENS_SUMMA
+
+
+# ---------------------------------------------------------------------------------------------
+# Hugos beslut 2026-11-05 om granskning 39.
+
+GRANSKNING_39_RUBRIK = "## Granskning 39 (av f52e6ef och c0b54e6)"
+GRANSKNING_39_BESLUT = [
+    '1. De 25 testerna blir grupp D. I sandlådan hoppar de över sig själva med "GRUPP D HOPPAS ÖVER", men bara när datorn '
+    "nekar med Operation not permitted (PermissionError, eller git som avslutas med det i sitt felmeddelande). Alla andra "
+    'fel ger rött. Utanför sandlådan körs de som vanligt och hoppas aldrig över. De körs i "Prov utanför sandlådan" i '
+    "INSTALLERA.md.",
+    '2. Kommandot i "Provkörning med sandlådan" får exakt samma sandbox-nyckel som sparr/managed-settings.json, också '
+    "filesystem. Ett test jämför dem.",
+    "3. Granskning 39, P1: Hugo läser listan i COMMIT_MSG.txt innan han committar. Kommandot cat COMMIT_MSG.txt läggs till "
+    "bland de fasta kommandona, efter ls -l COMMIT_MSG.txt och före git commit -F COMMIT_MSG.txt.",
+    '4. Granskning 39, P2: en rad i git status som innehåller ett citattecken (") stoppar alltid.',
+    "5. Granskning 39, P3: .github/ och .mcp.json läggs till i listan som alltid stoppar, i vilken mapp som helst och oavsett "
+    "stora och små bokstäver.",
+    "6. Stoppkriterium: Granskning 40 prövar bara punkt 1–5. Blockerar inget där, kör Hugo provkörningen igen och installerar. "
+    "Allt annat som hittas går till Öppet.",
+]
+
+
+@pytest.mark.parametrize("beslut", GRANSKNING_39_BESLUT, ids=[str(n) for n in range(1, 7)])
+def test_granskning_39_besluten_star_ordagrant_under_granskning_39(beslut):
+    avsnitt = _avsnitt_i_granskning(GRANSKNING_39_RUBRIK)
+    assert beslut in avsnitt.split("### Hugos beslut 2026-11-05 om granskning 39", 1)[1]
+
+
+def test_granskning_39_stoppkriteriet_star_efter_regeln_om_granskning_39():
+    rader = CLAUDE_MD.read_text(encoding="utf-8").splitlines()
+    plats = next(i for i, rad in enumerate(rader) if rad.startswith("- Granskning 39 prövar bara"))
+    assert rader[plats + 1] == (
+        "- Granskning 40 prövar bara punkt 1–5 i Hugos beslut 2026-11-05 om granskning 39. Blockerar inget där, kör Hugo "
+        "provkörningen igen och installerar. Allt annat som hittas går till Öppet (Hugos beslut 2026-11-05 om granskning 39, "
+        "beslut 6)."
+    )
+
+
+# Beslut 1: grupp D. Vad sandlådan nekar, enligt koden: test_granskning_37_p4_ skapar mappen .venv, och test_granskning_38_
+# och de riktiga raderna nedan skapar mappen .claude (_kopia_med_vantat_lage). Båda namnen står i Edit-förbuden i
+# sparr/managed-settings.json. test_granskning_37_a_ skapar inget sådant namn: den är röd i sandlådan eftersom den kör de andra
+# i en kopia, och blir grön när de hoppar över sig (PROGRESS.md).
+
+NEKAT = PermissionError(errno.EPERM, "Operation not permitted")
+ANDRA_FEL = {
+    "disken_full": OSError(errno.ENOSPC, "No space left on device"),
+    "ratten_saknas": PermissionError(errno.EACCES, "Permission denied"),
+}
+GIT_NEKAT = "fatal: cannot mkdir x: Operation not permitted\n"
+
+
+def _neka_mapp(byte, namn, fel):
+    """Bara mappen med namnet nekas. Allt annat i testet körs på riktigt, så det här går att köra också i sandlådan."""
+    riktig = Path.mkdir
+
+    def mkdir(self, *argument, **tillagg):
+        if self.name == namn:
+            raise fel
+        return riktig(self, *argument, **tillagg)
+
+    byte.setattr(Path, "mkdir", mkdir)
+
+
+GRUPP_D_PROV = {
+    "37_p4_uall": (".venv", lambda t: test_granskning_37_p4_uall_visar_varje_fil_for_sig(t)),
+    "37_p4_utan": (".venv", lambda t: test_granskning_37_p4_utan_uall_doljs_filerna(t)),
+    "38_vantat": (".claude", lambda t: test_granskning_38_det_vantade_laget_ger_inget_stopp(t, "claude")),
+    "38_p1": (".claude", lambda t: test_granskning_38_p1_en_ny_fil_i_en_mapp_i_det_vantade_laget_stoppar(t, "claude", "scripts/ny.py")),
+    "38_p3": (".claude", lambda t: test_granskning_38_p3_gitattributes_i_en_ny_mapp_stoppar_i_varje_stavning(t, "claude", ".gitattributes")),
+    "38_uppraknade": (".claude", lambda t: test_granskning_38_sessionens_uppraknade_filer_ar_vantade_och_inget_annat(t, "claude")),
+    "39_rader": (".claude", lambda t: test_granskning_39_riktiga_rader_stoppar_ocksa_om_de_ar_uppraknade(t, "claude", "ny/a b.py", '"ny/a b.py"')),
+}
+
+
+def _ska_ge_rott(vantat_fel, kor):
+    """Felet ska komma, och provet får inte hoppa över sig. Ett hopp inne i pytest.raises skulle annars räknas som överhoppat,
+    inte som rött, så att provet av att andra fel ger rött inte larmar när regeln är borta (mutation i byggsessionen)."""
+    try:
+        with pytest.raises(vantat_fel) as fangat:
+            kor()
+    except pytest.skip.Exception as hopp:
+        pytest.fail(f"provet hoppade över sig, men skulle ge rött: {hopp}")
+    return fangat.value
+
+
+@pytest.mark.parametrize("prov", GRUPP_D_PROV)
+def test_granskning_39_b1_operation_not_permitted_hoppar_over(monkeypatch, tmp_path, prov):
+    mapp, kor = GRUPP_D_PROV[prov]
+    _neka_mapp(monkeypatch, mapp, NEKAT)
+    with pytest.raises(pytest.skip.Exception, match="GRUPP D HOPPAS ÖVER"):
+        kor(tmp_path)
+
+
+@pytest.mark.parametrize("fel", ANDRA_FEL, ids=list(ANDRA_FEL))
+@pytest.mark.parametrize("prov", GRUPP_D_PROV)
+def test_granskning_39_b1_andra_fel_ger_rott(monkeypatch, tmp_path, prov, fel):
+    mapp, kor = GRUPP_D_PROV[prov]
+    _neka_mapp(monkeypatch, mapp, ANDRA_FEL[fel])
+    fangat = _ska_ge_rott(type(ANDRA_FEL[fel]), lambda: kor(tmp_path))
+    assert fangat.errno == ANDRA_FEL[fel].errno
+
+
+def _git_som_svarar(monkeypatch, returkod, felmeddelande, bara_for=None):
+    riktig = subprocess.run
+
+    def run(argument, *resten, **tillagg):
+        if bara_for is not None and bara_for not in argument:
+            return riktig(argument, *resten, **tillagg)
+        return subprocess.CompletedProcess(args=argument, returncode=returkod, stdout="", stderr=felmeddelande)
+
+    monkeypatch.setattr(subprocess, "run", run)
+
+
+def test_granskning_39_b1_git_som_nekas_hoppar_over(monkeypatch, tmp_path):
+    _git_som_svarar(monkeypatch, 128, GIT_NEKAT)
+    with pytest.raises(pytest.skip.Exception, match="GRUPP D HOPPAS ÖVER"):
+        _git_i_kopian(tmp_path, {}, "status")
+
+
+@pytest.mark.parametrize("felmeddelande", ["fatal: not a git repository\n", "fatal: Permission denied\n", ""])
+def test_granskning_39_b1_annat_git_fel_ger_rott(monkeypatch, tmp_path, felmeddelande):
+    _git_som_svarar(monkeypatch, 128, felmeddelande)
+    _ska_ge_rott(AssertionError, lambda: _git_i_kopian(tmp_path, {}, "status"))
+
+
+def test_granskning_39_b1_orden_utan_att_git_misslyckas_hoppar_inte_over(monkeypatch, tmp_path):
+    _git_som_svarar(monkeypatch, 0, "warning: Operation not permitted\n")
+    try:
+        assert _git_i_kopian(tmp_path, {}, "status") == ""
+    except pytest.skip.Exception as hopp:
+        pytest.fail(f"git gick bra, men provet hoppade över sig: {hopp}")
+
+
+def _inget_skapas_i_venv(byte):
+    """Mappen .venv skapas inte på riktigt. I sandlådan skulle provet annars hoppa över sig där, före git (modellprovet)."""
+    riktig_mkdir = Path.mkdir
+    riktig_skriv = Path.write_text
+
+    def mkdir(self, *argument, **tillagg):
+        return None if self.name == ".venv" else riktig_mkdir(self, *argument, **tillagg)
+
+    def skriv(self, *argument, **tillagg):
+        return 0 if self.parent.name == ".venv" else riktig_skriv(self, *argument, **tillagg)
+
+    byte.setattr(Path, "mkdir", mkdir)
+    byte.setattr(Path, "write_text", skriv)
+
+
+def test_granskning_39_b1_git_status_i_p4_som_nekas_hoppar_over(monkeypatch, tmp_path):
+    _inget_skapas_i_venv(monkeypatch)
+    _git_som_svarar(monkeypatch, 128, GIT_NEKAT, bara_for="status")
+    with pytest.raises(pytest.skip.Exception, match="git nekades"):
+        test_granskning_37_p4_uall_visar_varje_fil_for_sig(tmp_path)
+
+
+def test_granskning_39_b1_annat_fel_fran_git_status_i_p4_ger_rott(monkeypatch, tmp_path):
+    _inget_skapas_i_venv(monkeypatch)
+    _git_som_svarar(monkeypatch, 128, "fatal: not a git repository\n", bara_for="status")
+    _ska_ge_rott(AssertionError, lambda: test_granskning_37_p4_uall_visar_varje_fil_for_sig(tmp_path))
+
+
+def _neka_kopiering(byte, fel):
+    def copytree(*_a, **_k):
+        raise fel
+
+    byte.setattr(shutil, "copytree", copytree)
+
+
+def test_granskning_39_b1_prov_a_hoppar_over_bara_om_kopieringen_nekas(monkeypatch, tmp_path):
+    _neka_kopiering(monkeypatch, NEKAT)
+    with pytest.raises(pytest.skip.Exception, match="GRUPP D HOPPAS ÖVER"):
+        test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott(tmp_path)
+
+
+def test_granskning_39_b1_prov_a_annat_fel_vid_kopieringen_ger_rott(monkeypatch, tmp_path):
+    _neka_kopiering(monkeypatch, ANDRA_FEL["disken_full"])
+    _ska_ge_rott(OSError, lambda: test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott(tmp_path))
+
+
+def test_granskning_39_b1_prov_a_rott_i_kopian_ger_rott_ocksa_med_orden_i_utskriften(monkeypatch, tmp_path):
+    # Ett rött test i kopian får aldrig bli ett överhoppat prov, oavsett vad utskriften säger.
+    monkeypatch.setattr(shutil, "copytree", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda argument, *_r, **_k: subprocess.CompletedProcess(
+            args=argument, returncode=1, stdout="PermissionError: Operation not permitted", stderr=""
+        ),
+    )
+    _ska_ge_rott(AssertionError, lambda: test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott(tmp_path))
+
+
+def _prov_som_bygger_provrepo():
+    trad = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    hjalp = {"_kopia_med_vantat_lage", "_rad_for_ny_fil", "_status"}
+    return {
+        del_.name
+        for del_ in trad.body
+        if isinstance(del_, ast.FunctionDef)
+        and del_.name.startswith("test_")
+        and any(isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in hjalp for n in ast.walk(del_))
+    }
+
+
+def test_granskning_39_b1_varje_prov_som_kan_hoppa_over_kors_utanfor_sandladan():
+    # Ett nytt prov med samma hjälpfunktioner måste med i kommandot i "Prov utanför sandlådan", annars körs det aldrig.
+    utanfor = set(UTANFOR_K.split(" or "))
+    assert utanfor == _prov_som_bygger_provrepo() | {
+        "test_h6_en_lank_till_git_stoppas",
+        "test_beslut_1_gamla_venv_i_projektet_stoppas",
+        "test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott",
+    }
+
+
+def _insamlade_utanfor():
+    svar = subprocess.run(
+        [sys.executable, "-B", "-m", "pytest", "-p", "no:cacheprovider", "--collect-only", "-q", "-k", UTANFOR_K, str(Path(__file__).parent)],
+        cwd=PROJEKTET,
+        capture_output=True,
+        text=True,
+        timeout=300,
+        check=False,
+    )
+    assert svar.returncode == 0, svar.stdout + svar.stderr
+    return [rad for rad in svar.stdout.splitlines() if "::test_" in rad]
+
+
+def test_granskning_39_b1_antalen_i_installera_stammer_med_testerna():
+    prov = _insamlade_utanfor()
+    # Alla utom test_granskning_37_a_, som inte skapar något som sandlådan nekar.
+    hoppar = [rad for rad in prov if "::test_granskning_37_a_" not in rad]
+    assert (len(prov), len(hoppar)) == (39, 38)
+    sparrtestet, i_kopian, h1 = 10, 31, 6
+    assert f"`{len(hoppar) + sparrtestet + i_kopian + h1} skipped`" in _avsnitt(PROVKORNING_RUBRIK)
+    assert f"**{len(hoppar) + i_kopian}** överhoppade" in _byte_avsnittet()
+    assert f"**{len(hoppar) + i_kopian + 2}** om `~/.ssh` inte finns" in _byte_avsnittet()
+    assert f"`{len(prov)} passed`" in _avsnitt(UTANFOR_RUBRIK)
+
+
+@pytest.mark.parametrize(
+    "rubrik,text",
+    [
+        (UTANFOR_RUBRIK, "Hugos beslut 2026-11-05 om granskning 39, beslut 1"),
+        (UTANFOR_RUBRIK, "`Operation not permitted`"),
+        (PROVKORNING_RUBRIK, "`Operation not permitted`"),
+        (PROVKORNING_RUBRIK, "Alla andra fel ger rött"),
+        (PROVKORNING_RUBRIK, "`test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott`"),
+    ],
+    # Egna namn, eftersom -k också söker i namnet på en variant, och provnamnet ovan annars väljs i "Prov utanför sandlådan".
+    ids=["utanfor_beslutet", "utanfor_nekar", "provkorning_nekar", "provkorning_andra_fel", "provkorning_prov_a"],
+)
+def test_granskning_39_b1_installera_sager_vad_som_galler(rubrik, text):
+    assert text in _avsnitt(rubrik)
+
+
+def test_granskning_39_b1_claude_md_sager_nar_grupp_d_hoppas_over():
+    rader = CLAUDE_MD.read_text(encoding="utf-8").splitlines()
+    stycket = next(r for r in rader if r.startswith("- Prov som inte kan köras i sandlådan (grupp D)"))
+    assert "bara när datorn nekar med `Operation not permitted`" in stycket
+    assert "Hugos beslut 2026-11-05 om granskning 39, beslut 1" in stycket
+
+
+# Beslut 2: kommandot i rutan mot filen, nyckel för nyckel.
+
+PROVKORNING_START = "~/.local/bin/claude --settings '"
+
+
+def _provkorningens_installningar(text):
+    rad = next(r for r in _kodrader(text) if r.startswith(PROVKORNING_START))
+    assert rad.endswith("'")
+    return json.loads(rad[len(PROVKORNING_START):-1])
+
+
+def _skillnader_mot_filen(i_rutan):
+    i_filen = _installningar()["sandbox"]
+    assert set(i_rutan) == {"sandbox"}
+    nycklar = set(i_filen) | set(i_rutan["sandbox"])
+    return sorted(n for n in nycklar if i_rutan["sandbox"].get(n, "saknas") != i_filen.get(n, "saknas"))
+
+
+def test_granskning_39_b2_rutan_har_exakt_samma_sandbox_nyckel_som_filen():
+    i_rutan = _provkorningens_installningar(_avsnitt(PROVKORNING_RUBRIK))
+    assert _skillnader_mot_filen(i_rutan) == []
+    assert i_rutan["sandbox"]["filesystem"] == _installningar()["sandbox"]["filesystem"]
+
+
+@pytest.mark.parametrize("nyckel", ["filesystem", "enabled", "network"])
+def test_granskning_39_b2_jamforelsen_ser_en_saknad_nyckel(nyckel):
+    i_rutan = json.loads(PROVKORNINGENS_NYCKLAR)
+    del i_rutan["sandbox"][nyckel]
+    assert _skillnader_mot_filen(i_rutan) == [nyckel]
+
+
+def test_granskning_39_b2_texten_sager_att_det_ar_samma_nyckel():
+    avsnitt = _avsnitt(PROVKORNING_RUBRIK)
+    assert "exakt samma `sandbox`-nyckel som `sparr/managed-settings.json`, också `filesystem`" in avsnitt
+    assert "Hugos beslut 2026-11-05 om granskning 39, beslut 2" in avsnitt
+
+
+# Beslut 3: cat COMMIT_MSG.txt, på varje plats som listar de fasta kommandona.
+
+CAT_KOMMANDOT = "cat COMMIT_MSG.txt"
+
+
+@pytest.mark.parametrize("plats", ["CLAUDE.md", "INSTALLERA.md"])
+def test_granskning_39_b3_cat_star_efter_ls_och_fore_commiten(plats):
+    text = _platser_med_de_fasta_kommandona()[plats]
+    assert text.index(LS_KOMMANDOT) < text.index(CAT_KOMMANDOT) < text.index(COMMITEN)
+    assert "Hugos beslut 2026-11-05 om granskning 39, beslut 3" in text
+
+
+@pytest.mark.parametrize(
+    "plats,mening,villkor",
+    [
+        ("CLAUDE.md", "Med `cat` läser Hugo listan i `COMMIT_MSG.txt` före commiten", "bara när raden från `ls -l` stämmer"),
+        ("INSTALLERA.md", "**Läs listan i `COMMIT_MSG.txt` före commiten.**", "bara när raden ovan stämmer"),
+    ],
+)
+def test_granskning_39_b3_varje_plats_sager_att_listan_lases_fore_commiten(plats, mening, villkor):
+    text = _platser_med_de_fasta_kommandona()[plats]
+    assert mening in text and villkor in text
+
+
+def test_granskning_39_b3_i_installera_star_cat_i_en_egen_ruta_i_ordning():
+    rader = _kodrader(_byte_avsnittet())
+    start = rader.index(LS_KOMMANDOT)
+    assert rader[start:start + 3] == [LS_KOMMANDOT, CAT_KOMMANDOT, COMMITEN]
+
+
+def test_granskning_39_b3_spec_7_1_namner_cat_och_kommandolistan_ar_oforandrad():
+    assert f"`{CAT_KOMMANDOT}`" in _spec_punkt("- `git commit -F`")
+    assert hashlib.sha256(_kommandolistan().encode("utf-8")).hexdigest() == LISTANS_SUMMA
+
+
+# Beslut 4 och 5: citattecken, .github/ och .mcp.json.
+
+
+@pytest.mark.parametrize("stycket", STYCKENA, ids=list(STYCKENA))
+def test_granskning_39_b4_b5_stoppregeln_har_orden(stycket):
+    regel = _vantat_och_regel(STYCKENA[stycket]())[1]
+    for text in (CITATTECKEN_STOPPAR, "`.github/`", "`.mcp.json`", ALLA_BOKSTAVER, "i vilken mapp som helst"):
+        assert text in regel
+    assert "Hugos beslut 2026-11-05 om granskning 39, beslut 4 och 5" in regel
+
+
+def test_granskning_39_b4_b5_spec_7_1_sager_samma_sak():
+    punkt = _spec_punkt("- **Det vakten inte stoppar:**")
+    for text in ("citattecken", "`.github/`", "`.mcp.json`", "Hugos beslut 2026-11-05 om granskning 39, beslut 4 och 5"):
+        assert text in punkt
+
+
+@pytest.mark.parametrize("stycket", STYCKENA, ids=list(STYCKENA))
+@pytest.mark.parametrize(
+    "rad",
+    [
+        '?? "ny/a b.py"',
+        '?? "ny/.gitattribute\\305\\277"',
+        ' M "scripts/\\303\\245.py"',
+        'D  "a b.txt"',
+        'R  "a b.txt" -> c.txt',
+        '!! "ny/a b.py"',
+    ],
+)
+def test_granskning_39_b4_en_rad_med_citattecken_stoppar_alltid(stycket, rad):
+    sokvag = rad[3:]
+    assert _stoppar(STYCKENA[stycket](), rad, uppraknade=[sokvag])
+
+
+@pytest.mark.parametrize("stycket", STYCKENA, ids=list(STYCKENA))
+@pytest.mark.parametrize(
+    "fil",
+    [
+        ".github/workflows/x.yml",
+        "ny/.github/workflows/x.yml",
+        ".GITHUB/x.yml",
+        "scripts/.GitHub/x",
+        ".mcp.json",
+        "ny/under/.mcp.json",
+        ".MCP.json",
+        "scripts/.Mcp.Json",
+    ],
+)
+def test_granskning_39_b5_github_och_mcp_stoppar_i_varje_stavning_och_mapp(stycket, fil):
+    for kod in ("??", " M", "D ", "A "):
+        assert _stoppar(STYCKENA[stycket](), f"{kod} {fil}", uppraknade=[fil])
+
+
+@pytest.mark.parametrize("stycket", STYCKENA, ids=list(STYCKENA))
+@pytest.mark.parametrize("fil", ["github/x.yml", "scripts/mcp.json", "scripts/ny.py"])
+def test_granskning_39_b5_andra_namn_stoppar_bara_om_de_inte_ar_uppraknade(stycket, fil):
+    assert not _stoppar(STYCKENA[stycket](), f"?? {fil}", uppraknade=[fil])
+    assert _stoppar(STYCKENA[stycket](), f"?? {fil}")
+
+
+@pytest.mark.parametrize("stycket", STYCKENA, ids=list(STYCKENA))
+@pytest.mark.parametrize(
+    "fil,i_raden",
+    [
+        (".github/workflows/x.yml", None),
+        (".GITHUB/x.yml", None),
+        (".MCP.json", None),
+        ("ny/.mcp.json", None),
+        ("ny/.gitattributeſ", '"ny/.gitattribute\\305\\277"'),
+        ("ny/a b.py", '"ny/a b.py"'),
+    ],
+    ids=["github", "GITHUB", "MCP", "mcp_i_mapp", "langt_s", "mellanslag"],
+)
+def test_granskning_39_riktiga_rader_stoppar_ocksa_om_de_ar_uppraknade(tmp_path, stycket, fil, i_raden):
+    # Riktiga rader från git status i testets tillfälliga mapp, med projektets .gitignore. Långt s är granskning 39, P2: Macen
+    # räknar det som s, git läser filen, och raden innehåller inte namnet. Citattecknet stoppar den ändå.
+    rad = _rad_for_ny_fil(tmp_path, fil, i_raden)
+    assert rad == f"?? {i_raden or fil}"
+    assert _stoppar(STYCKENA[stycket](), rad, uppraknade=[fil, rad[3:]])
 
 
 # ---------------------------------------------------------------------------------------------

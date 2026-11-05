@@ -819,7 +819,7 @@ steg 1, 2, 3, 9.
 
 ## Provkörning med sandlådan, före bytet (steg 15)
 
-Den här provkörningen ska visa att testsviten är grön i sandlådan, med samma nycklar som i den nya filen. Ingenting
+Den här provkörningen ska visa att testsviten är grön i sandlådan, med exakt samma `sandbox`-nyckel som `sparr/managed-settings.json`, också `filesystem` (Hugos beslut 2026-11-05 om granskning 39, beslut 2). Ett test jämför dem. Ingenting
 installeras, inget kräver lösenord, och de låsta inställningarna är oförändrade. Sandlådan gäller bara den här sessionen.
 Kör i programmet **Terminal**, ett kommando i taget:
 
@@ -834,7 +834,7 @@ cd ~/VERA/agent
 - Skriv upp versionen. Den behövs vid bytet nedan. Provkörningen 2026-11-05, del E, gjordes med 2.1.318 (`PROGRESS.md`).
 
 ```bash
-~/.local/bin/claude --settings '{"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false,"autoAllowBashIfSandboxed":false,"excludedCommands":[],"enableWeakerNestedSandbox":false,"enableWeakerNetworkIsolation":false,"allowAppleEvents":false,"allowNestedUserNamespaces":false,"network":{"allowAllUnixSockets":false,"allowLocalBinding":false}}}'
+~/.local/bin/claude --settings '{"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false,"autoAllowBashIfSandboxed":false,"excludedCommands":[],"enableWeakerNestedSandbox":false,"enableWeakerNetworkIsolation":false,"allowAppleEvents":false,"allowNestedUserNamespaces":false,"network":{"allowAllUnixSockets":false,"allowLocalBinding":false},"filesystem":{"denyWrite":["/Applications/Claude.app","~/Library/Application Support/Claude/claude-code","~/.local/share/claude"],"denyRead":["~/.ssh"]}}}'
 ```
 
 Be sedan Claude: "Kör exakt det här kommandot med Bash-verktyget, och ändra ingenting i det:" och klistra in:
@@ -843,11 +843,11 @@ Be sedan Claude: "Kör exakt det här kommandot med Bash-verktyget, och ändra i
 '/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rfs scripts/tests
 ```
 
-**Väntat på sista raden: inget `failed`, alltså inga röda, och `49 skipped`.** Skicka hela slutet av utskriften till sessionen som hjälper dig. **Är något test rött, eller är antalet ett annat: stoppa och fråga.**
+**Väntat på sista raden: inget `failed`, alltså inga röda, och `85 skipped`.** Skicka hela slutet av utskriften till sessionen som hjälper dig. **Är något test rött, eller är antalet ett annat: stoppa och fråga.**
 
 Utskriften (`-rfs`) visar vilka som hoppas över, och varför:
 
-- `GRUPP D HOPPAS ÖVER`: **2** prov, `test_h6_en_lank_till_git_stoppas` och `test_beslut_1_gamla_venv_i_projektet_stoppas`. De skapar en mapp `.git` eller `.venv`, och det ska sandlådan stoppa. De körs i "Prov utanför sandlådan" nedan.
+- `GRUPP D HOPPAS ÖVER`: **38** prov (Hugos beslut 2026-11-05 om granskning 39, beslut 1). De skapar en mapp `.git`, `.venv` eller `.claude` i testets tillfälliga mapp, och det ska sandlådan stoppa. De hoppar över sig bara när datorn nekar med `Operation not permitted`. Alla andra fel ger rött. De körs i "Prov utanför sandlådan" nedan. `test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott` hör till gruppen men ska gå igenom här: den nekas inget själv, utan kör de andra i en kopia. Därför är det 38 och inte 39.
 - `SPÄRRTESTET HOPPAS ÖVER`: **10** prov, och `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`: **31** prov: väntat före bytet, eftersom sandlådan ännu inte står i de låsta inställningarna.
 - `H1-PROVET HOPPAS ÖVER`: **6** prov. Väntat i Terminal: de hoppas över där också utan sandlåda (Hugos körning 2026-11-05, P6). De körs i appen, se "Spärrprovet i kopian", punkt d.
 
@@ -980,14 +980,14 @@ ls -lde@ "/Library/Application Support/ClaudeCode/managed-settings.json" "/Libra
    '/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests
    ```
 
-   **Väntat: inget `failed`, alltså inga röda.** Väntat antal: **33** överhoppade, eller **35** om `~/.ssh` inte finns. Det ska inte stå `SPÄRRTESTET HOPPAS ÖVER`. Det ska stå `GRUPP D HOPPAS ÖVER` (2 prov) och `SPÄRRPROVET I KOPIAN HOPPAS ÖVER` (31 prov), som körs i punkt 8. Finns inte `~/.ssh` hoppas också de två proven av den mappen över, med texten "finns inte på den här datorn". Det ska inte heller stå `H1-PROVET HOPPAS ÖVER`. Står `H1-PROVET HOPPAS ÖVER` där: backa inte, utan fortsätt till "Spärrprovet i kopian", punkt d, som säger vad du gör. Spärrtestet i `scripts/tests/test_sandladan.py` prövar här att git kan visa läget och att läsning i projektet fungerar, att en fil eller mapp med namnet `.git` stoppas i testets tillfälliga mapp, att skrivning utanför projektet, i `~/.local/share/claude`, i appen och i appens Claude Code stoppas, och att läsning av `~/.ssh` stoppas. **Står `SPÄRRTESTET HOPPAS ÖVER` där, eller är något rött: stoppa och fråga.**
-5. **Git kan inte göra en commit i sandlådan, och det är rätt.** Från den här installationen committar agenten inte (Hugos beslut 2026-11-05 om granskning 34, beslut 2). Sessionen skriver bara commit-meddelandet i filen `COMMIT_MSG.txt` i projektmappen, och skriver aldrig ett kommando som du ska klistra in. Meddelandet räknar upp varje fil som sessionen har ändrat, skapat eller tagit bort. Du skriver alltid själv samma fyra kommandon, ett i taget, med `!` i sessionen eller i Terminal (Hugos beslut 2026-11-05 om granskning 35, beslut 6, och om granskning 36, P1). Gör det vid nästa ändring i projektet. Det första visar läget, varje fil för sig, också filer som `.gitignore` döljer (Hugos beslut 2026-11-05 om granskning 36, P3, och om granskning 37, P4):
+   **Väntat: inget `failed`, alltså inga röda.** Väntat antal: **69** överhoppade, eller **71** om `~/.ssh` inte finns. Det ska inte stå `SPÄRRTESTET HOPPAS ÖVER`. Det ska stå `GRUPP D HOPPAS ÖVER` (38 prov) och `SPÄRRPROVET I KOPIAN HOPPAS ÖVER` (31 prov), som körs i punkt 8. Finns inte `~/.ssh` hoppas också de två proven av den mappen över, med texten "finns inte på den här datorn". Det ska inte heller stå `H1-PROVET HOPPAS ÖVER`. Står `H1-PROVET HOPPAS ÖVER` där: backa inte, utan fortsätt till "Spärrprovet i kopian", punkt d, som säger vad du gör. Spärrtestet i `scripts/tests/test_sandladan.py` prövar här att git kan visa läget och att läsning i projektet fungerar, att en fil eller mapp med namnet `.git` stoppas i testets tillfälliga mapp, att skrivning utanför projektet, i `~/.local/share/claude`, i appen och i appens Claude Code stoppas, och att läsning av `~/.ssh` stoppas. **Står `SPÄRRTESTET HOPPAS ÖVER` där, eller är något rött: stoppa och fråga.**
+5. **Git kan inte göra en commit i sandlådan, och det är rätt.** Från den här installationen committar agenten inte (Hugos beslut 2026-11-05 om granskning 34, beslut 2). Sessionen skriver bara commit-meddelandet i filen `COMMIT_MSG.txt` i projektmappen, och skriver aldrig ett kommando som du ska klistra in. Meddelandet räknar upp varje fil som sessionen har ändrat, skapat eller tagit bort. Du skriver alltid själv samma fem kommandon, ett i taget, med `!` i sessionen eller i Terminal (Hugos beslut 2026-11-05 om granskning 35, beslut 6, om granskning 36, P1, och om granskning 39, beslut 3). Gör det vid nästa ändring i projektet. Det första visar läget, varje fil för sig, också filer som `.gitignore` döljer (Hugos beslut 2026-11-05 om granskning 36, P3, och om granskning 37, P4):
 
    ```bash
    git status --short --ignored -uall
    ```
 
-   Väntat, raderna som börjar med `!!`: `.DS_Store`, `.claude/.DS_Store`, `.claude/worktrees/.DS_Store`, `.pytest_cache/.gitignore`, `.pytest_cache/CACHEDIR.TAG`, `.pytest_cache/README.md`, `.pytest_cache/v/cache/lastfailed`, `.pytest_cache/v/cache/nodeids`, `foretag/.DS_Store`, `scripts/.DS_Store` och `testdata/.DS_Store`, och `COMMIT_MSG.txt`. Väntat är också en rad för varje fil som sessionen har räknat upp i `COMMIT_MSG.txt`, men aldrig en rad med `!!` (Hugos beslut 2026-11-05 om granskning 38, P1 och P3, och Hugos svar i chatten samma dag). **Stoppregel: varje rad som inte står exakt i det väntade läget stoppar, också en annan rad med `!!`. Det gör också alltid, i vilken mapp som helst och oavsett stora och små bokstäver, någon annan rad med `.claude/`, `.gitattributes`, `.gitignore`, `.lfsconfig` eller `.gitmodules`, även om sessionen har räknat upp filen. När en rad stoppar: stoppa och fråga, också när sessionen själv har ändrat filen.**
+   Väntat, raderna som börjar med `!!`: `.DS_Store`, `.claude/.DS_Store`, `.claude/worktrees/.DS_Store`, `.pytest_cache/.gitignore`, `.pytest_cache/CACHEDIR.TAG`, `.pytest_cache/README.md`, `.pytest_cache/v/cache/lastfailed`, `.pytest_cache/v/cache/nodeids`, `foretag/.DS_Store`, `scripts/.DS_Store` och `testdata/.DS_Store`, och `COMMIT_MSG.txt`. Väntat är också en rad för varje fil som sessionen har räknat upp i `COMMIT_MSG.txt`, men aldrig en rad med `!!` (Hugos beslut 2026-11-05 om granskning 38, P1 och P3, och Hugos svar i chatten samma dag). **Stoppregel: varje rad som inte står exakt i det väntade läget stoppar, också en annan rad med `!!`. Det gör också alltid, i vilken mapp som helst och oavsett stora och små bokstäver, någon annan rad med `.claude/`, `.github/`, `.mcp.json`, `.gitattributes`, `.gitignore`, `.lfsconfig` eller `.gitmodules`, och varje rad som innehåller ett citattecken (`"`), även om sessionen har räknat upp filen (Hugos beslut 2026-11-05 om granskning 39, beslut 4 och 5). När en rad stoppar: stoppa och fråga, också när sessionen själv har ändrat filen.**
 
    ```bash
    git add -A
@@ -998,6 +998,12 @@ ls -lde@ "/Library/Application Support/ClaudeCode/managed-settings.json" "/Libra
    ```
 
    **Raden ska börja med `-` (en vanlig fil), och antalet länkar (siffran efter rättigheterna) ska vara 1. Börjar den med `l` (en länk) eller något annat: committa inte, stanna. Är siffran en annan än 1: committa inte, stanna.** En länk kan annars få en fil som sandlådan förbjuder att hamna i commit-meddelandet (granskning 36, P1). En **hård länk** är ett andra namn på samma fil. Raden börjar då med `-`, men siffran är 2 eller högre (Hugos beslut 2026-11-05 om granskning 37, P3).
+
+   **Läs listan i `COMMIT_MSG.txt` före commiten.** Kör det här bara när raden ovan stämmer, annars kan det visa en annan fil (Hugos beslut 2026-11-05 om granskning 39, beslut 3). Det ändrar ingenting. Jämför listan med raderna från det första kommandot.
+
+   ```bash
+   cat COMMIT_MSG.txt
+   ```
 
    ```bash
    git commit -F COMMIT_MSG.txt
@@ -1150,7 +1156,7 @@ ls -ld ~/VERA/sparrprov
 
 ## Prov utanför sandlådan (steg 15)
 
-Hugos beslut 2026-11-05 om granskning 34, beslut 3, och Hugos beslut 2026-11-05 efter P6, beslut 1 och 3. Det här avsnittet gäller bara grupp D (2 prov). De kan inte köras i sandlådan, och där hoppas de över med texten `GRUPP D HOPPAS ÖVER`. Du kör dem själv i Terminal, varje gång vakten eller de låsta inställningarna ändras. H1-proven körs inte här, utan i appen, se "Spärrprovet i kopian", punkt d.
+Hugos beslut 2026-11-05 om granskning 34, beslut 3, Hugos beslut 2026-11-05 efter P6, beslut 1 och 3, och Hugos beslut 2026-11-05 om granskning 39, beslut 1. Det här avsnittet gäller bara grupp D (39 prov). De kan inte köras i sandlådan. Där hoppas 38 av dem över, med texten `GRUPP D HOPPAS ÖVER`, och bara när datorn nekar med `Operation not permitted`. Den sista går igenom där, eftersom den bara kör de andra i en kopia. Du kör dem själv i Terminal, varje gång vakten eller de låsta inställningarna ändras. H1-proven körs inte här, utan i appen, se "Spärrprovet i kopian", punkt d.
 
 Du kör dem i en kopia av en granskad commit, inte i projektmappen, eftersom de körs med dina fulla rättigheter. I projektmappen kan en testfil ha lagts av agenten, och här körs den utan sandlåda. En sådan kopia har bara det som är committat.
 
@@ -1177,10 +1183,10 @@ git log -1 --format=%H
 **b. Kör proven:**
 
 ```bash
-'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs -k 'test_h6_en_lank_till_git_stoppas or test_beslut_1_gamla_venv_i_projektet_stoppas' scripts/tests
+'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs -k 'test_h6_en_lank_till_git_stoppas or test_beslut_1_gamla_venv_i_projektet_stoppas or test_granskning_37_p4_uall_visar_varje_fil_for_sig or test_granskning_37_p4_utan_uall_doljs_filerna or test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott or test_granskning_38_det_vantade_laget_ger_inget_stopp or test_granskning_38_p1_en_ny_fil_i_en_mapp_i_det_vantade_laget_stoppar or test_granskning_38_p3_gitattributes_i_en_ny_mapp_stoppar_i_varje_stavning or test_granskning_38_sessionens_uppraknade_filer_ar_vantade_och_inget_annat or test_granskning_39_riktiga_rader_stoppar_ocksa_om_de_ar_uppraknade' scripts/tests
 ```
 
-- **Väntat: inget `failed`, och inte `GRUPP D HOPPAS ÖVER`.** Är något rött, eller står den texten där: stoppa och fråga.
+- **Väntat: `39 passed`, inget `failed`, och inte `GRUPP D HOPPAS ÖVER`.** Är något rött, står den texten där, eller är antalet ett annat: stoppa och fråga.
 
 **c. Ta bort kopian.** Kopiera kommandona exakt. Det andra raderar hela mappen, utan papperskorg.
 
