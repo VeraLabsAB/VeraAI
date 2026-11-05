@@ -12519,3 +12519,23 @@ Allt i en riktig sandlåda: att `.claude/`, `.mcp.json` och `.git` stängs, och 
 1. **Inget fynd måste rättas först.** Stoppkriteriet är uppfyllt: inget i P1, P3 eller SPEC 7.1 blockerar. Min rekommendation (bedömning): rätta P1, P2 och P3 i nästa byggsession, senast före första commiten efter installationen. Det är några meningar i CLAUDE.md och INSTALLERA.md, med test, och inga låsta filer.
 2. **Hugo kör provkörningen igen** (`49 skipped`).
 3. Hugo installerar från den granskade commiten och kör spärrprovet direkt, med H1-proven i appen.
+
+### Hugos beslut 2026-11-05 om granskning 39
+
+Skrivna ordagrant från uppdraget i chatten, efter Hugos provkörning 2026-11-05 22:08–22:23.
+
+1. De 25 testerna blir grupp D. I sandlådan hoppar de över sig själva med "GRUPP D HOPPAS ÖVER", men bara när datorn nekar med Operation not permitted (PermissionError, eller git som avslutas med det i sitt felmeddelande). Alla andra fel ger rött. Utanför sandlådan körs de som vanligt och hoppas aldrig över. De körs i "Prov utanför sandlådan" i INSTALLERA.md.
+2. Kommandot i "Provkörning med sandlådan" får exakt samma sandbox-nyckel som sparr/managed-settings.json, också filesystem. Ett test jämför dem.
+3. Granskning 39, P1: Hugo läser listan i COMMIT_MSG.txt innan han committar. Kommandot cat COMMIT_MSG.txt läggs till bland de fasta kommandona, efter ls -l COMMIT_MSG.txt och före git commit -F COMMIT_MSG.txt.
+4. Granskning 39, P2: en rad i git status som innehåller ett citattecken (") stoppar alltid.
+5. Granskning 39, P3: .github/ och .mcp.json läggs till i listan som alltid stoppar, i vilken mapp som helst och oavsett stora och små bokstäver.
+6. Stoppkriterium: Granskning 40 prövar bara punkt 1–5. Blockerar inget där, kör Hugo provkörningen igen och installerar. Allt annat som hittas går till Öppet.
+
+**Byggsessionens egna val, att pröva i granskning 40** (körningarna står i `PROGRESS.md`):
+
+- **`test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott` väntas gå igenom i sandlådan, inte hoppas över.** Enligt koden nekas den inget själv. Den är röd för att den kör de andra 24 i en kopia. När de hoppar över sig blir den grön, så villkoret i beslut 1 slår inte till. Den står ändå i listan i "Prov utanför sandlådan", och hoppar över sig om datorn nekar själva kopian. Ett rött test i kopian ger alltid rött. Därför hoppar 24 av de 25 över sig.
+- **`Permission denied` (errno 13) ger rött.** Beslutet säger `Operation not permitted`, och sandlådan svarade så i Hugos körning (errno 1). Den äldre hjälpfunktionen `gor_mapp_eller_hoppa_over` tar all `PermissionError`. Den är inte ändrad, eftersom uppdraget säger att inget annat ska rättas.
+- **De nya testerna med riktiga rader är också grupp D:** 12 prov, som bygger samma provrepo med mappen `.claude`. De hoppar över sig enligt beslut 1 och körs i "Prov utanför sandlådan". Rader utan riktiga filer prövas i alla lägen, också i sandlådan.
+- **`cat` kör Hugo, inte agenten.** `cat` står redan i kommandolistan, så listan i SPEC 7.1 behövde inte ändras.
+- **SPEC 7.1:** beslut 3 på raden om `git commit -F`, beslut 4 och 5 på raden "Det vakten inte stoppar". Stoppkriteriet står bara i `CLAUDE.md`, som de tidigare.
+- **`core.quotepath`.** Granskning 39 påpekade att regeln om citattecken kräver att den inställningen inte är av i Hugos git. Det är inte kontrollerat och ingår inte i beslutet.
