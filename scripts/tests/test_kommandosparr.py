@@ -305,9 +305,10 @@ def test_kontrollen_gors_i_en_ny_session():
     "steg",
     [
         "Enterprise managed settings (file)",  # /status, code.claude.com/docs/en/managed-settings
-        "`ls; ls`",
-        "`git status`",
-        "`sudo ls`",
+        # Agentens kommandon står i rutor sedan Hugos beslut 2026-11-05 om granskning 36, öppen fråga 1.
+        "```\n   ls; ls\n   ```",
+        "```\n   git status\n   ```",
+        "```\n   sudo ls\n   ```",
         "kan fortfarande fråga dig",
         "kan fortfarande skriva filer i `~/VERA`",
         "worktree",
@@ -1409,9 +1410,15 @@ def test_setting_sources_lases_i_terminal():
     _, rader = _installationskommandon()
     assert rader.index("cd ~/VERA/agent") + 1 == rader.index(TERMINAL_CLAUDE)
     assert "claude" not in rader
-    for stalle in _setting_sources_stallen():
-        assert "Terminal" in stalle and "`cd ~/VERA/agent`" in stalle and "`/status`" in stalle
-        assert f"`{TERMINAL_CLAUDE}`" in stalle and "Hugos beslut 2026-10-28, granskning 13, P3 b" in stalle
+    forsta_steget, efterat, kontroll_1 = _setting_sources_stallen()
+    # Kommandona står i rutor i steg 1, och de andra två ställena hänvisar dit (Hugos beslut 2026-11-05 om granskning 36,
+    # öppen fråga 1).
+    assert "```bash cd ~/VERA/agent ```" in forsta_steget and f"```bash {TERMINAL_CLAUDE} ```" in forsta_steget
+    assert 'de två rutorna under "Raden Setting sources"' in efterat
+    assert 'de två rutorna under "Raden Setting sources"' in kontroll_1
+    for stalle in (forsta_steget, efterat, kontroll_1):
+        assert "Terminal" in stalle and "`/status`" in stalle
+        assert "Hugos beslut 2026-10-28, granskning 13, P3 b" in stalle
         assert "no such file or directory" in stalle
         assert "command not found: claude`: stoppa" not in stalle
 
@@ -1435,7 +1442,9 @@ def test_sista_steget_ar_en_kontroll_i_skrivbordsappen_med_ett_ofarligt_kommando
     steget_en_rad = _en_rad(steget)
     assert "skrivbordsappen" in steget_en_rad and f"`{APPKONTROLL_KOMMANDO}`" in steget_en_rad
     assert "står inte på listan" in steget_en_rad and "Stoppat av vakten" in steget_en_rad
-    assert "sudo" not in steget and "```" not in steget
+    assert "sudo" not in steget
+    # Bara kommandot i en ruta (Hugos beslut 2026-11-05 om granskning 36, öppen fråga 1).
+    assert steget.count("```") == 2 and f"```\n   {APPKONTROLL_KOMMANDO}\n   ```" in steget
 
 
 def test_vakten_stoppar_kommandot_i_appkontrollen(vakt, mappar):
@@ -1835,6 +1844,8 @@ def test_installationen_bara_kopierar_och_satter_agare_och_rattigheter():
             + TERMINAL_KOMMANDON
             + TERMINAL_VERSION
             + (KRYPTEX_LAGG_TILL, SKRIPT_KORNING, AGENT_KOMMANDO, VAKTENS_PYTHON_VERSION, VAKTENS_PYTHON_KEDJAN)
+            # Ångra steg 4, som stod i löpande text före Hugos beslut 2026-11-05 om granskning 36, öppen fråga 1.
+            + ("cp ~/.zshrc.fore-vera ~/.zshrc",)
         ), rad
 
 

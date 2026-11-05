@@ -8,6 +8,28 @@ arenden/
 rapporter/
 logg/
 
+# Riktiga underlag: kontoutdrag, kvitton och Z-rapporter.
+*kontoutdrag*
+*kvitto*
+*kvitton*
+*z-rapport*
+*Z-rapport*
+
+# Undantag för de fem reglerna ovan, bara för Python-kod i mapparna med kod. Annars följer
+# scripts/kvitto_flode.py inte med git add -A, och inget sägs (Hugos beslut 2026-11-05 om
+# granskning 36, P2). Ett underlag är ingen .py-fil. Allt annat med de orden i namnet ignoreras
+# som förut, och testet i scripts/tests/test_sandladan.py larmar om det är en kodfil.
+# Ordningen spelar roll: den sista regeln som passar gäller. Reglerna för Shop and Go och
+# hemligheter står därför under undantaget, och är lika starka som förut.
+!/scripts/**/*.py
+!/sparr/**/*.py
+
+# Allt från gamla Shop and Go-projektet.
+*shop*and*go*
+*Shop*and*Go*
+*shopandgo*
+*ShopAndGo*
+
 # Hemligheter: miljöfiler, nycklar, lösenord och inloggningar
 # (till exempel till Fortnox eller banken).
 .env
@@ -26,18 +48,6 @@ hemligheter/
 *token*
 *api_key*
 *apikey*
-
-# Riktiga underlag: kontoutdrag, kvitton, Z-rapporter och
-# allt från gamla Shop and Go-projektet.
-*kontoutdrag*
-*kvitto*
-*kvitton*
-*z-rapport*
-*Z-rapport*
-*shop*and*go*
-*Shop*and*Go*
-*shopandgo*
-*ShopAndGo*
 
 # Inskannade underlag och exporterad bokföring (SIE-filer).
 # Fiktiva underlag i testdata/ får följa med.

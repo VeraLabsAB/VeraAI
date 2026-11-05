@@ -92,7 +92,7 @@ den ska inte läggas dit. Därför skriver du alltid hela sökvägen, `~/.local/
 > `~/.zprofile` eller någon annan fil.** Skälen:
 >
 > - Raden lägger `~/.local/bin` **först** i `PATH`, före systemets mappar. Mappen ägs av dig, så vakten
->   stoppar då **alla** kommandon, också `git status` (PATH-regeln, Hugos beslut 2026-10-28 om vakten,
+>   stoppar då **alla** kommandon (PATH-regeln, Hugos beslut 2026-10-28 om vakten,
 >   beslut 2).
 > - Ett program som läggs i den mappen med samma namn som ett program på listan, till exempel `git`, skulle
 >   köras i stället för systemets program. Det kräver inget lösenord. Det är just det PATH-regeln skyddar
@@ -121,7 +121,7 @@ Kontrollera versionen i Terminal. Öppna Terminal och kör:
 
 - Hämtar och installerar den senaste versionen av Claude Code för Terminal (det kräver internet). Det ska
   stå `Successfully updated from … to version …` eller `Claude Code is up to date (…)`. Kör sedan
-  `~/.local/bin/claude --version` igen. Är versionen fortfarande äldre än 2.1.305: stoppa och fråga.
+  versionskommandot ovan igen. Är versionen fortfarande äldre än 2.1.305: stoppa och fråga.
 
 **Raden Setting sources, i Terminal** (Hugos svar 2026-10-28, punkt 3, och Hugos beslut 2026-10-28,
 granskning 13, P3 b, som ersätter `claude` med hela sökvägen). Kör ett kommando i taget:
@@ -134,7 +134,7 @@ cd ~/VERA/agent
 ~/.local/bin/claude
 ```
 
-- `cd ~/VERA/agent` gör projektets mapp, `~/VERA/agent`, till mappen du står i. `~/.local/bin/claude` startar Claude Code för Terminal, i
+- Det första gör projektets mapp, `~/VERA/agent`, till mappen du står i. Det andra startar Claude Code för Terminal, i
   den mappen. Frågar Claude Code om du litar på mappen: svara ja.
 - Säger Terminal `no such file or directory`: stoppa och fråga.
 
@@ -162,7 +162,7 @@ Skriv sedan `/status` i Claude Code i Terminal och tryck Retur. Leta upp raden s
 
 Terminalen och skrivbordsappen har **var sin** Claude Code med var sitt versionsnummer, och att uppdatera
 den ena uppdaterar inte den andra. Kontrollera därför versionen i båda: i appen med `/status` och i Terminal med
-`~/.local/bin/claude --version` (ovan), innan du installerar vakten.
+versionskommandot ovan, innan du installerar vakten.
 
 De låsta inställningarna innehåller också `"requiredMinimumVersion": "2.1.305"`, så att en äldre Claude
 Code inte startar alls efter installationen (Hugos beslut 2026-11-05 efter P6). Kontrollen här behövs ändå,
@@ -183,7 +183,7 @@ allt som ligger i den (granskning 12, P7, Hugos beslut 2026-10-28, beslut 3).
 ls -lde@ / /Library "/Library/Application Support" "/Library/Application Support/ClaudeCode"
 ```
 
-- `ls -lde@` visar en rad per mapp: vem som äger mappen och vem som får ändra i den. `e@` gör att varje
+- `ls` visar en rad per mapp: vem som äger mappen och vem som får ändra i den. `e@` gör att varje
   extra uppgift och varje extra rättighet visas på en egen, indragen rad direkt under. Det bara läser, och
   ändrar ingenting. Citattecknen behövs, eftersom "Application Support" har ett mellanslag.
 - En rad ser ut ungefär så här: `drwxr-xr-x  67 root  wheel  2144 Oct 28 10:00 /Library`. Så läser du den:
@@ -241,7 +241,7 @@ f=/Library/Developer/CommandLineTools/usr/bin/python3; for p in $f ${f:A}; do wh
 ```
 
 - `${f:A}` är sökvägen dit filen till sist leder, efter alla **länkar** (hänvisningar till en fil någon
-  annanstans). Kommandot visar med `ls -lde@` (som i steg 2) filen och varje mapp ovanför den upp till `/`, och
+  annanstans). Kommandot visar (som i steg 2) filen och varje mapp ovanför den upp till `/`, och
   sedan samma sak för filen dit länkarna leder. Två omgångar alltså. Börjar första raden med `l` är filen en
   länk (raden slutar med `->` och vart den pekar). Börjar den med `-` är omgångarna likadana. Båda är rätt.
 - **Varje rad**, i båda omgångarna, ska följa samma regel som i steg 2: ägaren är `root`, det står **inget `w`**
@@ -286,7 +286,7 @@ mkdir -p ~/vera-forprov/.claude
 echo '{"hooks":{"PreToolUse":[{"matcher":"*","hooks":[{"type":"command","command":"/finns-inte/vera-forprov.sh","onFailure":"block"}]}]}}' > ~/vera-forprov/.claude/settings.json
 ```
 
-- `echo '…'` skriver ut texten mellan de enkla citattecknen, och `>` gör att texten hamnar i filen
+- `echo` skriver ut texten mellan de enkla citattecknen, och `>` gör att texten hamnar i filen
   `settings.json` i stället för på skärmen. Kommandot skapar bara den filen.
 - Texten är inställningar för Claude Code: före varje verktyg (`PreToolUse`, och `"matcher": "*"` betyder
   alla verktyg) ska programmet `/finns-inte/vera-forprov.sh` köras. Det programmet finns inte, och mappen
@@ -304,7 +304,11 @@ cat ~/vera-forprov/.claude/settings.json
 
 **e. Pröva.** Öppna Claude-appen, gå till fliken **Code** och starta en ny session i mappen
 `vera-forprov` i din hemmapp. Frågar appen om du litar på mappen: svara ja (den har bara filen ovan). Be
-Claude: "Kör kommandot `ls`."
+Claude köra:
+
+```
+ls
+```
 
 - **Förväntat: kommandot stoppas.** Claude Code säger att en vakt (en hook, `PreToolUse`) inte gick att
   köra, eller att verktyget stoppades. Eftersom vakten gäller alla verktyg kan Claude inte heller läsa
@@ -333,7 +337,7 @@ rmdir ~/vera-forprov
   `.claude`, sedan `vera-forprov`.
 - Säger `rmdir` `Directory not empty` har något mer hamnat i mappen. Radera inte på något annat sätt:
   stoppa och fråga.
-- Kör sedan `ls -ld ~/vera-forprov` från a igen. Det ska stå `No such file or directory`.
+- Kör sedan kommandot från a igen. Det ska stå `No such file or directory`.
 
 **Stoppades `ls` inte i e: avbryt installationen.** Gå vidare till steg 4 bara om `ls` stoppades.
 
@@ -352,7 +356,7 @@ annan (Hugos beslut 2026-10-28 om vakten, beslut 2). På din dator står två ma
 
 Båda står så både i den `PATH` som Claude Code själv har (och som vakten får) och i den `PATH` som
 agentens kommandon körs med (kontrollerat 2026-10-28, se `PROGRESS.md`). Utan det här steget stoppar vakten
-**alla** kommandon, också `git status`. Med båda mapparna sist går alla program på listan igenom
+**alla** kommandon. Med båda mapparna sist går alla program på listan igenom
 (prövat med vakten mot din `PATH` 2026-10-28). Vakten har inget undantag för någon av mapparna (Hugos svar
 2026-10-28, punkt 1).
 
@@ -382,9 +386,9 @@ cp -i ~/.zshrc ~/.zshrc.fore-vera
 echo '[ -n "$NVM_BIN" ] && path=( ${path:#$NVM_BIN} $NVM_BIN )' >> ~/.zshrc
 ```
 
-- `echo '…'` skriver ut texten mellan de enkla citattecknen, och `>>` (två större än-tecken) lägger
+- `echo` skriver ut texten mellan de enkla citattecknen, och `>>` (två större än-tecken) lägger
   texten **sist** i filen. Med bara ett `>` skulle hela filen ersättas, så kopiera kommandot exakt. Har
-  det ändå blivit fel: hämta tillbaka säkerhetskopian med `cp ~/.zshrc.fore-vera ~/.zshrc`, och fråga.
+  det ändå blivit fel: ångra (rutan sist i steg 4), och fråga.
 - Raden som hamnar i filen gör så här: `$NVM_BIN` är nvm-mappen. `path` är zsh:s namn på `PATH` som en
   lista. `${path:#$NVM_BIN}` är listan utan nvm-mappen, och nvm-mappen läggs sedan sist. `[ -n "$NVM_BIN" ]
   &&` betyder "bara om nvm har angett sin mapp", så att ingen tom mapp läggs till.
@@ -414,8 +418,7 @@ tail -n 3 ~/.zshrc
 - **På en dator utan nvm** (till exempel Caspers, om nvm inte finns där) har du bara lagt in raden från c,
   inte den från b. Då ska bara den **sista** raden vara Cryptexes-raden ovan, och raden för nvm ska inte
   stå bland de tre (granskning 14, R5, Hugos beslut 2026-10-28).
-- Står något annat där, eller står en rad två gånger: hämta tillbaka säkerhetskopian med
-  `cp ~/.zshrc.fore-vera ~/.zshrc`, och fråga.
+- Står något annat där, eller står en rad två gånger: ångra (rutan sist i steg 4), och fråga.
 
 **e. Kontrollera `PATH`.** Öppna ett **nytt** Terminal-fönster (Cmd+N), så att skalet läser filen på
 nytt, och kör:
@@ -452,7 +455,7 @@ echo $PATH
 **f. Starta om Claude-appen** helt (**Claude > Quit Claude**, eller Cmd+Q), och öppna den igen. Claude
 Code läser `PATH` när appen startar, så sessioner som redan är öppna har kvar den gamla ordningen. Att
 appen har fått den nya ordningen syns först efter installationen: i kontrollen efter installationen, steg
-3, ska `git status` gå igenom.
+3, ska kommandot gå igenom.
 
 **g. Kontrollera skalet i Terminal med kontrollskriptet** (Hugos beslut 2026-10-28 efter granskning 15).
 Claude Code läser in `~/.zshrc` när en session startar, och tar med sig **alias** (ett kortnamn som skalet
@@ -470,7 +473,7 @@ inte är väntat avviker, också sådant som verkar ofarligt.
 **Terminals egna funktioner** (Hugos beslut 2026-10-28 efter granskning 15, 8 d). I Terminal är exakt två
 namn godkända i kroklistorna: `update_terminal_cwd` i `precmd_functions` (talar om för Terminal vilken mapp
 skalet står i) och `shell_session_update` i `zshexit_functions` (sparar fönstret när det stängs). Skriptet
-kontrollerar med `whence -v` att båda kommer från Apples fil `/etc/zshrc_Apple_Terminal`, och med `ls -l`
+kontrollerar med `whence -v` att båda kommer från Apples fil `/etc/zshrc_Apple_Terminal`, och med `ls`
 att `/etc/zshrc` och `/etc/zshrc_Apple_Terminal` ägs av `root` och att varken gruppen eller andra kan
 skriva i dem. Terminals fil läser också in zsh:s egen funktion `add-zsh-hook`. Den godtas bara om `whence -v`
 visar att den kommer från zsh:s egen mapp, `/usr/share/zsh/<version>/functions/add-zsh-hook`, och filen ägs av
@@ -552,8 +555,12 @@ fast kontroll i sitt eget skal. Det går bara **före** installationen: efter de
    kommandot (granskning 15 såg att en inbyggd kontroll i Claude Code stoppade ett annat `print`-kommando),
    och att namnen är desamma i en annan version av Claude Code.
 
-Ångra steget: `cp ~/.zshrc.fore-vera ~/.zshrc`, och starta om Terminal och Claude-appen. Då stoppar vakten
+**Ångra steget** (hämtar tillbaka säkerhetskopian), och starta om Terminal och Claude-appen. Då stoppar vakten
 alla kommandon igen.
+
+```bash
+cp ~/.zshrc.fore-vera ~/.zshrc
+```
 
 ## Steg 5: kontrollera att filerna är de som granskades
 
@@ -575,7 +582,7 @@ shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-set
 ## Steg 6: skapa mapparna och låt systemet äga dem
 
 **Så ser det ut när det går bra, i steg 6–11** (granskning 14, R5, Hugos beslut 2026-10-28). Kommandona
-med `sudo mkdir`, `sudo chown`, `sudo chmod`, `sudo ditto` och `sudo cp -i` visar **ingenting** när de går
+med `mkdir`, `chown`, `chmod`, `ditto` och `cp` visar **ingenting** när de går
 bra: datorn frågar kanske efter ditt lösenord, och sedan får du bara en ny rad att skriva på. **Stoppa och
 fråga** om ett av dem skriver något, till exempel `Operation not permitted`, `Permission denied`,
 `No such file or directory`, `File exists` eller `illegal option`. Säger datorn `Sorry, try again.` efter
@@ -682,8 +689,8 @@ sudo chown -R root:wheel "/Library/Application Support/ClaudeCode/vera/venv"
 sudo chmod -R go-w "/Library/Application Support/ClaudeCode/vera/venv"
 ```
 
-- `-R` gör att kommandot gäller mappen och allt i den. `chown -R root:wheel` gör systemet till ägare av
-  allt, och `chmod -R go-w` tar bort rätten att ändra för gruppen (`g`) och alla andra (`o`). Ingenting
+- `-R` gör att kommandot gäller mappen och allt i den. `chown` gör systemet till ägare av
+  allt, och `chmod` tar bort rätten att ändra för gruppen (`g`) och alla andra (`o`). Ingenting
   annat ändras.
 - Går det bra visar båda kommandona ingenting. Visas något annat: stoppa och fråga.
 
@@ -760,8 +767,8 @@ Stoppa och fråga.**
 1. **Starta nya sessioner** i skrivbordsappen (och i terminalen, om du har Claude Code där). Sessioner som
    redan är öppna kan ha läst inställningarna innan filen fanns.
 2. **Kontrollera att de låsta inställningarna gäller** (Hugos beslut 2026-10-28, beslut 3). Raden visas
-   inte i skrivbordsappen, så den läses i Terminal (Hugos svar 2026-10-28, punkt 3): kör `cd ~/VERA/agent` och
-   sedan `~/.local/bin/claude` (hela sökvägen, Hugos beslut 2026-10-28, granskning 13, P3 b), som i steg 1,
+   inte i skrivbordsappen, så den läses i Terminal (Hugos svar 2026-10-28, punkt 3): kör de två rutorna under
+   "Raden Setting sources" i steg 1 (hela sökvägen, Hugos beslut 2026-10-28, granskning 13, P3 b),
    skriv `/status` och leta upp raden **Setting sources**. Säger Terminal `no such file or directory`:
    stoppa och fråga. Raden ska visa `Enterprise managed settings (file)`,
    alltså inställningarna från filen du installerade (code.claude.com/docs/en/managed-settings). **Saknas
@@ -850,7 +857,7 @@ Avsluta med `/exit`.
 
 Hugos beslut 2026-11-04 om sandlådan och Hugos beslut 2026-11-05 om granskning 34 (`GRANSKNING.md`). Alla kommandon körs i en sandlåda. Förbuden för `.git` och `.venv` är desamma som i filen som är installerad nu, så inget kommando i sandlådan kan skriva i `.git`. Vakten är oförändrad. **Agenten kör inga av kommandona.** Du kör dem själv i Terminal,
 ett i taget, och skriver ditt administratörslösenord när datorn frågar. **Visar ett kommando något annat än det som står:
-stoppa och fråga**, och kör inte nästa kommando. `sudo cp`, `sudo chown` och `sudo chmod` visar ingenting när de går bra.
+stoppa och fråga**, och kör inte nästa kommando. Kommandona med `sudo` i punkt 3 och 4 visar ingenting när de går bra.
 
 **Innan du börjar:** den oberoende granskningen ska vara klar, provkörningen ovan ska vara gjord, och filen ska vara den som
 granskades. Sessionen där bytet görs ska inte vara en session med agenten: kör allt i ett vanligt Terminal-fönster. **Avsluta alla öppna sessioner** i skrivbordsappen och i Terminal innan du börjar. Dokumentationen säger att nya låsta inställningar läses in också i en session som körs ([settings.md](https://code.claude.com/docs/en/settings.md), "When edits take effect").
@@ -935,7 +942,17 @@ ls -lde@ "/Library/Application Support/ClaudeCode/managed-settings.json" "/Libra
 
 **6. Kontrollen efter bytet.** Avsluta skrivbordsappen helt (Cmd+Q) och öppna den igen.
 
-1. **Terminal:** kör `cd ~/VERA/agent` och `~/.local/bin/claude`, och skriv `/status`. Raden **Setting sources** ska visa `Enterprise managed settings (file)`. Avsluta med `/exit`.
+1. **Terminal:** kör, ett kommando i taget:
+
+   ```bash
+   cd ~/VERA/agent
+   ```
+
+   ```bash
+   ~/.local/bin/claude
+   ```
+
+   Skriv `/status`. Raden **Setting sources** ska visa `Enterprise managed settings (file)`. Avsluta med `/exit`.
 2. **Inga egna undantag, kontrollerat i Terminal.** `/sandbox` går inte att använda för det här. Enligt [dokumentationen](https://code.claude.com/docs/en/sandboxing.md) skriver det ett fel i stället för att öppna sin panel när låsta inställningar sätter sandlådans nycklar: `Sandbox settings are overridden by a higher-priority configuration`. Det felet är väntat och inget skäl att backa. Kör i stället, ett kommando i taget:
 
    ```bash
@@ -951,23 +968,36 @@ ls -lde@ "/Library/Application Support/ClaudeCode/managed-settings.json" "/Libra
    ```
 
    **Väntat för varje kommando: ingenting visas, eller `No such file or directory`.** Visas en rad: stoppa och fråga. En tom lista i de låsta inställningarna kan inte hålla undantag borta (Hugos svar 2026-11-04), så du lägger aldrig till `excludedCommands`, `allowWrite` eller `--add-dir` själv.
-3. **Ny session i fliken Code i skrivbordsappen, startad i `~/VERA/agent`.** Be agenten köra `git status`. Claude Code frågar som vanligt (beslut 3). Säg ja. Kommandot ska visa läget i projektet.
+3. **Ny session i fliken Code i skrivbordsappen, startad i `~/VERA/agent`.** Be agenten köra rutan. Claude Code frågar som vanligt (beslut 3). Säg ja. Kommandot ska visa läget i projektet.
+
+   ```
+   git status
+   ```
+
 4. **Hela sviten, inne i sandlådan.** Be agenten köra:
 
    ```
    '/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests
    ```
 
-   **Väntat: inget `failed`, alltså inga röda.** Väntat antal: **33** överhoppade, eller **34** om `~/.ssh` inte finns. Det ska inte stå `SPÄRRTESTET HOPPAS ÖVER`. Det ska stå `GRUPP D HOPPAS ÖVER` (2 prov) och `SPÄRRPROVET I KOPIAN HOPPAS ÖVER` (31 prov), som körs i punkt 8. Finns inte `~/.ssh` hoppas också det provet över, med texten "finns inte på den här datorn". Det ska inte heller stå `H1-PROVET HOPPAS ÖVER`. Står `H1-PROVET HOPPAS ÖVER` där: backa inte, utan fortsätt till "Spärrprovet i kopian", punkt d, som säger vad du gör. Spärrtestet i `scripts/tests/test_sandladan.py` prövar här att `git status` och läsning i projektet fungerar, att en fil eller mapp med namnet `.git` stoppas i testets tillfälliga mapp, att skrivning utanför projektet, i `~/.local/share/claude`, i appen och i appens Claude Code stoppas, och att läsning av `~/.ssh` stoppas. **Står `SPÄRRTESTET HOPPAS ÖVER` där, eller är något rött: stoppa och fråga.**
-5. **`git add` och `git commit` stoppas i sandlådan, och det är rätt.** Från den här installationen committar agenten inte (Hugos beslut 2026-11-05 om granskning 34, beslut 2). Sessionen skriver bara commit-meddelandet i filen `COMMIT_MSG.txt` i projektmappen, och skriver aldrig ett kommando som du ska klistra in. Du skriver alltid själv samma tre kommandon, ett i taget, med `!` i sessionen eller i Terminal (Hugos beslut 2026-11-05 om granskning 35, beslut 6). Gör det vid nästa ändring i projektet. Det första visar läget, också filer som `.gitignore` döljer, så att du ser vad som följer med:
+   **Väntat: inget `failed`, alltså inga röda.** Väntat antal: **33** överhoppade, eller **34** om `~/.ssh` inte finns. Det ska inte stå `SPÄRRTESTET HOPPAS ÖVER`. Det ska stå `GRUPP D HOPPAS ÖVER` (2 prov) och `SPÄRRPROVET I KOPIAN HOPPAS ÖVER` (31 prov), som körs i punkt 8. Finns inte `~/.ssh` hoppas också det provet över, med texten "finns inte på den här datorn". Det ska inte heller stå `H1-PROVET HOPPAS ÖVER`. Står `H1-PROVET HOPPAS ÖVER` där: backa inte, utan fortsätt till "Spärrprovet i kopian", punkt d, som säger vad du gör. Spärrtestet i `scripts/tests/test_sandladan.py` prövar här att git kan visa läget och att läsning i projektet fungerar, att en fil eller mapp med namnet `.git` stoppas i testets tillfälliga mapp, att skrivning utanför projektet, i `~/.local/share/claude`, i appen och i appens Claude Code stoppas, och att läsning av `~/.ssh` stoppas. **Står `SPÄRRTESTET HOPPAS ÖVER` där, eller är något rött: stoppa och fråga.**
+5. **Git kan inte göra en commit i sandlådan, och det är rätt.** Från den här installationen committar agenten inte (Hugos beslut 2026-11-05 om granskning 34, beslut 2). Sessionen skriver bara commit-meddelandet i filen `COMMIT_MSG.txt` i projektmappen, och skriver aldrig ett kommando som du ska klistra in. Du skriver alltid själv samma fyra kommandon, ett i taget, med `!` i sessionen eller i Terminal (Hugos beslut 2026-11-05 om granskning 35, beslut 6, och om granskning 36, P1). Gör det vid nästa ändring i projektet. Det första visar läget, också många filer som `.gitignore` döljer, men inte alla (Hugos beslut 2026-11-05 om granskning 36, P3):
 
    ```bash
    git status --short --ignored
    ```
 
+   Väntat, raderna som börjar med `!!`: `.DS_Store`, `.claude/`, `.pytest_cache/`, `foretag/.DS_Store`, `scripts/.DS_Store` och `testdata/.DS_Store`, och `COMMIT_MSG.txt`. **En annan rad med `!!`, eller en rad med `.gitattributes`, `.gitignore`, `.lfsconfig` eller `.gitmodules`: stoppa och fråga.**
+
    ```bash
    git add -A
    ```
+
+   ```bash
+   ls -l COMMIT_MSG.txt
+   ```
+
+   **Raden ska börja med `-` (en vanlig fil). Börjar den med `l` (en länk) eller något annat: committa inte, stanna.** En länk kan annars få en fil som sandlådan förbjuder att hamna i commit-meddelandet (granskning 36, P1).
 
    ```bash
    git commit -F COMMIT_MSG.txt
@@ -979,8 +1009,8 @@ ls -lde@ "/Library/Application Support/ClaudeCode/managed-settings.json" "/Libra
 
 **Det här gäller från nu:**
 
-- Kommandon med `git fetch`, `git pull` och `git push` mot en SSH-adress går inte i sandlådan på macOS, enligt dokumentationen. De står inte heller på listan i SPEC 7.1. Du kör dem själv i Terminal.
-- Kommandon som skriver i `.git`, till exempel `git add`, `git commit`, `git merge` och `git checkout`, stoppas i sandlådan. Du kör dem själv i Terminal.
+- Kommandon som hämtar från eller skickar till GitHub över en SSH-adress går inte i sandlådan på macOS, enligt dokumentationen. De står inte heller på listan i SPEC 7.1. Du kör dem själv i Terminal.
+- Kommandon som skriver i `.git`, till exempel de som gör en commit eller slår ihop eller byter gren, stoppas i sandlådan. Du kör dem själv i Terminal.
 - Ett kommando du själv skriver efter `!` körs utanför sandlådan, enligt [dokumentationen](https://code.claude.com/docs/en/sandboxing.md).
 
 **Backa till förra versionen.** Vägrar Claude Code eller skrivbordsappen starta, stoppas allt med `Sandbox is required`, eller blir något i kontrollen fel. Kör i Terminal, som inte behöver agenten:
@@ -997,7 +1027,7 @@ shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json"
 
 ## Spärrprovet i kopian (steg 15)
 
-Hugos beslut 2026-11-05 om granskning 34, beslut 4. Provet visar att inget i sandlådan kan skriva i `.git`, skapa en fil eller mapp med namnet `.git`, skriva `.git/commondir`, byta namn på `.git` eller flytta hela arbetsmappen (granskning 35, P1). Det prövar också att `git status` och `git log` fungerar, och att `git add`, `git commit` och `git commit --amend` inte går. Det görs direkt efter bytet.
+Hugos beslut 2026-11-05 om granskning 34, beslut 4. Provet visar att inget i sandlådan kan skriva i `.git`, skapa en fil eller mapp med namnet `.git`, skriva `.git/commondir`, byta namn på `.git` eller flytta hela arbetsmappen (granskning 35, P1). Det prövar också att git kan visa läget och historiken, men inte lägga till filer, göra en commit eller ändra den senaste commiten. Det prövar läsförbudet för `~/.ssh` med en mapp som finns bara under provet. Det görs direkt efter bytet.
 
 Provet körs i en kopia, `~/VERA/sparrprov`, som du förbereder själv, utanför sandlådan. Kopian är ett undantag från regeln "Prov och test", bara för spärrtestet. Provet rör aldrig projektets riktiga `.git`, och testerna vägrar köra om kopian är projektet.
 
@@ -1011,7 +1041,7 @@ ls -ld ~/VERA/sparrprov
 git clone --no-hardlinks ~/VERA/agent ~/VERA/sparrprov
 ```
 
-- `git clone` gör en egen kopia av projektet med hela historiken. `--no-hardlinks` gör att kopian inte delar några filer med projektet.
+- Det gör en egen kopia av projektet med hela historiken. `--no-hardlinks` gör att kopian inte delar några filer med projektet.
 
 ```bash
 cd ~/VERA/sparrprov
@@ -1022,6 +1052,22 @@ git log -1 --format=%H
 ```
 
 - Visar den senaste commiten i kopian. Den ska vara den som granskades. Är den en annan: stoppa och fråga.
+
+**Skapa en `~/.ssh` för provet** (Hugos beslut 2026-11-05 om granskning 36, P6). Kontrollera först att mappen inte finns. Det ska stå `No such file or directory`. **Finns mappen: stoppa och fråga**, och ändra inget i den.
+
+```bash
+ls -ld ~/.ssh
+```
+
+```bash
+mkdir -m 700 ~/.ssh
+```
+
+```bash
+echo kassio-prov > ~/.ssh/prov
+```
+
+- Det andra skapar mappen, som bara du kan öppna. Det tredje skriver en testfil med texten `kassio-prov`, inget hemligt. Båda visar ingenting när de går bra.
 
 **b. Kör provet i Terminal:**
 
@@ -1035,11 +1081,11 @@ Frågar Claude Code om du litar på mappen: svara ja. Be Claude: "Kör exakt det
 '/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs -k test_sparr_ scripts/tests
 ```
 
-**Väntat: `40 passed`, inget `failed`, och varken `SPÄRRTESTET HOPPAS ÖVER` eller `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`.** Finns inte `~/.ssh` på datorn är väntat i stället `39 passed, 1 skipped`. Det överhoppade är då provet för `~/.ssh`, med texten "finns inte på den här datorn", och läsförbudet är inte prövat. Avsluta med `/exit`.
+**Väntat: `40 passed`, inget `failed`, och varken `SPÄRRTESTET HOPPAS ÖVER` eller `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`.** Ett av proven kör `cat` på testfilen inne i sandlådan. Avsluta med `/exit`.
 
 **c. Kör samma prov i skrivbordsappen.** Starta en ny session i fliken **Code**, i mappen `sparrprov` i `~/VERA`, inte i en worktree, och be Claude köra samma kommando. Samma väntade resultat. Det här är också provet av att sandlådan körs i skrivbordsappen. Låt sessionen vara kvar till d.
 
-**Är något rött i b eller c: lyckades ett försök, så backar du direkt** med "Backa till förra versionen" ovan, tar bort kopian och frågar. **Står någon av texterna `HOPPAS ÖVER` ovan där, körs provet inte i sandlådan:** backa också och fråga.
+**Är något rött i b eller c: lyckades ett försök, så backar du direkt** med "Backa till förra versionen" ovan, gör e och frågar. **Står någon av texterna `HOPPAS ÖVER` ovan där, körs provet inte i sandlådan:** backa också och fråga.
 
 **d. Kör H1-proven i skrivbordsappen, i samma session som i c** (Hugos beslut 2026-11-05 efter P6, beslut 1). I Terminal hoppas de över, också utan sandlåda (Hugos körning 2026-11-05, P6). Appen är där märkningen `com.apple.provenance` sätts och där vakten används. Be Claude: "Kör exakt det här kommandot med Bash-verktyget, och ändra ingenting i det:" och klistra in:
 
@@ -1051,13 +1097,38 @@ Frågar Claude Code om du litar på mappen: svara ja. Be Claude: "Kör exakt det
 - **Hoppas de över, så backa inte.** Stanna och fråga, utan att göra något mer i projektet. Spärrproven i b och c har redan gått igenom, så sandlådan fungerar då ändå. Det är H1-proven som inte går att köra där, och då behövs ett nytt beslut.
 - **Är ett H1-prov rött: backa inte, men stanna. Kör inga sessioner tills det är avgjort.** Det avgörs av en session som bara läser, som du startar, och som bara tittar på det provet (Hugos beslut 2026-11-05 om granskning 35, beslut 5). Skicka hela utskriften dit.
 
+**Pröva läsförbudet, i samma session** (Hugos beslut 2026-11-05 om granskning 36, P6). Förbudet står i `sparr/managed-settings.json`: `denyRead` för sandlådan och `Read(~/.ssh/**)` för fil-verktyget. Be Claude: "Läs filen `~/.ssh/prov` med verktyget Read." Be sedan Claude köra det här med Bash-verktyget:
+
+```
+cat ~/.ssh/prov
+```
+
+- **Väntat: båda stoppas, och texten `kassio-prov` visas inte.** Det senare stoppas redan av vakten. Sandlådans eget förbud prövas därför av testet `test_sparr_lasning_av_ssh_stoppas` i b och c, inne i sandlådan.
+- **Visas `kassio-prov`: läsförbudet gäller inte.** Backa med "Backa till förra versionen", gör e och fråga.
+
 Arkivera sessionen efteråt.
 
-**e. Ta bort kopian, i Terminal.** Kopiera kommandona exakt. Det mellersta raderar hela mappen, utan papperskorg.
+**e. Ta bort kopian, i Terminal.** Ta först bort testfilen och mappen `~/.ssh`. Kopiera kommandona exakt.
 
 ```bash
 cd ~/VERA/agent
 ```
+
+```bash
+rm ~/.ssh/prov
+```
+
+```bash
+rmdir ~/.ssh
+```
+
+```bash
+ls -ld ~/.ssh
+```
+
+- `rmdir` tar bara bort en tom mapp, så inget annat kan försvinna. Säger den `Directory not empty`: stoppa och fråga. Det sista ska säga `No such file or directory`.
+
+Ta sedan bort kopian. Det första raderar hela mappen, utan papperskorg.
 
 ```bash
 rm -rf ~/VERA/sparrprov
@@ -1073,7 +1144,7 @@ ls -ld ~/VERA/sparrprov
 
 Hugos beslut 2026-11-05 om granskning 34, beslut 3, och Hugos beslut 2026-11-05 efter P6, beslut 1 och 3. Det här avsnittet gäller bara grupp D (2 prov). De kan inte köras i sandlådan, och där hoppas de över med texten `GRUPP D HOPPAS ÖVER`. Du kör dem själv i Terminal, varje gång vakten eller de låsta inställningarna ändras. H1-proven körs inte här, utan i appen, se "Spärrprovet i kopian", punkt d.
 
-Du kör dem i en kopia av en granskad commit, inte i projektmappen, eftersom de körs med dina fulla rättigheter. I projektmappen kan en testfil ha lagts av agenten, och här körs den utan sandlåda. En kopia från `git clone` har bara det som är committat.
+Du kör dem i en kopia av en granskad commit, inte i projektmappen, eftersom de körs med dina fulla rättigheter. I projektmappen kan en testfil ha lagts av agenten, och här körs den utan sandlåda. En sådan kopia har bara det som är committat.
 
 **a. Gör kopian.** Det första kommandot ska säga `No such file or directory`. Finns mappen: stoppa och fråga.
 
@@ -1116,7 +1187,7 @@ rm -rf ~/VERA/provkopia
 ## Caspers dator
 
 Samma steg, i samma ordning, och samma versionskontroll i steg 1 (minst 2.1.305, med `/status` i
-skrivbordsappen och med `~/.local/bin/claude --version` i Terminal om Claude Code för Terminal finns där,
+skrivbordsappen och med versionskommandot i Terminal om Claude Code för Terminal finns där,
 med hela sökvägen och samma varning för installerarens förslag). Samma kontrollskript i steg 4 g och i
 kontrollen efter installationen, steg 1, och samma kontroll av agentens skal i steg 4 h. Samma förprov i
 steg 3 och samma kontroll av mapparna i steg 2 och 13. Samma kontroll av vaktens Python i steg 2 b: på
@@ -1127,7 +1198,7 @@ Skillnader:
 
 - Sökvägen till projektet kan vara en annan. Byt `~/VERA/agent` i steg 1, 4 g, 5, 7, 9, 10 och 12 mot där
   projektet ligger på Caspers dator.
-- Steg 4: kör `echo $PATH` från steg 4 e först. Raden för Cryptexes-mappen (steg 4 c) läggs in också
+- Steg 4: kör kommandot från steg 4 e först. Raden för Cryptexes-mappen (steg 4 c) läggs in också
   på Caspers dator (Hugos svar 2026-10-28, punkt 1). Raden för nvm-mappen (steg 4 b) behövs bara om nvm
   finns där. Utan nvm ska bara den sista raden i steg 4 d vara Cryptexes-raden (se steg 4 d). Står någon
   annan mapp än systemets före `/usr/bin`, till exempel Homebrew (`/opt/homebrew/bin`): stoppa och fråga,
@@ -1141,7 +1212,7 @@ Skillnader:
   Setting sources syns bara i Terminal (steg 1, "Efteråt" punkt 2 och kontrollen efter installationen,
   steg 1). Utan Claude Code för Terminal i `~/.local/bin/claude` går det inte att se att de låsta
   inställningarna gäller, och då **går installationen inte att kontrollera**. Säger
-  `~/.local/bin/claude --version` `no such file or directory`: stoppa och fråga innan installationen.
+  versionskommandot `no such file or directory`: stoppa och fråga innan installationen.
 - **Före installationen:** samma kontroll av `safe.bareRepository` som i bytet. Inte `explicit`: stoppa och fråga.
 
 Kontrollen nedan görs också på Caspers dator.
@@ -1159,18 +1230,7 @@ uppgift 4, men ska vara gjort före läget "auto", före körningar utan att Hug
 körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28, 8). Steg 8 är gjort på Hugos
 dator (175db51), ännu inte på Caspers.
 
-1. **De låsta inställningarna gäller.** Raden **Setting sources** visas inte i skrivbordsappen, så den läses
-   i Terminal (Hugos svar 2026-10-28, punkt 3): kör `cd ~/VERA/agent` och sedan `~/.local/bin/claude` (hela
-   sökvägen, Hugos beslut 2026-10-28, granskning 13, P3 b), som i installationens steg 1, och skriv
-   `/status`. Säger Terminal `no such file or directory`: stoppa och fråga. Raden ska
-   visa `Enterprise managed settings (file)`, alltså inställningarna från filen du installerade
-   (code.claude.com/docs/en/managed-settings). `User settings`, `Project settings` och
-   `Project local settings` är väntade och underkänner inte. Bara en annan låst källa underkänner
-   installationen, till exempel inställningar som styrs från claude.ai: stoppa och fråga (Hugos svar
-   2026-10-28, punkt 3). Avsluta med `/exit`. Läs också i skrivbordsappens `/status`
-   raden **Claude Code**: versionen ska vara
-   2.1.305 eller senare. Läget "auto" ska gå att välja (Hugos beslut 2026-10-29): i terminalens Claude Code,
-   tryck Shift+Tab några gånger, och "auto" ska komma upp.
+1. **De låsta inställningarna gäller.** Raden **Setting sources** visas inte i skrivbordsappen, så den läses i Terminal (Hugos svar 2026-10-28, punkt 3): kör de två rutorna under "Raden Setting sources" i installationens steg 1 (hela sökvägen, Hugos beslut 2026-10-28, granskning 13, P3 b), och skriv `/status`. Säger Terminal `no such file or directory`: stoppa och fråga. Raden ska visa `Enterprise managed settings (file)`, alltså inställningarna från filen du installerade (code.claude.com/docs/en/managed-settings). `User settings`, `Project settings` och `Project local settings` är väntade och underkänner inte. Bara en annan låst källa underkänner installationen, till exempel inställningar som styrs från claude.ai: stoppa och fråga (Hugos svar 2026-10-28, punkt 3). Avsluta med `/exit`. Läs också i skrivbordsappens `/status` raden **Claude Code**: versionen ska vara 2.1.305 eller senare. Läget "auto" ska gå att välja (Hugos beslut 2026-10-29): i terminalens Claude Code, tryck Shift+Tab några gånger, och "auto" ska komma upp.
 
    **Skalet, igen efter installationen** (Hugos beslut 2026-10-28, granskning 13, P1 a, och efter
    granskning 15). Öppna ett nytt Terminal-fönster (Cmd+N) och kör, ett i taget, samma två kommandon som i
@@ -1188,20 +1248,31 @@ dator (175db51), ännu inte på Caspers.
    annan, står det en rad som börjar med `AVVIKER`, eller saknas `SLUT`: stoppa och fråga**, och kör inte
    uppgift 4. Kontrollen av agentens skal i steg 4 h går inte att göra efter installationen, eftersom vakten
    stoppar kommandot.
-2. **Ihopkopplade kommandon stoppas.** Be agenten köra `ls; ls`. Det ska stoppas med ett fel som börjar
-   "Stoppat av vakten" och säger att kommandon inte kopplas ihop.
-3. **Ett kommando på listan går igenom.** Be agenten köra `git status`. Claude Code frågar dig som vanligt
-   om det får köras. Säg ja. Kommandot ska köras och visa läget i projektet. (`git` ligger i
-   `/usr/bin`, som ägs av systemet, så PATH-regeln släpper igenom det. Stoppas det med "PATH-regeln":
-   skriv upp felet och fråga. Nämner felet en mapp med `.nvm` i namnet eller
-   `/System/Cryptexes/App/usr/bin`, har installationens steg 4 inte fått effekt i appen.)
-   Be sedan agenten köra testsviten med kommandot i SPEC 7.1,
-   `'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests`
-   (Hugos beslut 2026-10-28 om vakten, beslut 1). Det ska gå igenom, och sista raden ska säga hur många
-   tester som är gröna (`passed`) och att inga är röda.
-4. **sudo stoppas.** Be agenten köra `sudo ls`. Det ska stoppas, antingen av vakten ("sudo och su stoppas
-   alltid") eller av förbudsregeln i inställningarna. Datorn ska **inte** fråga efter ditt lösenord. Gör
-   den det: skriv inte lösenordet, avbryt med Ctrl+C, och stoppa.
+2. **Ihopkopplade kommandon stoppas.** Be agenten köra rutan. Det ska stoppas med ett fel som börjar "Stoppat av vakten" och säger att kommandon inte kopplas ihop.
+
+   ```
+   ls; ls
+   ```
+
+3. **Ett kommando på listan går igenom.** Be agenten köra rutan. Claude Code frågar dig som vanligt om det får köras. Säg ja. Kommandot ska köras och visa läget i projektet. (`git` ligger i `/usr/bin`, som ägs av systemet, så PATH-regeln släpper igenom det. Stoppas det med "PATH-regeln": skriv upp felet och fråga. Nämner felet en mapp med `.nvm` i namnet eller `/System/Cryptexes/App/usr/bin`, har installationens steg 4 inte fått effekt i appen.)
+
+   ```
+   git status
+   ```
+
+   Be sedan agenten köra testsviten med kommandot i SPEC 7.1 (Hugos beslut 2026-10-28 om vakten, beslut 1). Det ska gå igenom, och sista raden ska säga hur många tester som är gröna (`passed`) och att inga är röda.
+
+   ```
+   '/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q scripts/tests
+   ```
+
+4. **sudo stoppas.** Be agenten köra rutan. Det ska stoppas, antingen av vakten ("sudo och su stoppas alltid") eller av förbudsregeln i inställningarna. Datorn ska **inte** fråga efter ditt lösenord. Gör den det: skriv inte lösenordet, avbryt med Ctrl+C, och stoppa.
+
+   ```
+   sudo ls
+   ```
+
+
 5. **Agenten kan fortfarande fråga dig.** Be agenten ställa en fråga till dig med svarsknappar. Frågan
    ska visas, och ditt svar ska komma fram.
 6. **Agenten kan fortfarande skriva filer i `~/VERA`.** Be agenten skapa en liten provfil,
@@ -1209,13 +1280,13 @@ dator (175db51), ännu inte på Caspers.
    finnas efteråt. Ta sedan bort den själv i Finder.
 7. **Hoppa över det här steget tills det finns ett prov för worktrees** (granskning 35, beslut 4). **En session i en worktree fungerar, eller stoppas på ett säkert sätt** (Hugos beslut 2026-10-28,
    punkt 6). En **worktree** är en egen kopia av projektet på en egen gren, som skrivbordsappen kan skapa
-   för en session. Starta en ny session i en worktree i skrivbordsappen och be agenten köra `git status`.
+   för en session. Starta en ny session i en worktree i skrivbordsappen och be agenten köra kommandot i steg 3.
    Det finns två godtagbara utfall:
    - kommandot går igenom (som i steg 3), eller
    - vakten stoppar det med "annan mapp". Då stoppar vakten alla kommandon i worktree-sessioner. Det är
      säkert, men skriv upp det och fråga, eftersom worktree-sessioner då inte går att använda.
 
-   Om kommandot i stället körs utan att vakten har prövat det, till exempel om `ls; ls` går igenom i
+   Om kommandot i stället körs utan att vakten har prövat det, till exempel om kommandot i steg 2 går igenom i
    worktree-sessionen: stoppa och fråga.
 8. **Provet med en vakt som fallerar:** ett vanligt kommando ska stoppas när vakten inte går att köra
    (Hugos beslut 2026-10-28, 7, granskning 12 P2). Det här
@@ -1232,13 +1303,13 @@ dator (175db51), ännu inte på Caspers.
      frågar efter ditt lösenord. När det är klart visas ingenting.
 
    **b. Pröva.** Starta en ny session i fliken **Code**, startad i `~/VERA/agent`, och be agenten köra
-   `git status`. **Det ska stoppas.** Felet kommer från Claude Code och inte från vakten (vakten ligger ju
+   det första kommandot i steg 3. **Det ska stoppas.** Felet kommer från Claude Code och inte från vakten (vakten ligger ju
    inte på plats), så det börjar inte med "Stoppat av vakten". Det säger att vakten (en hook,
    `PreToolUse`) inte gick att köra, och nämner troligen `can't open file` och `No such file or
    directory`. Eftersom vakten gäller alla verktyg stoppas allt i sessionen, också när agenten vill läsa
    en fil. Det är den säkra riktningen.
 
-   **Om `git status` går igenom och visar läget i projektet: gör c direkt, och stoppa och fråga.**
+   **Om kommandot går igenom och visar läget i projektet: gör c direkt, och stoppa och fråga.**
 
    **c. Flytta tillbaka vakten:**
 
@@ -1256,21 +1327,20 @@ dator (175db51), ännu inte på Caspers.
    **exakt samma** som i steg 12 i installationen (och som de som granskningen skrev upp). Är någon olika:
    stoppa och fråga.
 
-   **e. Starta en ny session** och gör steg 2 och 3 igen: `ls; ls` ska stoppas med "Stoppat av vakten",
-   och `git status` ska gå igenom. Då är vakten tillbaka och fungerar.
+   **e. Starta en ny session** och gör steg 2 och 3 igen: kommandot i steg 2 ska stoppas med "Stoppat av vakten",
+   och det första kommandot i steg 3 ska gå igenom. Då är vakten tillbaka och fungerar.
 
-   **Vad provet visar.** När vakten saknas kan vaktens Python
-   (`/Library/Developer/CommandLineTools/usr/bin/python3`, steg 2 b) inte öppna filen och avslutar med kod 2,
-   och kod 2 betyder för Claude Code "stoppa". Provet visar alltså att en **saknad** vakt stoppar allt.
-   Det prövar inte inställningen `onFailure: "block"` i sig, som gäller när vakten fallerar på andra sätt
-   (en annan kod än 0 och 2, tidsgränsen, eller att programmet inte går att starta). Att Python ger kod 2
-   visas av testet `test_systemets_python_stoppar_med_kod_2_nar_vakten_saknas`. Det är förprovet i steg 3
-   i installationen som prövar `onFailure: "block"`: där går vakten inte att starta alls.
+   **Vad provet visar.** När vakten saknas kan vaktens Python (`/Library/Developer/CommandLineTools/usr/bin/python3`, steg 2 b) inte öppna filen och avslutar med kod 2, och kod 2 betyder för Claude Code "stoppa". Provet visar alltså att en **saknad** vakt stoppar allt. Det prövar inte inställningen `onFailure: "block"` i sig, som gäller när vakten fallerar på andra sätt (en annan kod än 0 och 2, tidsgränsen, eller att programmet inte går att starta). Att Python ger kod 2 visas av testet `test_systemets_python_stoppar_med_kod_2_nar_vakten_saknas`. Det är förprovet i steg 3 i installationen som prövar `onFailure: "block"`: där går vakten inte att starta alls.
 
    Gör steg 9 igen efter e.
 9. **Sista kontrollen, i skrivbordsappen: vakten stoppar ett kommando som inte står på listan** (Hugos svar
    2026-10-28, punkt 3). Görs direkt efter steg 7, och igen efter steg 8 om du gör det. Starta en ny session
-   i fliken **Code** i skrivbordsappen, startad i `~/VERA/agent`, och be agenten: "Kör kommandot `date`."
+   i fliken **Code** i skrivbordsappen, startad i `~/VERA/agent`, och be agenten köra:
+
+   ```
+   date
+   ```
+
    - `date` visar bara dagens datum och klockslag. Det läser och ändrar ingenting, så det är ofarligt även
      om vakten skulle saknas. Det står inte på listan i SPEC 7.1.
    - **Förväntat:** kommandot stoppas innan Claude Code frågar dig om lov, med ett fel som börjar

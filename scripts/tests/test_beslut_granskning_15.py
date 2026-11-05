@@ -542,7 +542,7 @@ def test_8d_installera_namner_namnen_ursprunget_och_agaren():
     g = _en_rad(steget.split("**g. ", 1)[1].split("**h. ", 1)[0])
     assert "Hugos beslut 2026-10-28 efter granskning 15, 8 d" in g
     assert "`update_terminal_cwd` i `precmd_functions`" in g and "`shell_session_update` i `zshexit_functions`" in g
-    assert "`whence -v`" in g and "`/etc/zshrc_Apple_Terminal`" in g and "`ls -l`" in g and "`root`" in g
+    assert "`whence -v`" in g and "`/etc/zshrc_Apple_Terminal`" in g and "`ls`" in g and "`root`" in g
     assert "Allt annat avviker." in g
     text = SKRIPTET.read_text(encoding="utf-8")
     assert "precmd_functions} == update_terminal_cwd ]]" in text
@@ -642,7 +642,9 @@ def test_installera_ar_kortare_an_fore_granskning_15():
     assert len(text.splitlines()) < 989
     assert len(text.split()) < 9043
     assert len(re.findall(r"^ *```bash", text, flags=re.M)) < 51
-    assert len(re.findall(r"^ *sudo ", text, flags=re.M)) == 16
+    # 16 sudo-kommandon för Hugo, och `sudo ls` i kontrollens steg 4, som agenten ska stoppas från att köra. Det stod i löpande
+    # text före Hugos beslut 2026-11-05 om granskning 36, öppen fråga 1.
+    assert len(re.findall(r"^ *sudo ", text, flags=re.M)) == 17
 
 
 def test_besluten_star_i_granskning():
