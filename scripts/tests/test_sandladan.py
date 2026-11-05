@@ -24,6 +24,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import uuid
 from pathlib import Path
@@ -44,6 +45,9 @@ from test_kommandosparr import (  # noqa: F401 (fixturen används av pytest via 
 
 CLAUDE_MD = PROJEKTET / "CLAUDE.md"
 GRANSKNING = PROJEKTET / "GRANSKNING.md"
+SPEC = PROJEKTET / "SPEC.md"
+PROGRESS = PROJEKTET / "PROGRESS.md"
+GITIGNORE = PROJEKTET / ".gitignore"
 # Vaktens kontrollsumma, oförändrad sedan 2026-10-28 (INSTALLERA.md, steg 5). Beslut 5: vakten ändras inte.
 VAKTENS_SUMMA = "314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d"
 # Filen som är installerad i dag, före steg 15.
@@ -228,7 +232,7 @@ def test_inget_annat_i_filen_ar_andrat():
     [
         "committar agenten inte",
         "git add",
-        "git commit -m",
+        "git commit -F COMMIT_MSG.txt",
         "från installationen av steg 15",
         "Prov som inte kan köras i sandlådan (grupp D)",
         "H1-proven hoppas över i Terminal och körs i appen",
@@ -270,8 +274,12 @@ PROVKORNINGEN = [
     f"{PYTHON} -q --tb=line -rfs scripts/tests",
 ]
 
-# Ordningen är granskning 34, P5: version, summor, spara, kopiera, kontrollera, kontrollen efter bytet, backa.
+# Ordningen är granskning 34, P5: version, summor, spara, kopiera, kontrollera, kontrollen efter bytet, backa. Först
+# git-inställningen (Hugos beslut 2026-11-05 om granskning 35, beslut 2).
+SAFE_BARE = "git config --global --get safe.bareRepository"
+HUGOS_FASTA_KOMMANDON = ["git status --short --ignored", "git add -A", "git commit -F COMMIT_MSG.txt"]
 BYTET = [
+    SAFE_BARE,
     "~/.local/bin/claude --version",
     f"{SUMMA} ~/VERA/agent/sparr/managed-settings.json ~/VERA/agent/sparr/kommandosparr.py",
     f"{SUMMA} {AKTIV} {INSTALLERAD_VAKT_CITERAD}",
@@ -287,6 +295,8 @@ BYTET = [
     "grep -n -e sandbox -e additionalDirectories ~/VERA/agent/.claude/settings.json",
     "grep -n -e sandbox -e additionalDirectories ~/VERA/agent/.claude/settings.local.json",
     f"{PYTHON} -q --tb=short -rfs scripts/tests",
+    # Hugos beslut 2026-11-05 om granskning 35, beslut 6: de fasta kommandona, som Hugo alltid skriver själv.
+    *HUGOS_FASTA_KOMMANDON,
     f"sudo cp {SPARAD} {AKTIV}",
     f"{SUMMA} {AKTIV}",
 ]
@@ -595,6 +605,300 @@ def test_sparrprovet_sager_vad_som_galler(text):
 
 
 # ---------------------------------------------------------------------------------------------
+# Hugos beslut 2026-11-05 om granskning 35.
+
+GRANSKNING_35_BESLUT = [
+    "1. P1: testet test_sparr_kopian_arbetsmappen_gar_inte_att_flytta (från provkörningen) läggs in i "
+    "scripts/tests/test_sandladan.py.",
+    "2. P2: Hugo har satt git config --global safe.bareRepository explicit (2026-11-05). INSTALLERA.md kontrollerar att "
+    "den är satt före installationen.",
+    "3. P3: varje session börjar och slutar med git status --short --ignored.",
+    "4. P4: inga sessioner i worktrees tills det finns ett prov för det. Hugo har städat den gamla arbetskopian 2026-11-05 "
+    "(mappen till papperskorgen, git worktree prune, grenen borttagen med git branch -d).",
+    "5. P11: är ett H1-prov rött i appen: backa inte, men stanna. Kör inga sessioner tills det är avgjort. Det avgörs av "
+    "en session som bara läser, som Hugo startar, och som bara tittar på det provet.",
+    "6. P12: när sandlådan är installerad skriver Hugo alltid själv samma fasta kommandon: git status --short --ignored, "
+    "git add -A och git commit -F COMMIT_MSG.txt. Sessionen skriver bara commit-meddelandet i filen COMMIT_MSG.txt i "
+    'projektmappen, och skriver aldrig ett kommando som Hugo ska klistra in. Det ersätter delen om "färdiga kommandon" i '
+    "beslut 2 om granskning 34. COMMIT_MSG.txt står i .gitignore.",
+    "7. P13: CLAUDE.md ska säga att grupp D körs utanför sandlådan i en kopia av en granskad commit.",
+    "8. P9: INSTALLERA.md får bara ha kommandon i vanliga kodrutor (```). Testerna stoppar ~~~-rutor, indragna kodrader "
+    "och kodrutor i citat.",
+    "9. P14 och Öppet 62 (Git LFS) står kvar under Öppet. Git LFS låts vara tills Hugo vet om något annat repo använder det.",
+    "10. SPEC 7.1: 2.1.295 blir 2.1.305, och de två meningarna i Öppet 58 rättas, som en del av den här versionen.",
+    "11. Provkörningen 2026-11-05, del E (Terminal, Claude Code 2.1.318, ~/VERA/agent, hela sandlådan med --settings): "
+    "4683 passed, 47 skipped, 0 failed. De överhoppade: 30 spärrprov i kopian, 9 spärrtestet (sandlådan inte installerad), "
+    "6 H1-prov (Terminal), 2 grupp D.",
+]
+
+
+@pytest.mark.parametrize("beslut", GRANSKNING_35_BESLUT, ids=[str(n) for n in range(1, 12)])
+def test_granskning_35_besluten_star_ordagrant_sist_i_granskning(beslut):
+    avsnitt = GRANSKNING.read_text(encoding="utf-8").split("## Hugos beslut 2026-11-05 om granskning 35", 1)[1]
+    assert beslut in avsnitt
+
+
+def test_granskning_35_del_e_star_i_progress_under_steg_15():
+    forsta_laget = PROGRESS.read_text(encoding="utf-8").split("\n## Läge", 1)[1].split("\n## ", 1)[0]
+    assert "Steg i byggplanen: 15" in forsta_laget
+    assert GRANSKNING_35_BESLUT[10].split(" ", 1)[1] in forsta_laget
+
+
+# P1: testet ligger i filen, och antalen i INSTALLERA.md stämmer med testerna (granskning 35, P6).
+
+
+def _insamlade_sparrprov():
+    """Namnen på spärrproven i den här filen, som pytest samlar in dem. Kör inga tester och skriver inget."""
+    svar = subprocess.run(
+        [sys.executable, "-B", "-m", "pytest", "-p", "no:cacheprovider", "--collect-only", "-q", "-k", "test_sparr_", __file__],
+        cwd=PROJEKTET,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert svar.returncode == 0, svar.stdout + svar.stderr
+    return [rad for rad in svar.stdout.splitlines() if "::test_sparr_" in rad]
+
+
+def test_granskning_35_p1_antalen_i_installera_stammer_med_testerna():
+    prov = _insamlade_sparrprov()
+    assert any("::test_sparr_kopian_arbetsmappen_gar_inte_att_flytta" in rad for rad in prov)
+    i_kopian = [rad for rad in prov if "::test_sparr_kopian_" in rad]
+    assert (len(prov), len(i_kopian), len(prov) - len(i_kopian)) == (40, 31, 9)
+
+
+@pytest.mark.parametrize(
+    "rubrik,text",
+    [
+        (SPARRPROV_RUBRIK, "`40 passed`"),
+        (SPARRPROV_RUBRIK, "`39 passed, 1 skipped`"),
+        (SPARRPROV_RUBRIK, "flytta hela arbetsmappen"),
+        (SPARRPROV_RUBRIK, "`31 passed`"),
+        (PROVKORNING_RUBRIK, "`48 skipped`"),
+        (PROVKORNING_RUBRIK, "`SPÄRRTESTET HOPPAS ÖVER`: **9** prov"),
+        (PROVKORNING_RUBRIK, "`SPÄRRPROVET I KOPIAN HOPPAS ÖVER`: **31** prov"),
+        (PROVKORNING_RUBRIK, "2.1.318"),
+        (BYTE_RUBRIK, "**33** överhoppade"),
+        (BYTE_RUBRIK, "**34** om `~/.ssh` inte finns"),
+    ],
+)
+def test_granskning_35_p1_installera_har_vantade_antal(rubrik, text):
+    assert text in _avsnitt(rubrik)
+
+
+def test_granskning_35_p1_installera_namner_inte_den_gamla_provkorningens_version():
+    assert "2.1.314" not in INSTALLERA.read_text(encoding="utf-8")
+
+
+# P2: INSTALLERA.md kontrollerar git-inställningen före installationen.
+
+
+def test_granskning_35_p2_bytet_kontrollerar_git_installningen_forst():
+    avsnitt = _byte_avsnittet()
+    assert avsnitt.index(f"```bash\n{SAFE_BARE}\n```") < avsnitt.index("**1. Version.**")
+    assert "Väntat: exakt `explicit`" in avsnitt
+    assert "stoppa och fråga" in avsnitt.split(SAFE_BARE, 1)[1].split("**1. Version.**", 1)[0]
+    assert "granskning 35, beslut 2" in avsnitt
+
+
+def test_granskning_35_p2_caspers_dator_gor_samma_kontroll():
+    avsnitt = _avsnitt("## Caspers dator")
+    assert "`safe.bareRepository`" in avsnitt and "`explicit`" in avsnitt
+
+
+# P4: inga sessioner i worktrees. Kontrollen efter installationen startar annars en.
+
+
+def test_granskning_35_p4_kontrollen_startar_ingen_session_i_en_worktree():
+    avsnitt = _avsnitt("## Kontroll efter installationen")
+    assert "Hoppa över det här steget tills det finns ett prov för worktrees" in avsnitt
+    assert avsnitt.index("Hoppa över det här steget") < avsnitt.index("Starta en ny session i en worktree")
+
+
+# P11: ett rött H1-prov.
+
+
+def test_granskning_35_p11_installera_sager_vad_ett_rott_h1_prov_betyder():
+    avsnitt = _avsnitt(SPARRPROV_RUBRIK)
+    assert "**Är ett H1-prov rött: backa inte, men stanna. Kör inga sessioner tills det är avgjort.**" in avsnitt
+    assert "Det avgörs av en session som bara läser, som du startar, och som bara tittar på det provet" in avsnitt
+    assert "granskning 35, beslut 5" in avsnitt
+    assert "backa inte heller, men stanna och fråga" not in avsnitt
+
+
+# P12: Hugo skriver de fasta kommandona själv, och sessionen skriver bara meddelandet.
+
+
+def test_granskning_35_p12_installera_har_de_fasta_kommandona():
+    avsnitt = _byte_avsnittet()
+    assert "skriver aldrig ett kommando som du ska klistra in" in avsnitt
+    assert "`COMMIT_MSG.txt`" in avsnitt
+    assert "färdiga kommandon" not in avsnitt
+
+
+def test_granskning_35_p12_commit_msg_star_i_gitignore():
+    assert "COMMIT_MSG.txt" in GITIGNORE.read_text(encoding="utf-8").splitlines()
+
+
+# P3, P4, P11, P12 och P13 i CLAUDE.md.
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Varje session börjar och slutar med `git status --short --ignored`",
+        "Inga sessioner i worktrees tills det finns ett prov för det",
+        "Är ett H1-prov rött i appen: backa inte, men stanna. Kör inga sessioner tills det är avgjort.",
+        "Det avgörs av en session som bara läser, som Hugo startar, och som bara tittar på det provet",
+        "Sessionen skriver bara commit-meddelandet i filen `COMMIT_MSG.txt` i projektmappen",
+        "skriver aldrig ett kommando som Hugo ska klistra in",
+        "`git status --short --ignored`, `git add -A` och `git commit -F COMMIT_MSG.txt`",
+        "Hugo kör dem utanför sandlådan, i Terminal, i en kopia av en granskad commit",
+        "Hugos beslut 2026-11-05 om granskning 35, beslut 3",
+        "Hugos beslut 2026-11-05 om granskning 35, beslut 4",
+        "Hugos beslut 2026-11-05 om granskning 35, beslut 5",
+        "Hugos beslut 2026-11-05 om granskning 35, beslut 6",
+        "Hugos beslut 2026-11-05 om granskning 35, beslut 7",
+    ],
+)
+def test_granskning_35_star_i_claude_md(text):
+    assert text in CLAUDE_MD.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("text", ["färdiga kommandon", "git commit -m", "med namngivna filer"])
+def test_granskning_35_p12_claude_md_har_inte_kvar_det_som_ersatts(text):
+    assert text not in CLAUDE_MD.read_text(encoding="utf-8")
+
+
+# Beslut 10: SPEC 7.1.
+
+
+def _spec_7_1():
+    return SPEC.read_text(encoding="utf-8").split("### 7.1 Fast kommandolista", 1)[1].split("\n---\n", 1)[0]
+
+
+def test_granskning_35_beslut_10_spec_7_1_sager_den_nya_versionen():
+    avsnitt = _spec_7_1()
+    assert "2.1.295" not in avsnitt
+    assert "(minst 2.1.305)" in avsnitt
+    assert "Filen kräver Claude Code 2.1.305 eller senare" in avsnitt
+
+
+def test_granskning_35_beslut_10_spec_7_1_har_de_tva_ratta_meningarna():
+    avsnitt = _spec_7_1()
+    assert "ett test kontrollerar att de är samma, i samma ordning, som i inställningarna" in avsnitt
+    assert "sandlådan stoppar en egen testfil bara utanför projektet" in avsnitt
+    assert "`git status --short --ignored`" in avsnitt
+
+
+# P9: INSTALLERA.md har bara kommandon i vanliga kodrutor.
+
+LISTPUNKT = re.compile(r"(?:[-*+]|\d+[.)]) +")
+CITAT = re.compile(r"(?: {0,3}> ?)+")
+ANDRA_RUTOR = ("~~~", "<pre", "<code")
+
+
+def _otillatna_rutor(text):
+    """Rader som visas som en grå ruta utan att vara en vanlig kodruta, och som kontrollen av kommandon annars inte ser.
+
+    Det är ~~~-rutor, indragna kodrader och kodrutor i citat (Hugos beslut 2026-11-05 om granskning 35, beslut 8), och
+    <pre> och <code>, som visas på samma sätt. En vanlig ruta får vara indragen under en listpunkt. En indragen rad räknas
+    som kodrad om den inte fortsätter ett stycke och inte står exakt där texten i en öppen listpunkt börjar."""
+    fel = []
+    i_ruta = False
+    i_stycke = False
+    listor = []
+    for rad in text.splitlines():
+        ren = rad.strip()
+        if ren.startswith("```"):
+            i_ruta = not i_ruta
+            i_stycke = False
+            continue
+        if i_ruta:
+            continue
+        if not ren:
+            i_stycke = False
+            continue
+        innehall = rad.lstrip(" ")
+        indrag = len(rad) - len(innehall)
+        citat = CITAT.match(rad)
+        if citat:
+            inuti = rad[citat.end():]
+            if inuti.strip().startswith(("```", *ANDRA_RUTOR)) or inuti.startswith(("    ", "\t")):
+                fel.append(rad)
+            i_stycke = True
+            continue
+        if innehall.startswith("\t") or innehall.lower().startswith(ANDRA_RUTOR):
+            fel.append(rad)
+        listpunkt = LISTPUNKT.match(innehall)
+        if not i_stycke or listpunkt:
+            while listor and indrag < listor[-1]:
+                listor.pop()
+        if not i_stycke and indrag >= 4 and indrag not in listor:
+            fel.append(rad)
+        if listpunkt:
+            listor.append(indrag + listpunkt.end())
+        i_stycke = not innehall.startswith(("#", "|"))
+    return fel
+
+
+def test_granskning_35_p9_filen_har_bara_vanliga_kodrutor():
+    assert _otillatna_rutor(INSTALLERA.read_text(encoding="utf-8")) == []
+
+
+def test_granskning_35_p9_filen_har_bara_varningen_som_citat():
+    text = INSTALLERA.read_text(encoding="utf-8")
+    citat = [rad for rad in _lopande_text(text) if CITAT.match(rad)]
+    assert citat[0] == "> **Varning: kör inte installerarens förslag.** När Claude Code installerades föreslog installeraren"
+    assert len(citat) == 15
+
+
+def test_granskning_35_p9_indragna_listor_och_rutor_i_listor_ar_tillatna():
+    text = (
+        "1. Punkt\n\n   Fortsätter\n\n   ```bash\n   kommando\n   ```\n\n"
+        "10. Punkt\n    fortsätter\n\n    Fortsätter\n\n    - Under\n\n      Fortsätter\n"
+    )
+    assert _otillatna_rutor(text) == []
+
+
+P9_FORMER = {
+    "tilde": "~~~\n{k}\n~~~",
+    "tilde_bash": "~~~bash\n{k}\n~~~",
+    "tilde_i_lista": "- Punkt\n\n  ~~~\n  {k}\n  ~~~",
+    "indragen": "    {k}",
+    "indragen_tabb": "\t{k}",
+    "indragen_i_lista": "- Punkt\n\n      {k}",
+    "citat": "> ```\n> {k}\n> ```",
+    "citat_bash": "> ```bash\n> {k}\n> ```",
+    "citat_tilde": "> ~~~\n> {k}\n> ~~~",
+    "citat_indragen": ">     {k}",
+    "pre": "<pre>{k}</pre>",
+}
+P9_PLATSER = [
+    PROVKORNING_RUBRIK,
+    BYTE_RUBRIK,
+    SPARRPROV_RUBRIK,
+    UTANFOR_RUBRIK,
+    "## Steg 7: kopiera vakten",
+    "## Caspers dator",
+]
+
+
+@pytest.mark.parametrize("sida", ["fore", "efter"])
+@pytest.mark.parametrize("plats", P9_PLATSER, ids=["provkorningen", "bytet", "sparrprovet", "utanfor", "steg_7", "casper"])
+@pytest.mark.parametrize("form", P9_FORMER)
+@pytest.mark.parametrize("kommando", ["okant-kommando --flagga", "rm ~/VERA/agent/SPEC.md"], ids=["okant", "rm"])
+def test_granskning_35_p9_kommando_utanfor_vanlig_ruta_ger_rott(kommando, form, plats, sida):
+    # Mutationen i minnet. Provet med den riktiga filen i en kopia står i PROGRESS.md.
+    text = INSTALLERA.read_text(encoding="utf-8")
+    assert plats in text
+    tillagg = "\n\n" + P9_FORMER[form].format(k=kommando) + "\n\n"
+    ny = text.replace(plats, tillagg + plats if sida == "fore" else plats + tillagg, 1)
+    assert _otillatna_rutor(ny)
+
+
+# ---------------------------------------------------------------------------------------------
 # Hugos beslut 2026-11-05, beslut 3: grupp D hoppas över bara när datorn nekar.
 
 
@@ -854,6 +1158,13 @@ def test_sparr_kopian_git_config_gar_inte_att_andra_genom_lankar(kopian, underma
 def test_sparr_kopian_git_gar_inte_att_byta_namn_pa(kopian, fran, till):
     assert _namnbyte_stoppas(kopian / fran, kopian / till)
     assert (kopian / fran).is_dir()
+
+
+@kraver_kopian
+def test_sparr_kopian_arbetsmappen_gar_inte_att_flytta(kopian, tmp_path):
+    # Granskning 35, P1. Hugos beslut 2026-11-05 om granskning 35, beslut 1.
+    assert _namnbyte_stoppas(kopian, tmp_path / "flyttad")
+    assert (kopian / ".git").is_dir()
 
 
 @kraver_kopian

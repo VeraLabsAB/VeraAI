@@ -43,7 +43,7 @@ ligger i den. Därför flyttas nvm-mappen sist i din `PATH` i steg 4.
 
 **Testsviten.** Pytest-kommandona i SPEC 7.1 körs med Python i
 `/Library/Application Support/ClaudeCode/vera/venv`, som du skapar i steg 9 (Hugos beslut 2026-10-28 om
-vakten, beslut 1). Den gamla mappen `.venv` i projektet används inte längre när vakten är installerad.
+vakten, beslut 1).
 
 ## Innan du börjar
 
@@ -122,7 +122,6 @@ Kontrollera versionen i Terminal. Öppna Terminal och kör:
 - Hämtar och installerar den senaste versionen av Claude Code för Terminal (det kräver internet). Det ska
   stå `Successfully updated from … to version …` eller `Claude Code is up to date (…)`. Kör sedan
   `~/.local/bin/claude --version` igen. Är versionen fortfarande äldre än 2.1.305: stoppa och fråga.
-  (Kommandona står på code.claude.com/docs/en/setup, "Verify your installation" och "Update manually".)
 
 **Raden Setting sources, i Terminal** (Hugos svar 2026-10-28, punkt 3, och Hugos beslut 2026-10-28,
 granskning 13, P3 b, som ersätter `claude` med hela sökvägen). Kör ett kommando i taget:
@@ -162,8 +161,7 @@ Skriv sedan `/status` i Claude Code i Terminal och tryck Retur. Leta upp raden s
    versionen fortfarande är äldre än 2.1.305: stoppa och fråga.
 
 Terminalen och skrivbordsappen har **var sin** Claude Code med var sitt versionsnummer, och att uppdatera
-den ena uppdaterar inte den andra (sidan **code.claude.com/docs/en/desktop**, avsnittet "Claude Code
-version in the Code tab"). Kontrollera därför versionen i båda: i appen med `/status` och i Terminal med
+den ena uppdaterar inte den andra. Kontrollera därför versionen i båda: i appen med `/status` och i Terminal med
 `~/.local/bin/claude --version` (ovan), innan du installerar vakten.
 
 De låsta inställningarna innehåller också `"requiredMinimumVersion": "2.1.305"`, så att en äldre Claude
@@ -826,7 +824,7 @@ cd ~/VERA/agent
 ~/.local/bin/claude --version
 ```
 
-- Skriv upp versionen. Den behövs vid bytet nedan. Provkörningen 2026-11-04 gjordes med 2.1.314.
+- Skriv upp versionen. Den behövs vid bytet nedan. Provkörningen 2026-11-05, del E, gjordes med 2.1.318 (`PROGRESS.md`).
 
 ```bash
 ~/.local/bin/claude --settings '{"sandbox":{"enabled":true,"failIfUnavailable":true,"allowUnsandboxedCommands":false,"autoAllowBashIfSandboxed":false,"excludedCommands":[],"enableWeakerNestedSandbox":false,"enableWeakerNetworkIsolation":false,"allowAppleEvents":false,"allowNestedUserNamespaces":false,"network":{"allowAllUnixSockets":false,"allowLocalBinding":false}}}'
@@ -838,12 +836,12 @@ Be sedan Claude: "Kör exakt det här kommandot med Bash-verktyget, och ändra i
 '/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=line -rfs scripts/tests
 ```
 
-**Väntat på sista raden: inget `failed`, alltså inga röda.** Skicka hela slutet av utskriften till sessionen som hjälper dig. **Är något test rött: stoppa och fråga.**
+**Väntat på sista raden: inget `failed`, alltså inga röda, och `48 skipped`.** Skicka hela slutet av utskriften till sessionen som hjälper dig. **Är något test rött, eller är antalet ett annat: stoppa och fråga.**
 
 Utskriften (`-rfs`) visar vilka som hoppas över, och varför:
 
 - `GRUPP D HOPPAS ÖVER`: **2** prov, `test_h6_en_lank_till_git_stoppas` och `test_beslut_1_gamla_venv_i_projektet_stoppas`. De skapar en mapp `.git` eller `.venv`, och det ska sandlådan stoppa. De körs i "Prov utanför sandlådan" nedan.
-- `SPÄRRTESTET HOPPAS ÖVER` och `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`: väntat före bytet, eftersom sandlådan ännu inte står i de låsta inställningarna.
+- `SPÄRRTESTET HOPPAS ÖVER`: **9** prov, och `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`: **31** prov: väntat före bytet, eftersom sandlådan ännu inte står i de låsta inställningarna.
 - `H1-PROVET HOPPAS ÖVER`: **6** prov. Väntat i Terminal: de hoppas över där också utan sandlåda (Hugos körning 2026-11-05, P6). De körs i appen, se "Spärrprovet i kopian", punkt d.
 
 Avsluta med `/exit`.
@@ -857,7 +855,15 @@ stoppa och fråga**, och kör inte nästa kommando. `sudo cp`, `sudo chown` och 
 **Innan du börjar:** den oberoende granskningen ska vara klar, provkörningen ovan ska vara gjord, och filen ska vara den som
 granskades. Sessionen där bytet görs ska inte vara en session med agenten: kör allt i ett vanligt Terminal-fönster. **Avsluta alla öppna sessioner** i skrivbordsappen och i Terminal innan du börjar. Dokumentationen säger att nya låsta inställningar läses in också i en session som körs ([settings.md](https://code.claude.com/docs/en/settings.md), "When edits take effect").
 
-**1. Version.** Läs av båda, eftersom Claude Code har uppdaterat sig efter 2.1.314:
+**Kontrollera git-inställningen** (Hugos beslut 2026-11-05 om granskning 35, beslut 2). Den gör att git inte kör kod från en mapp som bara ser ut som ett repo (granskning 35, P2). Kommandot bara visar:
+
+```bash
+git config --global --get safe.bareRepository
+```
+
+- **Väntat: exakt `explicit`.** Visas något annat, eller ingenting: stoppa och fråga.
+
+**1. Version.** Läs av båda, eftersom Claude Code uppdaterar sig själv:
 
 ```bash
 ~/.local/bin/claude --version
@@ -952,8 +958,21 @@ ls -lde@ "/Library/Application Support/ClaudeCode/managed-settings.json" "/Libra
    '/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests
    ```
 
-   **Väntat: inget `failed`, alltså inga röda.** Det ska inte stå `SPÄRRTESTET HOPPAS ÖVER`. Det ska stå `GRUPP D HOPPAS ÖVER` (2 prov) och `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`, som körs i punkt 8. Det ska inte heller stå `H1-PROVET HOPPAS ÖVER`. Står `H1-PROVET HOPPAS ÖVER` där: backa inte, utan fortsätt till "Spärrprovet i kopian", punkt d, som säger vad du gör. Spärrtestet i `scripts/tests/test_sandladan.py` prövar här att `git status` och läsning i projektet fungerar, att en fil eller mapp med namnet `.git` stoppas i testets tillfälliga mapp, att skrivning utanför projektet, i `~/.local/share/claude`, i appen och i appens Claude Code stoppas, och att läsning av `~/.ssh` stoppas. **Står `SPÄRRTESTET HOPPAS ÖVER` där, eller är något rött: stoppa och fråga.**
-5. **`git add` och `git commit` stoppas i sandlådan, och det är rätt.** Från den här installationen committar agenten inte (Hugos beslut 2026-11-05, beslut 2). Varje session slutar med färdiga kommandon, ett i taget, som du kör själv med `!` i sessionen eller i Terminal. Gör det vid nästa ändring i projektet.
+   **Väntat: inget `failed`, alltså inga röda.** Väntat antal: **33** överhoppade, eller **34** om `~/.ssh` inte finns. Det ska inte stå `SPÄRRTESTET HOPPAS ÖVER`. Det ska stå `GRUPP D HOPPAS ÖVER` (2 prov) och `SPÄRRPROVET I KOPIAN HOPPAS ÖVER` (31 prov), som körs i punkt 8. Finns inte `~/.ssh` hoppas också det provet över, med texten "finns inte på den här datorn". Det ska inte heller stå `H1-PROVET HOPPAS ÖVER`. Står `H1-PROVET HOPPAS ÖVER` där: backa inte, utan fortsätt till "Spärrprovet i kopian", punkt d, som säger vad du gör. Spärrtestet i `scripts/tests/test_sandladan.py` prövar här att `git status` och läsning i projektet fungerar, att en fil eller mapp med namnet `.git` stoppas i testets tillfälliga mapp, att skrivning utanför projektet, i `~/.local/share/claude`, i appen och i appens Claude Code stoppas, och att läsning av `~/.ssh` stoppas. **Står `SPÄRRTESTET HOPPAS ÖVER` där, eller är något rött: stoppa och fråga.**
+5. **`git add` och `git commit` stoppas i sandlådan, och det är rätt.** Från den här installationen committar agenten inte (Hugos beslut 2026-11-05 om granskning 34, beslut 2). Sessionen skriver bara commit-meddelandet i filen `COMMIT_MSG.txt` i projektmappen, och skriver aldrig ett kommando som du ska klistra in. Du skriver alltid själv samma tre kommandon, ett i taget, med `!` i sessionen eller i Terminal (Hugos beslut 2026-11-05 om granskning 35, beslut 6). Gör det vid nästa ändring i projektet. Det första visar läget, också filer som `.gitignore` döljer, så att du ser vad som följer med:
+
+   ```bash
+   git status --short --ignored
+   ```
+
+   ```bash
+   git add -A
+   ```
+
+   ```bash
+   git commit -F COMMIT_MSG.txt
+   ```
+
 6. **Sista kontrollen:** steg 2, 4 och 9 i "Kontroll efter installationen" nedan. Be också agenten skapa en mapp i scratchpad med `mkdir -p`, eftersom kopior och provfiler ligger där. Det ska gå igenom.
 7. **Skalet:** kontrollskriptet i steg 4 g gäller oförändrat.
 8. **Spärrprovet i kopian, direkt och före annat arbete.** Gör avsnittet "Spärrprovet i kopian" nedan.
@@ -978,7 +997,7 @@ shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json"
 
 ## Spärrprovet i kopian (steg 15)
 
-Hugos beslut 2026-11-05 om granskning 34, beslut 4. Provet visar att inget i sandlådan kan skriva i `.git`, skapa en fil eller mapp med namnet `.git`, skriva `.git/commondir` eller byta namn på `.git`. Det prövar också att `git status` och `git log` fungerar, och att `git add`, `git commit` och `git commit --amend` inte går. Det görs direkt efter bytet.
+Hugos beslut 2026-11-05 om granskning 34, beslut 4. Provet visar att inget i sandlådan kan skriva i `.git`, skapa en fil eller mapp med namnet `.git`, skriva `.git/commondir`, byta namn på `.git` eller flytta hela arbetsmappen (granskning 35, P1). Det prövar också att `git status` och `git log` fungerar, och att `git add`, `git commit` och `git commit --amend` inte går. Det görs direkt efter bytet.
 
 Provet körs i en kopia, `~/VERA/sparrprov`, som du förbereder själv, utanför sandlådan. Kopian är ett undantag från regeln "Prov och test", bara för spärrtestet. Provet rör aldrig projektets riktiga `.git`, och testerna vägrar köra om kopian är projektet.
 
@@ -1016,7 +1035,7 @@ Frågar Claude Code om du litar på mappen: svara ja. Be Claude: "Kör exakt det
 '/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs -k test_sparr_ scripts/tests
 ```
 
-**Väntat: inget `failed`, och varken `SPÄRRTESTET HOPPAS ÖVER` eller `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`.** Avsluta med `/exit`.
+**Väntat: `40 passed`, inget `failed`, och varken `SPÄRRTESTET HOPPAS ÖVER` eller `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`.** Finns inte `~/.ssh` på datorn är väntat i stället `39 passed, 1 skipped`. Det överhoppade är då provet för `~/.ssh`, med texten "finns inte på den här datorn", och läsförbudet är inte prövat. Avsluta med `/exit`.
 
 **c. Kör samma prov i skrivbordsappen.** Starta en ny session i fliken **Code**, i mappen `sparrprov` i `~/VERA`, inte i en worktree, och be Claude köra samma kommando. Samma väntade resultat. Det här är också provet av att sandlådan körs i skrivbordsappen. Låt sessionen vara kvar till d.
 
@@ -1030,7 +1049,7 @@ Frågar Claude Code om du litar på mappen: svara ja. Be Claude: "Kör exakt det
 
 - **Väntat: `31 passed`, inget `skipped`, inget `failed`, och inte texten `H1-PROVET HOPPAS ÖVER`.** Inga överhoppade H1-prov, alltså.
 - **Hoppas de över, så backa inte.** Stanna och fråga, utan att göra något mer i projektet. Spärrproven i b och c har redan gått igenom, så sandlådan fungerar då ändå. Det är H1-proven som inte går att köra där, och då behövs ett nytt beslut.
-- **Är ett H1-prov rött: backa inte heller, men stanna och fråga.** Skicka hela utskriften.
+- **Är ett H1-prov rött: backa inte, men stanna. Kör inga sessioner tills det är avgjort.** Det avgörs av en session som bara läser, som du startar, och som bara tittar på det provet (Hugos beslut 2026-11-05 om granskning 35, beslut 5). Skicka hela utskriften dit.
 
 Arkivera sessionen efteråt.
 
@@ -1123,6 +1142,7 @@ Skillnader:
   steg 1). Utan Claude Code för Terminal i `~/.local/bin/claude` går det inte att se att de låsta
   inställningarna gäller, och då **går installationen inte att kontrollera**. Säger
   `~/.local/bin/claude --version` `no such file or directory`: stoppa och fråga innan installationen.
+- **Före installationen:** samma kontroll av `safe.bareRepository` som i bytet. Inte `explicit`: stoppa och fråga.
 
 Kontrollen nedan görs också på Caspers dator.
 
@@ -1187,7 +1207,7 @@ dator (175db51), ännu inte på Caspers.
 6. **Agenten kan fortfarande skriva filer i `~/VERA`.** Be agenten skapa en liten provfil,
    `~/VERA/agent/provfil.txt`, med fil-verktyget Write. Claude Code frågar dig först. Säg ja. Filen ska
    finnas efteråt. Ta sedan bort den själv i Finder.
-7. **En session i en worktree fungerar, eller stoppas på ett säkert sätt** (Hugos beslut 2026-10-28,
+7. **Hoppa över det här steget tills det finns ett prov för worktrees** (granskning 35, beslut 4). **En session i en worktree fungerar, eller stoppas på ett säkert sätt** (Hugos beslut 2026-10-28,
    punkt 6). En **worktree** är en egen kopia av projektet på en egen gren, som skrivbordsappen kan skapa
    för en session. Starta en ny session i en worktree i skrivbordsappen och be agenten köra `git status`.
    Det finns två godtagbara utfall:
