@@ -11458,3 +11458,113 @@ Allt under "Modell" på den riktiga Claude Code, också att det inbyggda skyddet
 2. Hugos eller Caspers ställningstagande till P1 (testet in i `test_sandladan.py`), P2 (`safe.bareRepository`), P3 (`git status --ignored`) och P4 (prov, eller inga worktrees). Övriga till Öppet.
 3. Byggsession om något av det ändrar filer. Ändras bara test och INSTALLERA.md är `managed-settings.json` oförändrad, med summan ovan. Det rör spärrar, så en ny oberoende granskning per steg gäller.
 4. Hugo installerar, och spärrprovet körs direkt.
+
+### Punkt 5–7 och provkörningen
+
+Uppdraget kom i chatten 2026-11-05, med resten av punkterna och Hugos körning. Inget är installerat, och ingen kod, inget test och ingen inställningsfil är ändrad. Listan "Vad som krävs före installationen" ovan ersätts av den sist i det här avsnittet.
+
+**Dom: fortfarande gult, men sandlådan har nu körts på riktigt.** Spärrprovet gick igenom i den riktiga Claude Code, både i Terminal och i appen. P1 räknas som prövad. Kvar före installationen: provkörningens del E, nya fynd i punkt 6 och 7, och besluten om P2, P3 och P4.
+
+#### Provkörningen 2026-11-05 01:28–01:36 (Hugos körning, i `~/VERA/sparrprov`)
+
+Hugo körde A–D, med `rm -rf` utbytt mot flytt till papperskorgen. Del E gjordes inte.
+
+| Del | Resultat | Vad det visar |
+|---|---|---|
+| A | `git log` gav 28fab6d…, diffen mot b423dd4 var tom, `~/.ssh` fanns inte och skapades för provet, `2 files changed, 7 insertions(+), 1 deletion(-)` | Provet kördes på den granskade koden, plus de två väntade ändringarna |
+| A | `filter.lfs.clean`, `.smudge`, `.process` och `.required` i Hugos globala git-inställningar | Se Git LFS nedan |
+| B, Terminal, Claude Code 2.1.318 | Setting sources: User settings, Command line arguments, Enterprise managed settings (file). `/sandbox` gav felet om högre nivå. **40 passed, 4691 deselected.** `git status --porcelain`: bara de två testfilerna | Alla försök stoppades i den riktiga sandlådan, och provet städade. Granskning 34, P4, är bekräftad |
+| C, appen, med `.claude/settings.local.json` | **40 passed, 4691 deselected. H1: 31 passed, 4700 deselected**, inga överhoppade | Sandlådan körs i skrivbordsappen, och H1-proven går igenom inne i den |
+| D | Kopian i papperskorgen, `~/.ssh` borttagen | Kopian med `.git` ligger kvar i papperskorgen tills den töms. Den har inga riktiga uppgifter |
+
+Antalen stämmer: 39 spärrprov och P1-testet är 40, och 40 + 4691 = 4731, som är sviten med ett test till. Inget hoppades över, så `SPÄRRTESTET HOPPAS ÖVER`, `SPÄRRPROVET I KOPIAN HOPPAS ÖVER` och `H1-PROVET HOPPAS ÖVER` stod inte där, och också provet för `~/.ssh` kördes.
+
+**Det här stänger tre saker under "Inte visat":** att spärrprovet stoppar i en riktig sandlåda, att sandlådan körs i appen, och att H1-proven går igenom där. Det är från `--settings` och `settings.local.json`, med förbuden för `.git` från filen som redan är installerad. Att allt gäller också från den nya låsta filen visas först efter bytet.
+
+**Inte visat av körningen:**
+
+- Appens version står inte i rapporten.
+- **Del E är inte gjord:** hela sviten har inte körts med alla nycklar och `filesystem`, och inte i projektet. INSTALLERA.md säger också att provkörningen ska göras om när Terminalens version är en annan, och den är nu 2.1.318, mot 2.1.314 senast hela sviten kördes.
+
+#### Kan P1 räknas som prövad? Ja
+
+`test_sparr_kopian_arbetsmappen_gar_inte_att_flytta` ingår i de 40, och gick igenom både i Terminal och i appen. Försöket att flytta arbetsmappen till testets tillfälliga mapp gav alltså `PermissionError`, i den riktiga Claude Code. I modellen är samma test rött utan sandlåda, så det är sandlådan som stoppar, inte något annat. **P1 blockerar inte längre.**
+
+**Testet finns bara i kopian, som nu ligger i papperskorgen. Det ska in i `scripts/tests/test_sandladan.py` i nästa byggsession**, med text från avsnittet "Punkt 4" ovan, så att spärrprovet efter bytet prövar det också. Då blir väntat antal i INSTALLERA.md 40 passed med `~/.ssh`, och 39 passed och 1 skipped utan den (P6). Provet gjordes från `--settings` och `settings.local.json`. Skyddet är inbyggt och bör inte bero på var inställningen kommer ifrån, men det är bedömning, och därför ska testet köras igen efter bytet.
+
+#### Punkt 5: testerna av INSTALLERA.md
+
+**Mutationer i en kopia** (körning, `test_sandladan.py`): 5 kommandon, 6 former och 6 platser, alltså provkörningen, bytet, spärrprovet, proven utanför, installationens steg 7 och Caspers avsnitt.
+
+| Kommando | Vanlig kodruta, med eller utan `bash` | Ruta med `~~~` | Indragen rad | Ruta i citat (`>`) | Löpande text |
+|---|---|---|---|---|---|
+| `sudo rm -rf …` | Rött | Rött | Rött | Rött | Rött |
+| `rm -rf …` | Rött | Rött | Rött | Rött | Rött |
+| `curl …` | Rött | Rött | Rött | Rött | Rött |
+| `rm ~/VERA/agent/SPEC.md`, utan flagga | Rött | **Grönt** | **Grönt** | **Grönt** | **Grönt** |
+| `okant-kommando --flagga` | Rött | **Grönt** | **Grönt** | **Grönt** | **Grönt** |
+
+**Svaret: i vanliga kodrutor godtas bara kända kommandon, exakt och i ordning.** Alla 60 mutationer där gav rött, på alla sex platser. Totalt 132 av 180 gav rött.
+
+De 48 gröna är **P9, nu utvidgad, nivå låg**: ett okänt kommando eller `rm` utan flagga utanför en vanlig ruta. Allt det i de fyra avsnitten för steg 15 på en gång, med hela sviten: **4691 passed, 39 skipped.** I installationens steg 7 gav en sådan rad 1 rött, men bara för att filen slog i ordgränsen (`test_installera_ar_kortare_an_fore_granskning_15`), inte för att kommandot kändes igen. Filen är genomläst, och inget sådant finns där i dag. Rättelse: stoppa filen om den har `~~~`, en ruta i citat eller en indragen rad utanför en lista.
+
+**Testet som sätter tillbaka 2.1.295 är inte svagare än förut** (läst i `git diff 795f848 b423dd4`, och körning). Undantaget är en enda rad, skriven exakt, och finns raden inte kraschar testet. Mutationer i `managed-settings.json`, i `test_sandladan.py` och `test_kommandosparr.py`:
+
+| Mutation | Röda test |
+|---|---|
+| Version 2.1.295, 2.1.300, 2.1.310 eller borta | 4 i varje fall, också det här testet |
+| `Edit(//**/.git)` borta | 5 |
+| `.venv` avsmalnad | 6 |
+| Ny regel i `deny` | 3 |
+| `allowManagedHooksOnly` false | 3 |
+| `onFailure` ändrad | 5 |
+| Sandlådan av, eller `excludedCommands: ["git *"]` | 3 |
+| Ny nyckel i `network` | 3 |
+| `filesystem` med `disabled` eller `allowWrite` | 2 |
+| Dubbla nycklar gömda i raden där sandlådan slutar | 14 respektive 2 |
+
+Sandlådans innehåll prövas inte av det här testet, eftersom blocket skärs bort före summan. Det prövas av de andra testen, och av kontrollsumman i `test_summan_i_bytet_ar_den_nya_filens_summa`, som blir röd vid varje ändring.
+
+#### Punkt 6: ett rött H1-prov. Fynd
+
+**P11, medel: INSTALLERA.md säger inte det som är Hugos linje.** Punkt d säger om rött: backa inte, stanna och fråga, och skicka hela utskriften. Hugos linje, i uppdraget 2026-11-05: man stannar och kör inga sessioner tills det är avgjort. Det står inte, och texten om rött säger inte ens det som texten om överhoppade prov säger, "utan att göra något mer i projektet". CLAUDE.md och beslutet efter P6 talar bara om överhoppade prov. Byggsessionen skrev själv att beslutet inte säger något om rött.
+
+Det räcker att stanna: ett rött H1-prov betyder att kontrollskriptet kanske godkänner något det inte ska, och skriptet är det som visar att skalet är rent. Det väntade utfallet är inte rött (31 passed i provkörningen), så det här gäller om det ändras. Rättelse i nästa byggsession, med test. Förslag till text:
+
+> Är ett H1-prov rött: backa inte, men stanna. Kör inga sessioner tills det är avgjort. Skicka hela utskriften.
+
+**Hugos beslut behövs om en sak:** vem som avgör, om inga sessioner får köras. Förslag: bara en läsande session om just det provet, startad av Hugo.
+
+#### Punkt 7: CLAUDE.md och versionen
+
+CLAUDE.md har fått två nya punkter, och inget är borttaget eller omskrivet (`git diff b08098b 28fab6d`). Reglerna under "Alltid", "Aldrig" och "Vem som ger OK" är oförändrade, och beslut 1 gör skyddet av git-historiken starkare. **Men tre saker är svagare eller ofullständiga:**
+
+- **P12, medel: commiten har flyttats ut ur både vakten och sandlådan.** Agenten skriver kommandot, och Hugo kör det med `!` eller i Terminal. Enligt [dokumentationen](https://code.claude.com/docs/en/sandboxing.md) körs `!` utanför sandlådan, och min bedömning är att vakten inte prövar det, eftersom det inte är ett verktyg. Vakten stoppar `git commit -m "prov $(touch x)"` och samma sak med bakåtfnuttar (körning av `bedom`), men Hugos skal kör det. En kapad session kan alltså skriva ett färdigt kommando som kör kod med Hugos rättigheter, och Hugo har ingen bakgrund i programmering. Beslut 2 prövas inte om. **Förslag på hur det byggs:** CLAUDE.md säger att meddelandet står inom enkla citattecken, och att Hugo inte kör ett kommando där det efter `git add` eller `git commit -m` finns något av `$`, bakåtfnutt, `;`, `|`, `&`, `>` eller `<`, eller en rad till. Hugos beslut.
+- **P13, låg: CLAUDE.md säger att grupp D körs "i Terminal", men inte i en kopia av en granskad commit**, som beslut 3 efter P6 säger. INSTALLERA.md säger det rätt, och CLAUDE.md pekar dit. Följer någon bara CLAUDE.md, och kör i projektet, körs en dold `conftest.py` (P3) med Hugos fulla rättigheter. Hugos egen körning i P6 var i projektet, före beslutet. Lägg till orden.
+- **P14, låg: ett H1-prov som börjar hoppas över senare märks inte.** Kontrollen görs en gång, i spärrprovet. Efter det hoppas de över utan att någon läser varför, eftersom kommandot i SPEC 7.1 bara visar antalet. Grupp D körs bara när vakten eller de låsta inställningarna ändras, vilket är rätt, eftersom de bara prövar vakten. Rättelse: skriv väntat antal överhoppade (P6).
+
+**Versionen: 2.1.305 stämmer överallt utom i SPEC 7.1** (körning, `grep` i hela projektet utom `GRANSKNING.md` och `PROGRESS.md`). `managed-settings.json` och alla ställen i INSTALLERA.md där det står vad filen kräver säger 2.1.305. 2.1.295 står kvar på tre ställen utöver testernas kommentarer:
+
+- INSTALLERA.md, rad 66 och 68: dokumentationens krav för `onFailure`, som är rätt.
+- `test_beslut_granskning_19.py`: prövar den texten.
+- **SPEC 7.1, rad 229, två gånger.** Kravet för `onFailure` är rätt, men "minst 2.1.295" vid kontrollen före installationen är fel. Det väntar på Hugos beslut om att rätta SPEC.
+
+#### Git LFS: nivå låg, Öppet 62
+
+`git config` visade att Hugos globala inställningar har ett filter, som `.gitattributes` kan slå på (P8). **Jag bedömer att det inte ger en testfil någon väg att välja vilken kod som körs.**
+
+- **Testfilen kan få git utanför sandlådan att starta filtret, och välja filnamnet.** Prov med ett utbytt filterprogram (körning, modell): en `.gitattributes` skriven i modellen fick `git status` från roten att köra filtret för `a.txt`, och `git add` för `b.txt`. Det är första gången något testfilen skriver startar ett program från roten.
+- **Men programmet väljs av Hugos inställningar, inte av testfilen.** Filnamnet ges med citattecken av git, enligt min bedömning. Att byta ut programmet kräver skrivning i en mapp i `PATH`, och det är stängt.
+- **`.lfsconfig`:** [dokumentationen för Git LFS](https://raw.githubusercontent.com/git-lfs/git-lfs/main/docs/man/git-lfs-config.adoc) säger att bara en kort lista nycklar läses därifrån, och `lfs.customtransfer.*.path`, som startar ett program, står inte på den. `lfs.url` står där, så en LFS-nedladdning eller -uppladdning kan skickas till en annan adress. Det bör inte hända vid `git add` eller `git status`, men det är inte prövat.
+- **`git-lfs` finns inte i `PATH` i den här sessionen** (körning). Med `filter.lfs.required` gör det att `git add` stoppas med ett fel för filer som omfattas (körning, med ett påhittat programnamn). Det ger ingen kod, men en testfil kan stoppa Hugos `git add`. **Riktig `git-lfs` är alltså inte prövad, och värdena i inställningarna har jag inte sett.**
+- **Projektet använder inte Git LFS:** kopian har ingen `.gitattributes` eller `.lfsconfig` (körning).
+
+Enklast är att ta bort filtret, om inget annat repo på datorn behöver det. Det är Hugos beslut, och kommandona står i Öppet 62.
+
+#### Vad som krävs före installationen (ersätter listan ovan)
+
+1. **Hugo kör del E**, hela sviten i projektet med hela sandlådan, och med den version som ska användas. Väntat `4683 passed, 47 skipped`. Läs också appens version i `/status`.
+2. **Hugos eller Caspers beslut:** P2 (`safe.bareRepository`), P3 (`git status --ignored`), P4 (prov i worktree, eller inga worktrees), P11 (vem som avgör) och P12 (formen på commit-kommandot). Övriga till Öppet.
+3. **Byggsession:** P1-testet in i `test_sandladan.py`, P11-texten med test, väntade antal (P6), CLAUDE.md (P12 och P13), och det som besluten ger. `managed-settings.json` ändras inte av något av det, och summan står kvar.
+4. **Ny oberoende granskning av ändringen.** Det rör spärrar, så per steg.
+5. Hugo installerar, och spärrprovet körs direkt, med `~/.ssh` skapad för stunden, annars prövas den inte.

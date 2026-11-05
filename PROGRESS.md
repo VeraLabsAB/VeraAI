@@ -24,6 +24,32 @@ borttagen.
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
 
+## Läge 2026-11-05, provkörningen och punkt 5–7 i granskning 35
+
+Steg i byggplanen: 15 (pågår)
+
+- **Säkerhet:** ingenting är installerat. Granskningen är fortfarande **gul**, men sandlådan har nu körts på riktigt och P1 är prövad. Installera inte förrän listan sist i `GRANSKNING.md`, "Punkt 5–7 och provkörningen", är klar. Ny text från den här sessionen är bara dokumentation.
+- **Provkörningen 2026-11-05 01:28–01:36** (Hugo, i `~/VERA/sparrprov`, A–D i granskning 35, punkt 4, med `rm -rf` utbytt mot flytt till papperskorgen):
+  - **A:** allt som väntat. `git log` gav 28fab6d…, diffen mot b423dd4 var tom, `~/.ssh` fanns inte och skapades för provet, `2 files changed, 7 insertions(+), 1 deletion(-)`. `git config --global --get-regexp` gav `filter.lfs.clean`, `.smudge`, `.process` och `.required` (Öppet 62).
+  - **B, Terminal, Claude Code 2.1.318:** Setting sources: User settings, Command line arguments, Enterprise managed settings (file). `/sandbox`: "Sandbox settings are overridden by a higher-priority configuration and cannot be changed locally." Spärrproven **40 passed, 4691 deselected**. `git status --porcelain`: bara de två ändrade testfilerna.
+  - **C, appen, fliken Code, mappen `sparrprov`, inte worktree, med `.claude/settings.local.json`:** spärrproven **40 passed, 4691 deselected**, H1-proven **31 passed, 4700 deselected**, inga överhoppade.
+  - **D:** kopian flyttad till papperskorgen, `~/.ssh` borttagen.
+  - **E är inte gjord:** hela sviten i projektet med hela sandlådan. Appens version står inte i rapporten.
+- **P1 räknas som prövad.** Testet stoppade flytten av arbetsmappen i den riktiga Claude Code, i Terminal och i appen. **Testet finns bara i kopian. Det ska in i `scripts/tests/test_sandladan.py` i nästa byggsession.**
+- **Punkt 5:** i vanliga kodrutor godtas bara kända kommandon (60 av 60 mutationer röda). `sudo`, `rm -` och `curl` stoppas i alla former. Ett okänt kommando eller `rm` utan flagga går igenom i `~~~`, indragen rad, ruta i citat och löpande text (P9, utvidgad). Testet med 2.1.295 är inte svagare.
+- **Punkt 6, P11, medel:** INSTALLERA.md säger inte att man inte kör några sessioner när ett H1-prov är rött, som är Hugos linje. Behöver text och test, och beslut om vem som avgör.
+- **Punkt 7:** inget i CLAUDE.md är borttaget. P12, medel: commiten körs nu utanför vakten och sandlådan, och vakten stoppar annars `$(...)`. P13, låg: CLAUDE.md säger inte "i en kopia". P14, låg: ett H1-prov som senare hoppas över märks inte. 2.1.305 stämmer överallt utom i SPEC 7.1, rad 229.
+- **Git LFS, låg:** en testfil kan få git att starta filtret, men inte välja programmet. Riktig `git-lfs` är inte prövad, eftersom den inte finns i `PATH` här.
+- **CLAUDE.md, `sparr/`, `scripts/` och `SPEC.md` är inte ändrade.**
+- **Körningar** (`<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`, `<S>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/71070165-896d-4a81-a588-78bcdaea03eb/scratchpad`). Från projektmappen, ett kommando i taget. Kopiorna gjordes med `git clone --no-hardlinks` inne i provfilen, i testets tillfälliga mapp.
+  1. `git diff b08098b 28fab6d -- CLAUDE.md` och `git diff 795f848 b423dd4 -- scripts/tests/test_sandladan.py`.
+  2. `grep -rn -F -e 2.1.295 -e 2.1.305 --exclude=GRANSKNING.md --exclude=PROGRESS.md --exclude=test_kommandosparr.py --exclude=test_sandladan.py --exclude=INSTALLERA.md --exclude-dir=.git --exclude-dir=.claude .` och `grep -n -F -e 2.1.295 -e 2.1.305 sparr/INSTALLERA.md`.
+  3. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfs <S>/prov/test_g35d.py` (4 passed på 7 min 12 s): mutationerna i INSTALLERA.md, 180 stycken med `test_sandladan.py`, **132 röda, 48 gröna**. De 48 ihop i de fyra avsnitten, hela sviten: **4691 passed, 39 skipped**. En i steg 7, hela sviten: **1 failed**, ordgränsen. Mutationerna i `managed-settings.json`, med `test_sandladan.py` och `test_kommandosparr.py`, utan mutation **640 passed, 39 skipped**, med mutation 2–14 röda. Vakten mot `git commit -m` med `$(...)`, och filtret med ett utbytt program.
+  4. `grep -c -F failed <S>/prov/utfall/mutation_matris.json` (132).
+  5. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rf scripts/tests`, efter texten här, före commit (**4691 passed, 39 skipped**).
+- **Verifierat med körning:** ovan, och Hugos provkörning. **Läst i dokumentationen:** [git-lfs-config](https://raw.githubusercontent.com/git-lfs/git-lfs/main/docs/man/git-lfs-config.adoc). **Min bedömning, inte provad:** att vakten inte prövar `!`, att skyddet mot flytt inte beror på var inställningen kommer ifrån, och att riktig `git-lfs` beter sig som dokumentationen säger.
+- **Opushat:** som nedan, 28fab6d och commiten med den här texten. Sessionen pushar inte.
+
 ## Läge 2026-11-05, granskning 35 av sandlådan
 
 Steg i byggplanen: 15 (pågår)
@@ -2078,7 +2104,8 @@ fattade och byggda, se avsnittet ovan.)
 58. **SPEC 7.1 stämmer inte längre på en punkt efter steg 15** (Hugos uppdrag: ändra inte listan). "Ett test kontrollerar att de är samma som i inställningarna" stämmer igen efter Hugos beslut 2026-11-05 om granskning 34, beslut 1. Kvar: att en egen testfil stoppas av sandlådan, vilket bara gäller utanför projektet. Rättas efter granskningen, med Hugos eller Caspers OK. **Öppen.**
 59. **Fynden i granskning 34** (steg 15, `GRANSKNING.md`). **Stängd** av Hugos beslut 2026-11-05 om granskning 34: P1 och P3 av beslut 1, P2 av spärrtestet i beslut 4, P4, P5 och P8 rättade i 795f848, P7 av beslut 6, P9 är nu Öppet 60. P6 väntar på Hugos körning, och det som bara går att visa efter installationen prövas där.
 60. **Vaktens prov av rättigheter testas bara genom kontrollsumman** (granskning 34, P9, nivå låg, utanför steget). Tar man bort kravet `not info.st_mode & SKRIVBAR_FOR_GRUPP_ELLER_ANDRA` i `_sakert_agd` blir bara de två testerna av kontrollsumman röda. `rotagd` byter ut funktionen. Summan stoppar en ändring, så det är inget hål i dag. **Öppen.**
-61. **Fynden i granskning 35** (steg 15, `GRANSKNING.md`). P1–P4, nivå medel, väntar på Hugos eller Caspers besked före installationen. P5–P10, nivå låg: `~/.ssh` finns inte, så provet är tomt, väntat utfall utan antal, en mapp med `.git` går att flytta in, `.gitattributes` beror på Hugos `~/.gitconfig`, kodrutor med `~~~` eller indrag prövas inte, och texterna i SPEC 7.1, CLAUDE.md och INSTALLERA.md. **Öppen.**
+61. **Fynden i granskning 35** (steg 15, `GRANSKNING.md`). P1 är prövad i Hugos provkörning 2026-11-05 och blockerar inte, men testet ska in i `scripts/tests/test_sandladan.py` i nästa byggsession. P2, P3, P4, P11 och P12, nivå medel, väntar på Hugos eller Caspers besked före installationen. P5–P10, P13 och P14, nivå låg: `~/.ssh` finns inte, så provet är tomt utan en mapp för stunden, väntat utfall utan antal, en mapp med `.git` går att flytta in, `.gitattributes` (Öppet 62), kommandon utanför vanliga kodrutor prövas inte, texterna i SPEC 7.1, CLAUDE.md och INSTALLERA.md, och ett H1-prov som senare hoppas över märks inte. **Öppen.**
+62. **Git LFS i Hugos globala git-inställningar** (granskning 35, P8, nivå låg). Provkörningen 2026-11-05 visade `filter.lfs.clean`, `.smudge`, `.process` och `.required`. En testfil i sandlådan kan skriva `.gitattributes`, så att git utanför sandlådan startar filtret, också `git status` från roten (prov med ett utbytt program). Programmet väljs av Hugos inställningar, inte av testfilen, och `.lfsconfig` får inte peka ut något program enligt dokumentationen. `git-lfs` finns inte i `PATH` i agentens session, så en testfil kan stoppa Hugos `git add` för filer som omfattas. Projektet använder inte Git LFS. Inte prövat: riktig `git-lfs`, och värdena i inställningarna. Hugo kan titta med `git config --global --get-regexp '^filter[.]lfs'` och `command -v git-lfs` i Terminal. Behövs filtret inte i något annat repo tar Hugo bort det med `git config --global --remove-section filter.lfs`. Hugos beslut. **Öppen.**
 
 ## Nästa steg i byggordningen
 
