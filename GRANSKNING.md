@@ -11814,3 +11814,25 @@ Att sandlådan låter en testfil skapa länken i P1 och `.gitattributes` i Hugos
 2. **Hugo kör provkörningen igen**, med `48 skipped` som väntat, eftersom 315 nya prov inte har körts i sandlåda.
 3. **Hugos eller Caspers beslut:** P1 (`ls -l COMMIT_MSG.txt`), P2 (`.gitignore`), P3 (väntat läge) och P6 (`~/.ssh`). Inget av det ändrar `managed-settings.json`, och summan står kvar. Rättas de i en byggsession, granskas ändringen per steg, eftersom den rör spärrar. **Min rekommendation:** rätta P1, P3, P5 och P6 före bytet, eftersom det är text och test, och P2 när beslutet om `.gitignore` finns. Väljer Hugo att installera först är inget av det farligt i dag, men då bör den första `git add -A` vänta på P3.
 4. Hugo installerar från den granskade commiten, och spärrprovet körs direkt.
+
+### Hugos beslut 2026-11-05 om granskning 36
+
+Skrivna ordagrant från chatten.
+
+- P1: Ja. Ett fjärde fast kommando före commit: ls -l COMMIT_MSG.txt. Raden ska börja med "-". Börjar den med "l" (länk) eller något annat: committa inte, stanna.
+- P2: Ja. .gitignore görs snävare så att den inte tar kodfiler, plus ett test som larmar om en kodfil ignoreras.
+- P3: Ja. CLAUDE.md får ett väntat läge för git status --short --ignored och en stoppregel. Löftet "kan inte gömma sig" tas bort eller skrivs om så att det stämmer.
+- P4: Kontrollerat av Hugo 2026-11-05 med git config --global --name-only --list. Namnen: user.name, user.email, filter.lfs.clean, filter.lfs.smudge, filter.lfs.process, filter.lfs.required, safe.barerepository. Ingen core.hooksPath. Stängd utan fynd.
+- P5: Rättas.
+- P6 och öppen fråga 3: Ja. Spärrprovet skapar ~/.ssh med en testfil, prövar läsförbudet och tar bort mappen efteråt.
+- Öppen fråga 1: Ja. Kommandon i löpande text i INSTALLERA.md flyttas till kodrutor.
+- Öppen fråga 2: git add och git commit står kvar i vaktens lista till nästa version av vakten. Läggs under Öppet.
+- Rättelserna görs före installationen.
+
+**Byggsessionens egna val, att pröva i nästa granskning** (körningarna står i `PROGRESS.md`):
+
+- **P2, hur snäv regeln är.** Undantaget gäller bara `.py` under `scripts/` och `sparr/`, och bara reglerna för kontoutdrag, kvitton och Z-rapporter. Det är det enda som blir mindre strikt: en `.py`-fil med de orden i namnet i de två mapparna följer nu med. Reglerna för Shop and Go och hemligheter står under undantaget och är lika starka, också för `.py`. Allt annat med de orden i namnet (till exempel `.md`, `.json` och `.csv`, och `.py` i projektroten) ignoreras som förut, och då larmar testet i stället för att filen tappas tyst. Skälet: ett `kvitto.json` eller `shop-and-go.md` kan vara ett riktigt underlag, och uppdraget säger att ingen sådan regel får bli svagare.
+- **P3, också i INSTALLERA.md.** Beslutet nämner CLAUDE.md. Samma väntade läge står i bytets punkt 5, eftersom det är där Hugo läser det, och orden "så att du ser vad som följer med" är borta.
+- **P3, stoppregeln gäller också sessionens egna ändringar.** Granskningens förslag hade inget undantag, så jag la inte till något.
+- **P6, `cat`.** Vakten stoppar `cat ~/.ssh/prov` från agenten innan sandlådan prövas (test finns). Därför kör spärrtestet `/bin/cat` inne i sandlådan också. Det kan bara visas efter bytet.
+- **Öppen fråga 1, vad som räknas.** Ett namn på ett kommando får stå i en förklaring (`cp` kopierar en fil). Ett kommando med något efter namnet får inte det, inte heller som exempel. Kvar i löpande text är bara enstaka namn, och `mkdir -p` och `export PATH=…`, som inte står bland de kända orden. Testet ser inte ett kommando som saknas i listan.
