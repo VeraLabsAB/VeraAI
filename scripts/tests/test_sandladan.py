@@ -805,7 +805,8 @@ def test_granskning_35_beslut_10_spec_7_1_har_de_tva_ratta_meningarna():
     avsnitt = _spec_7_1()
     assert "ett test kontrollerar att de är samma, i samma ordning, som i inställningarna" in avsnitt
     assert "sandlådan stoppar en egen testfil bara utanför projektet" in avsnitt
-    assert "`git status --short --ignored`" in avsnitt
+    # Med -uall sedan Hugos beslut 2026-11-05 om granskning 38, SPEC 7.1.
+    assert "`git status --short --ignored -uall`" in avsnitt
 
 
 # P9: INSTALLERA.md har bara kommandon i vanliga kodrutor.
@@ -1656,10 +1657,9 @@ def _gallande_dokument():
 
 def test_granskning_37_p4_varje_plats_har_uall():
     gamla = {namn: len(GAMMALT_STATUS.findall(text)) for namn, text in _gallande_dokument().items() if GAMMALT_STATUS.search(text)}
-    # Meningen "Det vakten inte stoppar" i SPEC 7.1 är inget av de fasta kommandona, och den står under Öppet 63 (P10). SPEC.md
-    # ingår inte i Hugos uppdrag om granskning 37, så den väntar på ett beslut (PROGRESS.md). Fler gamla former ger rött.
-    assert gamla == {"SPEC.md": 1}
-    assert {namn for namn, text in _gallande_dokument().items() if NYTT_STATUS in text} == {"CLAUDE.md", "INSTALLERA.md"}
+    # SPEC 7.1 är rättad (Hugos beslut 2026-11-05 om granskning 38). Ingen gammal form är kvar, och varje ny ger rött.
+    assert gamla == {}
+    assert {namn for namn, text in _gallande_dokument().items() if NYTT_STATUS in text} == {"CLAUDE.md", "INSTALLERA.md", "SPEC.md"}
 
 
 def _status(tmp_path, *tillagg):
@@ -1769,6 +1769,284 @@ def test_granskning_37_b_star_i_claude_md():
         "Granskning 38 prövar bara rättelserna från granskning 37. Nya fynd som inte blockerar installationen går till Öppet"
         in CLAUDE_MD.read_text(encoding="utf-8")
     )
+
+
+# ---------------------------------------------------------------------------------------------
+# Hugos beslut 2026-11-05 om granskning 38.
+
+GRANSKNING_38_RUBRIK = "## Granskning 38 (av 8bd6fe5 och 6065501)"
+GRANSKNING_38_BESLUT = [
+    "- P1: Rättas före installationen. En ny fil i .claude/ ska få stoppregeln att slå till.",
+    "- P3: Rättas före installationen. Stoppregeln gäller .gitattributes med alla sorters stora och små bokstäver.",
+    "- SPEC 7.1: Texten rättas nu så att den säger samma sak som CLAUDE.md och INSTALLERA.md (Öppet 66 och P4 i granskning 38). "
+    "Kommandolistan ändras inte. git add och git commit står kvar i den, enligt Öppet 64.",
+    "- Stoppkriterium: Granskning 39 prövar bara P1, P3 och SPEC 7.1. Blockerar inget där, installerar Hugo. Allt annat som "
+    "hittas går till Öppet.",
+    "- P2, P5, P6 och P7 i granskning 38: under Öppet.",
+]
+
+
+@pytest.mark.parametrize("beslut", GRANSKNING_38_BESLUT, ids=["P1", "P3", "SPEC", "stopp", "oppet"])
+def test_granskning_38_besluten_star_ordagrant_under_granskning_38(beslut):
+    avsnitt = _avsnitt_i_granskning(GRANSKNING_38_RUBRIK)
+    assert beslut in avsnitt.split("### Hugos beslut 2026-11-05 om granskning 38", 1)[1]
+
+
+def test_granskning_38_svaret_om_vantat_lage_star_under_besluten():
+    # Frågan i byggsessionen: ska sessionens egna filer få räknas som väntade? Hugos svar i chatten.
+    avsnitt = _avsnitt_i_granskning(GRANSKNING_38_RUBRIK).split("### Hugos beslut 2026-11-05 om granskning 38", 1)[1]
+    assert "Bara uppräknade" in avsnitt
+
+
+# Stoppregeln som kod, efter orden i texten. Ändras orden ändras utfallet, så ett prov här är ett prov av texten.
+
+FNUTTAT = re.compile(r"`([^`]+)`")
+ALLTID_STOPP = "någon annan rad med"
+ALLA_ANDRA_STOPPAR = "varje rad som inte står exakt i det väntade läget stoppar"
+ALLA_BOKSTAVER = "oavsett stora och små bokstäver"
+STYCKENA = {"claude": _claude_md_stycket_om_git_status, "installera": _installera_stycket_om_git_status}
+
+
+def _vantat_och_regel(stycket):
+    fore, regel = stycket.split("toppregel", 1)
+    return set(FNUTTAT.findall(fore.split("Väntat", 1)[1])) - {"!!"}, regel
+
+
+def _stoppar(stycket, rad, uppraknade=()):
+    """Slår stoppregeln till på raden från git status? uppraknade är filerna som sessionen räknar upp i COMMIT_MSG.txt."""
+    vantat, regel = _vantat_och_regel(stycket)
+    kod, sokvag = rad[:2], rad[3:]
+    if kod == "!!" and sokvag in vantat:
+        return False
+    if kod == "!!" and "en annan rad med `!!`" in regel:
+        return True
+    namn = [n.rstrip("/") for n in FNUTTAT.findall(regel) if n != "!!"]
+    delar = sokvag.split("/")
+    if ALLA_BOKSTAVER in regel:
+        namn, delar = [n.lower() for n in namn], [d.lower() for d in delar]
+    if ALLTID_STOPP in regel and set(namn) & set(delar):
+        return True
+    if ALLA_ANDRA_STOPPAR in regel:
+        return sokvag not in uppraknade
+    return False
+
+
+def _git_i_kopian(arbetsmapp, miljo, *argument):
+    svar = subprocess.run(
+        [GIT, *argument],
+        cwd=arbetsmapp,
+        env={**miljo, "GIT_AUTHOR_NAME": "prov", "GIT_AUTHOR_EMAIL": "prov@example.test", "GIT_COMMITTER_NAME": "prov", "GIT_COMMITTER_EMAIL": "prov@example.test"},
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert svar.returncode == 0, svar.stderr
+    return svar.stdout
+
+
+def _statusrader(arbetsmapp, miljo):
+    return set(_git_i_kopian(arbetsmapp, miljo, *NYTT_STATUS.split()[1:]).splitlines())
+
+
+def _kopia_med_vantat_lage(tmp_path):
+    """En kopia i testets tillfälliga mapp, med projektets .gitignore och det väntade läget. Aldrig projektets .git."""
+    arbetsmapp, miljo = _provrepo(tmp_path)
+    (arbetsmapp / "SPEC.md").write_text("x\n", encoding="utf-8")
+    _git_i_kopian(arbetsmapp, miljo, "add", ".gitignore", "SPEC.md")
+    _git_i_kopian(arbetsmapp, miljo, "commit", "-q", "-m", "prov")
+    for fil in VANTADE_IGNORERADE:
+        (arbetsmapp / fil).parent.mkdir(parents=True, exist_ok=True)
+        (arbetsmapp / fil).write_text("", encoding="utf-8")
+    return arbetsmapp, miljo
+
+
+def _rad_for_ny_fil(tmp_path, fil):
+    """Lägger en ny fil i kopian. Ger den enda nya raden från git status, som den ser ut på riktigt."""
+    arbetsmapp, miljo = _kopia_med_vantat_lage(tmp_path)
+    fore = _statusrader(arbetsmapp, miljo)
+    (arbetsmapp / fil).parent.mkdir(parents=True, exist_ok=True)
+    (arbetsmapp / fil).write_text("x\n", encoding="utf-8")
+    nya = _statusrader(arbetsmapp, miljo) - fore
+    assert len(nya) == 1, nya
+    rad = nya.pop()
+    assert rad[3:] == fil, rad
+    return rad
+
+
+@pytest.mark.parametrize("stycket", STYCKENA, ids=list(STYCKENA))
+def test_granskning_38_det_vantade_laget_ger_inget_stopp(tmp_path, stycket):
+    arbetsmapp, miljo = _kopia_med_vantat_lage(tmp_path)
+    (arbetsmapp / "COMMIT_MSG.txt").write_text("x\n", encoding="utf-8")
+    rader = _statusrader(arbetsmapp, miljo)
+    assert rader == {f"!! {namn}" for namn in [*VANTADE_IGNORERADE, "COMMIT_MSG.txt"]}
+    assert not [rad for rad in rader if _stoppar(STYCKENA[stycket](), rad)]
+
+
+@pytest.mark.parametrize("stycket", STYCKENA, ids=list(STYCKENA))
+@pytest.mark.parametrize(
+    "fil",
+    [".claude/ny.py", ".claude/worktrees/ny.py", ".pytest_cache/ny.py", "foretag/ny.txt", "scripts/ny.py", "testdata/ny.txt"],
+)
+def test_granskning_38_p1_en_ny_fil_i_en_mapp_i_det_vantade_laget_stoppar(tmp_path, stycket, fil):
+    # .claude/ är P1. Resten är de andra mapparna som står i det väntade läget.
+    assert _stoppar(STYCKENA[stycket](), _rad_for_ny_fil(tmp_path, fil))
+
+
+@pytest.mark.parametrize("stycket", STYCKENA, ids=list(STYCKENA))
+@pytest.mark.parametrize("fil", [".claude/ny.py", ".claude/worktrees/ny.py", ".CLAUDE/ny.py"])
+def test_granskning_38_p1_en_fil_i_claude_stoppar_ocksa_om_sessionen_har_raknat_upp_den(stycket, fil):
+    assert _stoppar(STYCKENA[stycket](), f"?? {fil}", uppraknade=[fil])
+
+
+@pytest.mark.parametrize("stycket", STYCKENA, ids=list(STYCKENA))
+@pytest.mark.parametrize("namn", [".GITATTRIBUTES", ".GitAttributes", ".gitattributes"])
+def test_granskning_38_p3_gitattributes_i_en_ny_mapp_stoppar_i_varje_stavning(tmp_path, stycket, namn):
+    fil = f"ny/{namn}"
+    rad = _rad_for_ny_fil(tmp_path, fil)
+    assert rad == f"?? {fil}"
+    # Också om sessionen har räknat upp filen, så att regeln inte bara är "allt annat stoppar".
+    assert _stoppar(STYCKENA[stycket](), rad, uppraknade=[fil])
+
+
+@pytest.mark.parametrize("stycket", STYCKENA, ids=list(STYCKENA))
+@pytest.mark.parametrize("namn", [".GITATTRIBUTES", ".GitIgnore", ".LFSCONFIG", ".GitModules", ".gitmodules"])
+def test_granskning_38_p3_de_fyra_namnen_stoppar_i_varje_stavning_i_vilken_mapp_som_helst(stycket, namn):
+    for fil in (namn, f"scripts/{namn}", f"ny/under/{namn}"):
+        assert _stoppar(STYCKENA[stycket](), f"?? {fil}", uppraknade=[fil])
+        assert _stoppar(STYCKENA[stycket](), f" M {fil}", uppraknade=[fil])
+
+
+@pytest.mark.parametrize("stycket", STYCKENA, ids=list(STYCKENA))
+def test_granskning_38_sessionens_uppraknade_filer_ar_vantade_och_inget_annat(tmp_path, stycket):
+    # Hugos svar i chatten: bara uppräknade. Riktiga rader från git status, en ändrad fil och en ny fil.
+    arbetsmapp, miljo = _kopia_med_vantat_lage(tmp_path)
+    (arbetsmapp / "SPEC.md").write_text("ändrad\n", encoding="utf-8")
+    (arbetsmapp / "scripts" / "ny.py").write_text("x\n", encoding="utf-8")
+    rader = _statusrader(arbetsmapp, miljo)
+    assert {" M SPEC.md", "?? scripts/ny.py"} <= rader
+    text = STYCKENA[stycket]()
+    assert not [rad for rad in rader if _stoppar(text, rad, uppraknade=["SPEC.md", "scripts/ny.py"])]
+    assert [rad for rad in rader if _stoppar(text, rad, uppraknade=["SPEC.md"])] == ["?? scripts/ny.py"]
+    assert [rad for rad in rader if _stoppar(text, rad, uppraknade=["scripts/ny.py"])] == [" M SPEC.md"]
+
+
+@pytest.mark.parametrize("stycket", STYCKENA, ids=list(STYCKENA))
+def test_granskning_38_en_ignorerad_fil_gar_inte_att_rakna_upp(stycket):
+    assert "men aldrig en rad med `!!`" in STYCKENA[stycket]()
+    assert _stoppar(STYCKENA[stycket](), "!! scripts/kvitto.csv", uppraknade=["scripts/kvitto.csv"])
+
+
+def test_granskning_38_samma_vantade_lage_pa_bada_platserna():
+    assert _vantat_och_regel(_claude_md_stycket_om_git_status())[0] == _vantat_och_regel(_installera_stycket_om_git_status())[0]
+
+
+@pytest.mark.parametrize("stycket", STYCKENA, ids=list(STYCKENA))
+def test_granskning_38_stoppregeln_har_orden(stycket):
+    regel = _vantat_och_regel(STYCKENA[stycket]())[1]
+    for text in (ALLA_ANDRA_STOPPAR, ALLA_BOKSTAVER, ALLTID_STOPP, "`.claude/`", "även om sessionen har räknat upp filen"):
+        assert text in regel
+
+
+@pytest.mark.parametrize("plats", ["CLAUDE.md", "INSTALLERA.md"])
+def test_granskning_38_meddelandet_raknar_upp_filerna(plats):
+    assert "Meddelandet räknar upp varje fil som sessionen har ändrat, skapat eller tagit bort." in _platser_med_de_fasta_kommandona()[plats]
+
+
+def test_granskning_38_stoppkriteriet_star_efter_regeln_om_granskning_38():
+    rader = CLAUDE_MD.read_text(encoding="utf-8").splitlines()
+    plats = next(i for i, rad in enumerate(rader) if rad.startswith("- Granskning 38 prövar bara rättelserna"))
+    assert rader[plats + 1] == (
+        "- Granskning 39 prövar bara P1, P3 och SPEC 7.1 från granskning 38. Blockerar inget där, installerar Hugo. Allt annat "
+        "som hittas går till Öppet (Hugos beslut 2026-11-05 om granskning 38)."
+    )
+
+
+# SPEC 7.1 mot CLAUDE.md och INSTALLERA.md. Ställena: "Det vakten inte stoppar" (status-kommandot), "Prov och test" (länkregeln,
+# undantaget för spärrprovet och undantaget för kopian) och "git commit -F" under git: (vem som committar före och efter).
+
+KOPIAN_UNDANTAG = 'Kopian är ett undantag från regeln "Prov och test", bara för spärrtestet'
+
+
+def _spec_punkt(borjan):
+    return next(rad for rad in _spec_7_1().splitlines() if rad.lstrip().startswith(borjan))
+
+
+def test_granskning_38_spec_status_kommandot_ar_samma_som_i_claude_md():
+    i_claude = re.findall(r"`(git status --short[^`]*)`", _claude_md_stycket_om_git_status())
+    assert i_claude == [NYTT_STATUS]
+    assert re.findall(r"`(git status --short[^`]*)`", _spec_7_1()) == i_claude
+    assert not GAMMALT_STATUS.search(_spec_7_1())
+
+
+def test_granskning_38_spec_lankregeln_har_samma_undantag_som_claude_md():
+    rader = CLAUDE_MD.read_text(encoding="utf-8").splitlines()
+    i_claude = next(r for r in rader if r.startswith("- Prov och test får bara skapa, ändra eller länka filer"))
+    undantaget = re.search(rf"testet `{HARD_LANK_TEST}` [^.]*[.]ssh/prov`, och ska stoppas", i_claude)
+    assert undantaget, "undantaget hittas inte i CLAUDE.md"
+    i_spec = _spec_punkt("- **Prov och test**")
+    assert undantaget.group(0) in i_spec
+    assert "Aldrig länkar (hårda eller mjuka) till något utanför de mapparna." in i_spec
+    assert "bara i spärrprovet" in i_spec
+    assert "Hugos beslut 2026-11-05 om granskning 37, P3" in i_spec
+
+
+def test_granskning_38_spec_lankregeln_har_undantaget_for_kopian_som_installera():
+    assert KOPIAN_UNDANTAG in _avsnitt(SPARRPROV_RUBRIK)
+    i_spec = _spec_punkt("- **Prov och test**")
+    assert KOPIAN_UNDANTAG in i_spec
+    assert "`~/VERA/sparrprov`" in i_spec
+
+
+def test_granskning_38_spec_sager_vem_som_committar_fore_och_efter_installationen():
+    rader = CLAUDE_MD.read_text(encoding="utf-8").splitlines()
+    i_claude = next(r for r in rader if r.startswith("- När sandlådan är installerad committar agenten inte"))
+    i_spec = _spec_punkt("- `git commit -F`")
+    for text in (
+        "När sandlådan är installerad committar agenten inte",
+        "Sessionen skriver bara commit-meddelandet i filen `COMMIT_MSG.txt` i projektmappen",
+        "Hugos beslut 2026-11-05 om granskning 34, beslut 2",
+        "Det gäller från installationen av steg 15",
+        "Hugos beslut 2026-11-05 om granskning 35, beslut 6",
+    ):
+        assert text in i_claude and text in i_spec
+    # Det gamla, att meddelandet skrivs i den tillfälliga mappen, gäller bara före installationen.
+    assert i_spec.index("Före installationen") < i_spec.index("skrivs med fil-verktygen i den tillfälliga mappen")
+    assert i_spec.index("skrivs med fil-verktygen i den tillfälliga mappen") < i_spec.index("När sandlådan är installerad")
+
+
+def test_granskning_38_spec_sager_att_git_add_och_git_commit_star_kvar_enligt_oppet_64():
+    i_spec = _spec_punkt("- `git commit -F`")
+    assert "`git add` och `git commit` står kvar i listan" in i_spec
+    assert "Öppet 64" in i_spec
+
+
+# Kommandolistan, inställningarna och vakten är oförändrade mot 103eb55, commiten före rättelsen (räknat i en kopia av den).
+
+LISTANS_SUMMA = "7c3ab251713a93073f5d9d10804f35af8d48497daca8f77140ff3c6e321783e7"
+INSTALLNINGARNAS_SUMMA = "1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da"
+
+
+def _kommandolistan():
+    rader = _spec_7_1().splitlines(keepends=True)
+    start = rader.index("| Kommando | Till vad |\n")
+    slut = start
+    while rader[slut].startswith("|"):
+        slut += 1
+    return "".join(rader[start:slut])
+
+
+def test_granskning_38_kommandolistan_i_spec_7_1_ar_oforandrad():
+    assert hashlib.sha256(_kommandolistan().encode("utf-8")).hexdigest() == LISTANS_SUMMA
+    assert "| `git add` |" in _kommandolistan() and "| `git commit` |" in _kommandolistan()
+
+
+def test_granskning_38_installningarna_ar_oforandrade():
+    assert hashlib.sha256(INSTALLNINGAR.read_bytes()).hexdigest() == INSTALLNINGARNAS_SUMMA
+
+
+def test_granskning_38_vakten_ar_oforandrad():
+    assert hashlib.sha256(VAKTEN.read_bytes()).hexdigest() == VAKTENS_SUMMA
 
 
 # ---------------------------------------------------------------------------------------------
