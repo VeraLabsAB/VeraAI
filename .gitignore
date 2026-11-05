@@ -64,5 +64,8 @@ __pycache__/
 # Claude Codes lokala inställningar för den här datorn
 .claude/settings.local.json
 
+# Commit-meddelandet som sessionen skriver åt Hugo (Hugos beslut 2026-11-05 om granskning 35, beslut 6)
+COMMIT_MSG.txt
+
 # macOS
 .DS_Store

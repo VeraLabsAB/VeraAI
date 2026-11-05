@@ -11568,3 +11568,55 @@ Enklast är att ta bort filtret, om inget annat repo på datorn behöver det. De
 3. **Byggsession:** P1-testet in i `test_sandladan.py`, P11-texten med test, väntade antal (P6), CLAUDE.md (P12 och P13), och det som besluten ger. `managed-settings.json` ändras inte av något av det, och summan står kvar.
 4. **Ny oberoende granskning av ändringen.** Det rör spärrar, så per steg.
 5. Hugo installerar, och spärrprovet körs direkt, med `~/.ssh` skapad för stunden, annars prövas den inte.
+
+## Hugos beslut 2026-11-05 om granskning 35
+
+Skrivna av Hugo i chatten 2026-11-05, i uppdraget för byggsessionen. Ordagrant:
+
+    1. P1: testet test_sparr_kopian_arbetsmappen_gar_inte_att_flytta (från provkörningen) läggs in i scripts/tests/test_sandladan.py.
+    2. P2: Hugo har satt git config --global safe.bareRepository explicit (2026-11-05). INSTALLERA.md kontrollerar att den är satt före installationen.
+    3. P3: varje session börjar och slutar med git status --short --ignored.
+    4. P4: inga sessioner i worktrees tills det finns ett prov för det. Hugo har städat den gamla arbetskopian 2026-11-05 (mappen till papperskorgen, git worktree prune, grenen borttagen med git branch -d).
+    5. P11: är ett H1-prov rött i appen: backa inte, men stanna. Kör inga sessioner tills det är avgjort. Det avgörs av en session som bara läser, som Hugo startar, och som bara tittar på det provet.
+    6. P12: när sandlådan är installerad skriver Hugo alltid själv samma fasta kommandon: git status --short --ignored, git add -A och git commit -F COMMIT_MSG.txt. Sessionen skriver bara commit-meddelandet i filen COMMIT_MSG.txt i projektmappen, och skriver aldrig ett kommando som Hugo ska klistra in. Det ersätter delen om "färdiga kommandon" i beslut 2 om granskning 34. COMMIT_MSG.txt står i .gitignore.
+    7. P13: CLAUDE.md ska säga att grupp D körs utanför sandlådan i en kopia av en granskad commit.
+    8. P9: INSTALLERA.md får bara ha kommandon i vanliga kodrutor (```). Testerna stoppar ~~~-rutor, indragna kodrader och kodrutor i citat.
+    9. P14 och Öppet 62 (Git LFS) står kvar under Öppet. Git LFS låts vara tills Hugo vet om något annat repo använder det.
+    10. SPEC 7.1: 2.1.295 blir 2.1.305, och de två meningarna i Öppet 58 rättas, som en del av den här versionen.
+    11. Provkörningen 2026-11-05, del E (Terminal, Claude Code 2.1.318, ~/VERA/agent, hela sandlådan med --settings): 4683 passed, 47 skipped, 0 failed. De överhoppade: 30 spärrprov i kopian, 9 spärrtestet (sandlådan inte installerad), 6 H1-prov (Terminal), 2 grupp D.
+
+### Så är det byggt (ed6b847 och commiten med den här texten), och vad som inte är visat
+
+`sparr/managed-settings.json`, `sparr/kommandosparr.py` och kommandolistan i SPEC 7.1 är inte ändrade. Summorna står kvar. Byggsessionens egna val, som granskningen ska titta på:
+
+- **SPEC 7.1, versionen.** Beslut 10 säger att 2.1.295 blir 2.1.305. Raden sa det två gånger, och den första var dokumentationens krav för `onFailure`, som granskning 35 kallar rätt. För att inte skriva ett fel om dokumentationen säger den nu "Filen kräver Claude Code 2.1.305 eller senare". Dokumentationens 2.1.295 står kvar i INSTALLERA.md, steg 1 (test).
+- **SPEC 7.1, de två meningarna.** Den om testet stämde redan igen efter beslut 1 om granskning 34 (Öppet 58). Den säger nu också "i samma ordning", som testet prövar. Den om testfilen säger nu att sandlådan stoppar en egen testfil bara utanför projektet. Tabellraderna `git add` och `git commit` står kvar, enligt uppdraget, och de stoppas efter bytet (granskning 35, P10). Det är kvar som en skillnad mellan listan och sandlådan.
+- **INSTALLERA.md, utöver P2, P11, P9 och antalen:** besluten kräver tre saker till. Kontrollen efter installationen, steg 7, startade en session i en worktree, och säger nu att steget hoppas över (P4). Bytets punkt 5 sa "färdiga kommandon", och har nu Hugos tre (P12). Provkörningens version är 2.1.318 (beslut 11).
+- **Hugos tre fasta kommandon står i kodrutor** i bytets punkt 5, eftersom beslut 8 säger att kommandon ska stå i vanliga kodrutor. Sessionen skriver dem aldrig, men INSTALLERA.md, som granskas, gör det.
+- **Git-inställningen kontrolleras i bytet och i Caspers avsnitt.** Visar den inte `explicit`: stoppa och fråga. Kontrollen ställer inte in något.
+- **Väntade antal.** Spärrprovet: `40 passed`, eller `39 passed, 1 skipped` om `~/.ssh` inte finns. Provkörningen: `48 skipped`. Hela sviten i sandlådan i appen: 33 eller 34 överhoppade. Ett test räknar 40, 31 och 9 ur testerna, men hela sviten nämns inte med ett antal `passed`, eftersom det ändras med varje nytt test. Att skapa `~/.ssh` för stunden (P5) står inte med, eftersom inget beslut säger det.
+- **CLAUDE.md:** P3, P4, P11, P12 och P13 enligt besluten. En mening förklarar vad `--ignored` visar, och en vad en worktree är.
+- **Ordgränsen i INSTALLERA.md höjdes inte.** För att få plats togs tre saker bort: en mening som också står under "Efteråt", punkt 9 (`.venv`), och två källhänvisningar till dokumentationen (`docs/en/setup` och `docs/en/desktop`). Ingen instruktion är borta.
+
+**P9, mutationer med den riktiga `test_sandladan.py` mot en ändrad kopia** (körning, 2 kommandon, 6 platser):
+
+| Form | Rött |
+|---|---|
+| Vanlig kodruta | 12 av 12 |
+| Ruta med `~~~` | 12 av 12 |
+| Indragen rad | 12 av 12 |
+| Ruta i citat | 12 av 12 |
+| Löpande text | **0 av 12** |
+
+Dessutom 264 mutationer i minnet, som står kvar i testerna, med fler varianter: `~~~bash`, `~~~` i en lista, tabb, kodrad i ett citat och `<pre>`. **Kvar:** beslut 8 säger att INSTALLERA.md bara får ha kommandon i vanliga kodrutor, och att testerna stoppar de tre formerna. Ett okänt kommando i löpande text går fortfarande igenom, och filen har sådana rader i dag, till exempel `cp ~/.zshrc.fore-vera ~/.zshrc`. `sudo`, `rm -`, `curl` och `wget` stoppas där som förut. En indragen rad som står exakt där texten i en öppen listpunkt börjar, eller som fortsätter ett stycke, visas som vanlig text och räknas som löpande text.
+
+**P12, prövat med riktig git i en tillfällig mapp** (körning): `COMMIT_MSG.txt` är ignorerad och följer inte med `git add -A`, och `$(...)`, bakåtfnuttar, `;` och `|` i filen körs inte av `git commit -F`. **Min bedömning, inte provad:** `git add -A` tar med allt som inte är ignorerat, också det en testfil har lagt dit, och det är därför `git status --short --ignored` kommer först. `.gitattributes` kan fortfarande starta LFS-filtret vid `git add` (Öppet 62). Skriver en session inget nytt meddelande ligger det gamla kvar i filen.
+
+**P1-testet, utan sandlåda** (körning): mot ett eget repo i testets tillfälliga mapp, med villkoret för kopian borttaget, blir det rött och repot kommer tillbaka. I den riktiga sandlådan gick det igenom i Hugos provkörning, i kopian. Från den låsta filen visas det först efter bytet.
+
+**Inte visat:**
+
+- Att `git config --global --get safe.bareRepository` visar `explicit` på Hugos dator. Kommandot står inte på listan, så det är Hugos uppgift i beslut 2.
+- Att Hugos arbetskopia är borta, utöver att `.git/worktrees` inte finns (körning).
+- Antalen 48, 33 och 34: räknade, inte körda i en sandlåda. Del E kördes före P1-testet, och med den versionen var det 47.
+- Allt som bara går att visa efter bytet ("Kan inte provas förrän efter bytet", granskning 35).
