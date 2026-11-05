@@ -297,7 +297,8 @@ def test_s3_en_funktion_som_heter_builtin_syns_pa_att_slut_saknas(tmp_path):
 
 
 def _oppet():
-    return _en_rad(PROGRESS.read_text(encoding="utf-8").split("## Öppet", 1)[1].split("\n## ", 1)[0])
+    # Rubriken på en egen rad: en post som nämner den i text ändrar inget (Hugos beslut 2026-11-05 om granskning 37, A).
+    return _en_rad(PROGRESS.read_text(encoding="utf-8").split("\n## Öppet\n", 1)[1].split("\n## ", 1)[0])
 
 
 def test_s4_trap_hash_och_builtin_star_under_oppet_for_sandladan():

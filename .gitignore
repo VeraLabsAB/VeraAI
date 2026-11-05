@@ -17,12 +17,20 @@ logg/
 
 # Undantag för de fem reglerna ovan, bara för Python-kod i mapparna med kod. Annars följer
 # scripts/kvitto_flode.py inte med git add -A, och inget sägs (Hugos beslut 2026-11-05 om
-# granskning 36, P2). Ett underlag är ingen .py-fil. Allt annat med de orden i namnet ignoreras
-# som förut, och testet i scripts/tests/test_sandladan.py larmar om det är en kodfil.
+# granskning 36, P2, och om granskning 37, P2). Ett underlag är ingen .py-fil. Allt annat med
+# de orden i namnet ignoreras som förut, och testet i scripts/tests/test_sandladan.py larmar om
+# det är en kodfil.
 # Ordningen spelar roll: den sista regeln som passar gäller. Reglerna för Shop and Go och
-# hemligheter står därför under undantaget, och är lika starka som förut.
+# hemligheter står därför under undantaget, och är lika starka som förut. Reglerna med / på
+# slutet gäller bara mappar: undantaget skulle annars släppa igenom en mapp som heter till
+# exempel scripts/kontoutdrag.py/ och allt i den.
 !/scripts/**/*.py
 !/sparr/**/*.py
+*kontoutdrag*/
+*kvitto*/
+*kvitton*/
+*z-rapport*/
+*Z-rapport*/
 
 # Allt från gamla Shop and Go-projektet.
 *shop*and*go*
