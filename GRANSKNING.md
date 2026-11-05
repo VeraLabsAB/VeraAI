@@ -11620,3 +11620,197 @@ Dessutom 264 mutationer i minnet, som står kvar i testerna, med fler varianter:
 - Att Hugos arbetskopia är borta, utöver att `.git/worktrees` inte finns (körning).
 - Antalen 48, 33 och 34: räknade, inte körda i en sandlåda. Del E kördes före P1-testet, och med den versionen var det 47.
 - Allt som bara går att visa efter bytet ("Kan inte provas förrän efter bytet", granskning 35).
+
+## Granskning 36 (av ed6b847 och 2572b0f) (2026-11-05)
+
+Oberoende granskning av steg 15 efter Hugos beslut om granskning 35, jämfört med 54d6acb. Inget är installerat, inget sudo är kört, och inget i `/Library`, i projektets `.git` eller i Hugos inställningar är rört. Ingen kod, inget test och ingen inställningsfil är ändrad. Egna prov ligger i scratchpad.
+
+**Dom: gult. Inget blockerar installationen, men sex fynd bör rättas, och två av kontrollerna gör Hugo själv före bytet.** Besluten är byggda som de står, och `git add -A` och `git commit -F` kör i mina prov ingen kod på egen hand. Det viktigaste fyndet: `COMMIT_MSG.txt` kan vara en länk, och då hamnar en fil som sandlådan förbjuder i git-historiken (P1).
+
+**Så skiljer jag vad som är visat.**
+
+- **Körning:** gjort på den här datorn med riktig git i testets tillfälliga mapp, med egen hemmapp och en påhittad global git-inställning, inte Hugos. Kommandona kördes som Hugo skriver dem, i zsh. **Inget är kört i en sandlåda.** Att en testfil i sandlådan får skapa filerna som proven utgår från är dokumentationens ord (länk nedan) och min bedömning.
+- **Dokumentation:** läst med WebFetch, återgiven med egna ord och avsnittets namn, med ett kort citat. En liten modell läser sidan åt WebFetch, så läs avsnittet själv om ordalydelsen avgör något.
+- **Bedömning:** står uttryckligen.
+
+**Summorna** (körning): `sparr/managed-settings.json` `1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da`, `sparr/kommandosparr.py` `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d`, `requirements.txt` `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a`, `sparr/kontrollera-skalet.zsh` `10388d474a555e6d337a9468c5a1f5e2fd0ca04608e36024f73011dc5186d51f`. Alla stämmer med INSTALLERA.md. Mellan 54d6acb och 2572b0f är bara `.gitignore`, `scripts/tests/test_sandladan.py` och `sparr/INSTALLERA.md` ändrade under `sparr`, `scripts` och `.gitignore`.
+
+**Hela sviten, utan sandlåda (körning): 5006 passed, 40 skipped.** Som väntat. Skälen, räknade ur utskriften: 31 `SPÄRRPROVET I KOPIAN HOPPAS ÖVER` och 9 `SPÄRRTESTET HOPPAS ÖVER`.
+
+### Punkt 1: CLAUDE.md
+
+**Listan före och efter i PROGRESS.md stämmer med `git diff`, rad för rad.** Diffen är ett enda stycke: två rader borta och fyra nya. "Alltid", "Aldrig" och "Vem som ger OK" är orörda. Två småsaker står inte i listan: orden "ett i taget" är borta ur CLAUDE.md (de står kvar i INSTALLERA.md), och raderna har bytt plats.
+
+**Ingen säkerhetsregel är borttagen, men en är ett byte åt båda håll.** Risken att Hugo klistrar in ett kapat kommando är borta, och det är starkare. Men `git add` med namngivna filer blev `git add -A`, så Hugo väljer inte längre vad som följer med, och han ser inte heller meddelandet före commiten. Det är Hugos uttryckliga beslut 6, och prövas inte om. Följderna är P1, P2 och P3.
+
+**Texten "så att en dold fil inte kan gömma sig" lovar för mycket**, se P3.
+
+### Punkt 2: de tre fasta kommandona, prövade
+
+| Försök | Resultat (körning) |
+|---|---|
+| Filnamn som `-F`, `--amend`, `--all`, `-A`, `-m`, `--no-verify`, `--exec=touch pwn`, `$(touch pwn1)`, `` `touch pwn2` ``, `;touch pwn3;`, `*` | Inget körs. Alla blir vanliga filer i commiten, meddelandet stämmer, och commiten är en ny, inte en `--amend`. Kommandona har inga jokertecken, så filnamn når aldrig skalet |
+| `$(...)`, bakåtfnuttar, `;`, `\|` och `>` i `COMMIT_MSG.txt` | Inget körs. Texten hamnar i meddelandet |
+| `COMMIT_MSG.txt` ignorerad? | **Ja:** `.gitignore:68`, och filen följer inte med. Skriver någon `!COMMIT_MSG.txt` i `.gitignore` följer den med, och det syns. Filen har aldrig varit committad (`git log`) |
+| `.gitattributes` med `* filter=lfs`, och filtret i den påhittade globala filen | **Programmet startas:** 2 gånger av `git status --short --ignored`, och 8 av `git add -A`. Se P8 |
+| Samma, med filnamn som `a$(touch pwn1).txt` och `c'; touch pwn3; '.txt` | Inget körs. Git citerar namnet för skalet, och programmet får det som ett argument |
+| `.gitattributes` gömd med en egen `.gitignore` | Filtret startas ändå. `git status --short` visar den inte, och `--ignored` gör det |
+| `* filter=elak diff=elak merge=elak`, `.gitconfig` i arbetsmappen med `core.fsmonitor`, `.gitmodules` med `update = !touch`, `.lfsconfig` med ett program, och `hooks/pre-commit` | Inget körs. **En fil i arbetsmappen kan inte själv peka ut ett program** |
+| Bar git-mapp i en undermapp, med `safe.bareRepository=explicit` | Inget körs, också med `git add -A` i mappen. Samma när `.git/config` försöker sätta `all`, så P2 i granskning 35 håller också om den skulle kunna skrivas |
+| `COMMIT_MSG.txt` som **länk** till en fil utanför | **Filens innehåll blir commit-meddelandet.** P1 |
+
+**Svaret: nej, inte med det jag kunde pröva. En kapad session får inte de tre kommandona att köra ett eget program,** så länge Hugos globala inställningar inte pekar ut något i projektet. Det villkoret är inte kontrollerat, se P4. Riktig `git-lfs` är inte prövad: den finns inte i `PATH` i sessionen (körning).
+
+#### P1, bör rättas: `COMMIT_MSG.txt` kan vara en länk, och då hamnar en förbjuden fil i historiken
+
+En testfil i sandlådan kan skriva i projektmappen ([dokumentationen](https://code.claude.com/docs/en/sandboxing.md), "How sandboxing works", ger läs- och skrivrätt i arbetsmappen och mapparna under den). Den kan alltså byta ut `COMMIT_MSG.txt` mot en **länk** (en hänvisning till en annan fil), till exempel till en nyckel i `~/.ssh`. Sandlådan stoppar läsningen, men Hugos `git commit -F` körs utanför den och följer länken.
+
+Provet (körning): `git status --short --ignored` visar `!! COMMIT_MSG.txt`, precis som för en vanlig fil. Efter `git commit -F` står hela den hemliga filen i meddelandet, och nästa session kan läsa den med `git log`, och vid en push hamnar den på GitHub.
+
+**Bedömning av allvaret:** det kör ingen kod. Allt utom `~/.ssh` kan en testfil läsa ändå, eftersom sandlådan låter kommandon läsa hela datorn som standard (samma avsnitt). Det nya är alltså bara `~/.ssh`, som inte finns på den här datorn i dag (granskning 35, P5). Därför blockerar det inte. Men det kringgår beslut 7, och det gäller från den dag en nyckel finns.
+
+Samma sak utan länk (körning): en specialfil (fifo) gör att `git commit -F` hänger tills Hugo avbryter, och en session som inte skriver något nytt lämnar det gamla meddelandet, och då får nästa commit samma meddelande utan varning.
+
+**Förslag, Hugos beslut:** ett fjärde fast kommando före commiten, `ls -l COMMIT_MSG.txt`. Väntat: raden börjar med `-` (en vanlig fil) och har dagens datum och tid. Börjar den med något annat: stoppa och fråga. Det visar också det gamla meddelandet.
+
+#### P2, bör rättas: `git add -A` tappar tyst nya filer med namn som `.gitignore` tar
+
+`.gitignore` har `*kvitto*`, `*token*`, `*secret*`, `*credentials*`, `*.se` och liknande, utan mapp, för riktiga underlag och hemligheter. De gäller också kod. Provet (körning), med projektets riktiga `.gitignore`: `scripts/kvitto_flode.py` och `scripts/tests/test_kvitto_saknas.py` följer inte med `git add -A`, koden är 0 och inget sägs. Den gamla formen, `git add` med filnamnet, gav ett fel. Steg 120 i BYGGPLAN.md gäller just "Kvitto saknas", så namnet är troligt.
+
+Det här är ingen attack utan ett misstag: pytest kör filen i projektmappen, sviten är grön, och filen finns inte i historiken, så en `git clone` blir röd eller saknar testet. Det syns bara som en `!!`-rad. **Förslag:** P3, och att mönstren i `.gitignore` smalnas av, om det går utan att riskera riktiga underlag. Den frågan är Hugos.
+
+#### P3, bör rättas: `git status --short --ignored` har inget väntat läge och ingen stoppregel
+
+Granskning 35, P3, föreslog "väntat läge skrivet". Beslut 3 tog med kommandot, inte det. INSTALLERA.md säger "så att du ser vad som följer med", och Hugo har ingen bakgrund i programmering, så han kan inte veta vad en rad betyder. Då är kommandot en kontroll bara om något annat läser utskriften. Tre saker det inte visar (körning):
+
+- **En ny fil i en mapp som redan är ignorerad syns inte.** `.pytest_cache/` finns i dag. Med en ny `conftest.py` och en ny mapp där är utskriften byte för byte densamma. Pytest läser inget där, så det ger ingen kod, men "inte kan gömma sig" stämmer inte.
+- **`?? scripts/` visar inte filerna i mappen**, bara mappen.
+- **Filtret i P8 har redan körts** när Hugo läser utskriften.
+
+**Förslag:** skriv i bytets punkt 5 vad som är väntat: raderna med `!!` i dag är `.DS_Store`, `.claude/`, `.pytest_cache/`, `foretag/.DS_Store`, `scripts/.DS_Store` och `testdata/.DS_Store` (körning), och `COMMIT_MSG.txt` när den finns. En annan `!!`-rad, eller en rad med `.gitattributes`, `.gitignore`, `.lfsconfig` eller `.gitmodules`: stoppa och fråga. Ändra orden i CLAUDE.md till "så att fler dolda filer syns".
+
+#### P4, bör rättas, Hugos kontroll: resten av Hugos globala git-inställningar är inte genomgångna
+
+Granskning 35 tittade bara på `filter`, `diff` och `merge`. Andra nycklar kan peka in i projektet. Provet (körning, påhittad fil): med `core.hooksPath = .githooks` i den globala filen körs `.githooks/pre-commit` i arbetsmappen av Hugos `git commit -F`, och den filen kan en testfil skriva. Jag vet inte om Hugos fil har något sådant, och inget tyder på det. `git config` står inte på listan, och uppdraget säger att jag inte rör Hugos filer. Kommandot visar bara namnen på nycklarna, inte värdena:
+
+```bash
+git config --global --name-only --list
+```
+
+Väntat är bland annat `user.name`, `user.email`, `safe.barerepository` och `filter.lfs.*`. Står något annat där, särskilt `core.*`, `include.*`, `includeif.*` eller `alias.*`: skicka namnen till en session, och stoppa med installationen tills det är avgjort.
+
+### Punkt 3: kommandon i löpande text
+
+Skriptet hittade 161 kommandoliknande avsnitt inom bakåtfnuttar utanför kodrutorna, i `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/3c15d933-252e-4a2c-b80a-eb5e14cac6a2/scratchpad/prov/rapport_lopande.txt`, och ett kort `ls` (rad 307) och `date` (rad 1273) som skriptet inte tog. De flesta är sökvägar eller namn. Jag har delat dem efter vem som ska köra dem:
+
+| Rad i INSTALLERA.md | Kommando | Vem | Risk (bedömning) |
+|---|---|---|---|
+| 387, 418, 555 | `cp ~/.zshrc.fore-vera ~/.zshrc` | Hugo | **Högst av dem, men liten.** Skriver över `~/.zshrc` utan att fråga. Det är ångra-steget, och det står inte i någon ruta alls |
+| 124, 165, 1119, 1144 | `~/.local/bin/claude --version` | Hugo | Ingen, bara visar, och står också i en ruta |
+| 336 | `ls -ld ~/vera-forprov` | Hugo | Ingen, bara visar, och står också i en ruta |
+| 1130 | `echo $PATH` | Hugo | Ingen, bara visar, och står också i en ruta |
+| 137, 763–764, 938, 1163–1164 | `cd ~/VERA/agent` och `~/.local/bin/claude` | Hugo | Ingen, startar Claude Code, och står också i en ruta |
+| 307, 954, 976, 1193, 1212, 1235, 1241, 1260, 1273 | `ls`, `git status`, `mkdir -p`, `date` | Agenten | Vakten prövar dem |
+| 1191, 1218, 1259 | `ls; ls` | Agenten | Ska stoppas |
+| 1199 | hela pytest-kommandot | Agenten | Vakten prövar det. Ska egentligen stå i en ruta, som samma kommando gör i bytet |
+| 1202 | `sudo ls` | Agenten | Ska stoppas. Texten säger vad Hugo gör om datorn ändå frågar efter lösenord |
+| 91 | `export PATH="$HOME/.local/bin:$PATH"` | Ingen | I en varning som säger "kör inte" |
+| 95, 186, 244, 289, 355, 385, 399, 410, 412, 413, 455, 473, 564, 578, 582, 658, 667, 685, 686, 853, 962, 982, 983, 1000, 1014, 1076 | Förklaringar av kommandon i rutor, eller text i en fil | Ingen | Inget att köra |
+
+**Inget av det är farligt i dag.** Men beslut 8 säger "bara kommandon i vanliga kodrutor", och rad 387, 418, 555 och Hugos rader ovan följer inte det. **Rad 982–983 säger också "Du kör dem själv i Terminal" om `git push`, `git merge` och `git checkout`, och de har ingen fast form** (P13).
+
+### Punkt 4: mutationsprov
+
+Med den riktiga `test_sandladan.py` mot en kopia (körning): 12 kommandon, 5 former och 6 platser, 360 ändrade kopior. Utan mutation: `410 passed, 40 skipped`, som byggsessionen.
+
+| Kommando | Vanlig ruta | `~~~` | Indragen | Citat | Löpande text |
+|---|---|---|---|---|---|
+| `sudo rm -rf …` | 6/6 | 6/6 | 6/6 | 6/6 | 6/6 |
+| `rm -rf …` | 6/6 | 6/6 | 6/6 | 6/6 | 6/6 |
+| `curl …` | 6/6 | 6/6 | 6/6 | 6/6 | 6/6 |
+| `okant-kommando --flagga` | 6/6 | 6/6 | 6/6 | 6/6 | **0/6** |
+| `rm ~/VERA/agent/SPEC.md` | 6/6 | 6/6 | 6/6 | 6/6 | **0/6** |
+| `sudo chmod -R 777 ~/VERA` | 6/6 | 6/6 | 6/6 | 6/6 | **0/6** |
+| `sudo cp …` | 6/6 | 6/6 | 6/6 | 6/6 | **0/6** |
+| `sudo mv …` | 6/6 | 6/6 | 6/6 | 6/6 | **0/6** |
+| `chmod -R 777 ~/VERA` | 6/6 | 6/6 | 6/6 | 6/6 | **0/6** |
+| `git config --global core.hooksPath .x` | 6/6 | 6/6 | 6/6 | 6/6 | **0/6** |
+| `python3 -c 'print(1)'` | 6/6 | 6/6 | 6/6 | 6/6 | **0/6** |
+| `bash ~/VERA/agent/x.sh` | 6/6 | 6/6 | 6/6 | 6/6 | **0/6** |
+
+**Tabellen i byggsessionens rapport stämmer** (12 av 12 i de fyra formerna, 0 av 12 i löpande text, för samma två kommandon). **En sak i dess text är för bred:** "`sudo` … stoppas där som förut" gäller inte `sudo chmod`, `sudo cp` och `sudo mv`, eftersom orden står i `SUDO_I_TEXT`, med vilka argument som helst.
+
+Mot alla 11 testfiler som läser INSTALLERA.md (körning, stickprov): i bytet går en löpande rad fortfarande igenom. I den vanliga delen av filen, till exempel vid steg 7, blir den röd, men bara av ordgränsen (`test_installera_ar_kortare_an_fore_granskning_15`). Marginalen är under sex ord. Det betyder också att rättelserna av P3 och P7 slår i gränsen, om de hamnar i den delen.
+
+### Punkt 5: INSTALLERA.md före och efter
+
+**Inga instruktioner försvann när texten kortades.** Jag har läst hela diffen. De tre borttagna sakerna: meningen om `.venv` (står kvar under "Efteråt", punkt 9, och i SPEC 7.1) och två källhänvisningar (`docs/en/setup` och `docs/en/desktop`). Källorna är borta, så påståendet "var sin Claude Code" har inget stöd i filen längre, men det ändrar inget Hugo gör.
+
+**Kontrollen är något svagare när steg 7 hoppas över, men inte för Hugos byte:**
+
+- Bytets punkt 6 gör steg 2, 4 och 9, och "Byte av inställningsfil" steg 1, 2, 3 och 9. Steg 7 ingick inte där förut heller.
+- Det gäller den första installationen på en ny dator, alltså Caspers. Där prövas aldrig vad en worktree-session gör.
+- Steg 7 var den enda kontrollen av att vakten körs i en worktree. Nu håller bara en regel i text (CLAUDE.md) sådana sessioner borta, och appen kan fortfarande skapa dem. Vakten stoppar agentens egen väg dit, eftersom varken `git worktree` eller verktyget står på listan (läst i SPEC 7.1, inte provat).
+- **P11:** Tre rader säger fortfarande "steg 1–7" eller "efter steg 7" (rad 1156, 1222 och 1272), och ett steg som ska hoppas över krockar med "ska vara klara". Hänvisningen på rad 1210 saknar också namn och datum, "(granskning 35, beslut 4)", som CLAUDE.md kräver.
+
+### Punkt 6: SPEC 7.1 mot dokumentationen
+
+Diffen ord för ord (körning) visar ändringar bara på raderna 30, 229, 266 och 282. Kommandolistan är orörd.
+
+- **Versionen: stämmer.** "Filen kräver Claude Code 2.1.305" är filens `requiredMinimumVersion`, och [settings-reference](https://code.claude.com/docs/en/settings-reference.md) säger att nyckeln får Claude Code att vägra starta på en äldre version. För `onFailure` anger [hooks](https://code.claude.com/docs/en/hooks.md) version 2.1.295, i tabellen över fälten och i "Block the action when a hook fails", och det står kvar i INSTALLERA.md, steg 1. 2.1.305 är också [sandlådans](https://code.claude.com/docs/en/sandboxing.md) version för `sandbox.allowNestedUserNamespaces`.
+- **"I samma ordning": stämmer.** Testet jämför listorna. Två förbud i bytt ordning i vakten ger 1 rött (körning).
+- **P10, under Öppet: "sandlådan stoppar en egen testfil bara utanför projektet" är för grov åt båda håll.** [Dokumentationen](https://code.claude.com/docs/en/sandboxing.md) säger om utanför, i "How sandboxing works": den tillfälliga mappen för användaren är också skrivbar, och läsning är "read access to the entire computer, except certain denied directories". Om innanför, i "Protected paths": också i arbetsmappen nekas skrivning till filer som Claude Code läser inställningar och kod från, bland annat `.claude`, `.mcp.json` och `hooks` och `config` i `.git`. Till det kommer `.git` och `.venv` från filen. Förslag: "sandlådan stoppar en egen testfil från att skriva utanför projektet och den tillfälliga mappen, men inte från att läsa, och i projektmappen kan den skriva utom i de skyddade filerna". "Det syns med `git status --short --ignored`" har samma brist som i P3.
+
+Att `!` körs utanför sandlådan stämmer med samma sida ("What runs outside the sandbox"), med två undantag ("Turn off the retry with strict sandbox mode"): en bakgrundssession, där Hugos `git add` alltså stoppas, och en sorts Linux-session. Att `!` finns i skrivbordsappen är inte prövat av mig.
+
+### Punkt 7: antalen
+
+Räknat i en kopia, inte kört i någon sandlåda (körning):
+
+| Grupp | Antal | Så räknat |
+|---|---|---|
+| Spärrprov i kopian | 31 | `-k test_sparr_`: 40 skipped, 31 med texten om kopian |
+| Spärrtestet | 9 | Samma körning |
+| H1 | 6 av 31 | `-k test_h1_`: 31 passed. Med märkningen borttagen: 25 passed, 6 skipped |
+| Grupp D | 2 | `-k` med de två namnen: 2 passed. När de nekas: 2 skipped |
+
+- **48** i provkörningen: 31 + 9 + 6 + 2. **Rimligt.** Del E gav 47 före P1-testet, och det stämmer med ett till.
+- **33** i appen i sandlådan: 31 + 2. **Rimligt.** H1-proven hoppas inte över där (Hugos körning, del C: 31 passed), och de 9 körs.
+- **34** utan `~/.ssh`: ett till. **Rimligt.**
+- **Villkor:** de tre mapparna i `test_sparr_skrivning_i_appen_och_claude_code_stoppas` måste finnas. De fanns i del C (40 passed), men saknas en på Caspers dator blir det fler överhoppade, med texten "finns inte på den här datorn".
+
+**Inte visat:** de 315 nya proven har aldrig körts i en sandlåda, eftersom del E gjordes före dem. Därför bör provkörningen göras om före bytet, även om versionen är densamma, så att ett oväntat rött inte kommer först efter bytet.
+
+**P5, bör rättas: testet av del E blir rött när nästa session skriver sin post.** `test_granskning_35_del_e_star_i_progress_under_steg_15` kräver texten i det *första* avsnittet `## Läge` i PROGRESS.md, och CLAUDE.md säger att varje session skriver en ny post. Provet i en kopia (körning): en ny post överst ger `1 failed`. Den här granskningen skrev sin rad i det befintliga avsnittet för att undvika det. Rättelse: sök i hela filen.
+
+**P12, under Öppet: "Prov utanför sandlådan" har inget antal.** Väntat är `2 passed` (körning, utan sandlåda). Med en felstavad `-k` körs inga tester, och "inget `failed`" stämmer ändå (bedömning, inte provat).
+
+### Punkt 8: byggsessionens tre öppna frågor
+
+**1. Kommandon i löpande text (P7, under Öppet).** Regeln bör gälla det Hugo ska köra, inte varje gång ett kommando nämns, annars går förklaringarna inte att skriva. Min bedömning: flytta `cp`-raderna, och Hugos rader som saknar en egen ruta, till rutor. Stoppa nya med en lista över godkända avsnitt inom bakåtfnuttar som börjar med ett kommandonamn, i stället för en lista med förbjudna ord, och ta bort `chmod`, `cp` och `mv` efter `sudo` om de inte följs av exakt känd text. Inget av det hindrar installationen, eftersom filen är genomläst och en senare ändring ska granskas ändå. Ordgränsen behöver höjas med Hugos beslut.
+
+**2. `git add` och `git commit` i listan i SPEC 7.1 (P14, under Öppet).** Låt dem stå tills nästa version av vakten. Ta inte bort dem nu: en ändrad lista är en ny version av vakten, med ny summa, och dubbelt skydd skadar inte, eftersom vakten släpper igenom och sandlådan stoppar (spärrprovet prövar det). Texten "Säger texten och vakten olika gäller den strängaste" täcker skillnaden. Skriv en mening under tabellen i samma version som listan ändras.
+
+**3. `~/.ssh` i spärrprovet (P6, bör rättas).** Med `39 passed, 1 skipped` prövas läsförbudet aldrig från den låsta filen på den här datorn. Det är prövat från `--settings` i del B, men granskning 35 skrev att det ska köras med mappen. Dessutom prövar **inget steg** `Read(~/.ssh/**)` för fil-verktyget Read, fast granskning 35 listar det under "Kan inte provas förrän efter bytet". **Förslag:** i "Spärrprovet i kopian", före b, en ruta med `mkdir -m 700 ~/.ssh` och efter d en ruta med `rmdir ~/.ssh`, som Hugo gjorde i provkörningen, med villkoret att mappen inte finns, och att Hugo ber agenten läsa `~/.ssh/prov` med Read och väntar sig att det stoppas. Rätta sedan väntat antal. Hugos beslut.
+
+### Övriga fynd under Öppet
+
+- **P7:** kommandon i löpande text, ovan.
+- **P8, Öppet 62, utökad:** `git status` startar också filtret, alltså redan det kommando som ska visa läget. Saknas `git-lfs` med `filter.lfs.required` och `process` stoppas också `git status`, inte bara `git add`, med `the remote end hung up unexpectedly` (körning, kod 128). Det ger ingen kod, men Hugo vet inte vad felet betyder. Hugos riktiga värden är inte lästa.
+- **P9: `.gitattributes` kan dölja innehåll, utan något filter** (körning). `*.py -diff` gör att `git diff` och `git show` säger `Binary files … differ` för en ändrad `.py`, och `dold.py export-ignore` i en committad fil gör att `git archive` inte tar med filen. `git archive` är sättet att göra en kopia till en granskning enligt SPEC 7.1, och `git clone` berörs inte. Det syns som en ny `.gitattributes`, vilket P3 täcker. Förslag: `.gitattributes` får inte finnas, med ett test.
+- **P10:** meningen i SPEC 7.1, ovan.
+- **P11:** texten om steg 7, ovan.
+- **P12:** antalet i "Prov utanför sandlådan", ovan.
+- **P13: två saker runt Hugos kommandon.** Råa styrtecken i `COMMIT_MSG.txt` når Hugos Terminal via första raden i utskriften från `git commit` (körning: `\x1b[2K` kom igenom oförändrat, medan `git status` och `create mode` citerar dem). De kan ändra hur raden ser ut, men jag känner inget sätt att köra kod så, och det är inte prövat i Terminal. Och `git push`, `git merge` och `git checkout` har ingen fast form, fast rad 982–983 säger att Hugo kör dem, och en session får inte skriva kommandot åt honom.
+- **P14:** `git add` och `git commit` i listan, ovan.
+
+### Inte visat
+
+Att sandlådan låter en testfil skapa länken i P1 och `.gitattributes` i Hugos session (dokumentationen säger skrivning i arbetsmappen, och granskning 35 prövade `.gitattributes` i en modell). Hugos riktiga `~/.gitconfig` och att `safe.bareRepository` är `explicit` där. Riktig `git-lfs`. `!` i skrivbordsappen. Antalen 48, 33 och 34 i en riktig sandlåda. Allt under "Kan inte provas förrän efter bytet" i granskning 35.
+
+### Vad som krävs före installationen
+
+1. **Hugo kör kommandot i P4**, och kontrollerar att `git config --global --get safe.bareRepository` visar `explicit` (står redan i bytet).
+2. **Hugo kör provkörningen igen**, med `48 skipped` som väntat, eftersom 315 nya prov inte har körts i sandlåda.
+3. **Hugos eller Caspers beslut:** P1 (`ls -l COMMIT_MSG.txt`), P2 (`.gitignore`), P3 (väntat läge) och P6 (`~/.ssh`). Inget av det ändrar `managed-settings.json`, och summan står kvar. Rättas de i en byggsession, granskas ändringen per steg, eftersom den rör spärrar. **Min rekommendation:** rätta P1, P3, P5 och P6 före bytet, eftersom det är text och test, och P2 när beslutet om `.gitignore` finns. Väljer Hugo att installera först är inget av det farligt i dag, men då bör den första `git add -A` vänta på P3.
+4. Hugo installerar från den granskade commiten, och spärrprovet körs direkt.
