@@ -12539,3 +12539,197 @@ Skrivna ordagrant från uppdraget i chatten, efter Hugos provkörning 2026-11-05
 - **`cat` kör Hugo, inte agenten.** `cat` står redan i kommandolistan, så listan i SPEC 7.1 behövde inte ändras.
 - **SPEC 7.1:** beslut 3 på raden om `git commit -F`, beslut 4 och 5 på raden "Det vakten inte stoppar". Stoppkriteriet står bara i `CLAUDE.md`, som de tidigare.
 - **`core.quotepath`.** Granskning 39 påpekade att regeln om citattecken kräver att den inställningen inte är av i Hugos git. Det är inte kontrollerat och ingår inte i beslutet.
+
+## Granskning 40 (av 623d84e och 81baffc) (2026-11-05)
+
+Oberoende granskning av rättelserna efter granskning 39 (steg 15). Omfattningen är Hugos stoppkriterium (beslut 6): bara punkt 1–5 i besluten. Allt annat står under Öppet. Inget är installerat, inget sudo är kört, `~/.ssh` är inte skapad, och ingen kod, inget test, ingen inställningsfil och inget i `/Library` är ändrat. Den här commiten ändrar `GRANSKNING.md`, `PROGRESS.md` och `BYGGPLAN.md`. De två sista kräver CLAUDE.md, också när ett uppdrag säger att bara granskningen ska skrivas.
+
+**Dom: gult. Inget blockerar installationen.**
+
+| Punkt | Vad | Besked |
+|---|---|---|
+| 1 | Grupp D hoppar bara vid `Operation not permitted` | **Håller.** `Permission denied` som rött är rätt val. Två fynd under Öppet: P1 och P2 |
+| 2 | Hela `sandbox`-nyckeln, och testet som jämför | **Håller** |
+| 3 | `cat COMMIT_MSG.txt` efter `ls -l`, före commiten, och Hugo kör det | **Håller** |
+| 4 | Citattecken, `.github/` och `.mcp.json` stoppar alltid | **Håller** med gits standard. **`core.quotepath` kan inte avgöras här**, eftersom vakten stoppade kommandot, se P3 |
+| 5 | Stoppkriteriet i CLAUDE.md, och SPEC 7.1 med beslut 3–5 | **Håller** |
+
+**Det Hugo bör göra före installationen:** köra `git config --get core.quotepath` i Terminal. Tomt eller `true` är bra. Står det `false`: stanna och fråga, se P3.
+
+**Så skiljer jag vad som är visat.**
+
+- **Körning:** gjort på den här datorn, med riktig git, i en kopia av 81baffc och i testets tillfälliga mapp. Egna prov: `test_g40.py` i `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/2baf7f43-9779-4232-80e2-43b4ed542859/scratchpad/prov/`, resultaten i `scratchpad/res` i samma mapp. Kommandona står i `PROGRESS.md`.
+- **Modell:** `sandbox-exec`, macOS eget verktyg för sandlådor, med en profil som jag skrev själv. Den nekar skrivning i `.git`, `.venv`, `.claude`, `.mcp.json` och `.ugrep` i alla stavningar. **Det är inte Claude Codes riktiga profil.**
+- **Inte kört i någon riktig sandlåda.** Det gör Hugos provkörning.
+- **Min bedömning:** står uttryckligen.
+- **Mitt eget fel:** min första profil använde `(?i)`, som sandlådeverktyget inte stoppar något med. Provet `.venv` gick igenom utan fel, så jag såg det. Alla modellsiffror nedan kommer från den rättade profilen, som ger `PermissionError: [Errno 1] Operation not permitted` för alla fyra namnen.
+
+### Siffrorna
+
+| Vad | Väntat | Utfall | Hur |
+|---|---|---|---|
+| Hela sviten utan sandlåda | 0 failed, 5488 passed, 41 skipped, ingen rad med `GRUPP D` | **5488 passed, 41 skipped, 0 failed, ingen rad med `GRUPP D`.** De 41 är 31 `SPÄRRPROVET I KOPIAN` och 10 `SPÄRRTESTET` | Körning, i appen |
+| "Prov utanför sandlådan" | 39 passed | **39 passed**, ingen rad med `GRUPP D`, både i projektmappen och i en kopia av 81baffc | Körning, i appen. Inte i Terminal och inte i en `git clone`, eftersom `git clone` inte står på listan. Hugo kör det enligt INSTALLERA.md |
+| `85 skipped` i provkörningen | 38 + 10 + 31 + 6 | **Stämmer** | Räkning |
+| `69` efter bytet | 38 + 31 | **Stämmer.** Spärrtestets 10 och H1-provens 6 ska inte hoppas över där | Räkning |
+| `71` utan `~/.ssh` | 69 + 2 | **Stämmer.** De två är `test_sparr_lasning_av_ssh_stoppas` och `test_sparr_hard_lank_till_ssh_stoppas` | Räkning |
+
+**Räkningen, delarna:**
+
+- **38:** 1 + 1 + 1 + 1 + 2 + 12 + 6 + 2 + 12 (listan över testen i kopian, per namn), alltså de 39 i "Prov utanför sandlådan" utom `test_granskning_37_a_…`.
+- **10 och 31:** raderna från `-rfs` i min körning.
+- **6:** de sex H1-proven som använder hoppet i `_provfil_eller_hoppa_over`, `test_beslut_granskning_17.py` (1 + 4 + 1). Läst. Samma antal i Hugos körning enligt `PROGRESS.md`.
+
+**Modellen ger samma bild:** hela sviten i kopian gav **5450 passed, 79 skipped, 0 failed**. 79 är 38 + 31 + 10. H1-proven hoppas inte över i appen, därför 79 och inte 85. "Prov utanför sandlådan" i modellen gav **1 passed, 38 skipped**.
+
+**En svaghet i testet av antalen (bedömning):** `test_granskning_39_b1_antalen_i_installera_stammer_med_testerna` skriver 10, 31 och 6 som fasta tal, och räknar bara 39 och 38 ur testerna. Stämmer i dag. Ett nytt spärrprov skulle Hugos körning se, som ett annat antal.
+
+### Punkt 1: grupp D. Håller
+
+**Mutationer (körning, i en kopia).** Mutation betyder att jag ändrar koden med flit och ser om ett test larmar. Utan ändring: 42 passed.
+
+| Ändring | Röda test |
+|---|---|
+| Kontrollen av felkoden borta, så all `PermissionError` hoppar | 7 |
+| All `OSError` hoppar, också full disk | 15 |
+| Hopp vid orden i git:s felmeddelande också när git lyckas | 1 |
+| Hopp vid varje fel från git | 4 |
+| Fel ord i konstanten, `Permission denied` | 3 |
+| `test_granskning_37_a_…` hoppar när orden står i utskriften | 1 |
+| `_status` utan skyddet | 2 |
+
+**Alla sju larmar.** Riktiga fel (körning): `_status` i en mapp utan skrivrätt ger rött med `errno 13`, och inget hopp. Modellen: `.venv`, `.claude`, `.GIT` och `.mcp.json` ger `errno 1`, och `git init` säger `Operation not permitted`. Utanför sandlådan körs de 39 utan hopp (ovan).
+
+**Är `Permission denied` som rött rätt? Ja (bedömning, med körningen som stöd).**
+
+- Vanliga rättigheter ger `errno 13` (körning: en mapp med `chmod 555`). Sandlådan gav `errno 1` i Hugos körning. Ett `Permission denied` är alltså troligen något annat än sandlådan, och ska inte gömmas.
+- Beslutet skriver "Operation not permitted (PermissionError, …)", och `PermissionError` omfattar båda koderna i Python. Men det säger också "bara" och "alla andra fel ger rött", så det smalare valet följer ordalydelsen.
+- Skulle den riktiga sandlådan ge `errno 13` någonstans blir det rött, och Hugo stannar och frågar. Det kostar en omgång och döljer inget.
+
+**Särskilt: kan `test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott` bli grönt utan att ha prövat något? Ja.** Den kräver bara `returncode == 0`, och pytest ger 0 också när alla test hoppas över (körning):
+
+| Läge i kopian | Vad som händer inne i kopian | Testet |
+|---|---|---|
+| Inget ändrat, utan sandlåda | 1074 passed, inga hopp | Grönt |
+| Inget ändrat, modellen | 1038 passed, 36 skipped, alla `GRUPP D HOPPAS ÖVER` | Grönt |
+| Alla test hoppar över sig av en annan anledning | Inget provas (1,3 sekunder i stället för omkring 45) | **Grönt, fel** |
+| En av de fyra filerna, `test_byggplan_progress.py`, hoppar av en annan anledning | Filen som mest läser `BYGGPLAN.md` och `PROGRESS.md` provas inte | **Grönt, fel** |
+| Inga test hittas (`-k` utan träff) | Returkod 5 | Rött, rätt |
+| Ett rött test planterat | Returkod 1 | Rött, rätt |
+
+**Som testet ser ut i dag prövar det något** (körning: 1038 test går igenom i modellen, och de 36 hoppen är alla grupp D). Det är bara att ingenting larmar om det slutar. Se P1. **Blockerar inte** (bedömning): testet är ingen spärr, utan skyddar mot att en ny rubrik ger rött. Testen i kopian körs också direkt i sviten, så ett sådant hopp syns oftast i Hugos antal.
+
+**Minsta rättelsen, prövad i en kopia (körning):** lägg till `"-rs"` i kommandot, och efter raden med `returncode`:
+
+```python
+assert re.search(r"[1-9][0-9]* passed", svar.stdout), svar.stdout[-2000:]
+annat = [r for r in svar.stdout.splitlines() if r.startswith("SKIPPED") and "GRUPP D HOPPAS ÖVER" not in r]
+assert not annat, annat
+```
+
+Med den: grönt utan ändring, grönt i modellen, rött när alla hoppar (med annan text, och med texten `GRUPP D HOPPAS ÖVER`), och rött när en fil hoppar. `test_granskning_39_b1_prov_a_…` är fortfarande gröna. **Ingenting i projektet är ändrat.** Hugos eller Caspers beslut.
+
+### Punkt 2: sandbox-nyckeln. Håller
+
+Rutan i INSTALLERA.md är lika med `sandbox` i `sparr/managed-settings.json`, 11 nycklar, och det finns en sådan ruta (körning).
+
+**Mutationer av `test_granskning_39_b2_rutan_har_exakt_samma_sandbox_nyckel_som_filen` (körning, 39 ändringar, en i taget):**
+
+| Ändring | Antal | Testet |
+|---|---|---|
+| Var och en av de 11 nycklarna saknas | 11 | Rött i alla |
+| Var och en av de 11 nycklarna ändrad | 11 | Rött i alla |
+| Inne i `network` och `filesystem`: saknas, ändrad, tom, en post borta, annan ordning, ny `allowWrite` | 10 | Rött i alla |
+| Ny nyckel i `sandbox`, och ny nyckel bredvid `sandbox` | 2 | Rött i båda |
+| I filen i stället: `filesystem` saknas, `enabled` ändrad | 2 | Rött i båda |
+| Rutan borta | 1 | Rött |
+| **En andra, svagare ruta efter den rätta** | 2 körningar | **Testet tar den första och överlever.** Två andra test i samma fil larmar (`test_avsnitten_for_steg_15_…` och `test_filen_har_de_avsnitten_i_ordning_och_inga_andra_rutor`), och `test_granskning_37_a_…`, som kör dem. Hela filen är alltså röd |
+
+**Hålet är täckt.** `~` och mellanslag i värdena är samma text i rutan och filen (körning, jämförda som JSON).
+
+### Punkt 3: `cat COMMIT_MSG.txt`. Håller
+
+- **Ordningen (läst):** CLAUDE.md: `git status …`, `git add -A`, `ls -l COMMIT_MSG.txt`, `cat COMMIT_MSG.txt`, `git commit -F COMMIT_MSG.txt`. INSTALLERA.md, punkt 5: samma ordning i egna rutor, och "samma fem kommandon".
+- **Villkoret (läst):** båda säger att `cat` bara körs när raden från `ls -l` stämmer. Det är ordningen som granskning 39 bad om.
+- **Vem (läst):** CLAUDE.md: "Hugo skriver alltid själv" och "Med `cat` läser Hugo". SPEC 7.1: "det kommandot kör Hugo, inte agenten".
+- **Mutationer (körning):** `cat` borta, före `ls` eller efter commiten, "agenten" i stället för Hugo i CLAUDE.md, villkoret borta, och rutan borta i INSTALLERA.md: alla ger rött.
+- **Överlevde:** "kör Hugo, inte agenten" blir "kör agenten" i SPEC 7.1. Inget test är rött, se P4.
+
+**Bedömning:** att Hugo kör det är en regel i text. Vakten släpper igenom `cat COMMIT_MSG.txt` för agenten också, och det är ofarligt. Agenten ser bara sin egen fil, och det viktiga är att Hugo läser utskriften själv.
+
+### Punkt 4: stoppregeln. Håller med gits standard
+
+Riktiga rader från `git status --short --ignored -uall` i ett provrepo, med projektets `.gitignore`, utan Hugos inställningar (körning, git i `/usr/bin`). Varje fil räknades som uppräknad i listan, så att bara "stoppar alltid" kunde stoppa.
+
+| Fall | Rad | Stoppar? |
+|---|---|---|
+| `.github/` i rot och mapp, i tre stavningar | `?? .github/workflows/x.yml`, `?? ny/.github/x.yml`, `?? .GITHUB/y.yml`, `?? scripts/.GitHub/x` | **Ja, i båda texterna** |
+| `.mcp.json` i rot och mapp, i tre stavningar | `?? .mcp.json`, `?? .MCP.JSON`, `?? ny/.mcp.json`, `?? scripts/.Mcp.Json` | **Ja** |
+| Mellanslag, `å`, citattecken, tabb | `?? "ny/a b.py"`, `?? "ny/\303\245.py"`, `?? "ny/a\"b.py"`, `?? "ny/a\tb.py"` | **Ja** |
+| Långt s, fyndet P2 i granskning 39 | `?? "ny/.gitattribute\305\277"`, `?? "ny/.mcp.j\305\277on"` | **Ja.** Hålet är stängt med gits standard |
+| Ändrad och borttagen | ` M .github/w.yml`, ` D .mcp.json`, ` M "ny b.txt"` | **Ja** |
+| Andra namn, uppräknade | `?? ny/.githubx/a`, `?? ny/github/x.yml`, `?? scripts/ny.py` | Nej, rätt |
+| Det väntade läget med `COMMIT_MSG.txt` | 12 rader med `!!` | Nej, rätt |
+
+**Inga falska larm i dag:** inget namn i commiten har mellanslag, citattecken eller annat än vanliga tecken (körning, 0 namn).
+
+**Omdöpning:** `R  flytta.txt -> .github/in.txt` stoppar enligt orden i regeln, och en människa ser namnet. Testens egen tolkning, `_stoppar`, missar den när raden står i listan (körning). Samma som P5 i granskning 39, Öppet 68.
+
+**`core.quotepath`: inte kontrollerat.** `git config --get core.quotepath` stoppades av vakten: "'git config' står inte på listan i SPEC 7.1". Projektets `.git/config` har ingen sådan rad (`grep`, körning). Hugos globala inställningar har jag inte läst. Se P3.
+
+### Punkt 5: stoppkriteriet och SPEC 7.1. Håller
+
+- **Stoppkriteriet (läst):** raden står i CLAUDE.md direkt efter raden om granskning 39, och säger det beslut 6 säger.
+- **SPEC.md (körning):** `git diff --word-diff=porcelain 73b754a HEAD -- SPEC.md` visar två tillagda meningar, på raderna 278 och 282, och **inget borttaget**. 81baffc rör inte SPEC.md.
+  - Rad 278: beslut 3, `cat COMMIT_MSG.txt`.
+  - Rad 282: beslut 4 och 5, citattecken, `.github/` och `.mcp.json`.
+- **Kommandolistan:** oförändrad. Kontrollsumman i `test_granskning_38_kommandolistan_i_spec_7_1_ar_oforandrad` är grön, och en ändrad rad ger rött (körning).
+- **Låsta filer:** `git diff --stat 73b754a HEAD -- sparr/managed-settings.json sparr/kommandosparr.py .gitignore requirements.txt sparr/kontrollera-skalet.zsh` är tom (körning). Summorna i testerna är gröna: vakten `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d` och inställningarna `1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da`, samma som i INSTALLERA.md, steg 5.
+- **Mutationer i texten, alla tre filerna (körning):** 24 ändringar, 23 röda. Utan ändring: 504 passed. Den som överlevde är P4.
+
+Att besluten är ordagranna mot chatten kan jag inte visa, eftersom jag inte har sett byggsessionens chatt.
+
+### Fynd
+
+Alla fynd är under Öppet. Inget blockerar installationen.
+
+#### P1, under Öppet, bör rättas: `test_granskning_37_a_…` kan bli grönt utan att pröva något
+
+Se punkt 1. Rättelsen är tre rader och `"-rs"`, prövad i en kopia, och rör bara `scripts/tests/test_sandladan.py`.
+
+#### P2, under Öppet, låg: två av de 38 hoppar också vid `Permission denied`
+
+`test_h6_en_lank_till_git_stoppas` och `test_beslut_1_gamla_venv_i_projektet_stoppas` använder den äldre `gor_mapp_eller_hoppa_over`, som tar all `PermissionError`. Körning, i en mapp utan skrivrätt: `errno 13` gav `GRUPP D HOPPAS ÖVER`. **Beslut 1 gäller "de 25", och de två hör inte dit,** och byggsessionen skrev upp valet. Men CLAUDE.md säger om hela grupp D att alla andra fel ger rött, och INSTALLERA.md säger det om de 38. **För de två stämmer det inte.** Bedömning: ofarligt, eftersom Hugos antal och "39 passed" ser ett hopp utanför sandlådan. **Förslag:** samma kontroll av felkoden i hjälpfunktionen, med ett test för `errno 13`. Befintligt test prövar bara `FileNotFoundError`.
+
+#### P3, under Öppet, bör kontrolleras före installationen: `core.quotepath`
+
+**Regeln om citattecken fungerar bara om inställningen inte är `false`.** Körning, bara i provrepot, med `core.quotepath=false`:
+
+| Fil | Rad | Stoppar när den står i listan? |
+|---|---|---|
+| `ny/.gitattributeſ` | `?? ny/.gitattributeſ` | **Nej** |
+| `ny/.mcp.jſon` | `?? ny/.mcp.jſon` | **Nej.** `.mcp.jſon` är samma fil som `.mcp.json` på Macen (körning) |
+| `ny/å.py` | `?? ny/å.py` | Nej |
+| `ny/a b.py` | `?? "ny/a b.py"` | Ja |
+
+Testen ser inte det här, eftersom `_gitmiljo` stänger av Hugos inställningar. INSTALLERA.md nämner det inte. **Allvaret (bedömning):** blockerar inte. Det är samma smala hål som P2 i granskning 39, och läget blir inte sämre än i dag. Men det tar några sekunder att titta. **Förslag:** Hugo kör `git config --get core.quotepath` i Terminal nu. På sikt en ruta bredvid "Kontrollera git-inställningen" i bytets avsnitt. Hugos eller Caspers beslut.
+
+#### P4, under Öppet, låg: "kör Hugo, inte agenten" är inte låst i SPEC 7.1
+
+Meningen kan bli "kör agenten" utan rött test (körning). `test_granskning_39_b3_spec_7_1_namner_cat_och_kommandolistan_ar_oforandrad` letar bara efter kommandot. CLAUDE.md är låst. **Förslag:** testa meningen.
+
+#### P5, under Öppet, låg: `cat` visar styrtecken rakt av
+
+**Bedömning, inte körd i ett riktigt fönster:** backsteg och färgkoder i `COMMIT_MSG.txt` kan dölja text för den som läser, som P2 i granskning 38 säger om `git show --stat`. Granskning 39 föreslog `cat -v`, och beslutet valde `cat`. Filen läses också i `git show --stat HEAD` före en push. **Förslag:** ta upp när Öppet 67 tas upp.
+
+### Inte visat
+
+Allt i en riktig sandlåda: `85`, `69`, `71`, och att sandlådan nekar `.claude` med `Operation not permitted`. Bara `.venv` är visat, i Hugos körning. `git add` och `git commit` i provrepot i den riktiga sandlådan. Provrepot heter `prov-repo`, inte `.git`, och `git init` gick där (Hugos körning kom förbi det till `.venv`). Nekas de ändå hoppar `test_granskning_38_…` över sig som väntat, men 10 varianter av `test_granskning_39_b1_andra_fel_ger_rott` blir röda (läst). Hugo stannar då och frågar, och inget är farligt (bedömning). Värdet på `core.quotepath`. Hur Hugo läser listan vid en riktig commit. Att besluten är ordagranna mot chatten.
+
+### Vad som krävs före installationen
+
+1. **Inget fynd måste rättas först.** Stoppkriteriet är uppfyllt: inget i punkt 1–5 blockerar.
+2. **Hugo kör `git config --get core.quotepath`.** Tomt eller `true`: gå vidare. `false`: stanna och fråga.
+3. **Hugo kör provkörningen igen** (`85 skipped`, inget `failed`).
+4. Hugo installerar och kör spärrprovet direkt, med H1-proven i appen. Den här commiten är senast och ändrar bara tre textfiler mot 81baffc. I "Prov utanför sandlådan", punkt a, är det alltså den här commitens nummer som ska stå.
+5. Min rekommendation (bedömning): rätta P1 och P2 i nästa byggsession. Bara test och en mening, inga låsta filer.
