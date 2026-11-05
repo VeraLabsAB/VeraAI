@@ -8,8 +8,8 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet arbetar mot skuggpiloten (SPEC avsnitt 9 och `BYGGPLAN.md`). Än finns ett testföretag, Syntet Testbutik AB.
 Inget i koden kan i dag bokföra något.
 
-Testsviten: **5 259 passed, 40 skipped**, 0 misslyckade (körd senast 2026-11-05 i rättelserna efter granskning 36, i
-projektmappen med kommandot i SPEC 7.1. De 40 är spärrproven, som hoppas över tills sandlådan är
+Testsviten: **9 failed, 5 250 passed, 40 skipped** (körd senast 2026-11-05 i granskning 37, i
+projektmappen med kommandot i SPEC 7.1. De 9 röda beror på ett test som inte tål en ny granskningsrubrik, `GRANSKNING.md`, granskning 37, P1. Före den rubriken: 5 259 passed, 40 skipped. De 40 är spärrproven, som hoppas över tills sandlådan är
 installerad). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
 borttagen.
@@ -24,6 +24,19 @@ borttagen.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-11-05, granskning 37 av rättelserna efter granskning 36
+
+Steg i byggplanen: 15 (pågår)
+
+- **Dom: rött, tills ett test är rättat. Installera inte än.** Granskning 37 (`GRANSKNING.md`): rubriken gör 9 tester röda (P1, blockerar). Besluten är byggda, CLAUDE.md är inte svagare, och de låsta filerna är orörda. Bör rättas: P2 (`.gitignore`, en mapp med `.py` i namnet, och Hugos eller Caspers ställningstagande till öppningen), P3 (`ls -l` ser inte en hård länk), P4 (`.gitattributes` i en ny mapp) och P5 (kärnan i stoppregeln saknar test). Under Öppet: P6, P7 och P8. Inget är installerat, inget sudo är kört, och inget är pushat. **Ingen sandlåda är prövad:** länkproven är en egen modell med `sandbox-exec`.
+- **Körningar** (`<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`, `<S>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/63145fb3-a886-4277-962f-fd27826a3663/scratchpad`). Från projektmappen, ett kommando i taget.
+  1. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests`, före granskningens text: **5259 passed, 40 skipped**. Samma kommando efter texten: **9 failed, 5250 passed, 40 skipped**.
+  2. `git archive --format=tar -o <S>/fore.tar 4f40869` och `git archive --format=tar -o <S>/efter.tar 420a57d`, `mkdir -p <S>/fore <S>/efter <S>/prov`, `tar -x -f <S>/fore.tar -C <S>/fore` och `tar -x -f <S>/efter.tar -C <S>/efter`.
+  3. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfE <S>/prov/test_g37_p1_p3.py`: 1 failed, sedan 6 passed. Det röda var mitt eget antagande om vad `ls -l` visar för en mapp. Samma kommando för `test_g37_gitignore.py` (4 passed), `test_g37_lank.py` (2 passed), `test_g37_lank_kontroll.py` (1 passed), `test_g37_antal_och_text.py` (3 passed) och `test_g37_ny_rubrik.py` (1 passed, resultatet `9 failed`, 662 passed, 40 skipped i `res_ny_rubrik.txt`).
+  4. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfE <S>/prov/test_g37_mutationer.py`, två gånger, i bakgrunden. Första gången: 1 failed efter 24 minuter, på en tidsgräns i provet, inget resultat. Vakten stoppade `TaskStop`, så den fick gå klart. Andra gången, i två steg: 1 passed, 105 mutationer, resultatet i `res_mutationer.txt`.
+  5. `git status --short --ignored -uall`, i projektmappen. Bara läsning.
+- **Opushat:** som i posten nedan, och den här commiten.
 
 ## Läge 2026-11-05, rättelserna efter granskning 36, inte granskade och inte installerade
 
@@ -2170,6 +2183,7 @@ fattade och byggda, se avsnittet ovan.)
 62. **Git LFS i Hugos globala git-inställningar** (granskning 35, P8, nivå låg). Provkörningen 2026-11-05 visade `filter.lfs.clean`, `.smudge`, `.process` och `.required`. En testfil i sandlådan kan skriva `.gitattributes`, så att git utanför sandlådan startar filtret, också `git status` från roten (prov med ett utbytt program). Programmet väljs av Hugos inställningar, inte av testfilen, och `.lfsconfig` får inte peka ut något program enligt dokumentationen. `git-lfs` finns inte i `PATH` i agentens session, så en testfil kan stoppa Hugos `git add` för filer som omfattas. Projektet använder inte Git LFS. Inte prövat: riktig `git-lfs`, och värdena i inställningarna. Hugo kan titta med `git config --global --get-regexp '^filter[.]lfs'` och `command -v git-lfs` i Terminal. Behövs filtret inte i något annat repo tar Hugo bort det med `git config --global --remove-section filter.lfs`. Git LFS låts vara tills Hugo vet om något annat repo använder det (Hugos beslut 2026-11-05 om granskning 35, beslut 9). **Öppen.**
 63. **Fynden i granskning 36** (steg 15, `GRANSKNING.md`). Bör rättas, väntar på Hugos eller Caspers besked: P1–P6. Låga: P7 (kommandon i löpande text, `sudo chmod`, `sudo cp` och `sudo mv` går igenom där), P8 (Öppet 62: också `git status` startar filtret), P9 (`.gitattributes` med `-diff` och `export-ignore`), P10 (meningen om testfilen i SPEC 7.1), P11 (texten runt steg 7), P12 (antal i "Prov utanför sandlådan"), P13 (styrtecken i meddelandet, ingen fast form för `git push`) och P14 (`git add` och `git commit` i listan, till nästa version av vakten). **Beslutade av Hugo 2026-11-05:** P1, P2, P3, P5, P6 och P7 är rättade, inte granskade. P4 är stängd utan fynd. P14 är Öppet 64. Kvar: P8, P9, P10, P11, P12 och P13. **Öppen.**
 64. **`git add` och `git commit` i listan i SPEC 7.1** (granskning 36, P14, öppen fråga 2). Sandlådan stoppar dem efter bytet, men de står kvar i listan och i vakten. De står kvar till nästa version av vakten (Hugos beslut 2026-11-05 om granskning 36), eftersom en ändrad lista är en ny version av vakten, med ny kontrollsumma. Då skrivs också en mening under tabellen i samma version. **Öppen.**
+65. **Fynden i granskning 37** (steg 15, `GRANSKNING.md`). Blockerar: P1 (9 röda tester när en ny granskning skriver sin rubrik). Bör rättas, väntar på Hugos eller Caspers besked: P2, P3, P4 och P5. Låga: P6 (spärrtestets eget krav är inte låst, och spärrprovet på en dator där `~/.ssh` finns), P7 (testet av löpande text ser bara kända ord) och P8 (hänvisningar som är sämre att läsa, och noll ord i marginal). **Öppen.**
 
 ## Nästa steg i byggordningen
 

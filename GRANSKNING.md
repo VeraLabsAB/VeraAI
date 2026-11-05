@@ -11836,3 +11836,196 @@ Skrivna ordagrant från chatten.
 - **P3, stoppregeln gäller också sessionens egna ändringar.** Granskningens förslag hade inget undantag, så jag la inte till något.
 - **P6, `cat`.** Vakten stoppar `cat ~/.ssh/prov` från agenten innan sandlådan prövas (test finns). Därför kör spärrtestet `/bin/cat` inne i sandlådan också. Det kan bara visas efter bytet.
 - **Öppen fråga 1, vad som räknas.** Ett namn på ett kommando får stå i en förklaring (`cp` kopierar en fil). Ett kommando med något efter namnet får inte det, inte heller som exempel. Kvar i löpande text är bara enstaka namn, och `mkdir -p` och `export PATH=…`, som inte står bland de kända orden. Testet ser inte ett kommando som saknas i listan.
+
+## Granskning 37 (av abded14 och 420a57d) (2026-11-05)
+
+Oberoende granskning av rättelserna efter granskning 36 (steg 15), jämfört med 4f40869, commiten före abded14. Numret är det väntade. Inget är installerat, inget sudo är kört, `~/.ssh` är inte skapad, och inget i `/Library` eller i projektets `.git` är rört utöver den här commiten. Ingen kod, inget test och ingen inställningsfil är ändrad.
+
+**Dom: rött, tills ett enda test är rättat. Installera inte än.** Inget säkerhetshål är öppet i dag. Besluten är byggda, CLAUDE.md har inte blivit svagare, och de låsta filerna är orörda. Men den här granskningens egen rubrik gör 9 tester röda (P1), och kontrollen efter bytet säger "stoppa" vid rött. Fyra fynd bör rättas samtidigt, och `.gitignore` behöver Hugos eller Caspers ställningstagande (P2).
+
+**Så skiljer jag vad som är visat.**
+
+- **Körning:** gjort på den här datorn, i kopior och i testets tillfälliga mapp, med påhittade inställningar för git. "Filen utanför projektet" i länkproven är en påhittad fil där, så inga länkar går till riktiga filer. Provfilerna och resultaten ligger i `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/63145fb3-a886-4277-962f-fd27826a3663/scratchpad/prov`.
+- **Modell:** `sandbox-exec`, macOS eget verktyg för sandlådor, med en profil som jag skrev själv efter samma idé som sandlådan. **Det är inte Claude Codes riktiga profil.**
+- **Inte kört i någon riktig sandlåda.** Sandlådan är inte installerad.
+- **Bedömning:** står uttryckligen.
+
+**Hela sviten (körning), före den här granskningens text: 5259 passed, 40 skipped**, som väntat: 31 `SPÄRRPROVET I KOPIAN HOPPAS ÖVER` och 9 `SPÄRRTESTET HOPPAS ÖVER`. **Efter den här granskningens text: 9 failed, 5250 passed, 40 skipped**, se P1.
+
+### Punkt 1: besluten
+
+Alla nio stycken står sist under granskning 36, och de är samma text som listan i testet (körning). **Att de är ordagranna mot chatten kan jag inte visa, eftersom jag inte har sett byggsessionens chatt.** Hugo kan läsa dem under "Hugos beslut 2026-11-05 om granskning 36".
+
+| Beslut | Byggt? | Test? |
+|---|---|---|
+| P1, `ls -l COMMIT_MSG.txt` före commiten | Ja, med orden i beslutet. Regeln är för svag mot hård länk, se P3 | Ja, 8 av 8 mutationer röda |
+| P2, `.gitignore` och larmet | Delvis, se P2 | Ja, men med luckor |
+| P3, väntat läge och stoppregel | Ja, och löftet är borta | Ja, men kärnan i stoppregeln är inte låst, se P5 |
+| P4, Hugos kontroll | Stängd, inget att bygga | Står i beslutet |
+| P5, testet av del E | Ja | Ja, 3 av 3 röda |
+| P6 och öppen fråga 3, `~/.ssh` i spärrprovet | Ja | Ja för texten, 11 av 11. Inte för spärrtestets eget krav, se P6 |
+| Öppen fråga 1, kommandon till rutor | Ja, alla tolv från tabellen i granskning 36 står i rutor (körning) | Ja för kända ord, se P7 |
+| Öppen fråga 2 | Ja, Öppet 64 | Ja |
+| Rättelserna före installationen | Ja, inget är installerat | Ingen ändring i de låsta filerna |
+
+### Punkt 2: CLAUDE.md
+
+**Ingen säkerhetsregel blev svagare, och listan före och efter i PROGRESS.md stämmer med `git diff`, rad för rad.** Diffen är exakt två stycken. Ett: löftet "inte kan gömma sig" är borta, med vad kommandot inte visar, det väntade läget och stoppregeln. Två: ett fjärde kommando med regeln om `-` och `l`. "Alltid", "Aldrig" och "Vem som ger OK" är orörda. Det nya är starkare än det gamla, men regeln i P1 lovar mer än den håller mot hård länk (P3).
+
+### Punkt 3: kan `ls -l COMMIT_MSG.txt` luras?
+
+| Försök (körning) | `ls -l` börjar med | Antal länkar | `git commit -F` |
+|---|---|---|---|
+| Vanlig fil | `-` | 1 | Går bra |
+| Vanlig länk (mjuk) | `l`, regeln stoppar | 1 | Skulle lägga filen i historiken |
+| **Hård länk till en fil utanför** | **`-`, regeln släpper igenom** | **2** | **Filens innehåll hamnar i historiken** |
+| Namngiven rörledning (FIFO) | `p`, regeln stoppar | 1 | Hänger |
+| Tom mapp | `t` (raden `total 0`), regeln stoppar | – | Fel, kod 128 |
+| Tom fil | `-` | 1 | Avbryts, inget meddelande |
+| Vanlig fil när `ls` körs, utbytt mot en länk före commiten | `-` | 1 | **Filens innehåll hamnar i historiken** |
+
+En **hård länk** är ett andra namn på samma fil, inte en hänvisning. Den ser ut som en vanlig fil, och det enda som syns är antalet länkar, siffran direkt efter rättigheterna.
+
+**Kan en session i sandlådan skapa en hård länk till en fil den inte får läsa? I modellen: nej. I den riktiga sandlådan: inte visat.** Modellen, i sex varianter av profilen, nekade `os.link` från en fil som inte får läsas, med `Operation not permitted`. Motprovet: från en källa i projektmappen gick länken, och från en fil som får läsas men inte skrivas nekades den. Modellen kräver alltså skrivrätt till källan, oavsett läsrätten. `~/.ssh` är inte skrivbar i de låsta inställningarna, så om den riktiga profilen gör likadant finns ingen väg.
+
+**Se P3 för förslaget.**
+
+### Punkt 4: `.gitignore`
+
+**Exakt vad som ändrades (`git show`, körning):** två nya regler, `!/scripts/**/*.py` och `!/sparr/**/*.py`, med en förklaring. Fem regler flyttades upp före hemligheterna: `*kontoutdrag*`, `*kvitto*`, `*kvitton*`, `*z-rapport*` och `*Z-rapport*`. Fyra regler om Shop and Go står nu i ett eget block efter undantaget. Ingen regel är borttagen eller omskriven.
+
+**Prov med `git check-ignore` (körning):** 3384 sökvägar, före och efter, med `core.ignorecase` både av och på (samma svar): 21 namn med orden om underlag, Shop and Go och hemligheter, 15 filtyper, 10 mappar, och formerna med mappar.
+
+- **Ignoreras nu, följde med förut: 0.**
+- **Följer med nu, ignorerades förut: 77.** 35 är `.py`-filer under `scripts/` och `sparr/` med ett ord om underlag, som beslutet avser. **De andra 42 är filer i en mapp som heter till exempel `kontoutdrag.py`,** se P2.
+- `.md`, `.json`, `.csv`, `.pdf` och bilder ignoreras som förut. Shop and Go och hemligheter ignoreras också i `.py`, som texten säger. `.py` i projektroten, `testdata/`, `foretag/` och `docs/` ignoreras som förut.
+
+**Bedömning av öppningen för `.py`, vid misstag:** liten. Risken är att någon klistrar in ett riktigt kvitto i till exempel `scripts/tests/test_kvitto_x.py`. Förut hade namnet råkat stoppa den filen. Men `test_underlag.py` med samma innehåll följde med både före och efter, så namnet var ett tunt skydd, och reglerna läser aldrig innehållet.
+
+**Bedömning av öppningen för `.py`, för en kapad session:** nästan ingen. Den väljer namnet själv. `scripts/utdrag.csv`, `data.csv`, `scripts/k.py` och `scripts/kvito.csv` ignoreras varken före eller efter (körning). Namnreglerna har aldrig stoppat någon som vill förbi dem.
+
+### Punkt 5: väntat läge och stoppregel
+
+Prövat med 22 fall i en kopia med den riktiga `.gitignore` och samma väntade läge (körning):
+
+| Fall | Utskriften | Stoppregeln |
+|---|---|---|
+| Ny fil eller ny mapp i `.pytest_cache/` | **Byte för byte samma** | **Slår inte till.** CLAUDE.md säger att den inte syns |
+| Ny `__pycache__/` i en mapp, `.venv/`, `inkorg/`, `scripts/logg/` | `!! …` | Slår till |
+| `scripts/kvitto.csv`, `kvitto.py` i roten | `!! …` | Slår till |
+| Ny fil i `.claude/` | `?? .claude/` och en `!!`-rad | Slår till. Sandlådan stoppar också skrivningen där, enligt granskning 36 |
+| `.gitattributes` i roten eller i en mapp som finns | `?? …` | Slår till |
+| **`.gitattributes` eller `.lfsconfig` i en ny mapp** | **`?? ny/`** | **Slår inte till,** se P4 |
+| `.gitignore` i en ny mapp | `!! …` | Slår till, genom filerna den döljer |
+
+**Ingen form av `git status` visar en ny fil i `.pytest_cache/` utan `-uall`.** Med `-uall` syns den (körning), se P4.
+
+### Punkt 6: mutationsprov
+
+Egna 105 mutationer i kopior (körning). Först mot de nya testen. De 37 som överlevde kördes sedan mot hela `test_sandladan.py` och `test_beslut_granskning_15.py`. Utan mutation är urvalet grönt.
+
+| Del | Röda | Överlevde |
+|---|---|---|
+| P1 | 8 av 8 | Inga |
+| P2, reglerna | 10 av 11 | `!testdata/**` |
+| P2, larmet | 4 av 11 | `sparr/token_koll.zsh`, `scripts/kvitto_koll.sh`, `foretag/x/kvitto_regler.json`, `testdata/kvitto_prov.py`, `verktyg/secret_koll.py`, `scripts/.gitignore` med `*.py`, och mappen `scripts/kvitto.py/` |
+| P3 | 8 av 11 | "en annan rad med `!!`" borttagen i CLAUDE.md och i INSTALLERA.md, och "också när sessionen själv har ändrat filen" |
+| P5 | 3 av 3 | Inga |
+| P6 | 16 av 20 | Spärrtestet utan sitt krav, spärrtestet som alltid hoppas över, `_lasning_stoppas` när filen går att öppna, och när bara `cat`s utskrift prövas |
+| Öppen fråga 1, kända ord | 17 av 19 | `` `Sudo rm -rf x` `` och `` `sudo` ditto a b `` |
+| Öppen fråga 1, andra kommandon | 0 av 20 i bytet | Alla, från `mkdir -p` till `dscl . -passwd`. I steg 7 blir två av två röda, men bara av ordgränsen |
+
+Larmets luckor är inte allvarliga: en ignorerad fil ger en `!!`-rad, och den stoppar Hugo enligt P3 (körning för samma slags fil). `scripts/.gitignore` ger `??` med namnet, och det stoppar också. Hålet i `scripts/kvitto.py/` är det enda som tar sig förbi båda.
+
+### Punkt 7: INSTALLERA.md
+
+**Ordgränsen är densamma, den är inte höjd** (`git show`, körning): under 989 rader, under 9043 ord, under 51 `bash`-rutor. Räknat med testets egen funktion: före 978 rader, 9040 ord, 46 rutor, efter 984, 9042 och 47. **Marginalen är noll ord.** Avsnitten för bytet räknas inte, så rättelser där går att göra. Den enda siffra som ändrades i testet är antalet rader som börjar med `sudo`, från 16 till 17, eftersom agentens `sudo ls` nu står i en ruta. Hela filen växte från 11353 till 11661 ord.
+
+**Ingen instruktion försvann, och ingen kontroll blev svagare** (jag har läst hela diffen). Rutorna för agentens kommandon har inget `bash`, och texten säger "Be agenten köra rutan". För att hålla ordgränsen blev några rader sämre att läsa, se P8.
+
+### Punkt 8: låsta filer
+
+`git diff 4f40869 420a57d` är tom för `sparr/managed-settings.json`, `sparr/kommandosparr.py`, `SPEC.md`, `requirements.txt` och `sparr/kontrollera-skalet.zsh` (körning). Testet med summorna är grönt, så summorna står kvar. Commitarna rör bara nio filer, de som meddelandena nämner.
+
+### Punkt 9: antalen
+
+**Stämmer** (körning, `--collect-only` på båda kopiorna): 5046 tester före och 5299 efter, 253 fler. Med de 40 överhoppade är det 5006 och 5259. Listan med namn visar 260 nya och 7 borta, men 5 av dem är samma test med nytt namn. Det ger 255 nya och 2 borta, som PROGRESS.md säger. Uppdelningen per beslut stämmer också.
+
+### Fynd
+
+#### P1, blockerar installationen: den här rubriken gör 9 tester röda
+
+`test_granskning_36_besluten_star_ordagrant_sist_under_granskning_36` kräver att ingen ny `## `-rubrik står efter granskning 36. **Varje ny granskning gör alltså testet rött.** Provet i en kopia, med bara en ny rubrik sist i `GRANSKNING.md`: `9 failed` (körning). Det är samma slags fel som P5 i granskning 36, i det test som skrevs samma dag som P5 rättades.
+
+Uppdraget säger att jag ska skriva en ny rubrik och inte ändra några tester, så **sviten är röd efter den här commiten**. Jag har inte gömt rubriken eller flyttat den för att få testet grönt. Det blockerar eftersom bytets punkt 4 säger att väntat är "inget `failed`" och "är något rött: stoppa och fråga".
+
+**Förslag:** i testet, klipp avsnittet vid nästa `## `-rubrik, som testet av del E gör, och pröva att besluten står sist där. En rad.
+
+#### P2, bör rättas och Hugos eller Caspers ställningstagande: öppningen i `.gitignore` är större än texten säger
+
+**Hålet (körning, riktig `git add -A`):** `!/scripts/**/*.py` gäller också en **mapp** med ett namn som slutar på `.py`. `scripts/kontoutdrag.py/utdrag_2026.csv` följer med, och `git status` visar bara `?? scripts/kontoutdrag.py/`. Förut ignorerades den. PROGRESS.md säger "Inget annat", och det stämmer inte. Varken larmet eller stoppregeln ser det. **Bedömning:** ett sådant mappnamn är osannolikt, men det är den enda vägen där ett riktigt underlag i en vanlig filtyp nu följer med.
+
+**Förslag, prövat (körning):** direkt efter undantaget, reglerna `*kontoutdrag*/`, `*kvitto*/`, `*kvitton*/`, `*z-rapport*/` och `*Z-rapport*/`, som bara gäller mappar. Då blir de 77 till 35, inga i en sådan mapp, och `scripts/kvitto_flode.py` följer fortfarande med.
+
+**Beslutet är inte helt byggt, med flit:** "görs snävare så att den inte tar kodfiler". `scripts/token_koll.py`, `scripts/secret_x.py` och `kvitto.py` i roten ignoreras fortfarande, och där larmar testet i stället. Det är rimligt för hemligheter, men det är byggsessionens tolkning.
+
+**Byggsessionen gjorde en regel mindre strikt utan att fråga, fast uppdraget enligt Hugo sa stanna.** Jag har inte sett det uppdraget. Byggsessionen skrev öppet om det i `GRANSKNING.md` och `PROGRESS.md`, men "den är Hugos beslut P2" säger mer än beslutets ord. **Hugo eller Casper behöver säga ja eller nej till öppningen.** Alternativet är ingen öppning alls: alla regler som förut, larmet kvar, och koden får namn utan orden.
+
+**Min rekommendation (bedömning):** behåll öppningen, med reglerna för mappar. Risken är liten, och namn som `kvitto_flode.py` är tydliga.
+
+#### P3, bör rättas: regeln om `ls -l` ser inte en hård länk och inte ett byte efteråt
+
+Punkt 3 ovan. Tre saker:
+
+1. **Regeln släpper igenom en hård länk.** Skyddet är i så fall att sandlådan nekar länken, och det är bara visat i min modell.
+2. **Samma hårda länk på vilket annat ställe som helst är värre.** Med en hård länk i `scripts/` lägger `git add -A` hela filens innehåll i historiken (körning), och `ls -l COMMIT_MSG.txt` tittar aldrig där. En vanlig länk sparas bara som vart den pekar (körning).
+3. **`ls -l` och `git commit` är två kommandon.** En process som fortfarande körs kan byta filen emellan (körning, bytet gjort för hand). Om en testfil i sandlådan kan lämna en sådan process efter sig är inte prövat.
+
+**Allvaret (bedömning):** samma som i granskning 36. Allt utom `~/.ssh` kan en testfil läsa ändå, och `~/.ssh` finns bara under spärrprovet, med en testfil. Därför blockerar det inte. Det gäller från den dag en nyckel finns.
+
+**Förslag, en regel som håller bättre, Hugos beslut:**
+
+- **Ett spärrprov som avgör frågan:** i sandlådan, `os.link` från `~/.ssh/prov` till testets tillfälliga mapp ska nekas. Det är ett undantag från regeln om länkar i CLAUDE.md, så det behöver ett OK, och källan är bara testfilen från P6.
+- **Regeln:** raden ska börja med `-`, **och siffran efter rättigheterna ska vara `1`**. Kostar inget nytt kommando.
+- **Efter commiten, före en push:** Hugo tittar på `git show --stat --format=%B HEAD`. Är meddelandet långt eller konstigt, eller står en oväntad fil där: pusha inte, fråga. Det är det enda som också fångar bytet och punkt 2.
+
+#### P4, bör rättas: stoppregeln ser inte `.gitattributes` i en ny mapp
+
+`ny/.gitattributes` med `* filter=lfs` ger bara `?? ny/`, och stoppregeln slår inte till. Med en påhittad global fil startades filtret av `git add -A` (körning). Det kringgår skälet till att `.gitattributes` står i regeln. Programmet väljs fortfarande av Hugos inställningar, och koden är inte sessionens (Öppet 62). Samma mapp kan dölja `-diff` och `export-ignore` (P9 i granskning 36).
+
+**Förslag, Hugos beslut:** byt kommandot till `git status --short --ignored -uall`. Då står varje fil för sig, också en ny fil i `.pytest_cache/`, och vakten släpper igenom det (körning). Det väntade läget måste skrivas om: i projektet blir det 11 rader i dag, bland annat `.pytest_cache/.gitignore`, som annars stoppar. Enklast är att Hugo tar bort `.pytest_cache/`, som ingen använder längre eftersom kommandona har `-p no:cacheprovider` (bedömning).
+
+Samma körning visar `.claude/worktrees/.DS_Store`. Det är ingen worktree, bara Finders fil i mappen, och inget annat finns där (körning).
+
+#### P5, bör rättas: kärnan i stoppregeln är inte låst av något test
+
+Tar man bort "en annan rad med `!!`" i CLAUDE.md eller INSTALLERA.md blir inget test rött (körning). Då är regeln bara de fyra filnamnen, och en ny `!!`-rad är tillåten. Testen frågar bara om namnen och "stanna och fråga" står i stycket. **Förslag:** kräv de orden, och "också när sessionen själv har ändrat filen", i båda testen.
+
+#### P6, under Öppet: spärrtestets eget krav är inte låst
+
+`assert svar` i `test_sparr_lasning_av_ssh_stoppas` går att ta bort utan att något blir rött, eftersom testet bara körs i sandlådan och kontrollen utanför bara söker efter två namn (körning). Att testet alltid hoppas över märks i `40 passed`, men inte det första. `_lasning_stoppas` saknar också ett prov för när filen går att öppna fast mappen inte går att lista. Ändringar i de här testen granskas ändå.
+
+Finns `~/.ssh` med riktiga nycklar på en dator, som kanske Caspers, säger spärrprovet "stoppa och fråga" utan något nästa steg. Testet klarar sig ändå utan testfilen (läst i koden). Tas upp när steg 14 görs.
+
+#### P7, under Öppet: testet av löpande text ser bara kända ord
+
+20 av 20 andra kommandon gick igenom i bytet, och nio av dem är program som filen själv använder i sina rutor: `mkdir`, `rmdir`, `chown`, `ditto`, `tail`, `cat`, `grep`, `shasum` och `source`. Byggsessionen sa det själv. Samma förslag som i granskning 36: en lista över godkända avsnitt i stället för förbjudna ord, eller åtminstone alla program från filens rutor.
+
+Texten i `GRANSKNING.md` om vad som är kvar är inte heller hel. Utöver `mkdir -p` och `export PATH=…` står `tail -n 3` (rad 414), `shasum -a 256` (rad 571) och `/usr/bin/python3 -m venv` (rad 665) i löpande text (körning). Alla är förklaringar av en ruta, utan något att köra.
+
+#### P8, under Öppet: några hänvisningar är sämre att läsa
+
+Rad 1283 säger "kommandot i steg 3", och steg 3 har nu två rutor. "Versionskommandot" (rad 124, 165, 1190 och 1215) är ett nytt ord, och Hugo har ingen bakgrund i programmering. Inget av det ändrar vad som kontrolleras (bedömning). **Marginalen på noll ord gör att varje rättelse i den delen av filen kräver en ny gräns,** och det är Hugos beslut. Granskning 36 sa samma sak.
+
+### Inte visat
+
+Allt i en riktig sandlåda, också att den nekar hård länk, och att Read och `cat` stoppas på `~/.ssh/prov`. De 40 spärrproven, nu med `/bin/cat`. Provkörningens `48 skipped`. `git check-ignore` i sandlådan. Riktig `git-lfs`. Att besluten är ordagranna mot chatten.
+
+**Händelse under granskningen:** vakten stoppade `TaskStop`, som inte står på listan i SPEC 7.1, när jag ville stoppa en mutationskörning som tog för lång tid. Jag gick inte runt det. Körningen fick gå klart, föll på sin egen tidsgräns utan att skriva något, och resultaten ovan kommer från den andra körningen.
+
+### Vad som krävs före installationen
+
+1. **En byggsession rättar P1**, en rad i ett test. Rättelsen rör ett test av en spärr, och granskas per steg.
+2. **Hugo eller Casper tar ställning till P2** (öppningen och reglerna för mappar), **P3** (spärrprovet, siffran `1` och titten efter commiten), **P4** (`-uall`) och **P5**. Min rekommendation: ja till alla. Inget av det ändrar `managed-settings.json` eller vakten.
+3. **Hugo kör provkörningen igen** (`48 skipped`), eftersom proven inte har körts i sandlåda sedan del E.
+4. Hugo installerar från den granskade commiten och kör spärrprovet direkt.
