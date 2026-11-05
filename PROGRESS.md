@@ -8,8 +8,8 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet arbetar mot skuggpiloten (SPEC avsnitt 9 och `BYGGPLAN.md`). Än finns ett testföretag, Syntet Testbutik AB.
 Inget i koden kan i dag bokföra något.
 
-Testsviten: **9 failed, 5 250 passed, 40 skipped** (körd senast 2026-11-05 i granskning 37, i
-projektmappen med kommandot i SPEC 7.1. De 9 röda beror på ett test som inte tål en ny granskningsrubrik, `GRANSKNING.md`, granskning 37, P1. Före den rubriken: 5 259 passed, 40 skipped. De 40 är spärrproven, som hoppas över tills sandlådan är
+Testsviten: **0 failed, 5 319 passed, 41 skipped** (körd senast 2026-11-05 i byggsessionen efter granskning 37, i
+projektmappen med kommandot i SPEC 7.1. De 41 är spärrproven, som hoppas över tills sandlådan är
 installerad). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
 borttagen.
@@ -24,6 +24,60 @@ borttagen.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-11-05, rättelserna efter granskning 37, inte granskade och inte installerade
+
+Steg i byggplanen: 15 (pågår)
+
+- **Säkerhet:** ingenting är installerat, inget sudo är kört, `~/.ssh` är inte skapad, inga länkar är gjorda, och inget i `/Library`, i projektets `.git` (utöver de två commitarna) eller utanför projektmappen och scratchpad är ändrat. `sparr/managed-settings.json`, `sparr/kommandosparr.py` och SPEC.md är oförändrade (`git status`, och testet med summorna). **Installera inte förrän granskning 38 är klar.** Den prövar bara rättelserna från granskning 37 (beslut B).
+- **Besluten** står ordagrant i `GRANSKNING.md`, sist under "Granskning 37", med byggsessionens egna val.
+- **P1:** testet heter nu `test_granskning_36_besluten_star_ordagrant_under_granskning_36`, och klipper avsnittet vid nästa rubrik.
+- **P2:** `*kontoutdrag*/`, `*kvitto*/`, `*kvitton*/`, `*z-rapport*/` och `*Z-rapport*/` direkt efter undantaget i `.gitignore`. De gäller bara mappar. Inga regler är borttagna eller svagare (test). `scripts/kvitto_flode.py` följer fortfarande med (test med riktig `git add -A` i testets tillfälliga mapp).
+- **P3:** siffran 1 och `git show --stat HEAD` i CLAUDE.md och i bytets punkt 5. Nytt spärrtest, `test_sparr_hard_lank_till_ssh_stoppas`, som bara körs i sandlådan och bara prövar testfilen `~/.ssh/prov`. Undantaget står i länkregeln i CLAUDE.md.
+- **P4:** `git status --short --ignored -uall`. **Räknat före det nya väntade läget: 11 rader**, under gränsen på 30, så inget annat sätt behövdes. Samma lista i CLAUDE.md och INSTALLERA.md. Stoppregeln säger nu "någon annan rad med" filnamnen, eftersom `.pytest_cache/.gitignore` är en väntad rad.
+- **P5:** "en annan rad med `!!`", "också när sessionen själv har ändrat filen" och "i vilken mapp som helst" är låsta av test, i båda filerna. INSTALLERA.md hade inte det mittersta förut.
+- **B:** i CLAUDE.md, efter granskningsnivån.
+- **A, alla träffar.** Jag läste varje rad i testerna som nämner filerna.
+
+  | Plats | Vad testet läser | Utfall med påhittade poster |
+  |---|---|---|
+  | `test_sandladan.py`, granskning 36, besluten | `GRANSKNING.md`, efter en rubrik, och kravet att ingen rubrik följer | **Rött (9 tester).** Rättat, P1 |
+  | `test_beslut_granskning_15.py`, `_oppet` | `PROGRESS.md`, efter första texten `## Öppet` | **Rött (1 test), när en post nämner rubriken i text.** Rättat: rubriken på egen rad |
+  | `test_sandladan.py`, `_platser_med_de_fasta_kommandona` | Alla `.md` utom historiken, och `BYGGPLAN.md` räknades inte som historik | **Rött (1 test), när en post nämner `git commit -F COMMIT_MSG.txt`.** Rättat |
+  | `test_sandladan.py`, öppen fråga 2 | `PROGRESS.md`, efter `\n## Öppet` | Tål dem. Samma rättelse ändå, så att en rubrik som börjar likadant inte lurar det |
+  | `test_sandladan.py`, efter P6 och granskning 35, besluten | `GRANSKNING.md`, allt efter en rubrik | Tål dem. Testet för granskning 35 hette "sist" utan att pröva det, och har bytt namn |
+  | `test_beslut_granskning_15.py`, historiken och besluten | `GRANSKNING.md`, allt efter en rubrik | Tål dem |
+  | `test_sandladan.py`, del E och granskning 36, P5 | Varje `## Läge` i `PROGRESS.md` | Tål dem |
+  | `test_beslut_granskning_15.py`, stoppregeln, och `test_beslut_granskning_23.py`, Öppet 29 | Hela `PROGRESS.md` | Tål dem |
+  | `test_byggplan_progress.py` | Första `## Läge`, raden `Uppdaterad`, "Läge nu", tabellerna under `## Fas`, rubrikerna i `GRANSKNING.md` | Tål dem, om posten följer CLAUDE.md. **Ska** ge rött för en post utan "Steg i byggplanen", ett steg som saknas eller två granskningar med samma nummer |
+
+  Övriga träffar är bara kommentarer eller text i kommandon. Ett nytt test, `test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott`, kör de fyra testfilerna i en kopia med poster mitt i och sist i varje fil. Ett annat larmar om en ny testfil börjar läsa filerna och inte är med.
+- **Gamla tester som ändrades, för att de låste den gamla texten:** `HUGOS_FASTA_KOMMANDON`, `BYTET`, `VANTADE_IGNORERADE`, `_claude_md_stycket_om_git_status`, `test_granskning_35_star_i_claude_md` (två rader), antalen i `test_granskning_35_p1_...`, och `test_granskning_36_p3_claude_md_sager_vad_kommandot_inte_visar`, som nu heter `..._visar_och_inte_visar` och kräver det som stämmer med `-uall`. `_ignorerade` delades, så att `_provrepo` går att använda.
+- **CLAUDE.md, listan före och efter:**
+  - Länkregeln. Före: inga länkar utanför scratchpad och testets tillfälliga mapp, utan undantag. Efter: samma regel, plus ett uttalat undantag för ett namngivet test, som bara prövar testfilen och ska stoppas. **Det enda som är ett undantag, och det är Hugos beslut P3.** Regeln själv står kvar ordagrant (test).
+  - `git status`. Före: `--short --ignored`, och en förklaring av vad det inte visar. Efter: `-uall`, varje fil för sig, och vad det nu inte visar. Starkare.
+  - Väntat läge. Före: 6 rader, med hela mappar. Efter: 11 rader, fil för fil. Starkare: en ny fil i `.pytest_cache/` eller `.claude/` syns nu.
+  - Stoppregeln. Före: en annan rad med `!!`, eller en rad med de fyra filnamnen. Efter: samma, i vilken mapp som helst, och `.pytest_cache/.gitignore` är väntad. Starkare.
+  - `ls -l COMMIT_MSG.txt`. Före: raden börjar med `-`. Efter: också siffran 1. Starkare.
+  - Nytt: `git show --stat HEAD` efter commiten och före en push. Starkare.
+  - Nytt: beslut B om granskning 38. Ingen säkerhetsregel.
+  - Inget annat är ändrat. "Aldrig" och "Vem som ger OK" är orörda.
+- **Ordgränsen i INSTALLERA.md:** inte höjd. Allt nytt står i avsnitten för bytet och spärrprovet, som inte räknas. `test_installera_ar_kortare_an_fore_granskning_15` är grönt och oförändrat. Ingen instruktion är borttagen.
+- **Antalen:** förut **9 failed, 5250 passed, 40 skipped** (5299 tester). Nu **0 failed, 5319 passed, 41 skipped** (5360 tester), 61 fler. De 9 röda blev gröna (P1). 60 nya gröna: 11 sökvägar i `SKA_IGNORERAS`, 10 av det längre väntade läget (5 på 2 platser), 7 besluten ordagrant, 3 P2, 17 P3, 3 P4, 6 P5, 2 A och 1 B. 1 ny överhoppad: spärrtestet med den hårda länken. Inget test är borttaget, och tre har bytt namn.
+- **Väntat i INSTALLERA.md:** provkörningen `49 skipped`, spärrtestet 10 prov, punkt 4 i kontrollen efter bytet `33`, eller `35` om `~/.ssh` inte finns, spärrprovet `41 passed` och H1-proven `31 passed`.
+- **Körningar** (`<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`, `<S>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/4bbb3e2c-c445-4ff8-85b5-c53ad89b4fee/scratchpad`). Från projektmappen, ett kommando i taget.
+  1. `git status --short --ignored` (start) och `git status --short --ignored -uall`: 11 rader med `!!`, inga andra.
+  2. `git archive --format=tar -o <S>/fore.tar HEAD`, `mkdir -p <S>/fore`, `tar -x -f <S>/fore.tar -C <S>/fore`. Med fil-verktygen i kopian: `## Granskning 99` sist i `GRANSKNING.md`, en post överst och en rubrik sist i `PROGRESS.md`, en post efter "Läge nu" i `BYGGPLAN.md`. Posterna nämner `## Öppet`, `git commit -F COMMIT_MSG.txt` och `git status --short --ignored`. `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rf <S>/fore/scripts/tests`: **11 failed, 5248 passed, 40 skipped** (rött före).
+  3. `<python> -B -m pytest -p no:cacheprovider -q --tb=no -rf -k test_sandladan scripts/tests`, nya tester mot gamla filer: **87 failed, 636 passed, 41 skipped, 4596 deselected** (rött före).
+  4. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests`, utan sandlåda: **5319 passed, 41 skipped**, före och efter statusraderna.
+  5. `mkdir -p <S>/efter <S>/mut`, och `cp -R scripts sparr foretag testdata testforetag BYGGPLAN.md CLAUDE.md DESIGN-regelbok.md GRANSKNING.md KASSIO-KRAV.md OVERLAMNING.md PLAN-KASSIO-FORSLAG.md PROGRESS.md SPEC.md .gitignore requirements.txt` till var och en. Samma påhittade poster i `<S>/efter`. `<python> -B -m pytest -p no:cacheprovider -qq --tb=line -rf <S>/efter/scripts/tests`: 1 failed, mitt nya test. Det lade in `## Granskning 99`, som redan fanns i kopian. Numren blev 99998 och 99999, i projektet och kopian. Samma kommando med `-q`: **5319 passed, 41 skipped** (grönt efter).
+  6. I `<S>/mut`: stoppregeln utan "en annan rad med `!!`" i CLAUDE.md, reglerna för mappar före undantaget i `.gitignore`, och spärrtestets `assert svar` borttaget. `<python> -B -m pytest -p no:cacheprovider -q --tb=no -rf -k test_granskning_37 <S>/mut/scripts/tests/test_sandladan.py`: **6 failed, 33 passed**. Varje mutation fångas: 3 av `.gitignore`, 1 vardera av de andra, och provet med påhittade poster.
+  7. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -k test_byggplan scripts/tests`, byggplanstestet efter commit 2. `git status --short --ignored` och samma med `-uall` sist.
+- **Verifierat med körning:** ovan, och att `-uall` visar nya filer i ignorerade och nya mappar men inte tomma mappar, i testets tillfälliga mapp med projektets `.gitignore`. **Inte kört i någon sandlåda:** det nya spärrtestet, och antalen `49`, `35` och `41`. **Min bedömning:** att sandlådan nekar den hårda länken, som granskning 37 såg i sin modell, och att en länk till en mapp som saknas ger "saknas" i sandlådan.
+- **Inte ändrat, och väntar på beslut (Öppet 66):** SPEC 7.1 har kvar `git status --short --ignored` i meningen "Det vakten inte stoppar", och meningen "Prov och test" i SPEC 7.1 har länkregeln utan undantaget. SPEC.md ingår inte i uppdraget.
+- **Commit 1, 8bd6fe5 (testerna, `.gitignore` och INSTALLERA.md):** ensam ger den röda tester, eftersom CLAUDE.md, GRANSKNING.md, PROGRESS.md och BYGGPLAN.md ligger i commit 2 enligt uppdraget. Commit 2 gör dem gröna.
+- **Kvar:** granskning 38. Sedan kör Hugo provkörningen igen (`49 skipped`), installerar och kör spärrprovet direkt.
+- **Opushat:** som nedan, och de två commitarna från den här sessionen. Sessionen pushar inte.
 
 ## Läge 2026-11-05, granskning 37 av rättelserna efter granskning 36
 
@@ -2183,7 +2237,8 @@ fattade och byggda, se avsnittet ovan.)
 62. **Git LFS i Hugos globala git-inställningar** (granskning 35, P8, nivå låg). Provkörningen 2026-11-05 visade `filter.lfs.clean`, `.smudge`, `.process` och `.required`. En testfil i sandlådan kan skriva `.gitattributes`, så att git utanför sandlådan startar filtret, också `git status` från roten (prov med ett utbytt program). Programmet väljs av Hugos inställningar, inte av testfilen, och `.lfsconfig` får inte peka ut något program enligt dokumentationen. `git-lfs` finns inte i `PATH` i agentens session, så en testfil kan stoppa Hugos `git add` för filer som omfattas. Projektet använder inte Git LFS. Inte prövat: riktig `git-lfs`, och värdena i inställningarna. Hugo kan titta med `git config --global --get-regexp '^filter[.]lfs'` och `command -v git-lfs` i Terminal. Behövs filtret inte i något annat repo tar Hugo bort det med `git config --global --remove-section filter.lfs`. Git LFS låts vara tills Hugo vet om något annat repo använder det (Hugos beslut 2026-11-05 om granskning 35, beslut 9). **Öppen.**
 63. **Fynden i granskning 36** (steg 15, `GRANSKNING.md`). Bör rättas, väntar på Hugos eller Caspers besked: P1–P6. Låga: P7 (kommandon i löpande text, `sudo chmod`, `sudo cp` och `sudo mv` går igenom där), P8 (Öppet 62: också `git status` startar filtret), P9 (`.gitattributes` med `-diff` och `export-ignore`), P10 (meningen om testfilen i SPEC 7.1), P11 (texten runt steg 7), P12 (antal i "Prov utanför sandlådan"), P13 (styrtecken i meddelandet, ingen fast form för `git push`) och P14 (`git add` och `git commit` i listan, till nästa version av vakten). **Beslutade av Hugo 2026-11-05:** P1, P2, P3, P5, P6 och P7 är rättade, inte granskade. P4 är stängd utan fynd. P14 är Öppet 64. Kvar: P8, P9, P10, P11, P12 och P13. **Öppen.**
 64. **`git add` och `git commit` i listan i SPEC 7.1** (granskning 36, P14, öppen fråga 2). Sandlådan stoppar dem efter bytet, men de står kvar i listan och i vakten. De står kvar till nästa version av vakten (Hugos beslut 2026-11-05 om granskning 36), eftersom en ändrad lista är en ny version av vakten, med ny kontrollsumma. Då skrivs också en mening under tabellen i samma version. **Öppen.**
-65. **Fynden i granskning 37** (steg 15, `GRANSKNING.md`). Blockerar: P1 (9 röda tester när en ny granskning skriver sin rubrik). Bör rättas, väntar på Hugos eller Caspers besked: P2, P3, P4 och P5. Låga: P6 (spärrtestets eget krav är inte låst, och spärrprovet på en dator där `~/.ssh` finns), P7 (testet av löpande text ser bara kända ord) och P8 (hänvisningar som är sämre att läsa, och noll ord i marginal). **Öppen.**
+65. **Fynden i granskning 37** (steg 15, `GRANSKNING.md`). Blockerar: P1 (9 röda tester när en ny granskning skriver sin rubrik). Bör rättas, väntar på Hugos eller Caspers besked: P2, P3, P4 och P5. Låga: P6 (spärrtestets eget krav är inte låst, och spärrprovet på en dator där `~/.ssh` finns), P7 (testet av löpande text ser bara kända ord) och P8 (hänvisningar som är sämre att läsa, och noll ord i marginal). **Beslutade av Hugo 2026-11-05:** P1–P5 är rättade, inte granskade. Kvar: P6, P7 och P8. **Öppen.**
+66. **SPEC 7.1 efter Hugos beslut om granskning 37** (steg 15). Två meningar stämmer inte helt: "Det vakten inte stoppar" har `git status --short --ignored` utan `-uall` (`test_granskning_37_p4_varje_plats_har_uall` tillåter exakt den raden), och "Prov och test" har länkregeln utan undantaget för spärrprovet. Kommandolistan berörs inte, och inget av det ändrar vad vakten eller sandlådan gör. SPEC.md ingick inte i uppdraget. Hugos eller Caspers beslut. **Öppen.**
 
 ## Nästa steg i byggordningen
 

@@ -12029,3 +12029,24 @@ Allt i en riktig sandlåda, också att den nekar hård länk, och att Read och `
 2. **Hugo eller Casper tar ställning till P2** (öppningen och reglerna för mappar), **P3** (spärrprovet, siffran `1` och titten efter commiten), **P4** (`-uall`) och **P5**. Min rekommendation: ja till alla. Inget av det ändrar `managed-settings.json` eller vakten.
 3. **Hugo kör provkörningen igen** (`48 skipped`), eftersom proven inte har körts i sandlåda sedan del E.
 4. Hugo installerar från den granskade commiten och kör spärrprovet direkt.
+
+### Hugos beslut 2026-11-05 om granskning 37
+
+Skrivna ordagrant från chatten.
+
+- P1: Rättas. Testet för granskning 36 får inte kräva att inget står efter rubriken.
+- P2: Ja till öppningen för .py-filer under scripts/ och sparr/. Ja till regler som bara gäller mappar, så att en mapp med .py i namnet och orden kontoutdrag, kvitto, kvitton, z-rapport eller Shop and Go ignoreras som förut.
+- P3: Ja. Raden från ls -l COMMIT_MSG.txt ska börja med "-" och antalet länkar (siffran efter rättigheterna) ska vara 1. Efter commiten och före push kör Hugo git show --stat HEAD och läser meddelandet och fillistan. Ser något fel ut: pusha inte, fråga. Spärrprovet prövar att sandlådan inte kan skapa en hård länk till testfilen i ~/.ssh, som ett uttalat undantag från länkregeln i CLAUDE.md, bara i spärrprovet.
+- P4: Ja. Kommandot blir git status --short --ignored -uall, med ett nytt väntat läge.
+- P5: Ja. Ett test skyddar orden "en annan rad med !!" i stoppregeln.
+- A: Inga tester får bero på vad som står sist i GRANSKNING.md, PROGRESS.md eller BYGGPLAN.md.
+- B: Granskning 38 prövar bara rättelserna från granskning 37. Nya fynd som inte blockerar installationen går till Öppet.
+
+**Byggsessionens egna val, att pröva i nästa granskning** (körningarna står i `PROGRESS.md`):
+
+- **SPEC 7.1 har kvar den gamla formen på ett ställe.** Meningen "Det vakten inte stoppar" säger "det syns med `git status --short --ignored`". SPEC.md ingår inte i uppdraget och inte i commitarna, och meningen är inget av de fasta kommandona. Testet tillåter exakt den raden och larmar om fler. Hugo eller Casper bestämmer.
+- **SPEC 7.1 har också länkregeln, utan undantaget.** Beslutet gäller länkregeln i CLAUDE.md, så meningen "Prov och test" i SPEC 7.1 är oförändrad. Hugo eller Casper bestämmer.
+- **Stoppregeln fick orden "någon annan rad" och "i vilken mapp som helst".** Med `-uall` är `.pytest_cache/.gitignore` en väntad rad, och "en rad med `.gitignore`" skulle annars stoppa varje gång. Regeln gäller nu också samma filnamn i varje undermapp.
+- **`-uall` gör två påståenden i CLAUDE.md fel,** att en ny fil i en ignorerad mapp inte syns och att `?? mapp/` inte visar filerna. De är ersatta av vad kommandot visar, med test. Att tomma mappar inte syns är också körd.
+- **Beslut A, vad som fortfarande får ge rött.** En post i `PROGRESS.md` utan raden "Steg i byggplanen" överst, ett steg som inte finns i `BYGGPLAN.md`, och två granskningar med samma nummer. Det är CLAUDE.md:s regler för hur en post ska se ut, och `scripts/tests/test_byggplan_progress.py` ska larma om dem. Besluten själva, till exempel raderna under en viss granskning, ska också stå kvar där de står.
+- **Antalen är räknade, inte körda i en sandlåda.** Spärrtestet blir 10 prov, så `-k test_sparr_` blir 41, provkörningen `49 skipped` och kontrollen efter bytet 35 när `~/.ssh` saknas. Att en hård länk till en mapp som saknas ger "saknas" och inte "nekad" i sandlådan är min bedömning. Blir det `34` i stället: stoppa och fråga, som INSTALLERA.md säger.
