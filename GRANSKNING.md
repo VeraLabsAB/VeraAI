@@ -12306,3 +12306,216 @@ Skrivna ordagrant från chatten.
 - **CLAUDE.md nämner inte undantaget för kopian,** bara SPEC 7.1 och INSTALLERA.md. Uppdraget gällde SPEC 7.1, och CLAUDE.md skulle bara få P1, P3 och stoppkriteriet. Hugo eller Casper bestämmer om det ska läggas till.
 - **Testerna av stoppregeln tolkar orden i texten** med en liten funktion (`_stoppar`). De visar vad orden säger om riktiga rader från `git status`, inte att Hugo följer regeln. Den är fortfarande en regel som en människa läser.
 - **Att kommandolistan, inställningarna och vakten är oförändrade** kan inte ge rött före bygget, eftersom inget är ändrat. Testerna jämför med kontrollsummor räknade i en kopia av 103eb55, och att de blir röda vid en ändring visas med mutationer i en kopia.
+
+## Granskning 39 (av f52e6ef och c0b54e6) (2026-11-05)
+
+Oberoende granskning av rättelserna efter granskning 38 (steg 15), jämfört med 103eb55. Numret är det väntade. Omfattningen är Hugos stoppkriterium 2026-11-05: bara P1, P3 och SPEC 7.1, med den nya stoppregeln och byggsessionens egna tillägg. Allt annat står under Öppet. Inget är installerat, inget sudo är kört, `~/.ssh` är inte skapad, och inget i `/Library` eller i projektets `.git` är ändrat utöver den här commiten. Ingen kod, inget test och ingen inställningsfil är ändrad.
+
+**Dom: gult. Inget blockerar installationen.** P1, P3 och SPEC 7.1 är byggda som besluten säger. Stoppregeln slår till i alla 106 fall med vanliga stavningar, i båda texterna. De fyra ställena i SPEC 7.1 stämmer. Tre saker bör rättas, men ingen av dem gör installationen farligare än läget i dag:
+
+1. **P1:** inget av de fyra fasta kommandona visar listan i `COMMIT_MSG.txt` innan commiten är gjord, så Hugo kan inte jämföra raderna med listan som regeln kräver.
+2. **P2:** rättelsen av P3 har ett hål. Ett gammalt tecken, långt s (`ſ`), räknas av Macen som ett vanligt s. `.gitattributeſ` fungerar som `.gitattributes` men fångas inte av orden.
+3. **P3:** `.github/` och `.mcp.json` står inte bland det som alltid stoppar. En fil i `.github/workflows/` kan köra kod hos GitHub efter en push.
+
+**Så skiljer jag vad som är visat.**
+
+- **Körning:** gjort på den här datorn, med riktig git, i testets tillfälliga mapp och i kopior, med påhittade inställningar för git. Provfiler och resultat ligger i `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/ce903c81-c765-4c8b-a1a1-687cabecf632/scratchpad/efter/scripts/tests/` (`test_g39_*.py`) och `scratchpad/res` i samma mapp.
+- **Modell:** `sandbox-exec`, macOS eget verktyg för sandlådor, med en profil som jag skrev själv. **Det är inte Claude Codes riktiga profil.**
+- **Inte kört i någon riktig sandlåda.** Sandlådan är inte installerad.
+- **Bedömning:** står uttryckligen.
+
+**Hela sviten (körning), före den här granskningens text: 0 failed, 5379 passed, 41 skipped**, som väntat. Körningen efter texten står i commit-meddelandet och i slutrapporten.
+
+### Punkt 1: besluten
+
+De fem besluten och Hugos svar står sist under "Granskning 38", samma text som listan i testet (körning). **Att de är ordagranna mot chatten kan jag inte visa, eftersom jag inte har sett byggsessionens chatt.** Hugo kan läsa dem där.
+
+| Beslut | Byggt? | Test som bevisar det |
+|---|---|---|
+| P1, ny fil i `.claude/` stoppar | Ja | Ja. Utan `.claude/` i texten: 4 röda per fil |
+| P3, alla stavningar | Ja för a–z, se P2 för långt s | Ja. Utan orden: 8 röda per fil |
+| SPEC 7.1, samma sak som CLAUDE.md och INSTALLERA.md | Ja | Ja, se punkt 5 |
+| Stoppkriteriet | Ja, raden i CLAUDE.md | Ja |
+| P2, P5, P6 och P7 under Öppet | Ja, Öppet 67 | Ja för beslutets ord, inte för vad Öppet 67 säger (bedömning: gör ingen skada) |
+| Hugos svar, "Bara uppräknade" | Ja | **Bara delvis, se P5.** Meningen kan ändras utan rött test |
+
+**Egna mutationer (körning, 38 ändringar i texten eller filerna, en i taget, i en kopia): 31 röda, 7 överlevde.** Mutation betyder att jag ändrar med flit och ser om ett test larmar. Utan mutation: 71 passed.
+
+| Överlevde | Vad det betyder | Se |
+|---|---|---|
+| "räknat upp i `COMMIT_MSG.txt`" blir "ändrat", i CLAUDE.md och INSTALLERA.md | Hugos svar kan bli verkningslöst utan rött test | P5 |
+| "Stoppregel gäller inte: …", i CLAUDE.md och INSTALLERA.md | Väntat, ett test av ord kan inte se det. Samma som P5 i granskning 37 och 38 | – |
+| `.claude/ny.py` tillagd i väntat läge på båda ställena | Samma som P5 i granskning 38. Raden `?? .claude/ny.py` stoppar ändå | – |
+| Undantag ett och två på rad 259 breddade i slutet av meningen | Samma slags lucka som P5 i granskning 38 | – |
+
+**Byggsessionens egna tillägg:**
+
+- **"Men aldrig en rad med `!!`" (körning):** `!! scripts/kvitto.csv` stoppar också när namnet står i listan. Det är strängare än Hugos svar, och går åt rätt håll: en ignorerad fil kommer ändå inte med i commiten. Bieffekt (bedömning): Finder kan lägga en `.DS_Store` i en ny mapp, och då stannar Hugo och frågar. Ofarligt.
+- **"Meddelandet räknar upp varje fil" (körning):** en fil som saknas stoppar. Meningen säger inte hur listan ska se ut, se P4.
+- **Regeln i två delar (körning):** behövs. Utan andra delen släpps `.claude/` och de fyra namnen igenom när de står i listan. Utan första delen släpps allt annat igenom.
+- **Stavningen för alla fem namnen (körning):** rätt, Macen behandlar dem lika.
+
+### Punkt 2: stoppregeln mot riktiga rader
+
+Riktig `git status --short --ignored -uall` i en kopia med projektets `.gitignore` och det väntade läget (körning, git 2.54.0). Varje fall räknades som uppräknat i listan, så att bara regelns andra del kunde stoppa.
+
+| Fall | Antal | Exempel på rad | Stoppregeln |
+|---|---|---|---|
+| Ny fil i `.claude/`, också `.CLAUDE/` och i undermapp | 9 | `?? .claude/ny.py`, `?? ny/.CLAUDE/x`, `!! .claude/settings.local.json` | **Slår till** |
+| De fyra namnen i fyra stavningar och tre mappar | 48 | `?? ny/under/.GITATTRIBUTES`, `?? scripts/.LfsConfig` | **Slår till** |
+| Samma namn i roten, med annan stavning | ingår ovan | `.GITIGNORE` är samma fil: ` M .gitignore`, och allt den dolde syns | Slår till |
+| Ändrad, borttagen, och samma sak förberedd för commit | 32 | ` M ny/.lfsconfig`, ` D scripts/.gitignore`, `D  .gitmodules`, `M  .gitattributes` | **Slår till** |
+| Omdöpt, bort från och till namnet, och bara stavningen | 14 | `R  ny/.gitmodules -> ny/.GITMODULES`, `R  x -> .claude/x.txt` | **Slår till** |
+| Blandat (`MM`, `AM`) och osparad omdöpning | 3 | `AM ny/nytt/.gitignore` | Slår till |
+| Ignorerad fil som står i listan | 1 | `!! scripts/kvitto.csv` | **Slår till** |
+| Ny fil som inte står i listan | 1 | `?? scripts/inte_uppraknad.py` | **Slår till** |
+| Ny fil som står i listan | 1 | `?? scripts/uppraknad.py` | Slår inte till, rätt |
+| Det väntade läget, med `COMMIT_MSG.txt` | 1 | 12 rader med `!!` | Slår inte till, rätt |
+
+**Konstiga filnamn (körning, 27 namn):**
+
+| Namn | Rad med gits standard | Bedömning |
+|---|---|---|
+| Mellanslag, citattecken, radbrytning, tabb, vagnretur, färgkod | `?? "ny/a b.py"`, `?? "ny/a\nb.py"`, `?? "ny/\033[8mdold.py"` | Alltid en rad, inom citattecken. **Ett namn kan inte se ut som en väntad rad**, inte heller `x`, radbrytning, `!! .DS_Store` |
+| `.gitattributes` i en mapp med mellanslag eller `å` | `?? "ny/a b/.gitattributes"`, `?? "ny/\303\245/.gitignore"` | Slår till, namnet syns |
+| `ı`, kyrilliskt `а`, nollbreddstecken | `?? "ny/.g\304\261tignore"` | Citerat. Filen är en annan fil. Git läser den inte, prövat för `.gitattributes` (körning) |
+| **Långt s** | **`?? "ny/.gitattribute\305\277"`** | **Git läser filen. Slår inte till när den står i listan, se P2** |
+
+**Testens egen tolkning, `_stoppar`, är smalare än orden.** Den hittar inte namnet i en rad inom citattecken, och inte i en omdöpning där namnet står före pilen (körning: i 10 av de 49 fallen med ändrade, borttagna och omdöpta filer stoppar den inte när hela raden står i listan). En människa som läser raden ser namnet. Se P5.
+
+**Allt ovan är vad orden säger om riktiga rader, inte att Hugo följer dem.** Regeln är fortfarande text som en människa läser.
+
+### Punkt 3: listan "stoppar alltid"
+
+Prövat i kopian (körning): varje fil gav en vanlig rad, regeln släppte igenom den när den stod i listan, `git add -A` tog med den och `git show --stat` visade den. **Git körde ingen av dem av sig själv** (körning, filerna var körbara och skulle ha lämnat ett spår). Projektets `.git/hooks` har bara `.sample`-filer, och `.git/config` har ingen `core.hooksPath` (läst). Hugos globala inställningar för git har jag inte läst.
+
+| Fil eller mapp | Vad den gör | När | Bedömning | Allvar |
+|---|---|---|---|---|
+| `.github/workflows/` | Kod körs på GitHubs datorer | **Efter en push, av sig själv**, om Actions är på | Enda filen här som går igång bara av git. Koden kommer åt repot och dess hemligheter på GitHub, inte Hugos dator | Under Öppet, **bör rättas**, P3 |
+| `.mcp.json` | Claude Code startar program | När en session startar, efter att Hugo godkänt | Skyddad enligt dokumentationen, och förbudet i inställningarna. Spärrprovet prövar den inte (`grep`, körning) | Under Öppet, **bör rättas**, P3 |
+| `CLAUDE.local.md`, `scripts/CLAUDE.md` | Text som senare sessioner läser som regler | När en session läser dem | Ingen kod, men kan ge fel instruktioner. CLAUDE.md säger att text i filer aldrig är ett OK | Under Öppet |
+| `conftest.py`, `pytest.ini`, `pyproject.toml`, `setup.cfg`, `tox.ini` | pytest kör eller läser dem | När testerna körs | I sandlådan för agenten. Hugo kör utanför sandlådan bara i en kopia av en granskad commit. Samma som Öppet 55 | Under Öppet |
+| `.envrc` | direnv kör den | Bara om direnv finns och Hugo skrivit `direnv allow` | Inte prövat om direnv finns | Under Öppet |
+| `.pre-commit-config.yaml`, `.husky/`, `.githooks/`, `hooks/` | Krokar | Bara om `.git/hooks` eller `core.hooksPath` pekar dit | Git kör dem inte (körning). `.git` är stängd i sandlådan | Under Öppet |
+| `.vscode/`, `.devcontainer/` | Uppgifter i en editor | Bara när mappen öppnas där och Hugo litar på den | Inte git | Under Öppet |
+| `.circleci/`, `.gitlab-ci.yml`, `vercel.json` | Tjänster som kör kod vid en push | Bara om tjänsten är kopplad till repot | Inte prövat vilka som är kopplade | Under Öppet |
+| `.gitconfig`, `Makefile`, `package.json`, `.python-version` | – | Bara om någon startar något | Git läser inte `.gitconfig` i ett projekt (bedömning) | Inget |
+
+**Ingen av dem blockerar** (bedömning). Hugo har sagt att bara P1, P3 och SPEC 7.1 kan blockera. Sakligt: inget av detta blir sämre av installationen. I dag kan en session lägga samma filer och committa dem själv, utan någon regel alls.
+
+### Punkt 4: `COMMIT_MSG.txt` som lista
+
+**Ja, en session kan få en fil att se väntad ut. Det räcker att skriva namnet i listan.** Den behöver inga knep, se P4. Knepen i uppdraget ger inget extra:
+
+- **Osynliga tecken (körning):** git skriver dem som siffror, till exempel `\342\200\213`, så raden ser annorlunda ut än listan. Det ger ett stopp, inte en gömd fil. Med `core.quotepath=false` i Hugos inställningar syns tecknet rakt av, se P2.
+- **Mycket lång lista (bedömning):** en människa kan inte jämföra hundratals rader. Git skriver ut alla (körning i granskning 38). Regeln har inget verktyg för jämförelsen.
+
+**Det viktigare är P1:** listan visas inte alls förrän commiten är gjord. **Blockerar inte** (bedömning): delen som alltid stoppar behöver ingen lista, och `git show --stat HEAD` visar både meddelandet och filerna före en push.
+
+### Punkt 5: SPEC 7.1
+
+`git diff 103eb55 HEAD -- SPEC.md` ändrar exakt tre rader: 259, 278 och 282 (körning).
+
+| Ställe | Stämmer med | Utfall |
+|---|---|---|
+| 282, status-kommandot | CLAUDE.md och INSTALLERA.md | Ja, `-uall`. Ingen gammal form kvar i SPEC.md, BYGGPLAN.md eller OVERLAMNING.md (`grep`, körning) |
+| 259, undantag ett, hård länk | CLAUDE.md, ord för ord | Ja |
+| 259, undantag två, kopian | INSTALLERA.md, ord för ord, och beslut 4 om granskning 34 | Ja, men hänvisningen är otydlig, se P6 |
+| 278, vem som committar | CLAUDE.md och INSTALLERA.md | Ja. Före installationen agenten, sedan Hugo |
+
+**Undantagen är inte bredare än Hugos beslut** (läst). Ett: ett namngivet test, en namngiven testfil, inne i sandlådan, och det ska stoppas. Två: samma ord som beslutet, "bara för spärrtestet". **Kommandolistan är oförändrad** (körning, `git diff` och kontrollsumman). `git add` och `git commit` står kvar, som beslutet säger. Meningen under tabellen från Öppet 64 väntar på nästa version av vakten, som Öppet 64 säger.
+
+Listan före och efter i `PROGRESS.md`, för CLAUDE.md och SPEC 7.1, stämmer med `git diff` (körning). "Aldrig" och "Vem som ger OK" är orörda.
+
+### Punkt 6: undantaget för kopian i CLAUDE.md
+
+**Blockerar inte** (bedömning), se P7. CLAUDE.md nämner bara undantaget för den hårda länken, så en session i `~/VERA/sparrprov` kan tveka. Det är det strängare hållet: sessionen frågar, och Hugo svarar i chatten. Spärrprovet gick också igenom i Hugos provkörning 2026-11-05 (`PROGRESS.md`, läst, inte körd av mig).
+
+### Punkt 7: låsta filer
+
+`git diff --stat 103eb55 HEAD -- sparr/managed-settings.json sparr/kommandosparr.py .gitignore` är tom (körning). Commitarna rör sju filer, de som meddelandena nämner: `BYGGPLAN.md`, `CLAUDE.md`, `GRANSKNING.md`, `PROGRESS.md`, `SPEC.md`, `scripts/tests/test_sandladan.py` och `sparr/INSTALLERA.md` (körning).
+
+### Punkt 8: antalen
+
+**Stämmer** (körning, listan över tester i båda kopiorna): 5360 tester före och 5420 efter, 60 nya, inget borta, inget nytt namn på ett gammalt. 5379 + 41 = 5420. De 41 är 31 spärrprov i kopian och 10 av spärrtestet (min körning). Räknat ur testerna: 5 + 1 besluten och svaret, 2 väntat läge, 12 ny fil i en mapp, 6 `.claude/` uppräknad, 6 `.gitattributes`, 10 de fyra namnen, 2 uppräknade, 2 ignorerad, 1 samma läge, 2 orden, 2 meddelandet, 1 stoppkriteriet, 5 SPEC 7.1 och 3 summorna. Det blir 60.
+
+### Fynd
+
+Alla fynd är under Öppet. Inget blockerar installationen.
+
+#### P1, under Öppet, bör rättas: Hugo kan inte läsa listan före commiten
+
+Regeln säger att en rad är väntad om filen står i `COMMIT_MSG.txt`. De fasta kommandona är `git status --short --ignored -uall`, `git add -A`, `ls -l COMMIT_MSG.txt` och `git commit -F COMMIT_MSG.txt`. **Inget av dem visar vad filen innehåller** (läst i CLAUDE.md och INSTALLERA.md, punkt 5). Listan syns först i `git show --stat HEAD`, när commiten redan är gjord. Testen ger funktionen listan direkt, så de ser inte det här.
+
+**Följd (bedömning):** Hugo kan inte följa regeln som den står. Han får antingen stanna vid varje commit, fråga sessionen (som själv skrev listan), eller öppna filen på eget initiativ.
+
+**Allvaret (bedömning):** blockerar inte, inget installerat skydd bygger på det, och titten före push finns kvar. Men det möter Hugo vid första commiten efter installationen.
+
+**Förslag:** ett steg till, i den här ordningen: `ls -l COMMIT_MSG.txt` först, sedan `cat -v COMMIT_MSG.txt`, sedan `git status --short --ignored -uall`. **Ordningen spelar roll:** är filen en länk visar `cat` det den pekar på, och med `!` i sessionen hamnar det hos agenten. `cat -v` visar också backsteg och färgkoder (P2 i granskning 38), men gör åäö svårlästa (bedömning). Hugos eller Caspers beslut.
+
+#### P2, under Öppet, bör rättas: långt s tar sig förbi orden i P3
+
+**Långt s** (`ſ`) är en gammal form av bokstaven s. Macens filsystem räknar den som ett vanligt s, och Unicode räknar den som en liten bokstav till S. Det är alltså en stavning med "stora och små bokstäver", som Hugos beslut säger.
+
+**Körning, i testets tillfälliga mapp:**
+
+| Prov | Utfall |
+|---|---|
+| Skapa `.gitattributeſ`. Finns `.gitattributes`? | Ja, samma fil. Likaså `.lfſconfig` och `.gitmoduleſ` |
+| Står `* -diff` i `ny/.gitattributeſ`: vad säger `git check-attr`? | `diff: unset`. **Git läser filen** |
+| Raden i `git status` | `?? "ny/.gitattribute\305\277"`. Texten `.gitattributes` står inte där |
+| `git add -A` och `git show --stat` | Filen följer med: `"ny/.gitattribute\305\277" \| 1 +` |
+| Stoppregeln när filen står i listan | **Slår inte till** |
+| Samma rad med `core.quotepath=false` | `?? ny/.gitattributeſ`, nästan omöjlig att skilja från det riktiga namnet |
+
+`.gitignore` och `.claude` har inget s och berörs inte. Bara långt s är prövat, inte andra tecken.
+
+**Allvaret (bedömning):** blockerar inte. Samma följd som P3 i granskning 38: `-diff` och `export-ignore` gömmer ändringar, och Git LFS kan startas med Hugos egna inställningar (Öppet 62). Sessionen kan inte välja vilket program som körs, eftersom `.git/config` och `~/.gitconfig` är stängda. Filen måste skapas med flit och stå i listan, och raden ser konstig ut. Det är ett hål i P3, men ett smalt.
+
+**Förslag:** "en rad med citattecken stoppar alltid". Git sätter citattecken runt alla namn med konstiga tecken, så det täpper till hela familjen, också tecken jag inte har prövat. Bieffekt: filer med mellanslag eller åäö stoppar, och det är ofarligt. Det kräver att `core.quotepath` inte är av: Hugo kan titta med `git config --global core.quotepath`. Tomt eller `true` är bra. Jag har inte läst Hugos inställningar.
+
+#### P3, under Öppet, bör rättas: `.github/` och `.mcp.json` stoppar inte alltid
+
+Se punkt 3. **`.github/workflows/x.yml` i listan släpps igenom (körning), och kommer med i commiten.** Nästa push kör koden på GitHub utan att någon gör mer. Inte prövat: om Actions är på för `VeraLabsAB/VeraAI`, om repot har hemligheter där, och om inloggningen får pusha sådana filer. Hugo eller Casper kan titta under Settings > Actions på GitHub.
+
+**Allvaret (bedömning):** blockerar inte. Koden kommer åt repot, inte Hugos dator, och agenten kan redan läsa repot. Filen syns i `git status` och `git show --stat`, men namnet säger inte en icke-programmerare vad den gör.
+
+**`.mcp.json`** är samma slags fil som `.claude/`, men står inte i regeln. Sandlådan ska stoppa den enligt dokumentationen. Förbudet för fil-verktygen fungerar också med långt s (körning av vakten). Spärrprovet prövar den inte.
+
+**Förslag:** lägg till `.github/` och `.mcp.json` i det som alltid stoppar, i CLAUDE.md och INSTALLERA.md, med test. Inga låsta filer. Överväg ett försök att skriva `.mcp.json` i spärrprovet.
+
+#### P4, under Öppet: listan fångar glömska, inte avsikt
+
+Sessionen skriver listan själv, så en fil den vill få med behöver bara stå där (körning, `?? scripts/uppraknad.py`). Det är vad Hugo valde, och regeln är bättre än ingen lista. Men **den skyddar mot misstag, inte mot en session som vill något annat**. Det som står emot är att Hugo läser filnamnen. "Räknar upp" säger inte heller hur: en mening om "alla filer i `scripts/`" är inte uttryckligen förbjuden (bedömning). **Förslag:** en mening i CLAUDE.md om vad listan inte gör, och en fast form, en fil per rad under en rubrik.
+
+#### P5, under Öppet: några rättelser är låsta bara delvis
+
+- **"räknat upp i `COMMIT_MSG.txt`" kan bytas mot "ändrat" utan rött test** (körning). Då vore varje fil som sessionen ändrat väntad, vilket är motsatsen till Hugos svar. `_stoppar` får listan som argument och läser inte meningen. **Förslag:** testa meningen ordagrant.
+- **`_stoppar` hittar inte namnet i en rad inom citattecken** (`"ny/a b/.gitattributes"`, `"ny/\303\245/.gitignore"`) **eller före pilen** (`R  .gitattributes -> ny/omdopt.txt`), och inte `.claude/` i `R  x -> .claude/x.txt` (körning). En människa ser dem. Testet säger alltså mindre än det ser ut att säga.
+- **Testerna har inga rader med `D`, `R` eller citattecken.** Reglerna håller för dem enligt orden (punkt 2), men ingenting larmar om tolkningen ändras.
+
+#### P6, under Öppet: hänvisningen i SPEC 7.1, rad 259
+
+Rad 259 skriver "Hugos beslut 2026-11-05, beslut 4". Det finns flera beslut det datumet med en punkt 4. Beslut 4 om granskning 35 gäller worktrees. Det rätta är beslut 4 om granskning 34, som rad 1038 i INSTALLERA.md skriver. Ändrar inget i sak. Samma brist överst i `test_sandladan.py`. "Ändrat 2026-11-04" överst i SPEC.md nämner inte ändringen, vilket byggsessionen själv tog upp.
+
+#### P7, under Öppet: undantaget för kopian står inte i CLAUDE.md
+
+Se punkt 6. CLAUDE.md säger "Uttalat undantag", ett, och SPEC 7.1 säger "Två uttalade undantag". **Förslag:** en mening i CLAUDE.md, i samma ändring som P1–P3. Hugos eller Caspers beslut.
+
+#### P8, under Öppet: ett inbäddat repo syns som en rad utan filer
+
+En mapp med en egen `.git` och en commit ger bara `?? ny/`, inte filerna i den, fast CLAUDE.md säger "varje fil för sig" (körning). `git add -A` lägger bara in en pekare, `ny | 1 +`, och git skriver en varning. Raden stoppar om den inte står i listan. Sandlådan ska stoppa namnet `.git`, och att flytta in en sådan mapp är kvar som P7 i granskning 35 (Öppet 61). **Mitt första prov av det här var fel:** det ärvde `GIT_DIR` från testets miljö, och räknas inte. Siffrorna ovan kommer från det rättade provet.
+
+#### P9, under Öppet: `~/.ssh` med långt s, fil-verktyget Read
+
+`.ſſh/prov` öppnar samma fil som `.ssh/prov`, i testets tillfälliga mapp (körning). **Modellen** stoppar båda, och en skrivning till `.ny.jſon` när `.ny.json` är förbjuden, med `Operation not permitted` (modell). **Vakten** stoppar Write till `.mcp.jſon`, `~/.ſſh/x`, `~/Library/LaunchAgentſ/x.plist` och `~/.zſhrc`, eftersom den jämför med `casefold` (körning). **Inte prövat:** om Claude Codes eget `Read(~/.ssh/**)` gör samma sak. Vakten prövar inte Read, och sandlådan gäller inte fil-verktygen (Öppet 57). Enligt INSTALLERA.md ska ingen `~/.ssh` finnas på Hugos dator före provet, så inget hemligt borde vara berört (inte kontrollerat av mig, vakten stoppar läsning där). **Förslag:** lägg till försöket i "Pröva läsförbudet", och ta upp det med Öppet 57.
+
+### Inte visat
+
+Allt i en riktig sandlåda: att `.claude/`, `.mcp.json` och `.git` stängs, och antalen `49`, `41`, `33` och `35`. Hur Hugo läser regeln vid en riktig commit. Hugos globala inställningar för git (`core.quotepath`, `core.hooksPath`). Om Actions är på, och vilka tjänster som är kopplade till repot. Andra tecken än långt s. Att besluten är ordagranna mot chatten.
+
+### Vad som krävs före installationen
+
+1. **Inget fynd måste rättas först.** Stoppkriteriet är uppfyllt: inget i P1, P3 eller SPEC 7.1 blockerar. Min rekommendation (bedömning): rätta P1, P2 och P3 i nästa byggsession, senast före första commiten efter installationen. Det är några meningar i CLAUDE.md och INSTALLERA.md, med test, och inga låsta filer.
+2. **Hugo kör provkörningen igen** (`49 skipped`).
+3. Hugo installerar från den granskade commiten och kör spärrprovet direkt, med H1-proven i appen.
