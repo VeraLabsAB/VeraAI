@@ -2813,18 +2813,172 @@ def test_beslut_steg_16_steget_ar_klart_i_byggplanen():
 
 
 def test_beslut_steg_16_lage_nu_foljer_beslut_5():
-    assert _raden_i_lage_nu("Senast avslutade steg").startswith("16 – ")
+    # Kontrollerna av orden i "Senast avslutade steg" och "Nästa steg" är borttagna: raderna ändras vid varje vanlig statusändring,
+    # och besluten om steg 16 är låsta i GRANSKNING.md (Hugos beslut 2026-11-06 om Öppet 71, beslut 1, och Hugos svar samma dag).
     assert "16 – " not in _raden_i_lage_nu("Pågående steg")
-    nasta = _raden_i_lage_nu("Nästa steg")
-    assert nasta.startswith("En oberoende granskning av commit dbe85a9 (Öppet 69 och spärrprovet) och commiten från sessionen för steg 16")
-    assert "Hugos beslut 2026-11-06, beslut 8" in nasta and "Sedan steg 17" in nasta
-    assert "Bash-vägen prövas" not in nasta
+    assert "Bash-vägen prövas" not in _raden_i_lage_nu("Nästa steg")
 
 
 def test_beslut_steg_16_progress_har_en_post_for_sessionen():
     text = (PROJEKTET / "PROGRESS.md").read_text(encoding="utf-8")
     post = text.split("\n## Läge 2026-11-06, steg 16 klart", 1)[1].split("\n## ", 1)[0]
     assert "\nSteg i byggplanen: 16 (klart)\n" in post
+
+
+# ---------------------------------------------------------------------------------------------
+# Hugos beslut 2026-11-06 om Öppet 71 (granskning 41). P2 och P4 står kvar under Öppet 71.
+
+BESLUT_71_RUBRIK = "## Hugos beslut 2026-11-06 om Öppet 71"
+BESLUT_71 = [
+    '1. P1 rättas: de två kontrollerna i test_beslut_steg_16_lage_nu_foljer_beslut_5 av raderna "Senast avslutade steg" och '
+    '"Nästa steg" i BYGGPLAN.md tas bort. Besluten om steg 16 är redan låsta i GRANSKNING.md. Det här är ett uttryckligt undantag '
+    'från regeln att inget test får bli svagare, bara för de två kontrollerna. Raden "Nästa steg" skrivs om på vanligt sätt, utan '
+    "orden som testet tvingade fram.",
+    '2. P3 rättas: ett test låser att Öppet 70 är öppen och att "Inget svar finns" står kvar, tills Hugo eller Casper har svarat i '
+    "chatten. Rött före.",
+    "3. P5 rättas: meningarna i Öppet 4 och Öppet 8 som säger att steg 15 inte är installerat rättas till att steg 15 är installerat "
+    "och provat 2026-11-06. Öppet 4 och Öppet 8 stängs inte. Om Öppet 4 ska stängas avgör nästa granskning.",
+    '4. P6 a rättas: Kassio-beslutet förs in i GRANSKNING.md under namnet "Kassio-beslutet 2026-11-05 om jurist och '
+    'redovisningskonsult", ordagrant ur Kassio-intervjun (projektdokumentet claude/intervju-kassio.md på claude.ai, frågan "Jurist '
+    'och redovisningskonsult?"): "Rådgivare, jurister och konsulter kontaktas längre fram. I nuläget har vi inte råd." Det ersätter '
+    'det tidigare svaret: "Kontaktas den här veckan av Hugo eller Casper, oavsett pilotalternativ, eftersom juristens svar behövs '
+    'innan riktig data används." Hänvisningarna i BYGGPLAN.md och PROGRESS.md pekar på den rubriken.',
+    '5. P6 b: Hugo godkänner de tre formuleringarna "som ersätter beslut 14 på den punkten" (steg 53 och 54), "något prov i appen '
+    'görs inte" (steg 16) och "när konsulten kontaktas" (Öppet 38).',
+    "6. P2 och P4 står kvar under Öppet 71.",
+    "7. Ingen egen granskning. Den här sessionen granskas tillsammans med steg 17. Den granskningen tar också punkt 6 i granskning 41 "
+    "(statusraderna mot git log), som inte nådde granskaren eftersom uppdraget var avklippt.",
+]
+BESLUT_71_TREDJE_KONTROLLEN = (
+    "**Hugos svar i chatten 2026-11-06, i samma session, till beslut 1.** Testet hade en tredje kontroll av raden "
+    '"Nästa steg", som varken granskning 41 eller beslut 1 nämner: raden måste innehålla "Hugos beslut 2026-11-06, beslut 8" och '
+    '"Sedan steg 17". Sessionen frågade om också den fick tas bort, och Hugo valde "Ta bort den också". Kontrollen att '
+    '"Bash-vägen prövas" inte står i raden blir kvar, liksom kontrollen av "Pågående steg".'
+)
+KASSIO_NAMN = "Kassio-beslutet 2026-11-05 om jurist och redovisningskonsult"
+KASSIO_RUBRIK = f"\n## {KASSIO_NAMN}\n"
+OPPET_70 = (
+    "**Vad krävs innan riktig data används?** (steg 109 och 118, Hugos beslut 2026-11-06, beslut 7.) Rådgivare, jurister och "
+    f"konsulter kontaktas längre fram, eftersom vi inte har råd nu ({KASSIO_NAMN}). I dag säger steg 109 \"riktig data först efter "
+    'juristens svar", steg 118 beror på steg 53 och 54, och CLAUDE.md säger att förbudet mot riktig data gäller helt tills alla '
+    "villkor i steg 118 är uppfyllda. Inget av det är ändrat. Öppen fråga. Inget svar finns, och inget ska antas. **Öppen.**"
+)
+
+
+def _oppet_70_ar_oppen_utan_svar(post):
+    # Hela posten jämförs, så att ett påhittat svar inne i texten också ger rött. Svarar Hugo eller Casper i chatten ändras posten
+    # och det här testet tillsammans, i den sessionen. Ingen annan orsak räcker.
+    assert post == OPPET_70
+    assert "Inget svar finns" in post
+
+
+@pytest.mark.parametrize("beslut", BESLUT_71, ids=[str(n) for n in range(1, len(BESLUT_71) + 1)])
+def test_beslut_oppet_71_star_ordagrant_i_granskning(beslut):
+    assert beslut in _avsnitt_i_granskning(f"\n{BESLUT_71_RUBRIK}\n")
+
+
+def test_beslut_oppet_71_svaret_om_den_tredje_kontrollen_star_i_granskning():
+    assert BESLUT_71_TREDJE_KONTROLLEN in _avsnitt_i_granskning(f"\n{BESLUT_71_RUBRIK}\n")
+
+
+# Beslut 1: P1. Provet körs med påhittade rader, så att det inte beror på vad "Läge nu" säger i dag.
+
+
+def _lage_nu_svarar(monkeypatch, senast="17 – Något", pagaende="18 – Något", nasta="Steg 18 – Något"):
+    rader = {"Senast avslutade steg": senast, "Pågående steg": pagaende, "Nästa steg": nasta}
+    monkeypatch.setitem(globals(), "_raden_i_lage_nu", rader.__getitem__)
+
+
+def test_beslut_oppet_71_p1_vanlig_statusandring_ger_inte_rott(monkeypatch):
+    _lage_nu_svarar(monkeypatch)
+    test_beslut_steg_16_lage_nu_foljer_beslut_5()
+
+
+@pytest.mark.parametrize(
+    "rader",
+    [{"pagaende": "16 – Bash-vägen"}, {"nasta": "Bash-vägen prövas i appen"}],
+    ids=["steg_16_pagar_igen", "bash_vagen_provas_igen"],
+)
+def test_beslut_oppet_71_p1_kontrollerna_som_ar_kvar_larmar(monkeypatch, rader):
+    _lage_nu_svarar(monkeypatch, **rader)
+    _ska_ge_rott(AssertionError, test_beslut_steg_16_lage_nu_foljer_beslut_5)
+
+
+# Beslut 2: P3. "Nästa steg" låses inte: det är samma fel som P1.
+
+
+def test_beslut_oppet_71_p3_oppet_70_ar_oppen_och_utan_svar():
+    _oppet_70_ar_oppen_utan_svar(_post_under_oppet(70))
+
+
+@pytest.mark.parametrize(
+    "gammalt,nytt",
+    [
+        ("**Öppen.**", "**Stängd.**"),
+        ("Inget svar finns, och inget ska antas.", "Inget svar behövs."),
+        ("Inget svar finns, och inget ska antas.", "Inget svar finns, och inget ska antas. Hugos OK räcker."),
+        ("Inget av det är ändrat.", "Hugos OK räcker. Inget av det är ändrat."),
+    ],
+    ids=["stangd", "meningen_borta", "svar_efter_meningen", "svar_inne_i_texten"],
+)
+def test_beslut_oppet_71_p3_stangd_eller_pahittat_svar_ger_rott(gammalt, nytt):
+    assert gammalt in OPPET_70
+    _ska_ge_rott(AssertionError, lambda: _oppet_70_ar_oppen_utan_svar(OPPET_70.replace(gammalt, nytt)))
+
+
+@pytest.mark.parametrize("nummer", [109, 118])
+def test_beslut_oppet_71_p3_stegen_sager_att_inget_svar_finns(nummer):
+    assert "**Öppen fråga" in _byggplanens_rad(nummer) and "Inget svar finns" in _byggplanens_rad(nummer)
+
+
+# Beslut 3: P5. Posterna radbryts olika, så mellanrummen jämförs inte.
+
+
+@pytest.mark.parametrize("nummer", [4, 8])
+def test_beslut_oppet_71_p5_steg_15_ar_installerat_och_posten_ar_oppen(nummer):
+    post = " ".join(_post_under_oppet(nummer).split())
+    assert "steg 15 är installerat och provat 2026-11-06" in post.lower()
+    assert "inte installerad" not in post and "inte installerat" not in post
+    assert "Stängd" not in post and not post.startswith("~~")
+
+
+# Beslut 4: P6 a.
+
+
+def test_beslut_oppet_71_p6_kassio_beslutet_har_en_egen_rubrik_med_svaren():
+    assert GRANSKNING.read_text(encoding="utf-8").count(KASSIO_RUBRIK) == 1
+    avsnitt = _avsnitt_i_granskning(KASSIO_RUBRIK)
+    assert '"Rådgivare, jurister och konsulter kontaktas längre fram. I nuläget har vi inte råd."' in avsnitt
+    assert (
+        '"Kontaktas den här veckan av Hugo eller Casper, oavsett pilotalternativ, eftersom juristens svar behövs innan riktig '
+        'data används."' in avsnitt
+    )
+
+
+@pytest.mark.parametrize("nummer", [53, 54])
+def test_beslut_oppet_71_p6_stegen_pekar_pa_rubriken(nummer):
+    assert KASSIO_NAMN in _byggplanens_rad(nummer)
+
+
+def _progress_oppet():
+    return (PROJEKTET / "PROGRESS.md").read_text(encoding="utf-8").split("\n## Öppet\n", 1)[1].split("\n## ", 1)[0]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [lambda: (PROJEKTET / "BYGGPLAN.md").read_text(encoding="utf-8"), _progress_oppet],
+    ids=["byggplanen", "oppet_i_progress"],
+)
+def test_beslut_oppet_71_p6_varje_hanvisning_pekar_pa_rubriken(text):
+    # Läge-posterna i PROGRESS.md är historik: de säger vad som gällde när de skrevs, och ändras inte.
+    innehall = text()
+    assert innehall.count("Kassio-beslutet 2026-11-05") == innehall.count(KASSIO_NAMN) > 0
+
+
+def test_beslut_oppet_71_oppet_71_sager_vad_som_ar_klart_och_kvar():
+    post = " ".join(_post_under_oppet(71).split())
+    assert "P1, P3, P5 och P6 är klara" in post and "Kvar: P2 och P4" in post
+    assert post.endswith("**Öppen.**")
 
 
 # ---------------------------------------------------------------------------------------------

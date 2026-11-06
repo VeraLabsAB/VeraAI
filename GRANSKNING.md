@@ -12907,3 +12907,27 @@ Beslut 6 säger att steg 15 är installerat. Öppet 4 säger "Byggd 2026-11-04 (
 ### Inte visat
 
 Rättelserna utanför sandlådan, och spärrprovet på HEAD. CLAUDE.md kräver inte det här, eftersom vakten och de låsta inställningarna inte är ändrade. Hugos körningar i beslut 6: de är Hugos uppgifter, och jag kan inte göra dem här. Att besluten är ordagranna mot chatten. Att dokumentationen säger det beslut 2 om steg 16 säger: jag har inte läst sidorna. Innehållet i Kassio-beslutet. Resten av uppdraget, om texten fortsatte efter punkt 5.
+
+## Kassio-beslutet 2026-11-05 om jurist och redovisningskonsult
+
+Inskrivet efter Hugos beslut 2026-11-06 om Öppet 71, beslut 4, som står under nästa rubrik. Orden är Hugos citat i det beslutet, ur Kassio-intervjun (projektdokumentet claude/intervju-kassio.md på claude.ai, frågan "Jurist och redovisningskonsult?"). Byggsessionen har inte läst dokumentet.
+
+Beslutet: "Rådgivare, jurister och konsulter kontaktas längre fram. I nuläget har vi inte råd."
+
+Det ersätter det tidigare svaret: "Kontaktas den här veckan av Hugo eller Casper, oavsett pilotalternativ, eftersom juristens svar behövs innan riktig data används."
+
+Vad som krävs innan riktig data används är en öppen fråga (Öppet 70, steg 109 och 118). Det här beslutet svarar inte på den.
+
+## Hugos beslut 2026-11-06 om Öppet 71
+
+Ordagrant ur Hugos uppdrag i chatten 2026-11-06.
+
+1. P1 rättas: de två kontrollerna i test_beslut_steg_16_lage_nu_foljer_beslut_5 av raderna "Senast avslutade steg" och "Nästa steg" i BYGGPLAN.md tas bort. Besluten om steg 16 är redan låsta i GRANSKNING.md. Det här är ett uttryckligt undantag från regeln att inget test får bli svagare, bara för de två kontrollerna. Raden "Nästa steg" skrivs om på vanligt sätt, utan orden som testet tvingade fram.
+2. P3 rättas: ett test låser att Öppet 70 är öppen och att "Inget svar finns" står kvar, tills Hugo eller Casper har svarat i chatten. Rött före.
+3. P5 rättas: meningarna i Öppet 4 och Öppet 8 som säger att steg 15 inte är installerat rättas till att steg 15 är installerat och provat 2026-11-06. Öppet 4 och Öppet 8 stängs inte. Om Öppet 4 ska stängas avgör nästa granskning.
+4. P6 a rättas: Kassio-beslutet förs in i GRANSKNING.md under namnet "Kassio-beslutet 2026-11-05 om jurist och redovisningskonsult", ordagrant ur Kassio-intervjun (projektdokumentet claude/intervju-kassio.md på claude.ai, frågan "Jurist och redovisningskonsult?"): "Rådgivare, jurister och konsulter kontaktas längre fram. I nuläget har vi inte råd." Det ersätter det tidigare svaret: "Kontaktas den här veckan av Hugo eller Casper, oavsett pilotalternativ, eftersom juristens svar behövs innan riktig data används." Hänvisningarna i BYGGPLAN.md och PROGRESS.md pekar på den rubriken.
+5. P6 b: Hugo godkänner de tre formuleringarna "som ersätter beslut 14 på den punkten" (steg 53 och 54), "något prov i appen görs inte" (steg 16) och "när konsulten kontaktas" (Öppet 38).
+6. P2 och P4 står kvar under Öppet 71.
+7. Ingen egen granskning. Den här sessionen granskas tillsammans med steg 17. Den granskningen tar också punkt 6 i granskning 41 (statusraderna mot git log), som inte nådde granskaren eftersom uppdraget var avklippt.
+
+**Hugos svar i chatten 2026-11-06, i samma session, till beslut 1.** Testet hade en tredje kontroll av raden "Nästa steg", som varken granskning 41 eller beslut 1 nämner: raden måste innehålla "Hugos beslut 2026-11-06, beslut 8" och "Sedan steg 17". Sessionen frågade om också den fick tas bort, och Hugo valde "Ta bort den också". Kontrollen att "Bash-vägen prövas" inte står i raden blir kvar, liksom kontrollen av "Pågående steg".
