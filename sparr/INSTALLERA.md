@@ -218,10 +218,10 @@ redan: avbryt installationen och fråga.**
 ## Steg 2 b: kontrollera Python som vakten körs med (före installationen)
 
 De låsta inställningarna startar vakten med Python i Apples **utvecklarverktyg** (Command Line Tools, program
-för den som programmerar), med hela sökvägen och `-I` (granskning 19, J1, Hugos beslut 2026-10-28). Kan någon
-byta ut den Pythonen utan lösenord, kan vakten ändras utan att den märker det. Går den inte att starta, stoppar
-Claude Code allt (`"onFailure": "block"`, steg 1). Kommandona **bara visar**, ändrar ingenting och kräver inget
-lösenord. Gör steget på varje dator där vakten installeras.
+för den som programmerar), med hela sökvägen och `-I -S` (granskning 19, J1, Hugos beslut 2026-10-28, och granskning
+20, K1: `-S` hoppar över tilläggsmappar). Kan någon byta ut den utan lösenord, kan vakten ändras utan att den märker
+det. Går den inte att starta, stoppar Claude Code allt (`"onFailure": "block"`, steg 1). Kommandona **bara visar** och
+kräver inget lösenord. Gör steget på varje dator.
 
 **a. Versionen:**
 
@@ -573,10 +573,10 @@ shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-set
 - Jämför de tre summorna, tecken för tecken, med dem som den oberoende granskningen har skrivit upp
   (Hugos beslut 2026-10-28). `requirements.txt` är listan över paket som installeras i steg 9 (granskning
   15, S6, Hugos beslut 2026-10-28). **Är någon summa olika: stoppa och fråga.** Kopiera ingenting.
-- Summorna ska vara exakt de här (2026-10-28 efter granskning 19, och 2026-11-05 för inställningarna). Den
+- Summorna ska vara exakt de här (2026-11-06, byggda i steg 18). Den
   oberoende granskningen ska skriva upp samma summor. Skiljer granskningens summor från dessa: stoppa och fråga.
-  - `sparr/kommandosparr.py`: `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d`
-  - `sparr/managed-settings.json`: `1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da`
+  - `sparr/kommandosparr.py`: `5aefe7afdff61f56c1160f5c2028db23159ac4e229ab63b1fcc0ad583f4b01a6`
+  - `sparr/managed-settings.json`: `33bfdb153cfc6ab83dc0a66a9f538a7d2819d98a6cc62a982be9c256593b94f2`
   - `requirements.txt`: `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a`
 
 ## Steg 6: skapa mapparna och låt systemet äga dem
@@ -1197,6 +1197,160 @@ cd ~/VERA/agent
 ```bash
 rm -rf ~/VERA/provkopia
 ```
+
+## Byte till nästa version av vakten (steg 18)
+
+Hugos beslut 2026-11-06 om Öppet 72 och steg 18 (`GRANSKNING.md`). **Gör det här först efter granskning 42** (beslut 5). Bytet i steg 15 är gjort, och summorna i det avsnittet gäller den versionen.
+
+Vakten byts. I de låsta inställningarna ändras bara `args`, från `-I` till `-I -S`. `-S` gör att Python inte läser sina **tilläggsmappar** (`site-packages`, mappar för extra paket), där en fil kan köra kod varje gång Python startar (granskning 20, K1). Vakten stoppar nu också:
+
+- en `cwd` (mappen där kommandot körs) som är tom eller inte börjar med `/` (K3),
+- tecknet `!` var det än står, också inom citattecken (O1),
+- tecknet `=` när ordet hittills är tomt (O2),
+- ett ord som bara är `}` utanför citattecken (O4).
+
+**Agenten kör inga av kommandona i punkt 1–4.** Du kör dem själv i Terminal, ett i taget, och skriver ditt administratörslösenord när datorn frågar. **Visar ett kommando något annat än det som står: stoppa och fråga**, och kör inte nästa kommando. Kommandona med `sudo` i punkt 2 och 3 visar ingenting när de går bra.
+
+**Innan du börjar:** granskning 42 ska vara klar, och filerna ska vara de som granskades. **Avsluta alla öppna sessioner** i skrivbordsappen och i Terminal, eftersom nya låsta inställningar når också sessioner som redan är öppna.
+
+**1. Kontrollsummor, före bytet:**
+
+```bash
+shasum -a 256 ~/VERA/agent/sparr/managed-settings.json ~/VERA/agent/sparr/kommandosparr.py
+```
+
+```bash
+shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+- Det första, filerna i projektet: `33bfdb153cfc6ab83dc0a66a9f538a7d2819d98a6cc62a982be9c256593b94f2` för inställningarna och `5aefe7afdff61f56c1160f5c2028db23159ac4e229ab63b1fcc0ad583f4b01a6` för vakten. Den oberoende granskningen ska ha skrivit upp samma summor.
+- Det andra, filerna som är installerade nu: `1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da` för inställningarna och `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d` för vakten.
+
+**2. Spara förra versionerna**, bredvid dem, så att du kan backa utan agenten:
+
+```bash
+sudo cp -i "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/managed-settings.fore-steg-18.json"
+```
+
+```bash
+sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.fore-steg-18.json"
+```
+
+```bash
+sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.fore-steg-18.json"
+```
+
+```bash
+sudo cp -i "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/vera/kommandosparr.fore-steg-18.py"
+```
+
+```bash
+sudo chown root:wheel "/Library/Application Support/ClaudeCode/vera/kommandosparr.fore-steg-18.py"
+```
+
+```bash
+sudo chmod 644 "/Library/Application Support/ClaudeCode/vera/kommandosparr.fore-steg-18.py"
+```
+
+- `-i` gör att datorn frågar innan den skriver över. Frågar den: svara `n`, stoppa och fråga.
+
+**3. Kopiera vakten först, sedan inställningarna.** Inställningarna börjar gälla direkt. Den nya vakten använder bara Pythons egna delar, så den ska fungera både med de gamla inställningarna och med de nya (visat i testerna, inte med den installerade filen).
+
+```bash
+sudo ditto ~/VERA/agent/sparr/kommandosparr.py "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+```bash
+sudo chown root:wheel "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+```bash
+sudo chmod 644 "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+```bash
+sudo cp ~/VERA/agent/sparr/managed-settings.json "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+```bash
+sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+```bash
+sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+**4. Kontrollsummor, efter bytet:**
+
+```bash
+shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/managed-settings.fore-steg-18.json" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/vera/kommandosparr.fore-steg-18.py"
+```
+
+- Raderna i ordning ska vara `33bfdb153cfc6ab83dc0a66a9f538a7d2819d98a6cc62a982be9c256593b94f2`, `1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da`, `5aefe7afdff61f56c1160f5c2028db23159ac4e229ab63b1fcc0ad583f4b01a6` och `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d`.
+
+```bash
+ls -lde@ "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/managed-settings.fore-steg-18.json" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/vera/kommandosparr.fore-steg-18.py"
+```
+
+- Alla fyra ska vara `-rw-r--r--`, med ägaren `root` och gruppen `wheel`. Extra uppgifter följer regeln i steg 2.
+
+**5. Provet efteråt.** Det är det här som visar att den installerade vakten fungerar med `-I -S`. Testerna i projektet kör vakten med samma flaggor, men inte den installerade filen. Avsluta skrivbordsappen helt (Cmd+Q) och öppna den igen.
+
+Kör först i Terminal, ett kommando i taget:
+
+```bash
+cd ~/VERA/agent
+```
+
+```bash
+~/.local/bin/claude
+```
+
+Skriv `/status`. Raden **Setting sources** ska visa `Enterprise managed settings (file)`. Avsluta med `/exit`.
+
+Starta sedan en ny session i fliken **Code** i skrivbordsappen, i `~/VERA/agent`. Be agenten köra de här tre, ett i taget. **Vart och ett ska stoppas innan Claude Code frågar dig om lov, med ett fel som börjar "Stoppat av vakten".** Frågar Claude Code om lov: svara nej, stoppa och fråga.
+
+```
+ls !x
+```
+
+```
+ls ''=y
+```
+
+```
+ls }
+```
+
+Be sedan agenten köra de här två. Claude Code frågar som vanligt. Säg ja. Det första ska visa läget i projektet.
+
+```
+git status
+```
+
+```
+'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests
+```
+
+**Väntat: inget `failed`, alltså inga röda.** Väntat antal är samma som i kontrollen efter bytet i steg 15: **69** överhoppade, eller **71** om `~/.ssh` inte finns. **Är något rött, eller är antalet ett annat: stoppa och fråga.**
+
+**6. Proven som ska göras om.** Vakten och de låsta inställningarna har ändrats, så gör "Prov utanför sandlådan" igen, med den commit som granskades (`CLAUDE.md`). Steg 19 i `BYGGPLAN.md`, spärrtestet i en ny session, kommer efter det här.
+
+**Backa till förra versionen.** Stoppar allt, vägrar Claude Code eller appen starta, eller blir något i provet fel. Kör i Terminal, som inte behöver agenten:
+
+```bash
+sudo cp "/Library/Application Support/ClaudeCode/vera/kommandosparr.fore-steg-18.py" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+```bash
+sudo cp "/Library/Application Support/ClaudeCode/managed-settings.fore-steg-18.json" "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+```bash
+shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+- Summorna ska vara `1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da` och `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d`. Avsluta sedan appen helt och öppna den igen. Skriv upp vad som hände, och fråga.
 
 ## Caspers dator
 

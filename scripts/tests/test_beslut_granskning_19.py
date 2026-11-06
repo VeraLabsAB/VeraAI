@@ -1,8 +1,9 @@
 """Hugos beslut 2026-10-28 efter granskning 19 (GRANSKNING.md, "Hugos beslut 2026-10-28 (efter granskning 19)").
 
-- J1: vakten körs med /Library/Developer/CommandLineTools/usr/bin/python3 -I, och stoppar allt om den inte kan köras.
+- J1: vakten körs med /Library/Developer/CommandLineTools/usr/bin/python3 och flaggorna i de låsta inställningarna (-I -S
+  sedan steg 18), och stoppar allt om den inte kan köras.
 
-Rökprovet kör vakten som Claude Code gör, med den Pythonen (version 3.9 på Hugos dator) och -I, i ett eget
+Rökprovet kör vakten som Claude Code gör, med den Pythonen (version 3.9 på Hugos dator) och de flaggorna, i ett eget
 program för varje anrop. Testen hoppar över sig själva om den Pythonen inte finns på datorn. Allt skapas i testets
 tillfälliga mapp, och inga länkar görs (H3). Två saker tittar ändå på disken utanför testets mapp, bara läsande:
 PATH-regeln tittar på var systemets program ligger (/usr/bin och /bin), som i test_kommandosparr.py, och vakten
@@ -29,6 +30,7 @@ from test_kommandosparr import (
     _forsta_sudo,
     _installationskommandon,
     _steg,
+    vaktens_flaggor,
 )
 
 SOKVAG = "/usr/bin:/bin"
@@ -155,7 +157,7 @@ def _kor(mappar, data, miljo=None, argument=(str(VAKTEN),)):
     if miljo is None:
         miljo = {"PATH": SOKVAG, "CLAUDE_PROJECT_DIR": mappar["projekt"]}
     return subprocess.run(
-        [VAKTENS_PYTHON, "-I", *argument],
+        [VAKTENS_PYTHON, *vaktens_flaggor(), *argument],
         input=data,
         capture_output=True,
         env=miljo,
@@ -178,7 +180,7 @@ def _stoppas(svar, ord_=None):
 @finns_inte
 def test_j1_vaktens_python_ar_minst_3_9():
     svar = subprocess.run(
-        [VAKTENS_PYTHON, "-I", "-c", "import sys; print(sys.version_info[0], sys.version_info[1])"],
+        [VAKTENS_PYTHON, *vaktens_flaggor(), "-c", "import sys; print(sys.version_info[0], sys.version_info[1])"],
         capture_output=True,
         env={"PATH": SOKVAG},
         timeout=10,
@@ -191,7 +193,7 @@ def test_j1_vaktens_python_ar_minst_3_9():
 def test_j1_vakten_gar_att_oversatta_med_vaktens_python():
     # Som py_compile, men utan att skriva någon fil i projektet (__pycache__).
     svar = subprocess.run(
-        [VAKTENS_PYTHON, "-I", "-c", "import sys; compile(open(sys.argv[1], 'rb').read(), sys.argv[1], 'exec')", str(VAKTEN)],
+        [VAKTENS_PYTHON, *vaktens_flaggor(), "-c", "import sys; compile(open(sys.argv[1], 'rb').read(), sys.argv[1], 'exec')", str(VAKTEN)],
         capture_output=True,
         env={"PATH": SOKVAG},
         timeout=10,
@@ -291,12 +293,13 @@ def _vakter():
 
 def test_j1_installningen_startar_vakten_med_utvecklarverktygens_python():
     # Formen med "args": command är bara programmet, och varje argument står för sig, så att inget skal tolkar
-    # raden. -I står före vaktens sökväg, och onFailure block stoppar allt om vakten inte kan köras.
+    # raden. -I och -S står före vaktens sökväg (K1, Hugos beslut 2026-11-06 om Öppet 72 och steg 18), och onFailure
+    # block stoppar allt om vakten inte kan köras.
     assert _vakter() == [
         {
             "type": "command",
             "command": "/Library/Developer/CommandLineTools/usr/bin/python3",
-            "args": ["-I", INSTALLERAD_VAKT],
+            "args": ["-I", "-S", INSTALLERAD_VAKT],
             "timeout": 10,
             "onFailure": "block",
         }

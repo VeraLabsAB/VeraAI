@@ -8,7 +8,7 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet arbetar mot skuggpiloten (SPEC avsnitt 9 och `BYGGPLAN.md`). Än finns ett testföretag, Syntet Testbutik AB.
 Inget i koden kan i dag bokföra något.
 
-Testsviten: **0 failed, 5 528 passed, 71 skipped** (körd senast 2026-11-06, i sandlådan, i
+Testsviten: **0 failed, 5 605 passed, 71 skipped** (körd senast 2026-11-06, i sandlådan, i
 projektmappen med kommandot i SPEC 7.1. De 71 är 38 i grupp D, 31 spärrprov i kopian och 2 prov av
 `~/.ssh`, som inte finns). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
@@ -24,6 +24,35 @@ borttagen.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-11-06, steg 18: nästa version av vakten, byggd
+
+Steg i byggplanen: 18 (pågår)
+
+- **Säkerhet först:** vakten i projektet är ändrad, men den som gäller på datorn är fortfarande den gamla. Inget är installerat (beslut 5). Att den installerade vakten fungerar med `-I -S` kan bara Hugos installation visa. Agenten committar inte.
+- **Steg 17 är klart** (Hugos beslut 2026-11-06 om Öppet 72 och steg 18, beslut 3). Besluten står ordagrant i `GRANSKNING.md`.
+- **Byggt, inte granskat och inte installerat:** K1 (`-I -S` i `sparr/managed-settings.json`, bara `args` ändrat), K3 (`cwd` som är tom eller inte börjar med `/` stoppas), O1 (`!` stoppas var det än står), O2 (`=` stoppas när ordet hittills är tomt), O4 (ett ord som bara är `}` utanför citattecken stoppas). O3 och O5 godtagna. `histchars` öppen, så Öppet 72 står kvar öppen.
+- **`sparr/INSTALLERA.md`:** steg 2 b säger `-I -S`, steg 5 har de nya summorna, och avsnittet "Byte till nästa version av vakten (steg 18)" är nytt.
+- **Punkt 2 i uppdraget:** inget kommando i kodrutorna i `INSTALLERA.md` eller i SPEC 7.1 har `!` eller ett ord som bara är `}`. Visat med en provfil i scratchpad och med `grep`. Utropstecknen i `CLAUDE.md` och `INSTALLERA.md` är löpande text: `!` som sätt att skriva ett kommando i sessionen, och `!!` i utskriften från git. Att `!` före ett kommando inte följer med i kommandot är en bedömning. Efter bygget har kodrutorna två träffar, `ls !x` och `ls }` i det nya avsnittet, som är proven som ska stoppas (beslutet i uppdraget, punkt 4).
+- **Ordgränsen:** `test_installera_ar_kortare_an_fore_granskning_15` är oförändrad. `INSTALLERA.md` utan bytena var 9 042 ord, gränsen är under 9 043. Steg 2 b är omskrivet så att antalet inte ökar. Det nya avsnittet ligger bland bytena, som testet inte räknar, som bytet i steg 15.
+- **Tester som ändrades:**
+  - Väntade sig bara `-I`, nu `-I -S`: `test_installningarna_kor_vakten_fore_varje_verktyg_och_stoppar_om_den_fallerar` och `test_j1_installningen_startar_vakten_med_utvecklarverktygens_python`.
+  - Startar vakten med flaggorna ur inställningsfilen i stället för ett fast `-I`: `_kor_programmet` och `test_systemets_python_stoppar_med_kod_2_nar_vakten_saknas` i `test_kommandosparr.py`, och `_kor`, `test_j1_vaktens_python_ar_minst_3_9` och `test_j1_vakten_gar_att_oversatta_med_vaktens_python` i `test_beslut_granskning_19.py`.
+  - Låser summorna, nu med de nya summorna och lika strikt: `VAKTENS_SUMMA` och `INSTALLNINGARNAS_SUMMA` (`test_beslut_5_vakten_ar_oforandrad_och_kors_som_forut`, `test_granskning_36_vakten_och_installningarna_ar_oforandrade`, `test_granskning_38_installningarna_ar_oforandrade`, `test_granskning_38_vakten_ar_oforandrad`). De gamla summorna låses nu i bytet i steg 15 och i bytet i steg 18.
+  - `test_2026_11_05_beslut_1_filen_ar_den_installerade_plus_sandladan_och_ssh`: sätter också tillbaka `args` före jämförelsen, så den visar fortfarande byte för byte att inget annat har ändrats.
+  - `test_summan_i_bytet_ar_den_nya_filens_summa`: prövar den nya filens summa i bytet i steg 18, och den gamla i bytet i steg 15.
+  - `test_avsnitten_for_steg_15_har_exakt_de_har_kommandona_i_den_har_ordningen` och `test_filen_har_de_avsnitten_i_ordning_och_inga_andra_rutor`: har också det nya avsnittet.
+  - Inget test är borttaget.
+- **Körningar** (`<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`, `<S>` är scratchpad, `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/46453c49-9dbc-43f7-827b-f270d49cb94f/scratchpad`). Från projektmappen, ett kommando i taget.
+  1. `git status --short --ignored -uall` (start): 12 rader med `!!`, alla väntade, inga andra.
+  2. Provfil, punkt 2: `<python> -B -m pytest -p no:cacheprovider -q -rP --tb=short <S>/test_steg18_skanna.py`.
+  3. Rött före, innan vakten ändrades: `<python> -B -m pytest -p no:cacheprovider -q --tb=line -k test_steg_18_ scripts/tests`: **36 failed, 15 passed**. De 15 är fallen som släpps eller stoppas som förut.
+  4. Efter vakten: samma kommando med `--tb=short`: **51 passed**.
+  5. Provfil för summorna: `<python> -B -m pytest -p no:cacheprovider -q -rP --tb=short <S>/test_steg18_summor.py`.
+  6. Hela sviten: `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests`: **5605 passed, 71 skipped**, inget failed. Förut 5528 passed och 71 skipped. De 77 nya gröna är 51 i `test_beslut_steg_18.py`, 25 nya test i `test_sandladan.py` och en ny variant av `test_avsnitten_for_steg_15_…` för det nya avsnittet. De 71 är desamma: 38 `GRUPP D HOPPAS ÖVER`, 31 `SPÄRRPROVET I KOPIAN HOPPAS ÖVER` och 2 "finns inte på den här datorn".
+  7. Efter sista texten: kommandot i 6 igen, `<python> -B -m pytest -p no:cacheprovider -q --tb=short -k test_byggplan scripts/tests`, och `git status --short --ignored -uall` sist. Utfallet står i slutrapporten.
+- **Stoppat av vakten:** sex av mina första `grep` (`|`), och sessionen stannade och frågade. Hugo svarade att ett läsande kommando får skrivas om (`GRANSKNING.md`, under besluten). Sedan stoppades flera `grep` till (`|`, `\` och `$` i mönstret) och en med `*` utan citat. Alla var läsande kommandon på listan och är omskrivna enligt svaret. Inget annat har stoppats, och inget säkerhetsfilter har stoppat något.
+- **Inte ändrat:** `sparr/kontrollera-skalet.zsh`, `.gitignore`, `CLAUDE.md`, `SPEC.md`. K2, K4, K5, O7 och `histchars` står kvar under Öppet.
 
 ## Läge 2026-11-06, steg 17: vaktens tecken mot zsh
 
@@ -2182,7 +2211,9 @@ fattade och byggda, se avsnittet ovan.)
    **Gjord som en kontroll av tecknen 2026-11-06, steg 17** (Hugos beslut 2026-11-06 om steg 17, `GRANSKNING.md`,
    "Steg 17: vaktens tecken mot zsh (2026-11-06)"): ingen väg förbi vakten visad, inget kört i zsh, och en lista
    med fynd under Öppet 72. Inställningarna i agentens skal är inte visade (O6). **Öppen** tills Hugo eller
-   Casper har tagit ställning till listan.
+   Casper har tagit ställning till listan. Hugo tog ställning 2026-11-06 (Hugos beslut 2026-11-06 om Öppet 72 och
+   steg 18, beslut 1), och det som är kvar står under Öppet 72. Beslutet säger inte att den här punkten stängs, så
+   den står kvar tills Hugo eller Casper säger till.
 7. ~~**Bash-vägen: Bash-verktyget i `/bin/bash` i stället för zsh** (`CLAUDE_CODE_SHELL=/bin/bash` i `env` i
    den låsta inställningsfilen). Hugos svar 2026-10-28 efter granskning 14, punkt 3: **prövas inte nu.**
    Den prövas **efter installationen, i samma veva som sandlådan** (punkt 4), med ett prov i
@@ -2237,10 +2268,12 @@ fattade och byggda, se avsnittet ovan.)
     - **K1:** steg 2 b visar inte mapparna där vaktens Python läser in kod när den startar, bland annat
       `/Library/Python/3.9/site-packages`, där en `.pth`-fil kör kod också med `-I`. **Rättas med `-I -S` nästa
       gång vakten ändras.** `/Library/Python` kontrolleras för hand på Caspers dator före hans installation.
+      Byggd i steg 18, inte granskad och inte installerad (Hugos beslut 2026-11-06 om Öppet 72 och steg 18, beslut 4 a).
     - **K2:** kan vakten inte skriva sitt fel (felkanalen stängd eller inte skrivbar) avslutar Python med kod 120,
       inte 2. Stoppas ändå av `onFailure: block`.
     - **K3:** en tom `cwd` (`""`) släpps igenom, eftersom vakten räknar den som sin egen arbetsmapp. **Rättas i
-      nästa version av vakten.**
+      nästa version av vakten.** Byggd i steg 18, inte granskad och inte installerad (Hugos beslut 2026-11-06 om Öppet 72
+      och steg 18, beslut 4 b).
     - **K5:** steg 2 b säger inte var andra omgången börjar, och första raden visar en relativ sökväg som kan
       förväxlas med regeln för andra omgången.
 15. Caspers dator: **väntar på en ny dator** (Hugos beslut 2026-11-04 om planen, beslut 13, steg 14 i BYGGPLAN.md). Casper behöver bara
@@ -2533,7 +2566,7 @@ fattade och byggda, se avsnittet ovan.)
 69. **Fynden i granskning 40** (steg 15, `GRANSKNING.md`). Inget blockerar. Bör rättas, väntar på Hugos eller Caspers besked: P1 (`test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott` kräver bara `returncode == 0`, och blir grönt också när testen i kopian hoppar över sig av en annan anledning, rättelsen prövad i en kopia). Bör kontrolleras före installationen: P3 (`core.quotepath` är inte kontrollerat, och med `false` stoppar `.gitattributeſ` och `.mcp.jſon` inte när de står i listan). Låga: P2 (`test_h6_en_lank_till_git_stoppas` och `test_beslut_1_gamla_venv_i_projektet_stoppas` hoppar också vid `Permission denied`, fast CLAUDE.md och INSTALLERA.md säger att alla andra fel ger rött), P4 ("kör Hugo, inte agenten" är inte låst i SPEC 7.1) och P5 (`cat` visar styrtecken rakt av). **Beslutade av Hugo 2026-11-06** (`GRANSKNING.md`, "Hugos beslut 2026-11-06 om Öppet 69 och spärrprovet"): P1 och P2 är rättade (beslut 1 och 2), inte granskade, och granskas tillsammans med steg 16 (beslut 8). P3 är klar: Hugo körde `git config --get core.quotepath` 2026-11-05, standardläge (beslut 3). Kvar: P4 och P5 (beslut 4). **Öppen.**
 70. **Vad krävs innan riktig data används?** (steg 109 och 118, Hugos beslut 2026-11-06, beslut 7.) Rådgivare, jurister och konsulter kontaktas längre fram, eftersom vi inte har råd nu (Kassio-beslutet 2026-11-05 om jurist och redovisningskonsult). I dag säger steg 109 "riktig data först efter juristens svar", steg 118 beror på steg 53 och 54, och CLAUDE.md säger att förbudet mot riktig data gäller helt tills alla villkor i steg 118 är uppfyllda. Inget av det är ändrat. Öppen fråga. Inget svar finns, och inget ska antas. **Öppen.**
 71. **Fynden i granskning 41** (steg 15 och 16, `GRANSKNING.md`). Inget blockerar. **Beslutade av Hugo 2026-11-06** (`GRANSKNING.md`, "Hugos beslut 2026-11-06 om Öppet 71"): P1, P3, P5 och P6 är klara, inte granskade, och granskas tillsammans med steg 17 (beslut 7). P1: kontrollerna av orden i "Nästa steg" och "Senast avslutade steg" är borttagna. P3: ett test låser Öppet 70. Ett påhittat svar i steg 109 eller 118, bredvid "Inget svar finns", eller i "Nästa steg" ger fortfarande inget rött. P5: Öppet 4 och Öppet 8 säger att steg 15 är installerat och provat 2026-11-06, och båda står kvar öppna. Om Öppet 4 ska stängas avgör nästa granskning. P6: Kassio-beslutet 2026-11-05 om jurist och redovisningskonsult har en egen rubrik i `GRANSKNING.md`, och Hugo har godkänt de tre formuleringarna. Kvar: P2 och P4 (beslut 6). P2: talen 43, 31 och 39 prövas i avsnittet, inte vid sitt kommando. P4: en fil som hoppar med texten `GRUPP D HOPPAS ÖVER` eller inte körs alls ger grönt i `test_granskning_37_a_…`, kontrollen kan kortas till `HOPPAS ÖVER` utan rött skyddstest, och kommentaren "ett steg som verkligen pågår" stämmer inte. **Öppen.**
-72. **Fynden i steg 17** (`GRANSKNING.md`, "Steg 17: vaktens tecken mot zsh (2026-11-06)"). Inget prov visar en väg förbi vakten. Väntar på Hugos eller Caspers besked. O1: `!` är historik i zsh och släpps av vakten, säkert bara om agentens skal inte är interaktivt, vilket är bedömt, inte visat. Förslag: stoppas i steg 18. O2: `''=y` släpps, och om zsh byter ut det är inte avgjort. Låg. Förslag: rättas i steg 18. O3: `=` mitt i ett ord med MAGIC_EQUAL_SUBST, säkert. O4: ensam `}` släpps, zsh bör ge syntaxfel, säkert åt rätt håll. Förslag: stoppas i steg 18. O5: `''` inom enkla citat med RC_QUOTES, säkert. O6: inställningarna i agentens skal och `histchars` är inte visade, eftersom filen i `~/.claude/shell-snapshots/` inte gick att nå. Förslag: Hugo läser filen, eller så prövar kontrollskriptet dem. O7: alias, känt sedan granskning 13. **Öppen.**
+72. **Fynden i steg 17** (`GRANSKNING.md`, "Steg 17: vaktens tecken mot zsh (2026-11-06)"). Inget prov visar en väg förbi vakten. **Beslutade av Hugo 2026-11-06** (`GRANSKNING.md`, "Hugos beslut 2026-11-06 om Öppet 72 och steg 18"). O1, O2 och O4 är byggda, inte granskade och inte installerade: `!` stoppas var det än står, `=` stoppas när ordet hittills är tomt, och ett ord som bara är `}` utanför citattecken stoppas. O3 och O5 är godtagna, eftersom Hugos kontroll i O6 visar att inställningarna är av. O6: Hugos kontroll 2026-11-06 i Terminal av den nyaste filen i `~/.claude/shell-snapshots/`, grep efter de fyra formerna. Kvar: `histchars` är inte kontrollerad. O7: alias lämnas, känt sedan granskning 13. **Öppen.**
 
 ## Nästa steg i byggordningen
 

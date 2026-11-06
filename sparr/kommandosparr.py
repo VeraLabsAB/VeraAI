@@ -24,10 +24,13 @@ Reglerna, i den ordning de prövas (planen i GRANSKNING.md, "Granskning 11 – p
 3. Ingen mapp undantas (Hugos beslut 8). Kommandot ska köras i mappen där sessionen startade
    (CLAUDE_PROJECT_DIR), och den mappen får inte vara hemmappen eller en mapp ovanför den. Där vakten stoppar
    jämförs sökvägar utan hänsyn till stora och små bokstäver, och där den släpper igenom jämförs de exakt
-   (granskning 17, H6).
+   (granskning 17, H6). Mappen där kommandot körs (cwd) ska vara en hel sökväg, alltså börja med / (granskning 20,
+   K3, Hugos beslut 2026-11-06 om Öppet 72 och steg 18).
 4. Inga ihopkopplade kommandon: inget ;, &, |, <, >, $, bakåtfnutt, omvänt snedstreck eller
-   radbrytning, inte heller inom citattecken. Inga osynliga eller styrande tecken. Inga tecken som
-   skalet byter ut mot något annat (jokertecken, ~ och liknande) utanför citattecken.
+   radbrytning, inte heller inom citattecken. Inget !, inte heller inom citattecken (steg 17, O1). Inga osynliga
+   eller styrande tecken. Inga tecken som skalet byter ut mot något annat (jokertecken, ~ och liknande) utanför
+   citattecken. Inget = när ordet hittills är tomt (steg 17, O2) och inget ord som bara är } utanför citattecken
+   (steg 17, O4, båda Hugos beslut 2026-11-06 om Öppet 72 och steg 18).
 5. Första ordet ska stå på listan i SPEC 7.1.
 6. Reglerna under listan: mål bara i den tillfälliga mappen, ingen fil eller mapp som heter .ugrep
    (granskning 16, G7, Hugos beslut 2026-10-28), inga mål eller källor till cp -R som förbuden för
@@ -48,9 +51,10 @@ Allt som vakten inte känner igen stoppas. Om vakten själv kraschar stoppas kom
 (kod 2) och av Claude Code (inställningen "onFailure": "block").
 
 Vakten körs med Python i Apples utvecklarverktyg, med hela sökvägen
-(/Library/Developer/CommandLineTools/usr/bin/python3 -I, granskning 19, J1, Hugos beslut 2026-10-28), och
-använder bara Pythons egna delar. Den ska fungera med Python 3.9. -I gör att Python inte läser in filer från
-vaktens mapp, arbetsmappen eller inställningar i miljön.
+(/Library/Developer/CommandLineTools/usr/bin/python3 -I -S, granskning 19, J1, Hugos beslut 2026-10-28, och
+granskning 20, K1, Hugos beslut 2026-11-06 om Öppet 72 och steg 18), och använder bara Pythons egna delar. Den ska
+fungera med Python 3.9. -I gör att Python inte läser in filer från vaktens mapp, arbetsmappen eller inställningar i
+miljön. -S gör att Python inte läser tilläggsmapparna (site-packages), där en .pth-fil annars kan köra kod vid start.
 """
 
 from __future__ import annotations
@@ -95,10 +99,14 @@ IHOPKOPPLING = {
     "\n": "radbrytning",
     "\r": "vagnretur",
 }
+# ! läser zsh som en hämtning ur historiken, också inom dubbla citattecken, och då kan texten bli något som vakten
+# aldrig såg. Det gäller bara interaktiva skal, men det är billigare att stoppa tecknet än att visa det (steg 17, O1).
+HISTORIKTECKEN = "!"
 # Tecken som skalet (bash eller zsh) byter ut mot något annat utanför citattecken: jokertecken,
 # hemmappen (~), uttryck med parenteser och zsh:s utökade jokertecken (^ och #). = i början av ett
-# ord byts i zsh mot sökvägen till ett program.
+# ord byts i zsh mot sökvägen till ett program. Ett ord som bara är } slutar i zsh ett block.
 UTBYTESTECKEN = "*?[{()~^#"
+SLUTKLAMMER = "}"
 OSYNLIGA_KATEGORIER = ("Cc", "Cf", "Cn", "Co", "Cs", "Zl", "Zp", "Zs")
 
 # Regel 5 och 6: listan i SPEC 7.1. Projektets Python med pytest ligger i en mapp som root äger, bredvid
@@ -349,6 +357,11 @@ def _bedom(indata, projektmapp, hemmapp, sokvag):
                 "Kommandon kopplas inte ihop och utskriften styrs inte om: ett kommando i taget "
                 "(SPEC 7.1)."
             )
+    if HISTORIKTECKEN in kommando:
+        raise _Stopp(
+            f"tecknet {HISTORIKTECKEN} är inte tillåtet, inte heller inom citattecken: zsh kan byta ut det mot text ur "
+            "historiken, och då körs något annat än det som står (steg 17, O1, Hugos beslut 2026-11-06)."
+        )
     for tecken in kommando:
         if tecken != " " and unicodedata.category(tecken) in OSYNLIGA_KATEGORIER:
             raise _Stopp(
@@ -412,6 +425,11 @@ def _sessionen(projektmapp, hemmapp, cwd, tillfallig):
             f"sessionen är startad i hemmappen eller i en mapp ovanför den ({projekt}). Då skulle "
             "läsande kommandon nå allt i hemmappen. Starta sessionen i projektmappen."
         )
+    if not cwd.startswith("/"):
+        raise _Stopp(
+            f"kommandot skulle köras i en annan mapp ('{cwd}') än projektmappen ({projekt}): mappen där kommandot körs "
+            "(cwd) ska vara en hel sökväg, men är tom eller börjar inte med / (granskning 20, K3, Hugos beslut 2026-11-06)."
+        )
     if os.path.realpath(cwd) != projekt:
         raise _Stopp(
             f"kommandot skulle köras i en annan mapp ({cwd}) än projektmappen ({projekt}). Allt körs "
@@ -434,6 +452,7 @@ def _dela_upp(kommando):
     ordlista = []
     nu = []
     borjat = False
+    utan_citat = False
     citat = None
     for tecken in kommando:
         if citat:
@@ -444,15 +463,17 @@ def _dela_upp(kommando):
             continue
         if tecken == " ":
             if borjat:
-                ordlista.append("".join(nu))
+                ordlista.append(_fardigt_ord(nu, utan_citat))
                 nu = []
                 borjat = False
+                utan_citat = False
             continue
         if tecken in "'\"":
             citat = tecken
             borjat = True
             continue
-        if tecken in UTBYTESTECKEN or (tecken == "=" and not borjat):
+        # = stoppas när ordet hittills är tomt, inte bara när det inte har börjat, så att också ''=y stoppas (steg 17, O2).
+        if tecken in UTBYTESTECKEN or (tecken == "=" and not nu):
             raise _Stopp(
                 f"tecknet {tecken} utanför citattecken är inte tillåtet: skalet byter ut det mot något "
                 "annat än det som står (till exempel filnamn eller hemmappen). Sätt texten inom "
@@ -460,11 +481,22 @@ def _dela_upp(kommando):
             )
         nu.append(tecken)
         borjat = True
+        utan_citat = True
     if citat:
         raise _Stopp("ett citattecken är inte stängt.")
     if borjat:
-        ordlista.append("".join(nu))
+        ordlista.append(_fardigt_ord(nu, utan_citat))
     return ordlista
+
+
+def _fardigt_ord(tecknen, utan_citat):
+    """Ordet som text. Stoppar ett ord som bara är } utanför citattecken, som zsh läser som slutet på ett block (steg 17, O4)."""
+    if utan_citat and tecknen == [SLUTKLAMMER]:
+        raise _Stopp(
+            f"tecknet {SLUTKLAMMER} som ett eget ord utanför citattecken är inte tillåtet: zsh läser det som slutet på "
+            "ett block, inte som ett ord. Sätt texten inom enkla citattecken."
+        )
+    return "".join(tecknen)
 
 
 # ---------------------------------------------------------------------------------------------

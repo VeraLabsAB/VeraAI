@@ -13226,3 +13226,15 @@ def test_skriv_orden():
 ### Beslut som behövs
 
 Hugo eller Casper, för varje fynd: O1 och O4 stoppas i nästa version av vakten (steg 18) eller inte. O2 rättas i steg 18 eller inte. O3 och O5 godtas, eller väntar på O6. O6: Hugo läser filen själv, eller så tar kontrollskriptet med inställningarna. O7 är känt och kräver inget nytt.
+
+## Hugos beslut 2026-11-06 om Öppet 72 och steg 18
+
+Ordagrant ur Hugos uppdrag i chatten 2026-11-06.
+
+1. Öppet 72 (Hugos "ja" i chatten 2026-11-06 på rådet): O1 (!), O2 (''=y) och O4 (ensam }) stoppas i steg 18. O3 och O5 godtas, eftersom O6 visar att inställningarna är av. O7 lämnas, känt sedan granskning 13.
+2. O6, Hugos kontroll 2026-11-06 i Terminal: grep efter setopt, unsetopt, set -o och set +o i den nyaste filen i ~/.claude/shell-snapshots/ (snapshot-zsh-1793968160864-xujcou.sh). Utan indrag står bara setopt nohashdirs och setopt login (rad 4635–4636). De indragna raderna 80–316 (extendedglob, kshglob, braceexpand) står troligen inne i funktioner. Det är en bedömning, eftersom funktionernas början inte syns. Varken rcquotes, magicequalsubst, interactive eller banghist finns. histchars är inte kontrollerad, och grep hittar bara de fyra formerna. Den punkten står kvar under Öppet 72.
+3. Steg 17 är klart: exitkriteriet "en lista som Hugo tar ställning till" är uppfyllt med beslut 1.
+4. Steg 18 bygger: (a) K1: vakten startas med -I -S i sparr/managed-settings.json. Inget annat i filen ändras. (b) K3: vakten stoppar en cwd som är tom eller inte börjar med /. (c) O1: ! stoppas var det än står, också inom enkla och dubbla citattecken. (d) O2: = stoppas när ordet hittills är tomt, inte bara när det inte har börjat, så att ''=y och ""=y stoppas. (e) O4: ett ord som bara är } utanför citattecken stoppas. (f) Inget annat i vakten ändras. K2, K4, K5, O7 och histchars står kvar under Öppet.
+5. Installationen skrivs i INSTALLERA.md men görs inte förrän efter granskning 42. Granskning 42 tar steg 17 (93dec02), sessionen om Öppet 71 (25c8c30), punkt 6 i granskning 41 och bygget av steg 18, i samma omgång. Sedan installation och steg 19.
+
+**Hugos svar i chatten 2026-11-06, i samma session.** Vakten stoppade byggsessionens första sökkommandon, eftersom de hade ett lodstreck i sökmönstret, och sessionen stannade och frågade. Hugo svarade: "Att skriva om ett läsande kommando så att det följer vaktens regler är att följa vakten, inte att gå runt den. Använd grep -n -e ... -e ... utan lodstreck, eller ett kommando per sökning. Gäller bara läsande kommandon som redan står på listan i SPEC 7.1. Stoppar vakten något annat: stanna som förut."

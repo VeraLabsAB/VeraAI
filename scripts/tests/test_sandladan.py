@@ -55,9 +55,13 @@ GRANSKNING = PROJEKTET / "GRANSKNING.md"
 SPEC = PROJEKTET / "SPEC.md"
 PROGRESS = PROJEKTET / "PROGRESS.md"
 GITIGNORE = PROJEKTET / ".gitignore"
-# Vaktens kontrollsumma, oförändrad sedan 2026-10-28 (INSTALLERA.md, steg 5). Beslut 5: vakten ändras inte.
-VAKTENS_SUMMA = "314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d"
-# Filen som är installerad i dag, före steg 15.
+# Vaktens kontrollsumma (INSTALLERA.md, steg 5). Ny i steg 18 (Hugos beslut 2026-11-06 om Öppet 72 och steg 18, beslut 4). Testen
+# som låser den är lika stränga: en ändring i vakten kräver fortfarande ett nytt beslut och en ny summa här.
+VAKTENS_SUMMA = "5aefe7afdff61f56c1160f5c2028db23159ac4e229ab63b1fcc0ad583f4b01a6"
+# Versionerna före steg 18, oförändrade från 2026-10-28 (vakten) och 2026-11-05 (inställningarna). Bytet i steg 15 gäller dem.
+VAKTENS_SUMMA_FORE_STEG_18 = "314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d"
+INSTALLNINGARNAS_SUMMA_FORE_STEG_18 = "1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da"
+# Filen som var installerad före steg 15.
 FORE_STEG_15 = "149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2"
 GIT = "/usr/bin/git"
 HEM = Path.home()
@@ -67,6 +71,7 @@ PROVKORNING_RUBRIK = "## Provkörning med sandlådan, före bytet (steg 15)"
 BYTE_RUBRIK = "## Byte till versionen med sandlåda (steg 15)"
 SPARRPROV_RUBRIK = "## Spärrprovet i kopian (steg 15)"
 UTANFOR_RUBRIK = "## Prov utanför sandlådan (steg 15)"
+BYTE_18_RUBRIK = "## Byte till nästa version av vakten (steg 18)"
 
 
 def _installningar():
@@ -173,13 +178,16 @@ def test_2026_11_05_beslut_1_varken_avsmalningen_eller_granskarens_forbud_finns(
 
 def test_2026_11_05_beslut_1_filen_ar_den_installerade_plus_sandladan_och_ssh():
     # Tar man bort sandbox-blocket och Read(~/.ssh/**) och sätter tillbaka den gamla versionen (Hugos beslut 2026-11-05
-    # efter P6, beslut 2), ska det bli exakt filen som är installerad i dag, byte för byte.
+    # efter P6, beslut 2) och flaggan -S (Hugos beslut 2026-11-06 om Öppet 72 och steg 18, beslut 4 a), ska det bli exakt
+    # filen som var installerad före steg 15, byte för byte. Så visas också att inget annat i filen ändrades i steg 18.
     rader = INSTALLNINGAR.read_text(encoding="utf-8").splitlines(keepends=True)
     start = rader.index('  "sandbox": {\n')
     slut = rader.index("  },\n", start)
     kvar = rader[:start] + rader[slut + 1:]
     kvar.remove('      "Read(~/.ssh/**)",\n')
     kvar[kvar.index('  "requiredMinimumVersion": "2.1.305",\n')] = '  "requiredMinimumVersion": "2.1.295",\n'
+    args = '            "args": ["-I", "-S", "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"],\n'
+    kvar[kvar.index(args)] = args.replace('"-S", ', "")
     assert hashlib.sha256("".join(kvar).encode("utf-8")).hexdigest() == FORE_STEG_15
 
 
@@ -366,6 +374,37 @@ UTANFOR = [
     "rm -rf ~/VERA/provkopia",
 ]
 
+# Hugos beslut 2026-11-06 om Öppet 72 och steg 18, beslut 5. Vakten kopieras före inställningarna, som börjar gälla direkt.
+SPARAD_18 = f'{MAPP}/managed-settings.fore-steg-18.json"'
+SPARAD_VAKT_18 = f'{MAPP}/vera/kommandosparr.fore-steg-18.py"'
+PROVEN_18 = ["ls !x", "ls ''=y", "ls }"]
+BYTET_18 = [
+    f"{SUMMA} ~/VERA/agent/sparr/managed-settings.json ~/VERA/agent/sparr/kommandosparr.py",
+    f"{SUMMA} {AKTIV} {INSTALLERAD_VAKT_CITERAD}",
+    f"sudo cp -i {AKTIV} {SPARAD_18}",
+    f"sudo chown root:wheel {SPARAD_18}",
+    f"sudo chmod 644 {SPARAD_18}",
+    f"sudo cp -i {INSTALLERAD_VAKT_CITERAD} {SPARAD_VAKT_18}",
+    f"sudo chown root:wheel {SPARAD_VAKT_18}",
+    f"sudo chmod 644 {SPARAD_VAKT_18}",
+    f"sudo ditto ~/VERA/agent/sparr/kommandosparr.py {INSTALLERAD_VAKT_CITERAD}",
+    f"sudo chown root:wheel {INSTALLERAD_VAKT_CITERAD}",
+    f"sudo chmod 644 {INSTALLERAD_VAKT_CITERAD}",
+    f"sudo cp ~/VERA/agent/sparr/managed-settings.json {AKTIV}",
+    f"sudo chown root:wheel {AKTIV}",
+    f"sudo chmod 644 {AKTIV}",
+    f"{SUMMA} {AKTIV} {SPARAD_18} {INSTALLERAD_VAKT_CITERAD} {SPARAD_VAKT_18}",
+    f"ls -lde@ {AKTIV} {SPARAD_18} {INSTALLERAD_VAKT_CITERAD} {SPARAD_VAKT_18}",
+    "cd ~/VERA/agent",
+    "~/.local/bin/claude",
+    *PROVEN_18,
+    "git status",
+    f"{PYTHON} -q --tb=short -rfs scripts/tests",
+    f"sudo cp {SPARAD_VAKT_18} {INSTALLERAD_VAKT_CITERAD}",
+    f"sudo cp {SPARAD_18} {AKTIV}",
+    f"{SUMMA} {AKTIV} {INSTALLERAD_VAKT_CITERAD}",
+]
+
 # Resten av filen: den vanliga installationen, kontrollen efter den och väntade utskrifter. Alla rader i alla rutor,
 # i ordning. En ny rad eller en ändrad rad gör testet rött, så att den måste läggas in här med avsikt.
 RESTEN = [
@@ -478,8 +517,9 @@ def _lopande_text(text):
         (BYTE_RUBRIK, BYTET),
         (SPARRPROV_RUBRIK, SPARRPROVET),
         (UTANFOR_RUBRIK, UTANFOR),
+        (BYTE_18_RUBRIK, BYTET_18),
     ],
-    ids=["provkorningen", "bytet", "sparrprovet", "utanfor"],
+    ids=["provkorningen", "bytet", "sparrprovet", "utanfor", "bytet_18"],
 )
 def test_avsnitten_for_steg_15_har_exakt_de_har_kommandona_i_den_har_ordningen(rubrik, forvantade):
     assert _kodrader(_avsnitt(rubrik)) == forvantade
@@ -491,10 +531,10 @@ def test_resten_av_filen_har_exakt_de_har_raderna_i_den_har_ordningen():
 
 def test_filen_har_de_avsnitten_i_ordning_och_inga_andra_rutor():
     text = INSTALLERA.read_text(encoding="utf-8")
-    platser = [text.index(r) for r in (PROVKORNING_RUBRIK, BYTE_RUBRIK, SPARRPROV_RUBRIK, UTANFOR_RUBRIK, "## Caspers dator")]
+    platser = [text.index(r) for r in (PROVKORNING_RUBRIK, BYTE_RUBRIK, SPARRPROV_RUBRIK, UTANFOR_RUBRIK, BYTE_18_RUBRIK, "## Caspers dator")]
     assert platser == sorted(platser)
     # Allt mellan rubrikerna räknas, så ett nytt avsnitt med kommandon kan inte smita förbi.
-    assert len(_kodrader(text)) == len(RESTEN) + len(PROVKORNINGEN) + len(BYTET) + len(SPARRPROVET) + len(UTANFOR)
+    assert len(_kodrader(text)) == len(RESTEN) + len(PROVKORNINGEN) + len(BYTET) + len(SPARRPROVET) + len(UTANFOR) + len(BYTET_18)
 
 
 @pytest.mark.parametrize(
@@ -529,8 +569,10 @@ def test_avsluta_sessioner_star_fore_kopieringen():
 
 
 def test_summan_i_bytet_ar_den_nya_filens_summa():
+    # Nya filens summa står i det senaste bytet (steg 18). Bytet i steg 15 står kvar som det gjordes, med sin versions summa.
     summa = hashlib.sha256(INSTALLNINGAR.read_bytes()).hexdigest()
-    assert _byte_avsnittet().count(summa) == 2
+    assert _avsnitt(BYTE_18_RUBRIK).count(summa) == 2
+    assert _byte_avsnittet().count(INSTALLNINGARNAS_SUMMA_FORE_STEG_18) == 2
 
 
 def test_provkorningen_har_samma_nycklar_som_filen_ocksa_filesystem():
@@ -1509,7 +1551,7 @@ def test_granskning_36_oppen_fraga_2_star_under_oppet():
 def test_granskning_36_vakten_och_installningarna_ar_oforandrade():
     # Rättelserna görs utan att ändra de låsta filerna. Kommandolistan i SPEC 7.1 står kvar med git add och git commit.
     assert hashlib.sha256(VAKTEN.read_bytes()).hexdigest() == VAKTENS_SUMMA
-    assert hashlib.sha256(INSTALLNINGAR.read_bytes()).hexdigest() == "1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da"
+    assert hashlib.sha256(INSTALLNINGAR.read_bytes()).hexdigest() == INSTALLNINGARNAS_SUMMA
     for rad in ("| `git add` | Välja ut ändrade filer inför en commit |", "| `git commit` | Spara ändringarna i projektets historik (en **commit**) |"):
         assert rad in _spec_7_1()
 
@@ -2094,10 +2136,11 @@ def test_granskning_38_spec_sager_att_git_add_och_git_commit_star_kvar_enligt_op
     assert "Öppet 64" in i_spec
 
 
-# Kommandolistan, inställningarna och vakten är oförändrade mot 103eb55, commiten före rättelsen (räknat i en kopia av den).
+# Kommandolistan är oförändrad mot 103eb55, commiten före rättelsen (räknat i en kopia av den). Inställningarna och vakten har
+# nya summor från steg 18 (Hugos beslut 2026-11-06 om Öppet 72 och steg 18, beslut 4).
 
 LISTANS_SUMMA = "7c3ab251713a93073f5d9d10804f35af8d48497daca8f77140ff3c6e321783e7"
-INSTALLNINGARNAS_SUMMA = "1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da"
+INSTALLNINGARNAS_SUMMA = "33bfdb153cfc6ab83dc0a66a9f538a7d2819d98a6cc62a982be9c256593b94f2"
 
 
 def _kommandolistan():
@@ -2979,6 +3022,125 @@ def test_beslut_oppet_71_oppet_71_sager_vad_som_ar_klart_och_kvar():
     post = " ".join(_post_under_oppet(71).split())
     assert "P1, P3, P5 och P6 är klara" in post and "Kvar: P2 och P4" in post
     assert post.endswith("**Öppen.**")
+
+
+# ---------------------------------------------------------------------------------------------
+# Hugos beslut 2026-11-06 om Öppet 72 och steg 18. Vaktens egna test står i test_beslut_steg_18.py.
+
+BESLUT_72_RUBRIK = "## Hugos beslut 2026-11-06 om Öppet 72 och steg 18"
+BESLUT_72 = [
+    '1. Öppet 72 (Hugos "ja" i chatten 2026-11-06 på rådet): O1 (!), O2 (\'\'=y) och O4 (ensam }) stoppas i steg 18. O3 och O5 '
+    "godtas, eftersom O6 visar att inställningarna är av. O7 lämnas, känt sedan granskning 13.",
+    "2. O6, Hugos kontroll 2026-11-06 i Terminal: grep efter setopt, unsetopt, set -o och set +o i den nyaste filen i "
+    "~/.claude/shell-snapshots/ (snapshot-zsh-1793968160864-xujcou.sh). Utan indrag står bara setopt nohashdirs och setopt login "
+    "(rad 4635–4636). De indragna raderna 80–316 (extendedglob, kshglob, braceexpand) står troligen inne i funktioner. Det är en "
+    "bedömning, eftersom funktionernas början inte syns. Varken rcquotes, magicequalsubst, interactive eller banghist finns. "
+    "histchars är inte kontrollerad, och grep hittar bara de fyra formerna. Den punkten står kvar under Öppet 72.",
+    '3. Steg 17 är klart: exitkriteriet "en lista som Hugo tar ställning till" är uppfyllt med beslut 1.',
+    "4. Steg 18 bygger: (a) K1: vakten startas med -I -S i sparr/managed-settings.json. Inget annat i filen ändras. (b) K3: vakten "
+    "stoppar en cwd som är tom eller inte börjar med /. (c) O1: ! stoppas var det än står, också inom enkla och dubbla citattecken. "
+    "(d) O2: = stoppas när ordet hittills är tomt, inte bara när det inte har börjat, så att ''=y och \"\"=y stoppas. (e) O4: ett ord "
+    "som bara är } utanför citattecken stoppas. (f) Inget annat i vakten ändras. K2, K4, K5, O7 och histchars står kvar under Öppet.",
+    "5. Installationen skrivs i INSTALLERA.md men görs inte förrän efter granskning 42. Granskning 42 tar steg 17 (93dec02), "
+    "sessionen om Öppet 71 (25c8c30), punkt 6 i granskning 41 och bygget av steg 18, i samma omgång. Sedan installation och steg 19.",
+]
+
+
+@pytest.mark.parametrize("beslut", BESLUT_72, ids=lambda text: text[:2])
+def test_steg_18_besluten_star_ordagrant_under_sin_rubrik(beslut):
+    assert beslut in _avsnitt_i_granskning(BESLUT_72_RUBRIK)
+
+
+def _avsnitt_i_granskning(rubrik):
+    text = GRANSKNING.read_text(encoding="utf-8")
+    assert text.count(rubrik) == 1
+    return text.split(rubrik, 1)[1].split("\n## ", 1)[0]
+
+
+def test_steg_18_svaret_om_omskrivna_kommandon_star_under_besluten():
+    assert "Att skriva om ett läsande kommando så att det följer vaktens regler är att följa vakten" in _avsnitt_i_granskning(BESLUT_72_RUBRIK)
+
+
+@pytest.mark.parametrize(
+    "summa,antal",
+    [
+        (hashlib.sha256(INSTALLNINGAR.read_bytes()).hexdigest(), 2),
+        (hashlib.sha256(VAKTEN.read_bytes()).hexdigest(), 2),
+        (INSTALLNINGARNAS_SUMMA_FORE_STEG_18, 3),
+        (VAKTENS_SUMMA_FORE_STEG_18, 3),
+    ],
+    ids=["nya_installningarna", "nya_vakten", "gamla_installningarna", "gamla_vakten"],
+)
+def test_steg_18_bytet_har_summorna_fore_efter_och_vid_backning(summa, antal):
+    assert _avsnitt(BYTE_18_RUBRIK).count(summa) == antal
+
+
+def test_steg_18_vaktens_gamla_summa_star_kvar_i_bytet_i_steg_15():
+    assert VAKTENS_SUMMA_FORE_STEG_18 in _byte_avsnittet()
+
+
+def test_steg_18_bytet_kopierar_vakten_fore_installningarna():
+    kod = _kodrader(_avsnitt(BYTE_18_RUBRIK))
+    assert kod.index(f"sudo ditto ~/VERA/agent/sparr/kommandosparr.py {INSTALLERAD_VAKT_CITERAD}") < kod.index(
+        f"sudo cp ~/VERA/agent/sparr/managed-settings.json {AKTIV}"
+    )
+
+
+def test_steg_18_bytet_har_de_tre_proven_som_ska_stoppas(vakt, mappar):
+    avsnitt = _avsnitt(BYTE_18_RUBRIK)
+    assert all(prov in _kodrader(avsnitt) for prov in PROVEN_18)
+    assert 'med ett fel som börjar "Stoppat av vakten"' in _en_rad_text(avsnitt)
+    for prov in PROVEN_18:
+        fel = _bedom(vakt, mappar, prov)
+        assert fel is not None and fel.startswith("Stoppat av vakten"), prov
+
+
+def _en_rad_text(text):
+    return " ".join(text.split())
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "**Gör det här först efter granskning 42** (beslut 5)",
+        "från `-I` till `-I -S`",
+        "**Agenten kör inga av kommandona i punkt 1–4.**",
+        "**Avsluta alla öppna sessioner**",
+        "**Backa till förra versionen.**",
+        '"Prov utanför sandlådan" igen',
+        "**69** överhoppade",
+        "Det är det här som visar att den installerade vakten fungerar med `-I -S`",
+    ],
+)
+def test_steg_18_bytet_sager_vad_som_galler(text):
+    assert text in _en_rad_text(_avsnitt(BYTE_18_RUBRIK))
+
+
+def test_steg_18_steg_2_b_sager_i_och_s():
+    steget = _avsnitt("## Steg 2 b: kontrollera Python som vakten körs med (före installationen)")
+    assert "`-I -S`" in steget and "`-I` (" not in steget
+
+
+def test_steg_18_steg_17_ar_klart_och_steg_18_pagar():
+    assert "| ✅ 2026-11-06" in _byggplanens_rad(17)
+    rad = _byggplanens_rad(18)
+    assert "| 🔶 2026-11-06" in rad and "byggd, väntar på granskning 42, inte installerad" in rad
+    assert "18 – " in _raden_i_lage_nu("Pågående steg")
+    assert "granskning 42" in _raden_i_lage_nu("Nästa steg")
+
+
+def test_steg_18_oppet_72_star_kvar_oppen_for_histchars():
+    post = " ".join(_post_under_oppet(72).split())
+    assert "O1, O2 och O4 är byggda, inte granskade och inte installerade" in post
+    assert "O3 och O5 är godtagna" in post and "histchars" in post
+    assert post.endswith("**Öppen.**")
+
+
+def test_steg_18_k1_och_k3_ar_byggda_men_inte_installerade():
+    oppet = PROGRESS.read_text(encoding="utf-8")
+    for nyckel in ("**K1:**", "**K3:**"):
+        stycke = " ".join(oppet.split(nyckel, 1)[1].split("    - **", 1)[0].split())
+        assert "Byggd i steg 18, inte granskad och inte installerad" in stycke, nyckel
 
 
 # ---------------------------------------------------------------------------------------------

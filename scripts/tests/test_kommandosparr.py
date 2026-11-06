@@ -1,8 +1,8 @@
 """Q1 (granskning 11): vakten som spärrar den fasta kommandolistan i SPEC 7.1.
 
 Vakten ligger i sparr/kommandosparr.py. Claude Code kör den före varje verktyg som agenten använder,
-med Python i Apples utvecklarverktyg (/Library/Developer/CommandLineTools/usr/bin/python3 -I, granskning 19,
-J1). Den släpper bara igenom det som SPEC 7.1 tillåter och
+med Python i Apples utvecklarverktyg (/Library/Developer/CommandLineTools/usr/bin/python3 -I -S, granskning 19,
+J1, och granskning 20, K1). Den släpper bara igenom det som SPEC 7.1 tillåter och
 stoppar allt annat med ett fel på svenska. Planen och Hugos beslut står i GRANSKNING.md under
 "Granskning 11 – plan för Q1".
 
@@ -57,6 +57,13 @@ GAMLA_PYTEST = f".venv/bin/python {PYTEST_FAST}"
 # PATH-regeln (Hugos beslut 2026-10-28, beslut 1): vakten letar upp programmet i PATH och kontrollerar
 # var det ligger. Testerna använder datorns egna mappar för program, som ägs av systemet (root).
 SYSTEMETS_SOKVAG = "/usr/bin:/bin"
+
+
+def vaktens_flaggor():
+    """Flaggorna som vakten startas med i sparr/managed-settings.json, så att testen som startar vakten med vaktens Python
+    prövar samma läge som installeras (Hugos beslut 2026-11-06 om Öppet 72 och steg 18, uppdraget, punkt 3)."""
+    (vakt_,) = [v for grupp in json.loads(INSTALLNINGAR.read_text(encoding="utf-8"))["hooks"]["PreToolUse"] for v in grupp["hooks"]]
+    return [argument for argument in vakt_["args"] if argument.startswith("-")]
 
 
 def gor_mapp_eller_hoppa_over(sokvag):
@@ -401,7 +408,7 @@ def test_systemets_python_stoppar_med_kod_2_nar_vakten_saknas(tmp_path):
     # avslutar med kod 2, som Claude Code läser som "stoppa". Provet visar alltså att en saknad vakt
     # stoppar, men prövar inte onFailure (som gäller andra koder än 0 och 2). Se INSTALLERA.md.
     svar = subprocess.run(
-        [VAKTENS_PYTHON, "-I", str(tmp_path / "kommandosparr.py")],
+        [VAKTENS_PYTHON, *vaktens_flaggor(), str(tmp_path / "kommandosparr.py")],
         input=b"{}",
         capture_output=True,
         env={"PATH": "/usr/bin:/bin"},
@@ -1457,7 +1464,7 @@ def test_vakten_stoppar_kommandot_i_appkontrollen(vakt, mappar):
 
 
 # ---------------------------------------------------------------------------------------------
-# Programmet: så som Claude Code kör det, med vaktens Python och -I.
+# Programmet: så som Claude Code kör det, med vaktens Python och flaggorna i de låsta inställningarna.
 
 def _kor_programmet(mappar, indata, fil=VAKTEN, projektmapp=True, cwd=None, sokvag=SYSTEMETS_SOKVAG):
     miljo = {} if sokvag is None else {"PATH": sokvag}
@@ -1466,7 +1473,7 @@ def _kor_programmet(mappar, indata, fil=VAKTEN, projektmapp=True, cwd=None, sokv
     if not isinstance(indata, bytes):
         indata = json.dumps(indata).encode("utf-8")
     return subprocess.run(
-        [VAKTENS_PYTHON, "-I", str(fil)],
+        [VAKTENS_PYTHON, *vaktens_flaggor(), str(fil)],
         input=indata,
         capture_output=True,
         env=miljo,
@@ -1591,7 +1598,7 @@ def test_installningarna_kor_vakten_fore_varje_verktyg_och_stoppar_om_den_faller
         {
             "type": "command",
             "command": VAKTENS_PYTHON,
-            "args": ["-I", INSTALLERAD_VAKT],
+            "args": ["-I", "-S", INSTALLERAD_VAKT],
             "timeout": 10,
             "onFailure": "block",
         }
@@ -1727,8 +1734,8 @@ def test_installningarna_kraver_lagst_den_version_som_kan_stoppa_vid_krasch():
 
 
 def installera_utan_sandlada():
-    """INSTALLERA.md utan avsnitten för versionen med sandlåda (steg 15), som är ett byte och inte en ny installation.
-    De avsnitten prövas för sig i test_sandladan.py."""
+    """INSTALLERA.md utan avsnitten för versionen med sandlåda (steg 15) och bytet i steg 18, som är byten och inte en ny
+    installation. De avsnitten prövas för sig i test_sandladan.py."""
     text = INSTALLERA.read_text(encoding="utf-8")
     fore, rest = text.split("## Provkörning med sandlådan, före bytet (steg 15)", 1)
     return fore + "## Caspers dator" + rest.split("## Caspers dator", 1)[1]
