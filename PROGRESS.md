@@ -25,6 +25,34 @@ borttagen.
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
 
+## Läge 2026-11-06, granskning 41 av steg 15 och 16
+
+Steg i byggplanen: 16 (klart)
+
+- **Säkerhet:** ingenting är installerat, inget sudo är kört, och inget i `/Library` eller utanför projektmappen och scratchpad är ändrat. Ingen kod, inget test och ingen inställningsfil är ändrad. Den här sessionen ändrar `GRANSKNING.md`, `PROGRESS.md` och `BYGGPLAN.md`. Prov och ändringar med flit gjordes bara i kopior i scratchpad och i testets tillfälliga mapp. Agenten committar inte: meddelandet står i `COMMIT_MSG.txt`.
+- **Dom: gult, inget blockerar** (`GRANSKNING.md`, "Granskning 41"). Punkt 1–5 håller. Uppdraget var avklippt mitt i punkt 5, och det står i granskningen.
+- **Fynden står under Öppet 71.** P1 bör rättas före steg 17: `test_beslut_steg_16_lage_nu_foljer_beslut_5` blir rött vid nästa vanliga statusändring. Därför börjar "Nästa steg" i `BYGGPLAN.md` fortfarande med samma ord som testet kräver. P2–P6 är låga.
+- **Siffrorna:** hela sviten 0 failed, 5502 passed, 71 skipped. H1-proven 31 passed. Insamlade test 43, 31 och 39.
+- **Körningar** (`<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`, `<S>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/981cc92c-e1b5-42db-b7a9-fef4c04e2f57/scratchpad`, `<G>` är `<S>/kopia/prov/test_g41.py`). Från projektmappen, ett kommando i taget. Utfallen står i `<S>/res`.
+  1. `git status --short --ignored -uall` (start): 12 rader med `!!`, alla väntade, inga andra.
+  2. `git show --stat dbe85a9`, `git show --stat fe69234`, och `git show` för koden och texterna i båda.
+  3. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests`: **5502 passed, 71 skipped**, 205 sekunder.
+  4. `mkdir -p <S>/kopia`, `git archive --format=tar -o <S>/head.tar HEAD`, `tar -x -f <S>/head.tar -C <S>/kopia`. Kopian är fe69234. Samma sak för c49ebf1, i `<S>/c49`.
+  5. `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rf -k 'test_p2 or test_p4_vilket' <G>`: 16 passed.
+  6. Samma kommando med `-k 'test_p1_grona or test_p1_inre or test_p1_alla or test_p1_en_fil_hoppar_annan or test_p1_kodmutation'`: 14 passed.
+  7. Samma kommando med `-k 'test_p3_ingen or test_p2_p3_samma or test_p5_lage_nu or test_p5_mutation'`: 14 passed.
+  8. Samma kommando med `-k 'test_p1_ett_test or test_p1_en_fil_hoppar_grupp or test_p1_modulhopp or test_p1_pytestmark or test_p1_en_fil_xfail or test_p1_en_fil_valjs or test_p1_utan_rs'`: 7 passed.
+  9. Samma kommando med `-k test_p3_mutation`: 19 passed, 695 sekunder. Det gick över tidsgränsen för ett kommando och kördes klart i bakgrunden.
+  10. Samma kommando med `-k 'test_p4_numret or test_p4_raden'`: 5 passed.
+  11. Samma kommando med `-k 'test_p3_mutation and 43_fel'`, efter att jag rättat provet, och med `-k 'test_p3_hela_sviten and 43_och_31'`, `-k 'test_p3_hela_sviten and 43_fel'` och `-k 'test_p3_hela_sviten and 39_fel'`: 1 passed i varje. De tre sista visar 5491 passed, 38 skipped, 44 deselected inne i kopian.
+  12. Samma kommando med `-k test_p4_orsaken`: 4 passed.
+  13. `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rs -k test_h1_ scripts/tests`: **31 passed**.
+  14. `git diff --stat c49ebf1 HEAD -- sparr/managed-settings.json sparr/kommandosparr.py sparr/kontrollera-skalet.zsh .gitignore requirements.txt SPEC.md CLAUDE.md`: tom. `git log -3 --format=%h origin/main`: fe69234 först.
+  15. Efter texten: kommandot i 3 igen, `<python> -B -m pytest -p no:cacheprovider -q --tb=short -k test_byggplan scripts/tests`, och `git status --short --ignored -uall` sist. Utfallet står i slutrapporten.
+- **Proven säger "passed" oavsett utfall:** de i `<G>` skriver bara vad som hände inne i kopian, i `<S>/res/kort`. Det är de filerna som är resultatet.
+- **Mina egna fel:** den första mutationen `43_fel_kvar_i_annan_mening` lade meningen utanför avsnittet, och blev därför röd av fel skäl. Utskriften visade det. Den är rättad och omkörd (körning 11), och den överlever. Vakten stoppade flera av mina första kommandon (`;`, `|`, `\` och `*`), och de är omskrivna, utan att något kördes förbi den.
+- **Inte visat:** rättelserna utanför sandlådan, spärrprovet på HEAD, Hugos körningar i beslut 6, att besluten är ordagranna mot chatten, sidorna i beslut 2 om steg 16, innehållet i Kassio-beslutet 2026-11-05, och resten av uppdraget om texten fortsatte efter punkt 5.
+
 ## Läge 2026-11-06, steg 16 klart, beslutet är zsh
 
 Steg i byggplanen: 16 (klart)
@@ -2462,6 +2490,7 @@ fattade och byggda, se avsnittet ovan.)
 68. **Fynden i granskning 39** (steg 15, `GRANSKNING.md`). Inget blockerar. Bör rättas, väntar på Hugos eller Caspers besked, helst före första commiten efter installationen: P1 (de fasta kommandona visar inte listan i `COMMIT_MSG.txt` före commiten), P2 (långt s: `.gitattributeſ` är samma fil som `.gitattributes`, git läser den, och raden innehåller inte namnet) och P3 (`.github/` och `.mcp.json` stoppar inte alltid, och en fil i `.github/workflows/` kan köra kod hos GitHub efter en push). Låga: P4 (listan fångar glömska, inte avsikt), P5 (meningen "räknat upp" är inte låst, och `_stoppar` ser inte namn inom citattecken eller före pilen), P6 (hänvisningen "beslut 4" på rad 259 i SPEC.md), P7 (kopian står inte i CLAUDE.md), P8 (ett inbäddat repo syns som en rad utan filer) och P9 (`Read(~/.ssh/**)` med långt s är inte prövat). **Beslutade av Hugo 2026-11-05 om granskning 39:** P1, P2 och P3 är rättade (beslut 3, 4 och 5) och granskade i granskning 40. P2 kräver att `core.quotepath` inte är `false`, se Öppet 69. Kvar: P4–P9. **Öppen.**
 69. **Fynden i granskning 40** (steg 15, `GRANSKNING.md`). Inget blockerar. Bör rättas, väntar på Hugos eller Caspers besked: P1 (`test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott` kräver bara `returncode == 0`, och blir grönt också när testen i kopian hoppar över sig av en annan anledning, rättelsen prövad i en kopia). Bör kontrolleras före installationen: P3 (`core.quotepath` är inte kontrollerat, och med `false` stoppar `.gitattributeſ` och `.mcp.jſon` inte när de står i listan). Låga: P2 (`test_h6_en_lank_till_git_stoppas` och `test_beslut_1_gamla_venv_i_projektet_stoppas` hoppar också vid `Permission denied`, fast CLAUDE.md och INSTALLERA.md säger att alla andra fel ger rött), P4 ("kör Hugo, inte agenten" är inte låst i SPEC 7.1) och P5 (`cat` visar styrtecken rakt av). **Beslutade av Hugo 2026-11-06** (`GRANSKNING.md`, "Hugos beslut 2026-11-06 om Öppet 69 och spärrprovet"): P1 och P2 är rättade (beslut 1 och 2), inte granskade, och granskas tillsammans med steg 16 (beslut 8). P3 är klar: Hugo körde `git config --get core.quotepath` 2026-11-05, standardläge (beslut 3). Kvar: P4 och P5 (beslut 4). **Öppen.**
 70. **Vad krävs innan riktig data används?** (steg 109 och 118, Hugos beslut 2026-11-06, beslut 7.) Rådgivare, jurister och konsulter kontaktas längre fram, eftersom vi inte har råd nu (Kassio-beslutet 2026-11-05). I dag säger steg 109 "riktig data först efter juristens svar", steg 118 beror på steg 53 och 54, och CLAUDE.md säger att förbudet mot riktig data gäller helt tills alla villkor i steg 118 är uppfyllda. Inget av det är ändrat. Öppen fråga: inget svar finns, och inget ska antas. **Öppen.**
+71. **Fynden i granskning 41** (steg 15 och 16, `GRANSKNING.md`). Inget blockerar. Bör rättas före steg 17, väntar på Hugos eller Caspers besked: P1 (`test_beslut_steg_16_lage_nu_foljer_beslut_5` låser "Nästa steg" och "Senast avslutade steg", och blir rött vid nästa vanliga statusändring). Låga: P2 (talen 43, 31 och 39 prövas i avsnittet, inte vid sitt kommando), P3 (ett påhittat svar på den öppna frågan i steg 118, Öppet 70 eller "Nästa steg" ger inget rött), P4 (en fil som hoppar med texten `GRUPP D HOPPAS ÖVER` eller inte körs alls ger grönt i `test_granskning_37_a_…`, kontrollen kan kortas till `HOPPAS ÖVER` utan rött skyddstest, och kommentaren "ett steg som verkligen pågår" stämmer inte), P5 (Öppet 4 och Öppet 8 säger fortfarande att steg 15 inte är installerat) och P6 (Kassio-beslutet 2026-11-05 står inte i projektet, och tre formuleringar är byggsessionens egna). **Öppen.**
 
 ## Nästa steg i byggordningen
 

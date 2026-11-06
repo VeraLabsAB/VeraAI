@@ -12763,3 +12763,147 @@ Ordagrant ur Hugos uppdrag i chatten 2026-11-06.
 3. Öppet 7 stängs med det här beslutet. Öppet 8 (en rad som redan står i en startfil syns inte för sandlådan) står kvar öppen. Den gäller oavsett skal.
 4. Steg 16 är klart: beslutet är zsh.
 5. Nästa steg är en oberoende granskning av commit dbe85a9 (Öppet 69 och spärrprovet) och commiten från den här sessionen, enligt Hugos beslut 2026-11-06, beslut 8. Sedan steg 17.
+
+## Granskning 41 (av dbe85a9 och fe69234) (2026-11-06)
+
+Oberoende granskning av steg 15 och 16 (Hugos beslut 2026-11-06, beslut 8). Omfattningen är de fem punkterna i uppdraget, och allt annat står under Öppet 71. Inget är installerat, inget sudo är kört, och ingen kod, inget test, ingen inställningsfil och inget i `/Library` är ändrat. Den här sessionen ändrar `GRANSKNING.md`, `PROGRESS.md` och `BYGGPLAN.md`. Agenten committar inte.
+
+**Dom: gult. Inget blockerar.** De fem punkterna håller. Ett fynd bör rättas före steg 17, eftersom ett test annars blir rött vid nästa vanliga statusändring (P1 nedan).
+
+**Uppdraget var avklippt.** Texten slutar mitt i punkt 5: "följer BYGGPLAN.md och PROGRESS.md besluten utan att hitta på ett". Jag har läst det som "utan att hitta på något eget". Har uppdraget fler krav efter det, är de inte prövade.
+
+| Punkt | Vad | Besked |
+|---|---|---|
+| 1 | `test_granskning_37_a_…` rött när alla eller en fil hoppar av annan anledning, grönt annars | **Håller.** Visat med körning |
+| 2 | `gor_mapp_eller_hoppa_over` hoppar bara vid errno 1 | **Håller.** Inget test i grupp D är svagare |
+| 3 | 43, 31 och 39 kan inte glida isär från INSTALLERA.md | **Håller för antalen.** Men talet prövas bara i avsnittet, inte vid sitt kommando, se P2 |
+| 4 | Stegnumret läses ur "Pågående steg" | **Håller.** Lika strängt som förut |
+| 5 | Beslut 7 och steg 16 i BYGGPLAN.md och PROGRESS.md | **Håller.** Inget svar är påhittat. Fynd: P1, P3, P5 och P6 |
+
+**Så skiljer jag vad som är visat.**
+
+- **Körning:** gjort här, i appen, i den riktiga sandlådan, i en kopia av fe69234 i scratchpad. En mutation betyder att jag ändrar något med flit och ser om ett test larmar. Provfilen är `test_g41.py` i `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/981cc92c-e1b5-42db-b7a9-fef4c04e2f57/scratchpad/kopia/prov/`, utfallen i `scratchpad/res` i samma mapp. Kommandona står i `PROGRESS.md`.
+- **Läst:** diffarna i de två commitarna och texterna.
+- **Bedömning:** står uttryckligen.
+
+### Siffrorna
+
+| Vad | Väntat | Utfall |
+|---|---|---|
+| Hela sviten på HEAD, i sandlådan | 0 failed, 5502 passed, 71 skipped | **5502 passed, 71 skipped, 0 failed.** De 71 är 38 grupp D, 31 spärrprov i kopian och 2 prov av `~/.ssh`, räknat ur raderna från `-rfs` |
+| H1-proven, kommandot i INSTALLERA.md, i appen | 31 passed | **31 passed**, inget hopp |
+| Insamlade test: filtret för spärrproven, H1-proven och proven utanför sandlådan | 43, 31 och 39 | **43, 31 och 39**, samma test i c49ebf1 och nu |
+
+### Punkt 1: håller
+
+Utan mutation kör kopian **1082 passed, 36 skipped**, och alla 36 raderna har texten `GRUPP D HOPPAS ÖVER`.
+
+| Läge i kopian (en `conftest.py` eller en ändrad testfil) | `test_granskning_37_a_…` |
+|---|---|
+| Inget ändrat | **Grönt** |
+| Alla test hoppar, annan text | **Rött**, på raden med `passed` |
+| En fil hoppar, annan text, var och en av de fyra filerna | **Rött** i alla fyra |
+| Ett enda test hoppar, annan text | **Rött** |
+| Filen hoppar med `pytest.skip` högst upp, och med `pytestmark` | **Rött** i båda |
+| Alla test hoppar med texten `GRUPP D HOPPAS ÖVER` | **Rött**, inget gick igenom |
+| En fil hoppar med texten `GRUPP D HOPPAS ÖVER` | Grönt. Så säger beslut 1, se P4 |
+| En fil körs inte alls (`xfail` utan körning, eller bortvald) | Grönt. Inget hopp i pytests mening, och utanför beslut 1, se P4 |
+
+Mutationer av själva kontrollen, mot de nya skyddstesten: `-rs` borta, raden med `passed` borta, raden med `annat` borta och fel ord i `SKIPPED` ger alla rött. Två överlever: `GRUPP D HOPPAS ÖVER` kortad till `HOPPAS ÖVER` (se P4) och `[0-9]+ passed`. Den senare är ingen skillnad i praktiken, eftersom pytest inte skriver `0 passed` (bedömning).
+
+**Utanför sandlådan (räkning, inte körning):** `-k test_sparr_` väljer 43, alltså 31 + 10 + 2, så spärrprovens hopp är bortvalda i kopian. H1-provens 6 ligger i en annan fil. Grep efter `pytest.skip` visar inget annat i de fyra filerna, utom zsh-kontrollen. Testet bör alltså vara grönt i Hugos körning i Terminal.
+
+### Punkt 2: håller
+
+| Fel | Utfall |
+|---|---|
+| errno 1 (`Operation not permitted`) | Hoppar |
+| errno 13, 28, 30, 2, 17, 20, 5, 16, ett i taget | **Rött** i alla |
+| En riktig mapp med `chmod 555` | **Rött**, errno 13 |
+| Mappen finns redan, och en mapp under en fil | **Rött**, errno 17 och 20 |
+| En riktig `.git`, `.GIT`, `.venv` och `.claude` i sandlådan | Hoppar. Sandlådan ger alltså errno 1 |
+| En vanlig mapp | Skapas |
+
+Fyra mutationer av kontrollen (ingen kontroll, också 13, bara 13, aldrig hopp) ger alla rött.
+
+**Inget test i grupp D är svagare (läst och körning).** Diffen ändrar bara hjälpfunktionen, och den blev strängare. Inget testes innehåll är ändrat, utom `test_granskning_37_a_…` i punkt 1 och 4. Filtret väljer samma 39 test i c49ebf1 och nu.
+
+### Punkt 3: håller för antalen
+
+Utan mutation ger hela `test_sandladan.py` 897 passed, 36 skipped. Alla mutationer nedan är gjorda i en kopia.
+
+| Mutation | Rött i |
+|---|---|
+| Nytt spärrprov: i filen, i en ny fil, i en klass, och bara i variantens namn | Det nya testet för 43, i alla fyra |
+| Nytt H1-prov, och en ny fil vars namn innehåller `test_h1_` | Det nya testet för 31, i båda |
+| Ny variant och ny fil med ett namn ur filtret för proven utanför sandlådan | `test_granskning_39_b1_antalen_…`, i båda |
+| Ett spärrprov och ett H1-prov med nytt namn | Testen för 43 och 31 |
+| `43`, `31` eller `39` ändrat i INSTALLERA.md | Rött i alla tre |
+| Kommandot smalare, och ett namn borta ur filtret i rutan eller i testet | `test_avsnitten_for_steg_15_…`, rött i alla tre |
+| **`43 passed` och `31 passed` byter plats** | **Överlever hela sviten**, se P2 |
+| **`99 passed` vid kommandot, med `43 passed` kvar i en annan mening** | **Överlever hela sviten**, se P2 |
+| **Samma sak med `39 passed`** | **Överlever hela sviten**, se P2 |
+
+Antalet test kan alltså inte glida isär utan rött. Det som kan bli fel är bara vilket tal som står vid vilket kommando. Då visar Hugos körning ett annat tal än texten, och Hugo stannar och frågar, så felet stannar i säkert läge (bedömning).
+
+### Punkt 4: lika strängt
+
+Numret läses med samma mönster som `pagaende_steg` i `test_byggplan_progress.py`. I dag ger raden `17`, `105` och `106`, och testet tar 17.
+
+| Numret i den påhittade posten | Kontrollen i `test_byggplan_progress.py` |
+|---|---|
+| 17, som nu | Grönt |
+| 16, klart steg | **Rött**: `test_steg_som_pagar_i_progress_pagar_i_byggplanen` |
+| 15, det gamla fasta numret | **Rött**, samma test. Det är felet som rättelsen tog bort |
+| 99999, finns inte | **Rött**: det testet och `test_progress_sager_vilket_steg_och_stegen_finns` |
+
+Samma mutationer i `test_granskning_37_a_…` ger rött för 15, 16 och 99999, och grönt för 17. Kontrollerna körs alltså fortfarande på posten. Står inget nummer på raden blir `test_granskning_37_a_…` rött, och det blir `test_pagaende_steg_finns_och_ar_inte_klara` också, så det är inget nytt sätt att fela på. Kommentaren "ett steg som verkligen pågår" stämmer inte: steg 17 har status ⬜, se P4.
+
+### Punkt 5: håller
+
+**Beslut 7 (läst):** raden "Nästa steg" och steg 53 och 54 säger längre fram, och skälet. Steg 109 och 118 har en öppen fråga, och villkoren står kvar. Öppet 70 säger att inget svar finns. `CLAUDE.md` och `SPEC.md` är inte ändrade (`git diff --stat` är tom). Inget svar är påhittat.
+
+**Steg 16 (läst och körning):** steg 16 är klart, "beslutet är zsh", "Nästa steg" följer beslut 5, Öppet 7 är stängd och Öppet 8 är oförändrad och öppen. `CLAUDE_CODE_SHELL` står inte i `sparr/managed-settings.json`. Vakten, inställningarna och kontrollskriptet är oförändrade sedan c49ebf1 (`git diff --stat` är tom). Beslut 6 står i `PROGRESS.md` med samma ord.
+
+| Mutation | Utfall |
+|---|---|
+| Öppet 7 öppen igen, Öppet 8 stängd, steg 16 inte klart | Rött i alla |
+| "den här veckan" i steg 53, villkoret borta i steg 109, beroendet borta i steg 118 | Rött i alla |
+| **Ett påhittat svar i steg 118, i Öppet 70 och i "Nästa steg"** | **Grönt i alla tre**, se P3 |
+| **"Nästa steg" eller "Senast avslutade steg" ändras till steg 17** | **Rött**, se P1 |
+
+### Fynd
+
+Alla fynd står under Öppet 71, och inget blockerar.
+
+#### P1, bör rättas före steg 17: ett test låser ett läge som ska ändras
+
+`test_beslut_steg_16_lage_nu_foljer_beslut_5` kräver att "Senast avslutade steg" börjar med `16 – ` och att "Nästa steg" börjar med orden om den här granskningen. Körning: båda ändringarna till steg 17 ger rött. Testet blir alltså rött vid nästa vanliga statusändring, i samma commit som CLAUDE.md kräver den. Det är samma sorts fel som det fasta 15 som dbe85a9 fick rätta. **Den här granskningen påverkas redan:** jag fick låta "Nästa steg" börja med samma ord ("… är gjord") för att hålla sviten grön. **Förslag:** ta bort de två kontrollerna av raderna som ändras, och låt besluten stå i `GRANSKNING.md`, där de redan är låsta. Ändrar bara ett test. Hugos eller Caspers beslut.
+
+#### P2, låg: talet prövas i avsnittet, inte vid sitt kommando
+
+Se punkt 3. Tre mutationer överlever hela sviten. **Förslag:** testa att talet står i raden "Väntat" närmast efter kommandot.
+
+#### P3, låg: den öppna frågan är låst bara till orden "Öppen fråga"
+
+Ett påhittat svar ("Hugos OK räcker") i steg 118, i Öppet 70 eller i "Nästa steg" ger inget rött. Villkoren i steg 109 och 118 är låsta, och förbudet i CLAUDE.md står kvar, så det ger ingen väg till riktig data (bedömning). I dag följs beslut 7. **Förslag:** testa att Öppet 70 är öppen och att "Inget svar finns" står kvar, tills Hugo eller Casper har svarat.
+
+#### P4, låg: kanter kring P1 och två småsaker
+
+- En fil som hoppar med texten `GRUPP D HOPPAS ÖVER` ger grönt, och en fil som inte körs alls ger grönt (körning). Båda kräver en ändring med flit, och beslut 1 omfattar dem inte. Antalet i sviten skulle ändras, men inget test låser det.
+- Kontrollen kan bli `HOPPAS ÖVER` utan rött skyddstest (körning), eftersom ingen av testraderna har en annan text med de orden.
+- Kommentaren "ett steg som verkligen pågår" i `test_granskning_37_a_…`: steg 17 har status ⬜.
+
+#### P5, låg: Öppet 4 och Öppet 8 säger fortfarande "inte installerad"
+
+Beslut 6 säger att steg 15 är installerat. Öppet 4 säger "Byggd 2026-11-04 (steg 15), inte installerad och inte granskad", och Öppet 8 säger "steg 15, som inte är installerat". Öppet 8 skulle stå kvar enligt beslut 3, men att den är öppen hindrar inte att meningen rättas. **Förslag:** rätta meningarna, och ta ställning till om Öppet 4 ska stängas.
+
+#### P6, låg: uppgifter som inte står i besluten
+
+- **"Kassio-beslutet 2026-11-05" står inte någonstans i projektet** utom i hänvisningarna (körning, `grep`), och det har inget namn. CLAUDE.md säger att varje beslut skrivs in med namn och datum. Sessionen skrev själv upp det under "Inte visat". **Förslag:** skriv in det i `GRANSKNING.md`.
+- Byggsessionens egna ord, inte Hugos: "som ersätter beslut 14 på den punkten" (steg 53 och 54), "något prov i appen görs inte" (steg 16) och "när konsulten kontaktas" (Öppet 38). Alla tre är rimliga följder av besluten (bedömning). De svarar inte på den öppna frågan, men Hugo eller Casper bör se dem.
+- **Att känna till:** steg 118 har kvar datumförslaget 2027-01-11, och beror på steg 53 och 54, som nu saknar tid. Det ingår i Öppet 70 och är inget fel.
+
+### Inte visat
+
+Rättelserna utanför sandlådan, och spärrprovet på HEAD. CLAUDE.md kräver inte det här, eftersom vakten och de låsta inställningarna inte är ändrade. Hugos körningar i beslut 6: de är Hugos uppgifter, och jag kan inte göra dem här. Att besluten är ordagranna mot chatten. Att dokumentationen säger det beslut 2 om steg 16 säger: jag har inte läst sidorna. Innehållet i Kassio-beslutet. Resten av uppdraget, om texten fortsatte efter punkt 5.
