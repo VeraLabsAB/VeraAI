@@ -12931,3 +12931,298 @@ Ordagrant ur Hugos uppdrag i chatten 2026-11-06.
 7. Ingen egen granskning. Den här sessionen granskas tillsammans med steg 17. Den granskningen tar också punkt 6 i granskning 41 (statusraderna mot git log), som inte nådde granskaren eftersom uppdraget var avklippt.
 
 **Hugos svar i chatten 2026-11-06, i samma session, till beslut 1.** Testet hade en tredje kontroll av raden "Nästa steg", som varken granskning 41 eller beslut 1 nämner: raden måste innehålla "Hugos beslut 2026-11-06, beslut 8" och "Sedan steg 17". Sessionen frågade om också den fick tas bort, och Hugo valde "Ta bort den också". Kontrollen att "Bash-vägen prövas" inte står i raden blir kvar, liksom kontrollen av "Pågående steg".
+
+## Steg 17: vaktens tecken mot zsh (2026-11-06)
+
+### Hugos beslut 2026-11-06 om steg 17
+
+Ordagrant ur Hugos uppdrag i chatten 2026-11-06.
+
+1. Steg 17 görs som en kontroll av vakten, inte som försök att ta sig förbi den. Ett första försök 2026-11-06 med kommandotexter som skulle köra date stoppades av Claude Codes säkerhetsfilter innan något hann hända. Inget i projektet ändrades. Den metoden används inte.
+2. Metod: (a) Ta fram en fullständig lista över vilka tecken sparr/kommandosparr.py släpper igenom i ett Bash-kommando, och var: utanför citattecken, inom enkla och inom dubbla citattecken. Visa det genom att läsa koden och genom att anropa vaktens kontroll med ofarliga texter i en kopia i scratchpad, till exempel ls följt av ett ord med tecknet i. (b) Jämför listan med zsh:s regler för vilka tecken som har särskild betydelse (citattecken, utvidgningar, glob, tilldelning, kommentar, alias). Ange avsnittet i zsh:s manual för varje regel, eller skriv "bedömning" om det inte går att kontrollera här. (c) Ett tecken som släpps igenom och har särskild betydelse för zsh blir ett fynd: skriv varför vakten ändå är säker, eller att den inte är det.
+3. Ingen kommandotext körs i zsh, och ingen text skrivs för att ta sig förbi vakten.
+4. Skalets inställningar (setopt) kan ändra vilka tecken som är särskilda. Ta reda på vilka som gäller i agentens skal genom att läsa startfilerna om det går. Går det inte: skriv det som inte visat.
+5. Vakten rättas inte i den här sessionen. Fynd går till Öppet, och Hugo tar ställning.
+6. Stoppar ett säkerhetsfilter något: gå inte runt det, och byt inte modell. Skriv vad som stoppades och stanna.
+7. Exitkriterium: inga tecken där vakten och zsh tolkar texten olika, eller en lista som Hugo tar ställning till.
+
+### Dom
+
+**Gult. Exitkriteriets andra del gäller: en lista som Hugo tar ställning till.** Inget prov visar en väg förbi vakten, och inget säkerhetsfilter stoppade något i den här sessionen. Men det finns tecken som vakten och zsh tolkar olika eller kan tolka olika (O1–O5), och skalets inställningar är inte visade (O6). Inget av fynden kan koppla ihop kommandon, om agentens skal inte är interaktivt (ett skal som tar emot kommandon från en människa vid en prompt). Det villkoret är inte visat, bara bedömt (O1).
+
+Vaktens grundidé håller vid genomgången: de tecken som zsh använder för att koppla ihop kommandon, styra om utskrift eller byta ut text stoppas var de än står (`;`, `&`, `|`, `<`, `>`, `$`, bakåtfnutt, omvänt snedstreck, radbrytning), och tecknen för filnamnsmönster stoppas utanför citattecken.
+
+### Tecknen
+
+"Utanför" gäller ett tecken mitt i ett ord, som i `ls x!y`. Kolumnerna "inom" gäller `ls 'x!y'` och `ls "x!y"`. Allt i de tre kolumnerna för vakten är visat med körning av provet nedan. Kolumnerna för zsh är manualen eller min bedömning, och inget av det är kört i zsh (beslut 3). Avsnitten gäller manualen för zsh 5.9.2 på zsh.sourceforge.io. Vilken version agentens skal har är inte visat.
+
+Först i ett kommando stoppas varje tecken utom mellanslag, eftersom ordet då inte står på listan (visat med körning, kolumnen "först i kommandot" i utfallet).
+
+| Tecken | Utanför citat | Inom enkla | Inom dubbla | Särskilt för zsh | Källa | Dom |
+|---|---|---|---|---|---|---|
+| mellanslag | släpps | släpps | släpps | Skiljer ord | 6.1 | Samma |
+| `!` | släpps | släpps | släpps | Historik, också inom dubbla citat. Först i ett kommando vänder det utfallet | 14.1, 16.2.4 BANG_HIST, 6.1 | **O1** |
+| `"` | citattecken | släpps | stänger | Citattecken | 6.9 | Samma. Ensamt: stopp, inte stängt |
+| `#` | stopp | släpps | släpps | Kommentar, mönster | 6.7, 14.8, 15.6 histchars | Stoppas, se O6 om histchars |
+| `$` | stopp | stopp | stopp | Parameter, kommando, räkning | 14.3–14.5 | Stoppas |
+| `%` | släpps | släpps | släpps | Bara jobb, inte i ett ord till ett program | Bedömning (kapitlet om jobb är inte läst) | Inget fynd |
+| `&` | stopp | stopp | stopp | Kopplar ihop | 6.1 | Stoppas |
+| `'` | citattecken | stänger | släpps | Citattecken | 6.9, 16.2.6 RC_QUOTES | **O5** |
+| `(` `)` | stopp | släpps | släpps | Delskal, mönster, tilldelning av lista | 6.3, 14.2, 14.8 | Stoppas utanför. Inom citat bokstavligt i båda (6.9) |
+| `*` `?` `[` | stopp | släpps | släpps | Mönster | 14.8 | Stoppas utanför. Inom citat bokstavligt i båda |
+| `+` | släpps | släpps | släpps | Bara före `(` med KSH_GLOB | 14.8, 16.2.3 | Inget fynd: `(` stoppas |
+| `,` | släpps | släpps | släpps | Bara inom `{` | 14.6 | Inget fynd: `{` stoppas |
+| `-` | släpps | släpps | släpps | Ensamt först i ett kommando: modifierare | 6.2 | Inget fynd: först stoppas. Vakten läser ord med `-` som tillägg, som programmen |
+| `.` | släpps | släpps | släpps | Först i ett kommando: kommandot `.`. `..` inom `{` | 6.2 (bedömning för `.`), 14.6 | Inget fynd. Vakten räknar om `..` i sökvägar |
+| `/` | släpps | släpps | släpps | Sökväg. Först i ett ord stoppas det av sökvägsregeln, inte av teckenregeln | 16.2.6 PATH_DIRS | Inget fynd |
+| `0`–`9` | släpps | släpps | släpps | Siffra före `>` | Bedömning (kapitlet om omstyrning är inte läst) | Inget fynd: `>` stoppas |
+| `:` | släpps | släpps | släpps | Först i ett kommando: kommandot `:`. Annars i historik och mönster | Bedömning, 14.1 | Inget fynd |
+| `;` | stopp | stopp | stopp | Kopplar ihop | 6.1 | Stoppas |
+| `<` `>` | stopp | stopp | stopp | Omstyrning, mönster, processbyte | 14.2, 14.8 (kapitlet om omstyrning är inte läst) | Stoppas |
+| `=` | släpps, stopp först i ord | släpps | släpps | Först i ett ord: program. Efter namn: tilldelning. Efter `x=`: bara med MAGIC_EQUAL_SUBST | 14.7, 16.2.3 EQUALS och MAGIC_EQUAL_SUBST | **O2**, **O3** |
+| `@` | släpps | släpps | släpps | Bara före `(` med KSH_GLOB | 14.8 | Inget fynd: `(` stoppas |
+| `A`–`Z` `a`–`z` | släpps | släpps | släpps | Alias, reserverade ord | 6.5, 6.8 | **O7** (känt) |
+| `\` | stopp | stopp | stopp | Citerar nästa tecken | 6.9 | Stoppas |
+| `]` | släpps | släpps | släpps | Bara efter `[` | 14.8 | Inget fynd: `[` stoppas utanför citat |
+| `^` | stopp | släpps | släpps | Historik, mönster | 14.8, 15.6 histchars, 16.2.3 EXTENDED_GLOB | Stoppas utanför. O6 om histchars |
+| `_` | släpps | släpps | släpps | Inget | Bedömning | Inget fynd |
+| `` ` `` | stopp | stopp | stopp | Kommando i kommando | 14.4 | Stoppas |
+| `{` | stopp | släpps | släpps | Klammer, block | 14.6, 6.3 | Stoppas utanför |
+| `\|` | stopp | stopp | stopp | Kopplar ihop | 6.1 | Stoppas |
+| `}` | släpps | släpps | släpps | Ensam: slutar ett block, var den än står | 6.5, 16.2.3 IGNORE_CLOSE_BRACES | **O4** |
+| `~` | stopp | släpps | släpps | Hemmappen, mönster | 14.7, 14.8 | Stoppas utanför |
+| Radbrytning, vagnretur | stopp | stopp | stopp | Skiljer kommandon | 6.1 (bedömning för vagnretur) | Stoppas |
+| Tabb och andra styrtecken, osynliga tecken, alla mellanslag utom vanligt | stopp | stopp | stopp | Tabb skiljer ord | Bedömning | Stoppas |
+| Övrig Unicode: bokstäver, tecken, symboler | släpps | släpps | släpps | Ingen regel i manualen ger dem särskild betydelse i ett ord | 16.2.3 MULTIBYTE, annars bedömning | Inget fynd |
+
+Alla 1 114 112 kodpunkter är prövade mot teckenregeln. Koderna utan tecken, de privata och de osynliga stoppas alla (Unicode 13 i provets Python, kategorierna Cc, Cf, Cn, Co, Cs, Zl och Zp helt, Zs utom vanligt mellanslag). Utfallet per kategori står i utfallsfilen.
+
+### Fynden
+
+**O1. `!` är historik i zsh, och vakten släpper det. Säker om skalet inte är interaktivt. Det villkoret är inte visat.**
+- **Olika tolkning:** ett `!` följt av något annat än mellanslag, `=` eller `(` läser zsh som en hämtning ur historiken, också inom dubbla citat (14.1). Texten byts ut före all annan tolkning. Den kan alltså innehålla `;` och annat som vakten stoppar, utan att vakten ser det. Vakten ser bara ordet `!y` (visat med körning).
+- **Varför det ändå är säkert, om villkoret håller:** manualen säger att historiken bara gäller interaktiva skal (kapitel 14, ordningen). Att agentens skal inte är interaktivt är min bedömning, inte visat: Claude Code läser `~/.zshrc` en gång när sessionen startar och tar med resultatet till varje kommando (tools-reference, "What persists between commands"), och ett interaktivt skal hade läst filen självt varje gång (5.1). Prövas i zsh gör jag det inte (beslut 3).
+- **Om villkoret inte håller är vakten inte säker här:** `/etc/zshrc` sätter en historikfil, så historiken är troligen inte tom (bedömning, filen är inte läst).
+- **Förslag:** nästa version av vakten stoppar `!` var det än står. Inget kommando på listan behöver tecknet, utom möjligen ett sökmönster. Det är billigare än att visa villkoret.
+
+**O2. `=` först i ett ord efter tomma citattecken. Inte avgjort, låg om zsh byter ut det.**
+- **Olika tolkning möjlig:** `ls ''=y` släpps, och vakten läser ordet `=y` (visat med körning). Regeln i `_dela_upp` är `tecken == "=" and not borjat`, och citattecknen har redan satt `borjat`. Manualen säger bara att ordet ska börja med ett `=` utan citat (14.7). Om `''` före räknas som början på ordet går det inte att avgöra med manualen. Citattecken tas bort före filnamnssteget i vissa ordningar (kapitel 14), så det är inte heller uteslutet.
+- **Om zsh byter ut det:** ordet blir hela sökvägen till programmet `y`, medan vakten prövade en sökväg i projektet. Regeln "läsande kommandon bara i projektet" kan då passeras för en programfil i `PATH`. Det kan inte köra något eller koppla ihop något, och först i kommandot stoppas ordet ändå (`=y` står inte på listan). Sandlådan begränsar skrivning.
+- **Förslag:** regeln prövar om ordet hittills är tomt, inte om det har börjat. Då stoppas också `''=y`. Det stoppar inget som används i dag (bedömning).
+
+**O3. `=` mitt i ett ord, med MAGIC_EQUAL_SUBST. Säkert.**
+- `x==y` och `--include==y` släpps. Med inställningen MAGIC_EQUAL_SUBST byter zsh ut det efter första `=` på samma sätt som i O2 (14.7, 16.2.3). Inställningen är av som standard, och den står inte i någon startfil jag kunde läsa (O6). `~` stoppas ändå. Effekten är som O2.
+
+**O4. Ensam `}` utanför citattecken. Säkert, åt rätt håll.**
+- `ls }` släpps, och vakten läser `}` som ett vanligt ord (visat med körning). I zsh slutar en ensam `}` ett block var den än står, om inte IGNORE_BRACES eller IGNORE_CLOSE_BRACES är satta (6.5, 16.2.3). Eftersom `{` utanför citat alltid stoppas finns inget öppet block, och zsh bör ge ett syntaxfel (bedömning, inte kört). Då körs inget.
+- **Inte visat:** exakt hur Claude Code slår in kommandot innan det går till skalet. Dokumentationen säger inget om det. Skulle det skrivas i ett block som text kan `}` stänga blocket, men utan `;` eller radbrytning bör det ge syntaxfel (bedömning).
+- **Förslag:** nästa version stoppar en ensam `}` utanför citat, så att vakten och zsh säger samma sak.
+
+**O5. `''` inom enkla citattecken, med RC_QUOTES. Säkert.**
+- `ls 'a''b'` ger hos vakten ordet `ab` (visat med körning). Med RC_QUOTES ger zsh `a'b` (6.9, 16.2.6). Inställningen är av som standard och står inte i någon startfil jag kunde läsa (O6).
+- **Varför det ändå är säkert (bedömning):** gränserna mellan orden blir desamma, eftersom `''` stänger och öppnar direkt. Skillnaden är att zsh:s ord har ett `'` mer än vaktens. Ett extra tecken kan inte skapa `..`, ett `/` först, eller ett förbjudet tillägg som vakten inte redan såg. Första ordet blir bara ett program som inte finns.
+
+**O6. Skalets inställningar i agentens skal är inte visade.** Beslut 4.
+- **Vad som gäller:** enligt tools-reference läser Claude Code `~/.zshrc` när sessionen startar, sparar alias, funktioner och inställningar och använder dem för varje kommando. Det sparas i en fil i `~/.claude/shell-snapshots/` (granskning 15, S3). **Den filen är det som avgör, och den har jag inte läst:** mappen går inte att lista, eftersom vakten stoppar `ls` där, och filens namn går inte att gissa. Jag gick inte runt det. Inte heller med en provfil, som inte får läsa något utanför (CLAUDE.md).
+- **Lästa startfiler, med fil-verktyget Read (beslut 4):** `/etc/zshrc` sätter COMBINING_CHARS och BEEP, som gäller visning och ljud, och sätter ingen `histchars`. `/etc/zprofile` och `~/.zshrc` sätter inga inställningar. `~/.nvm/bash_completion` sätter inga på filnivå, men kör `compinit` och `bashcompinit`. `/etc/zshenv`, `/etc/zlogin`, `~/.zshenv`, `~/.zprofile` och `~/.zlogin` finns inte.
+- **Inte läst:** `~/.nvm/nvm.sh`, utom de sista 60 raderna (4 620 rader i filen). `~/.zshrc` läser in den. `/etc/zshrc_Apple_Terminal`, som bara gäller Terminal.
+- **Vilka inställningar som skulle spela roll:** MAGIC_EQUAL_SUBST (O3), RC_QUOTES (O5), IGNORE_BRACES och IGNORE_CLOSE_BRACES (O4), BANG_HIST (O1), EQUALS (O2) och ALIASES (O7). De som inte spelar roll, eftersom tecknen de gäller stoppas ändå: EXTENDED_GLOB, KSH_GLOB, SH_GLOB, BARE_GLOB_QUAL, BRACE_CCL, INTERACTIVE_COMMENTS, CSH_JUNKIE_QUOTES, GLOB_SUBST och GLOB_ASSIGN (16.2.3, 16.2.6, 16.2.10). Bedömning, utifrån tabellen.
+- **`histchars`:** parametern, inte en inställning, avgör vilka tecken som är historik och kommentar (15.6). Vakten känner bara till standardtecknen `!`, `^` och `#`. Ingen startfil jag läste ändrar den. Sätts den i en startfil kan ett annat tecken bli kommentar, och vakten märker det inte. Startfilerna har förbud för agenten.
+- **Förslag:** Hugo läser själv raderna om inställningar i den senaste filen i den mappen, i Terminal, eller så tar kontrollskriptet (`sparr/kontrollera-skalet.zsh`) med inställningarna och `histchars` i nästa version, så att de prövas som alias och funktioner redan gör.
+
+**O7. Alias. Känt sedan granskning 13, P1.** Vakten ser inte alias, och zsh byter ut ord före tolkningen (6.8). Ett globalt alias gäller vilket ord som helst. Det är inte ett teckenfel, utan står här för att beslut 2 nämner alias. Skyddet är kontrollskriptet och förbuden för startfilerna. `alias` i agentens skal visades senast i granskning 15, S3. Jag har inte visat det i dag (O6).
+
+### Vad som är visat, och hur
+
+- **Visat med körning, mot en kopia av vakten:** alla kolumner för vakten, uppdelningen i ord och kodpunkterna. `diff` mellan `sparr/kommandosparr.py` och kopian gav ingen skillnad. **28 passed.**
+- **Bortkopplat i provet:** regel 7 (var programmet ligger), eftersom den läser systemets filer och inte handlar om tecken. Provet har också en tillfällig projektmapp, så att sökvägsreglerna inte läser riktiga mappar.
+- **Kört i zsh:** ingen provtext (beslut 3).
+- **Manualen:** lästes med WebFetch, som svarar genom en mindre modell. Avsnitten och formuleringarna är alltså modellens läsning av sidorna, inte en läsning rad för rad. Sidan Expansion lästes till tecken 100 000 av 133 407, så slutet av mönsterdelen är oläst. Det påverkar inget tecken, eftersom alla mönstertecken stoppas utanför citat. `%`, siffror och `:` är bedömning, eftersom kapitlen om jobb och omstyrning inte är lästa.
+- **Bedömning, inte visat:** att skalet inte är interaktivt (O1), hur zsh läser `''=y` (O2), att `}` ger syntaxfel (O4), Claude Codes omslag runt kommandot, och att zsh delar ord likadant för tecken utanför ASCII.
+- **Inte prövat:** vad programmen gör med sina argument (till exempel git med `:(`), som står i regel 5 och 6, inte här.
+
+### Provet
+
+Sparat i `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/a2feb94b-9363-4888-b92f-9ed7ab6ae99a/scratchpad/test_steg17_tecken.py`, med kopian av vakten i `steg17-sparr/` och utfallet i `steg17-utfall.md` i samma mapp. Scratchpad är sessionens egen och kan försvinna, och vakten låter en annan session bara läsa sin egen. Granskningen gör därför så här: kopiera mappen `sparr` till sin egen scratchpad som `steg17-sparr`, skriv in provet nedan där med fil-verktyget, och kör det med pytest-kommandot i SPEC 7.1 med provfilen som mål. Väntat: **28 passed.**
+
+```python
+"""Steg 17: vilka tecken släpper vakten igenom i ett Bash-kommando, och var? (Hugos beslut 2026-11-06 om steg 17.)
+
+Provet anropar vaktens kontroll i kopian steg17-sparr/kommandosparr.py bredvid den här filen. Det kör inget i zsh
+och startar inget program. Regel 7 (var programmet ligger) är bortkopplad, eftersom den läser systemets filer och
+inte handlar om tecken. Projektmappen, hemmappen och den tillfälliga mappen är tillfälliga mappar från pytest.
+
+Utfallet skrivs till steg17-utfall.md bredvid den här filen.
+"""
+
+import importlib.util
+import os
+import unicodedata
+from pathlib import Path
+
+import pytest
+
+HAR = Path(__file__).resolve().parent
+UTFALL = HAR / "steg17-utfall.md"
+
+spec = importlib.util.spec_from_file_location("kommandosparr_kopia", HAR / "steg17-sparr" / "kommandosparr.py")
+vakten = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(vakten)
+
+FORMER = (
+    ("mitt i ord", "ls x{c}y"),
+    ("först i ord", "ls {c}y"),
+    ("sist i ord", "ls x{c}"),
+    ("ensamt", "ls {c}"),
+    ("enkla citat", "ls 'x{c}y'"),
+    ("dubbla citat", 'ls "x{c}y"'),
+    ("först i kommandot", "{c}ls"),
+)
+
+SKRIVBARA = [chr(k) for k in range(0x20, 0x7F)]
+
+ALLTID_STOPP = set(";&|<>$`\\")
+STOPP_UTANFOR = set("*?[{()~^#")
+
+
+@pytest.fixture
+def miljo(tmp_path, monkeypatch):
+    projekt = tmp_path / "projekt"
+    hem = tmp_path / "hem"
+    skrap = tmp_path / "skrap"
+    for mapp in (projekt, hem, skrap):
+        mapp.mkdir()
+    monkeypatch.setattr(vakten, "_programmet", lambda namn, lage, sokvag: None)
+
+    def bedom(kommando):
+        indata = {
+            "tool_name": "Bash",
+            "tool_input": {"command": kommando},
+            "cwd": str(projekt),
+            "scratchpad_dir": str(skrap),
+        }
+        return vakten.bedom(indata, str(projekt), str(hem), "/saknas")
+
+    return bedom
+
+
+def _kort(fel):
+    return "släpps" if fel is None else "stopp"
+
+
+def test_tabell_for_varje_skrivbart_tecken(miljo):
+    rader = ["| Tecken | " + " | ".join(namn for namn, _ in FORMER) + " |", "|---" * (len(FORMER) + 1) + "|"]
+    skal = {}
+    for tecken in SKRIVBARA:
+        utfall = []
+        skal[tecken] = {}
+        for namn, form in FORMER:
+            fel = miljo(form.replace("{c}", tecken))
+            skal[tecken][namn] = fel
+            utfall.append(_kort(fel))
+        visas = "mellanslag" if tecken == " " else tecken
+        rader.append(f"| `{visas}` | " + " | ".join(utfall) + " |")
+
+    # Stoppas var de än står.
+    for tecken in ALLTID_STOPP:
+        for namn, _ in FORMER:
+            assert skal[tecken][namn], (tecken, namn)
+    # Stoppas utanför citattecken men släpps inom.
+    for tecken in STOPP_UTANFOR:
+        for namn in ("mitt i ord", "först i ord", "sist i ord", "ensamt", "först i kommandot"):
+            assert skal[tecken][namn], (tecken, namn)
+        for namn in ("enkla citat", "dubbla citat"):
+            assert skal[tecken][namn] is None, (tecken, namn)
+    # = stoppas bara först i ett ord utanför citattecken.
+    assert skal["="]["först i ord"] and skal["="]["ensamt"]
+    assert skal["="]["mitt i ord"] is None and skal["="]["sist i ord"] is None
+    # Tecken som släpps igenom utanför citattecken, mitt i ett ord.
+    slapps = {t for t in SKRIVBARA if skal[t]["mitt i ord"] is None}
+    assert slapps == set(SKRIVBARA) - ALLTID_STOPP - STOPP_UTANFOR - set("'\"")
+    # Inget kommando kan börja med ett av dem och stå på listan: "först i kommandot" stoppas, utom mellanslag och
+    # citattecknen, som inte ändrar ordet.
+    for tecken in SKRIVBARA:
+        fel = skal[tecken]["först i kommandot"]
+        if tecken == " ":
+            assert fel is None
+        else:
+            assert fel, tecken
+
+    text = "\n".join(rader) + "\n"
+    UTFALL.write_text("# Steg 17, utfall\n\n## Skrivbara tecken\n\n" + text, encoding="utf-8")
+
+
+def test_alla_kodpunkter_i_vaktens_teckenregel():
+    """Regel 4 och ordens uppdelning för varje kodpunkt i Unicode, utanför citattecken, utan sökvägsregeln."""
+    stoppade = {}
+    slappta = {}
+    for kod in range(0x110000):
+        tecken = chr(kod)
+        kategori = unicodedata.category(tecken)
+        stopp = tecken in vakten.IHOPKOPPLING or (tecken != " " and kategori in vakten.OSYNLIGA_KATEGORIER)
+        if not stopp:
+            try:
+                vakten._dela_upp("x" + tecken + "y")
+            except vakten._Stopp:
+                stopp = True
+            else:
+                if tecken in "'\"":
+                    stopp = True  # stoppas som ett citattecken som inte är stängt
+        malgrupp = stoppade if stopp else slappta
+        malgrupp[kategori] = malgrupp.get(kategori, 0) + 1
+
+    # Inget tecken i de osynliga kategorierna släpps, utom vanligt mellanslag.
+    for kategori in vakten.OSYNLIGA_KATEGORIER:
+        assert kategori not in slappta or (kategori == "Zs" and slappta[kategori] == 1), kategori
+
+    rader = ["| Kategori | Släpps | Stoppas |", "|---|---|---|"]
+    for kategori in sorted(set(stoppade) | set(slappta)):
+        rader.append(f"| {kategori} | {slappta.get(kategori, 0)} | {stoppade.get(kategori, 0)} |")
+    with UTFALL.open("a", encoding="utf-8") as fil:
+        fil.write(f"\n## Alla kodpunkter (Unicode {unicodedata.unidata_version})\n\n" + "\n".join(rader) + "\n")
+
+
+FALL_ORD = (
+    ("ls 'a''b'", ["ls", "ab"]),
+    ("ls ''=y", ["ls", "=y"]),
+    ('ls "="y', ["ls", "=y"]),
+    ("ls x==y", ["ls", "x==y"]),
+    ("ls x=y", ["ls", "x=y"]),
+    ("ls }", ["ls", "}"]),
+    ("ls x}y", ["ls", "x}y"]),
+    ("ls !", ["ls", "!"]),
+    ("ls !y", ["ls", "!y"]),
+    ('ls "!y"', ["ls", "!y"]),
+    ("ls '!y'", ["ls", "!y"]),
+    ("ls ''", ["ls", ""]),
+    ("ls 'x y'", ["ls", "x y"]),
+    ('ls "x\'y"', ["ls", "x'y"]),
+    ("ls 'x\"y'", ["ls", 'x"y']),
+    ("l's' x", ["ls", "x"]),
+    ("  ls   x  ", ["ls", "x"]),
+)
+
+
+@pytest.mark.parametrize("kommando,ord_", FALL_ORD, ids=[f[0] for f in FALL_ORD])
+def test_sa_delar_vakten_upp_orden(kommando, ord_, miljo):
+    assert vakten._dela_upp(kommando) == ord_
+    assert miljo(kommando) is None
+
+
+@pytest.mark.parametrize("kommando", ("ls 'a", 'ls "a', "ls 'a''", "ls ''' ", "! ls", "} ls", "ls =y", "ls #y"))
+def test_stoppas(kommando, miljo):
+    assert miljo(kommando)
+
+
+def test_skriv_orden():
+    rader = ["| Kommando | Vaktens ord |", "|---|---|"]
+    for kommando, ord_ in FALL_ORD:
+        rader.append(f"| `{kommando}` | {ord_} |")
+    with UTFALL.open("a", encoding="utf-8") as fil:
+        fil.write("\n## Vaktens uppdelning\n\n" + "\n".join(rader) + "\n")
+    assert os.path.getsize(UTFALL) > 0
+```
+
+### Beslut som behövs
+
+Hugo eller Casper, för varje fynd: O1 och O4 stoppas i nästa version av vakten (steg 18) eller inte. O2 rättas i steg 18 eller inte. O3 och O5 godtas, eller väntar på O6. O6: Hugo läser filen själv, eller så tar kontrollskriptet med inställningarna. O7 är känt och kräver inget nytt.
