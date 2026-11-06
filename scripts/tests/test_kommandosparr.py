@@ -243,10 +243,13 @@ def test_vakten_har_samma_verktygslista_som_spec(vakt):
 @pytest.mark.parametrize("verktyg", VERKTYGSLISTAN)
 def test_alla_verktyg_pa_listan_slapps_igenom(vakt, mappar, verktyg):
     # Bash prövas mot kommandolistan, så det får ett kommando som står där. Write och Edit prövas mot förbuden för
-    # fil-verktygen (granskning 17, H6), så de får en vanlig fil i projektet.
+    # fil-verktygen (granskning 17, H6), så de får en vanlig fil i projektet. WebFetch prövas mot sina två webbplatser (Hugos beslut
+    # 2026-11-06 om steg 149, beslut 3), så det får en adress där.
     indata = _indata(mappar, "git status", verktyg)
     if verktyg in ("Write", "Edit"):
         indata["tool_input"] = {"file_path": os.path.join(mappar["projekt"], "SPEC.md"), "content": "x"}
+    if verktyg == "WebFetch":
+        indata["tool_input"] = {"url": "https://code.claude.com/docs/en/settings", "prompt": "x"}
     assert vakt.bedom(indata, mappar["projekt"], mappar["hem"], SYSTEMETS_SOKVAG) is None
 
 
@@ -277,9 +280,12 @@ def test_verktyg_som_inte_star_pa_listan_stoppas(vakt, mappar, verktyg):
 
 @pytest.mark.parametrize("verktyg", ["Read", "Write", "Edit", "Glob", "Grep", "WebFetch"])
 def test_vanliga_filverktyg_slapps_igenom(vakt, mappar, verktyg):
-    # SPEC 7.1 gäller bara kommandon (planen, regel 2). Fil-verktygen släpps igenom.
+    # SPEC 7.1 gäller bara kommandon (planen, regel 2). Fil-verktygen släpps igenom. WebFetch har en adress, inte en fil (Hugos
+    # beslut 2026-11-06 om steg 149, beslut 3).
     indata = _indata(mappar, "", verktyg)
     indata["tool_input"] = {"file_path": mappar["projekt"] + "/SPEC.md"}
+    if verktyg == "WebFetch":
+        indata["tool_input"] = {"url": "https://docs.claude.com/", "prompt": "x"}
     assert vakt.bedom(indata, mappar["projekt"], mappar["hem"], SYSTEMETS_SOKVAG) is None
 
 
@@ -1728,13 +1734,13 @@ def test_filregler_har_en_form_som_galler_pa_varje_dator():
 
 def test_installningarna_kraver_lagst_den_version_som_kan_stoppa_vid_krasch():
     # onFailure kräver Claude Code 2.1.295 (code.claude.com/docs/en/hooks). En äldre version ska inte
-    # starta alls (Hugos beslut 2026-10-28, punkt 3). Filen kräver nu 2.1.305, som också nyckeln
-    # allowNestedUserNamespaces kräver (Hugos beslut 2026-11-05 efter P6, beslut 2).
-    assert _installningar()["requiredMinimumVersion"] == "2.1.305"
+    # starta alls (Hugos beslut 2026-10-28, punkt 3). Filen kräver nu 2.1.314, som också nyckeln
+    # permissions.blockWritesOutsideWorkingDirectories kräver (Hugos beslut 2026-11-06 om steg 149, beslut 1).
+    assert _installningar()["requiredMinimumVersion"] == "2.1.314"
 
 
 def installera_utan_sandlada():
-    """INSTALLERA.md utan avsnitten för versionen med sandlåda (steg 15) och bytet i steg 18, som är byten och inte en ny
+    """INSTALLERA.md utan avsnitten för versionen med sandlåda (steg 15) och bytena i steg 18 och 149, som är byten och inte en ny
     installation. De avsnitten prövas för sig i test_sandladan.py."""
     text = INSTALLERA.read_text(encoding="utf-8")
     fore, rest = text.split("## Provkörning med sandlådan, före bytet (steg 15)", 1)
@@ -1882,7 +1888,7 @@ def _steg(text):
 
 def test_installationen_kontrollerar_versionen_forst():
     # Hugos beslut 2026-10-28, beslut 3: versionen i appen kontrolleras med /status i en Claude Code-session
-    # och ska vara 2.1.305 eller senare (Hugos beslut 2026-11-05 efter P6, beslut 2, förut 2.1.295). Hugos beslut
+    # och ska vara 2.1.314 eller senare (Hugos beslut 2026-11-06 om steg 149, beslut 1, förut 2.1.305). Hugos beslut
     # 2026-10-28, granskning 13, P3 b: Claude Code för
     # Terminal ligger i ~/.local/bin, utanför PATH, så versionen där kontrolleras och uppdateras med hela
     # sökvägen, aldrig med bara claude.
@@ -1891,7 +1897,7 @@ def test_installationen_kontrollerar_versionen_forst():
     forsta_rader = forsta
     forsta = _en_rad(forsta)
     assert "version" in rubrik.lower()
-    assert "/status" in forsta and "2.1.305" in forsta
+    assert "/status" in forsta and "2.1.314" in forsta and "2.1.305" not in forsta
     assert "Check for Updates" in forsta, "hur Hugo uppdaterar appen ska stå med"
     for kommando in TERMINAL_VERSION:
         assert f"```bash\n{kommando}\n```" in forsta_rader, kommando

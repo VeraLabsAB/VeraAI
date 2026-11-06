@@ -13824,3 +13824,22 @@ Ja. Kör ett kommando i taget. Ett omskrivet läsande kommando som följer vakte
 ### Inte visat
 
 Allt som kräver prov 9, 10, 17, 18, 19 eller 20, enligt uppdraget. Att besluten är ordagranna mot chatten. Hugos körningar: installationen, spärrprovet i kopian och grupp D. Filerna i `/Library`, som jag inte har läst, så att installerade summor stämmer är inte prövat här, men `ls !x`, `ls ''=y` och `ls }` stoppas på ett sätt som bara den nya vakten gör. En riktig `Agent` med `isolation`, underagenter, Write genom en länk, en hård länk och själva skrivningarna utanför projektet. Allt som står som dokumentation: sidorna lästes genom WebFetch, och `tools-reference` sparades utanför projektet och är inte läst. Hela diffen av `PROGRESS.md` och `BYGGPLAN.md` i fe8a2df sparades också där och är inte läst. Jag läste i stället filerna som de ser ut nu, raderna för stegen och posten för steg 19. Vad som finns i den riktiga hemmappen.
+
+## Hugos beslut 2026-11-06 om granskning 43
+
+1. P1, P2 och P3 tas med i steg 149. Vakten stoppar Agent med isolation. Tillåtelselistan prövar dit länkarna leder, inte bara texten. Exitkriteriet prövar också Edit, relativa sökvägar, saknad scratchpad och underagenter. Utredningen gäller Read, Grep, Glob och WebFetch, och Hugo beslutar. Claude Codes inställning blockWritesOutsideWorkingDirectories utreds som ett andra lager bredvid vaktens lista.
+2. Tills steg 149 är installerat gäller tre försiktighetsregler: ingen session körs utan att Hugo tittar, ingen underagent startas med isolation, och inget innehåll utifrån tas in i en session som kan skriva. WebFetch får bara användas mot Claude Codes egen dokumentation. Svaren från steg 105 och 106 tas inte in i en Code-session före steg 149.
+3. P7 godtas, samma val som P1 i granskning 42.
+4. P4, P5 och P6 rättas i steg 149. P8–P11 står kvar under Öppet 78.
+
+## Hugos beslut 2026-11-06 om steg 149 (mellanvägen)
+
+1. Steg 149 byggs som mellanvägen. Claude Codes inställningar blockWritesOutsideWorkingDirectories och blockReadsOutsideWorkingDirectories slås på under permissions i de låsta inställningarna, och requiredMinimumVersion höjs till 2.1.314. Det ersätter vaktens egen tillåtelselista i beslut 1 om granskning 43, så länge proven i beslut 5 och 7 håller.
+2. Vakten stoppar Agent när tool_input har fältet isolation, oavsett stora och små bokstäver i namnet och med vilket värde som helst, också tomt.
+3. Vakten släpper WebFetch bara till https://code.claude.com/ och https://docs.claude.com/, med värdnamnet exakt så, utan port, användare eller lösenord, och utan ? % @ eller \ i adressen. Allt annat stoppas.
+4. Vaktens egen tillåtelselista för Write, Edit och läsverktygen, prövning av länkar, och en lista med tillåtna fält och typer för Agent byggs inte nu. De skrivs under Öppet och byggs om provkörningen eller spärrproven visar en lucka.
+5. Provkörning före bytet, i Terminal, med de nya inställningarna via --settings: Write och Read utanför projektet och scratchpad ska vägras av Claude Code, Write och Read i scratchpad ska gå igenom, och hela sviten ska inte ha något rött. Vägras Read i scratchpad, eller blir något rött: Hugo stannar och frågar.
+6. Spärrproven använder /System/kassio-prov-149-*.txt och https://kassio-prov-149.invalid/ som mål. Länkar och Agent med isolation provas bara i test och mot den installerade vaktfilen som program, inte med riktiga verktyg.
+7. Exitkriteriet för steg 149: testerna är röda före och gröna efter, provkörningen före bytet är godkänd, och spärrproven efter installationen är godkända. Öppet 74 stängs först då.
+8. Testräkningen görs i del 2. Testet test_beslut_42_b10_… tas bort, eftersom P7 är godtaget.
+9. Skrivbordsappens Claude Code ska vara minst 2.1.314 före bytet. Det kontrolleras i INSTALLERA.md.

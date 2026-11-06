@@ -1,5 +1,5 @@
 {
-  "requiredMinimumVersion": "2.1.305",
+  "requiredMinimumVersion": "2.1.314",
   "allowManagedHooksOnly": true,
   "allowManagedPermissionRulesOnly": true,
   "disableSkillShellExecution": true,
@@ -28,6 +28,8 @@
   },
   "permissions": {
     "disableBypassPermissionsMode": "disable",
+    "blockWritesOutsideWorkingDirectories": true,
+    "blockReadsOutsideWorkingDirectories": true,
     "deny": [
       "Bash(sudo *)",
       "Bash(su *)",

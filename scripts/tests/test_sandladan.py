@@ -55,12 +55,15 @@ GRANSKNING = PROJEKTET / "GRANSKNING.md"
 SPEC = PROJEKTET / "SPEC.md"
 PROGRESS = PROJEKTET / "PROGRESS.md"
 GITIGNORE = PROJEKTET / ".gitignore"
-# Vaktens kontrollsumma (INSTALLERA.md, steg 5). Ny i steg 18 (Hugos beslut 2026-11-06 om Öppet 72 och steg 18, beslut 4). Testen
+# Vaktens kontrollsumma (INSTALLERA.md, steg 5). Ny i steg 149 (Hugos beslut 2026-11-06 om steg 149, beslut 2 och 3). Testen
 # som låser den är lika stränga: en ändring i vakten kräver fortfarande ett nytt beslut och en ny summa här.
-VAKTENS_SUMMA = "5aefe7afdff61f56c1160f5c2028db23159ac4e229ab63b1fcc0ad583f4b01a6"
+VAKTENS_SUMMA = "a903190eb4c44fab116fa4c1e1ed28f616c3202e9df7edd7b737384b6513ae4a"
 # Versionerna före steg 18, oförändrade från 2026-10-28 (vakten) och 2026-11-05 (inställningarna). Bytet i steg 15 gäller dem.
 VAKTENS_SUMMA_FORE_STEG_18 = "314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d"
 INSTALLNINGARNAS_SUMMA_FORE_STEG_18 = "1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da"
+# Versionerna från steg 18, som är installerade nu och som bytet i steg 149 utgår från.
+VAKTENS_SUMMA_STEG_18 = "5aefe7afdff61f56c1160f5c2028db23159ac4e229ab63b1fcc0ad583f4b01a6"
+INSTALLNINGARNAS_SUMMA_STEG_18 = "33bfdb153cfc6ab83dc0a66a9f538a7d2819d98a6cc62a982be9c256593b94f2"
 # Filen som var installerad före steg 15.
 FORE_STEG_15 = "149b603bf44438c1643a213dfcf52325ed3f7c8ff9aa402bee97c6328ef92ea2"
 GIT = "/usr/bin/git"
@@ -72,6 +75,7 @@ BYTE_RUBRIK = "## Byte till versionen med sandlåda (steg 15)"
 SPARRPROV_RUBRIK = "## Spärrprovet i kopian (steg 15)"
 UTANFOR_RUBRIK = "## Prov utanför sandlådan (steg 15)"
 BYTE_18_RUBRIK = "## Byte till nästa version av vakten (steg 18)"
+BYTE_149_RUBRIK = "## Byte till nästa version av vakten (steg 149)"
 
 
 def _installningar():
@@ -179,13 +183,16 @@ def test_2026_11_05_beslut_1_varken_avsmalningen_eller_granskarens_forbud_finns(
 def test_2026_11_05_beslut_1_filen_ar_den_installerade_plus_sandladan_och_ssh():
     # Tar man bort sandbox-blocket och Read(~/.ssh/**) och sätter tillbaka den gamla versionen (Hugos beslut 2026-11-05
     # efter P6, beslut 2) och flaggan -S (Hugos beslut 2026-11-06 om Öppet 72 och steg 18, beslut 4 a), ska det bli exakt
-    # filen som var installerad före steg 15, byte för byte. Så visas också att inget annat i filen ändrades i steg 18.
+    # filen som var installerad före steg 15, byte för byte. Så visas också att inget annat i filen ändrades i steg 18. De två
+    # raderna från steg 149 tas också bort (Hugos beslut 2026-11-06 om steg 149, beslut 1), och versionen är nu 2.1.314.
     rader = INSTALLNINGAR.read_text(encoding="utf-8").splitlines(keepends=True)
     start = rader.index('  "sandbox": {\n')
     slut = rader.index("  },\n", start)
     kvar = rader[:start] + rader[slut + 1:]
     kvar.remove('      "Read(~/.ssh/**)",\n')
-    kvar[kvar.index('  "requiredMinimumVersion": "2.1.305",\n')] = '  "requiredMinimumVersion": "2.1.295",\n'
+    kvar.remove('    "blockWritesOutsideWorkingDirectories": true,\n')
+    kvar.remove('    "blockReadsOutsideWorkingDirectories": true,\n')
+    kvar[kvar.index('  "requiredMinimumVersion": "2.1.314",\n')] = '  "requiredMinimumVersion": "2.1.295",\n'
     args = '            "args": ["-I", "-S", "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"],\n'
     kvar[kvar.index(args)] = args.replace('"-S", ', "")
     assert hashlib.sha256("".join(kvar).encode("utf-8")).hexdigest() == FORE_STEG_15
@@ -222,8 +229,13 @@ def test_inget_annat_i_filen_ar_andrat():
         "sandbox",
         "hooks",
     }
-    assert installningar["requiredMinimumVersion"] == "2.1.305"
-    assert set(installningar["permissions"]) == {"disableBypassPermissionsMode", "deny"}
+    assert installningar["requiredMinimumVersion"] == "2.1.314"
+    assert set(installningar["permissions"]) == {
+        "disableBypassPermissionsMode",
+        "blockWritesOutsideWorkingDirectories",
+        "blockReadsOutsideWorkingDirectories",
+        "deny",
+    }
     andra = [r for r in installningar["permissions"]["deny"] if not r.startswith("Edit(")]
     assert andra == ["Bash(sudo *)", "Bash(su *)", "Bash(su)", "Read(~/.ssh/**)"]
     assert set(installningar["sandbox"]) == {
@@ -405,6 +417,65 @@ BYTET_18 = [
     f"{SUMMA} {AKTIV} {INSTALLERAD_VAKT_CITERAD}",
 ]
 
+# Hugos beslut 2026-11-06 om steg 149 (mellanvägen), beslut 5, 6 och 9. Version, provkörning, summor, kopior, vakten före
+# inställningarna, summor, /status, spärrproven och backning. Målen för spärrproven är beslut 6.
+SPARAD_149 = f'{MAPP}/managed-settings.fore-steg-149.json"'
+SPARAD_VAKT_149 = f'{MAPP}/vera/kommandosparr.fore-steg-149.py"'
+PROVFILEN_149 = "~/VERA/agent/sparr/provkorning-steg-149.json"
+PROGRAMMET_149 = '/Library/Developer/CommandLineTools/usr/bin/python3 -I -S "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"'
+BYTET_149 = [
+    "~/.local/bin/claude --version",
+    "cd ~/VERA/agent",
+    f"{SUMMA} {PROVFILEN_149}",
+    f"~/.local/bin/claude --settings {PROVFILEN_149}",
+    "Använd verktyget Write och skriv texten prov till filen /System/kassio-prov-149-provkorning.txt. Gör inget annat.",
+    "Använd verktyget Read och läs filen /System/kassio-prov-149-provkorning.txt. Gör inget annat.",
+    "Använd verktyget Write och skriv texten prov till filen kassio-prov-149.txt i din scratchpad-mapp. Gör inget annat.",
+    "Använd verktyget Read och läs filen kassio-prov-149.txt i din scratchpad-mapp. Gör inget annat.",
+    f"{PYTHON} -q --tb=short -rfs scripts/tests",
+    f"{SUMMA} ~/VERA/agent/sparr/managed-settings.json ~/VERA/agent/sparr/kommandosparr.py",
+    f"{SUMMA} {AKTIV} {INSTALLERAD_VAKT_CITERAD}",
+    f"sudo cp -i {AKTIV} {SPARAD_149}",
+    f"sudo chown root:wheel {SPARAD_149}",
+    f"sudo chmod 644 {SPARAD_149}",
+    f"sudo cp -i {INSTALLERAD_VAKT_CITERAD} {SPARAD_VAKT_149}",
+    f"sudo chown root:wheel {SPARAD_VAKT_149}",
+    f"sudo chmod 644 {SPARAD_VAKT_149}",
+    f"sudo ditto ~/VERA/agent/sparr/kommandosparr.py {INSTALLERAD_VAKT_CITERAD}",
+    f"sudo chown root:wheel {INSTALLERAD_VAKT_CITERAD}",
+    f"sudo chmod 644 {INSTALLERAD_VAKT_CITERAD}",
+    f"sudo cp ~/VERA/agent/sparr/managed-settings.json {AKTIV}",
+    f"sudo chown root:wheel {AKTIV}",
+    f"sudo chmod 644 {AKTIV}",
+    f"{SUMMA} {AKTIV} {SPARAD_149} {INSTALLERAD_VAKT_CITERAD} {SPARAD_VAKT_149}",
+    f"ls -lde@ {AKTIV} {SPARAD_149} {INSTALLERAD_VAKT_CITERAD} {SPARAD_VAKT_149}",
+    "cd ~/VERA/agent",
+    "~/.local/bin/claude",
+    f"""echo '{{"tool_name":"Agent","tool_input":{{"isolation":"worktree"}}}}' | {PROGRAMMET_149}""",
+    "echo $?",
+    f"""echo '{{"tool_name":"Agent","tool_input":{{"Isolation":""}}}}' | {PROGRAMMET_149}""",
+    "echo $?",
+    f"""echo '{{"tool_name":"Agent","tool_input":{{"prompt":"x"}}}}' | {PROGRAMMET_149}""",
+    "echo $?",
+    "Använd verktyget Write och skriv texten prov till filen /System/kassio-prov-149-skriv.txt. Gör inget annat.",
+    "Använd verktyget Edit på filen /System/kassio-prov-149-andra.txt och byt ordet a mot ordet b. Gör inget annat.",
+    "Använd verktyget Write och skriv texten prov till den relativa sökvägen ../../../../System/kassio-prov-149-relativ.txt. Gör inget annat.",
+    "Använd verktyget Read och läs filen /System/kassio-prov-149-las.txt. Gör inget annat.",
+    "Använd verktyget Grep och sök efter ordet prov i filen /System/kassio-prov-149-sok.txt. Gör inget annat.",
+    "Använd verktyget Glob med mönstret kassio-prov-149-*.txt i mappen /System. Gör inget annat.",
+    "Starta en underagent utan isolation. Den ska använda verktyget Write och skriva texten prov till filen /System/kassio-prov-149-underagent.txt, och sedan rapportera vad som hände. Gör inget annat.",
+    "Använd verktyget WebFetch på https://kassio-prov-149.invalid/ och säg vad som händer. Gör inget annat.",
+    "Använd verktyget Write och skriv texten prov till filen .git/provfil-149.txt i din scratchpad-mapp. Gör inget annat.",
+    "Använd verktyget Write och skriv texten prov till filen kassio-prov-149.txt i din scratchpad-mapp. Gör inget annat.",
+    "Använd verktyget Read och läs filen kassio-prov-149.txt i din scratchpad-mapp. Gör inget annat.",
+    "Använd verktyget WebFetch på https://code.claude.com/docs/en/settings och säg sidans rubrik. Gör inget annat.",
+    "git status",
+    f"{PYTHON} -q --tb=short -rfs scripts/tests",
+    f"sudo cp {SPARAD_VAKT_149} {INSTALLERAD_VAKT_CITERAD}",
+    f"sudo cp {SPARAD_149} {AKTIV}",
+    f"{SUMMA} {AKTIV} {INSTALLERAD_VAKT_CITERAD}",
+]
+
 # Resten av filen: den vanliga installationen, kontrollen efter den och väntade utskrifter. Alla rader i alla rutor,
 # i ordning. En ny rad eller en ändrad rad gör testet rött, så att den måste läggas in här med avsikt.
 RESTEN = [
@@ -518,8 +589,9 @@ def _lopande_text(text):
         (SPARRPROV_RUBRIK, SPARRPROVET),
         (UTANFOR_RUBRIK, UTANFOR),
         (BYTE_18_RUBRIK, BYTET_18),
+        (BYTE_149_RUBRIK, BYTET_149),
     ],
-    ids=["provkorningen", "bytet", "sparrprovet", "utanfor", "bytet_18"],
+    ids=["provkorningen", "bytet", "sparrprovet", "utanfor", "bytet_18", "bytet_149"],
 )
 def test_avsnitten_for_steg_15_har_exakt_de_har_kommandona_i_den_har_ordningen(rubrik, forvantade):
     assert _kodrader(_avsnitt(rubrik)) == forvantade
@@ -531,10 +603,12 @@ def test_resten_av_filen_har_exakt_de_har_raderna_i_den_har_ordningen():
 
 def test_filen_har_de_avsnitten_i_ordning_och_inga_andra_rutor():
     text = INSTALLERA.read_text(encoding="utf-8")
-    platser = [text.index(r) for r in (PROVKORNING_RUBRIK, BYTE_RUBRIK, SPARRPROV_RUBRIK, UTANFOR_RUBRIK, BYTE_18_RUBRIK, "## Caspers dator")]
+    platser = [text.index(r) for r in (PROVKORNING_RUBRIK, BYTE_RUBRIK, SPARRPROV_RUBRIK, UTANFOR_RUBRIK, BYTE_18_RUBRIK, BYTE_149_RUBRIK, "## Caspers dator")]
     assert platser == sorted(platser)
     # Allt mellan rubrikerna räknas, så ett nytt avsnitt med kommandon kan inte smita förbi.
-    assert len(_kodrader(text)) == len(RESTEN) + len(PROVKORNINGEN) + len(BYTET) + len(SPARRPROVET) + len(UTANFOR) + len(BYTET_18)
+    assert len(_kodrader(text)) == (
+        len(RESTEN) + len(PROVKORNINGEN) + len(BYTET) + len(SPARRPROVET) + len(UTANFOR) + len(BYTET_18) + len(BYTET_149)
+    )
 
 
 @pytest.mark.parametrize(
@@ -569,9 +643,10 @@ def test_avsluta_sessioner_star_fore_kopieringen():
 
 
 def test_summan_i_bytet_ar_den_nya_filens_summa():
-    # Nya filens summa står i det senaste bytet (steg 18). Bytet i steg 15 står kvar som det gjordes, med sin versions summa.
+    # Nya filens summa står i det senaste bytet (steg 149). Bytena i steg 15 och 18 står kvar som de gjordes, med sin versions summa.
     summa = hashlib.sha256(INSTALLNINGAR.read_bytes()).hexdigest()
-    assert _avsnitt(BYTE_18_RUBRIK).count(summa) == 2
+    assert _avsnitt(BYTE_149_RUBRIK).count(summa) == 2
+    assert _avsnitt(BYTE_18_RUBRIK).count(INSTALLNINGARNAS_SUMMA_STEG_18) == 2
     assert _byte_avsnittet().count(INSTALLNINGARNAS_SUMMA_FORE_STEG_18) == 2
 
 
@@ -640,8 +715,9 @@ def test_efter_p6_beslut_1_provkorningen_och_bytet_sager_var_h1_proven_kors():
 
 def test_efter_p6_beslut_2_installera_sager_samma_version_som_filen():
     text = INSTALLERA.read_text(encoding="utf-8")
-    assert '`"requiredMinimumVersion": "2.1.305"`' in text
-    assert "En Claude Code som är äldre än 2.1.305 startar inte alls." in text
+    # Versionen höjd till 2.1.314 (Hugos beslut 2026-11-06 om steg 149, beslut 1). Bytet i steg 15 står kvar som det gjordes.
+    assert '`"requiredMinimumVersion": "2.1.314"`' in text
+    assert "En Claude Code som är äldre än 2.1.314 startar inte alls." in text
     # 2.1.295 står bara kvar som dokumentationens krav för onFailure, inte som det filen kräver.
     kvar = [rad for rad in text.splitlines() if "2.1.295" in rad]
     assert len(kvar) == 2
@@ -769,7 +845,13 @@ def test_granskning_35_p1_installera_har_vantade_antal(rubrik, text):
 
 
 def test_granskning_35_p1_installera_namner_inte_den_gamla_provkorningens_version():
-    assert "2.1.314" not in INSTALLERA.read_text(encoding="utf-8")
+    # Testet förbjöd 2.1.314 i hela filen, eftersom den versionen var den gamla provkörningens. Sedan Hugos beslut 2026-11-06 om
+    # steg 149, beslut 1, är 2.1.314 lägsta version, och måste stå i installationen och bytet i steg 149. Det testet skyddar mot
+    # gäller fortfarande: provkörningen i steg 15, och de andra bytena, nämner den inte, och ingen rad kallar den provkörningens.
+    for rubrik in (PROVKORNING_RUBRIK, BYTE_RUBRIK, SPARRPROV_RUBRIK, UTANFOR_RUBRIK, BYTE_18_RUBRIK):
+        assert "2.1.314" not in _avsnitt(rubrik), rubrik
+    for rad in installera_utan_sandlada().splitlines():
+        assert not ("2.1.314" in rad and "provkörning" in rad.lower()), rad
 
 
 # P2: INSTALLERA.md kontrollerar git-inställningen före installationen.
@@ -863,8 +945,10 @@ def _spec_7_1():
 def test_granskning_35_beslut_10_spec_7_1_sager_den_nya_versionen():
     avsnitt = _spec_7_1()
     assert "2.1.295" not in avsnitt
-    assert "(minst 2.1.305)" in avsnitt
-    assert "Filen kräver Claude Code 2.1.305 eller senare" in avsnitt
+    # Versionen höjd till 2.1.314 (Hugos beslut 2026-11-06 om steg 149, beslut 1).
+    assert "2.1.305" not in avsnitt
+    assert "(minst 2.1.314)" in avsnitt
+    assert "Filen kräver Claude Code 2.1.314 eller senare" in avsnitt
 
 
 def test_granskning_35_beslut_10_spec_7_1_har_de_tva_ratta_meningarna():
@@ -2137,10 +2221,10 @@ def test_granskning_38_spec_sager_att_git_add_och_git_commit_star_kvar_enligt_op
 
 
 # Kommandolistan är oförändrad mot 103eb55, commiten före rättelsen (räknat i en kopia av den). Inställningarna och vakten har
-# nya summor från steg 18 (Hugos beslut 2026-11-06 om Öppet 72 och steg 18, beslut 4).
+# nya summor från steg 149 (Hugos beslut 2026-11-06 om steg 149, beslut 1, 2 och 3).
 
 LISTANS_SUMMA = "7c3ab251713a93073f5d9d10804f35af8d48497daca8f77140ff3c6e321783e7"
-INSTALLNINGARNAS_SUMMA = "33bfdb153cfc6ab83dc0a66a9f538a7d2819d98a6cc62a982be9c256593b94f2"
+INSTALLNINGARNAS_SUMMA = "d99ff000628881f59f0bf66397c50b5d4bc939549149888d7ffc433f725ad929"
 
 
 def _kommandolistan():
@@ -3064,8 +3148,8 @@ def test_steg_18_svaret_om_omskrivna_kommandon_star_under_besluten():
 @pytest.mark.parametrize(
     "summa,antal",
     [
-        (hashlib.sha256(INSTALLNINGAR.read_bytes()).hexdigest(), 2),
-        (hashlib.sha256(VAKTEN.read_bytes()).hexdigest(), 2),
+        (INSTALLNINGARNAS_SUMMA_STEG_18, 2),
+        (VAKTENS_SUMMA_STEG_18, 2),
         (INSTALLNINGARNAS_SUMMA_FORE_STEG_18, 3),
         (VAKTENS_SUMMA_FORE_STEG_18, 3),
     ],
@@ -3264,14 +3348,6 @@ def test_beslut_42_b9_oppet_73_har_kvar_p5_p6_och_p8():
     assert "Kvar: P5, P6 och P8" in post
     assert "Två frågor väntar också på Hugo" not in post and "Bör rättas i den sessionen" not in post
     assert post.endswith("**Öppen.**")
-
-
-def test_beslut_42_b10_nasta_steg_ar_steg_19_sa_lange_det_inte_har_borjat():
-    # Villkoret gör att en senare statusändring inte ger rött, vilket var felet i P1. Steg 19 är inte påbörjat när testet skrivs,
-    # så kontrollen körs. Den ger rött om "Nästa steg" inte säger det beslut 10 säger.
-    if "| ⬜ |" in _byggplanens_rad(19):
-        assert "steg 19, spärrtestet i en ny session" in _raden_i_lage_nu("Nästa steg")
-        assert re.search(r"(?<!\d)19 – ", _raden_i_lage_nu("Pågående steg"))
 
 
 # ---------------------------------------------------------------------------------------------

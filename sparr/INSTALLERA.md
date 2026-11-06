@@ -17,7 +17,7 @@ Agenten kan därför inte ändra filerna.
 | Fil i projektet | Kopieras till | Vad den gör |
 |---|---|---|
 | `sparr/kommandosparr.py` | `/Library/Application Support/ClaudeCode/vera/kommandosparr.py` | **Vakten.** Ett litet program som Claude Code kör före varje verktyg. Det stoppar allt som inte står på listan i SPEC 7.1. Det stoppar också ett kommando vars program ligger i en mapp som du kan ändra utan lösenord, och kommandon som ändrar `PATH` (PATH-regeln, se nedan). |
-| `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.305 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Inte heller i filerna som zsh läser när det startar och de filer som de läser in: nvm-mappen `~/.nvm`, `~/.zkbd`, `~/.zsh_sessions`, `~/.zlogout` och systemets zsh-filer i `/etc` (granskning 13, P1 b), och `~/.zcompdump`,
+| `sparr/managed-settings.json` | `/Library/Application Support/ClaudeCode/managed-settings.json` | **De låsta inställningarna.** De säger åt Claude Code att köra vakten, att stoppa kommandot om vakten kraschar eller inte svarar, och att bara vakter och regler härifrån gäller. En Claude Code som är äldre än 2.1.314 startar inte alls. Agenten får inte skriva i `.git` (varken mappen eller filen, på varje djup), i skalets och gits startfiler, i `~/.claude`, i `~/Library/LaunchAgents`, i `~/.ssh`, i `.mcp.json`, i någon mapp `.claude` (också projektets), i `~/.claude.json`, i `~/bin`, `~/.local/bin` och `/opt/homebrew`, eller i någon mapp `.venv`. Inte heller i filerna som zsh läser när det startar och de filer som de läser in: nvm-mappen `~/.nvm`, `~/.zkbd`, `~/.zsh_sessions`, `~/.zlogout` och systemets zsh-filer i `/etc` (granskning 13, P1 b), och `~/.zcompdump`,
 som zsh:s `compinit` läser in vid start (granskning 14, R1), eller i den kompilerade versionen (`.zwc`) av någon av zsh:s startfiler eller av `~/.zcompdump`, som zsh läser i stället för filen (granskning 15, S2). Inte heller i Claude Code för Terminal (`~/.local/bin/claude` och `~/.local/share/claude`), i skrivbordsappens egen Claude Code (`~/Library/Application Support/Claude/claude-code`) eller i appen (`/Applications/Claude.app`) (granskning 13, P4 a). Inte heller någonstans i hela `~/Library/Application Support/Claude`, där också skrivbordsappens egna inställningar ligger (Hugos svar 2026-10-28 efter granskning 13, punkt 3). Inte heller i en fil som heter `.ugrep`, i någon mapp, som är inställningsfilen för det program som `grep` kör i agentens skal (granskning 16, G7). Läget "auto" går att använda, och skills kan inte köra skalkommandon. |
 | `requirements.txt` (listan över paket) | `/Library/Application Support/ClaudeCode/vera/venv` (skapas, kopieras inte) | **Projektets Python med pytest**, som testsviten körs med. Den låg förut i mappen `.venv` i projektet, som du äger, och då stoppade PATH-regeln testsviten. Nu ligger den där bara systemet kan ändra den (Hugos beslut 2026-10-28 om vakten, beslut 1). |
 
@@ -69,15 +69,15 @@ tabellen över fälten för en vakt av typen `command` ("Requires Claude Code v2
 avsnittet "Block the action when a hook fails". Kontrollerat 2026-10-28.
 
 Du har två Claude Code: den i **Claude-appen** och **Claude Code för Terminal**. Båda ska ha version
-2.1.305 eller senare. Först appen, med `/status` (Hugos beslut 2026-10-28, beslut 3):
+2.1.314 eller senare. Först appen, med `/status` (Hugos beslut 2026-10-28, beslut 3):
 
 1. Öppna Claude-appen, gå till fliken **Code** och starta en ny session, till exempel i `~/VERA/agent`.
 2. Skriv `/status` i rutan där du skriver till Claude och tryck Retur. `/status` är ett kommando till
    Claude Code, inte till Terminal. Det visar bland annat versionen och var inställningarna kommer ifrån,
    och ändrar ingenting.
-3. Läs raden **Claude Code**. Den visar versionen, till exempel `2.1.310`. Jämför siffergrupperna mellan
-   punkterna en i taget, från vänster: `2.1.310` och `2.2.0` är senare än `2.1.305`, men `2.1.30` är
-   äldre (30 är mindre än 305).
+3. Läs raden **Claude Code**. Den visar versionen, till exempel `2.1.320`. Jämför siffergrupperna mellan
+   punkterna en i taget, från vänster: `2.1.320` och `2.2.0` är senare än `2.1.314`, men `2.1.31` är
+   äldre (31 är mindre än 314).
 4. Raden **Setting sources** (var inställningarna kommer från) visas inte i skrivbordsappen. Den läses i
    Terminal, se nedan.
 
@@ -109,11 +109,11 @@ Kontrollera versionen i Terminal. Öppna Terminal och kör:
 ~/.local/bin/claude --version
 ```
 
-- Visar versionen av Claude Code för Terminal, till exempel `2.1.312 (Claude Code)`, och ändrar ingenting.
-  Versionen ska vara 2.1.305 eller senare (jämför som i punkt 3 ovan).
+- Visar versionen av Claude Code för Terminal, till exempel `2.1.318 (Claude Code)`, och ändrar ingenting.
+  Versionen ska vara 2.1.314 eller senare (jämför som i punkt 3 ovan).
 - Säger Terminal `no such file or directory`: Claude Code för Terminal ligger inte där. Stoppa och fråga.
 
-**Om versionen i Terminal är äldre än 2.1.305**, uppdatera:
+**Om versionen i Terminal är äldre än 2.1.314**, uppdatera:
 
 ```bash
 ~/.local/bin/claude update
@@ -121,7 +121,7 @@ Kontrollera versionen i Terminal. Öppna Terminal och kör:
 
 - Hämtar och installerar den senaste versionen av Claude Code för Terminal (det kräver internet). Det ska
   stå `Successfully updated from … to version …` eller `Claude Code is up to date (…)`. Kör sedan
-  versionskommandot ovan igen. Är versionen fortfarande äldre än 2.1.305: stoppa och fråga.
+  versionskommandot ovan igen. Är versionen fortfarande äldre än 2.1.314: stoppa och fråga.
 
 **Raden Setting sources, i Terminal** (Hugos svar 2026-10-28, punkt 3, och Hugos beslut 2026-10-28,
 granskning 13, P3 b, som ersätter `claude` med hela sökvägen). Kör ett kommando i taget:
@@ -151,21 +151,21 @@ Skriv sedan `/status` i Claude Code i Terminal och tryck Retur. Leta upp raden s
 - Står det något annat på raden som inte är nämnt här: stoppa och fråga.
 - Avsluta Claude Code i Terminal med `/exit`.
 
-**Om appens version är äldre än 2.1.305: stoppa och uppdatera först.**
+**Om appens version är äldre än 2.1.314: stoppa och uppdatera först.**
 
 1. Klicka på **Claude** i menyraden överst på skärmen (när Claude-appen är aktiv) och välj **Check for
    Updates…**. Installera uppdateringen om det finns en.
 2. Avsluta appen helt (**Claude > Quit Claude**, eller Cmd+Q) och öppna den igen.
 3. Starta en ny session och gör `/status` igen.
-4. Gå vidare först när versionen är minst 2.1.305. Säger appen att den redan är senaste versionen, men
-   versionen fortfarande är äldre än 2.1.305: stoppa och fråga.
+4. Gå vidare först när versionen är minst 2.1.314. Säger appen att den redan är senaste versionen, men
+   versionen fortfarande är äldre än 2.1.314: stoppa och fråga.
 
 Terminalen och skrivbordsappen har **var sin** Claude Code med var sitt versionsnummer, och att uppdatera
 den ena uppdaterar inte den andra. Kontrollera därför versionen i båda: i appen med `/status` och i Terminal med
 versionskommandot ovan, innan du installerar vakten.
 
-De låsta inställningarna innehåller också `"requiredMinimumVersion": "2.1.305"`, så att en äldre Claude
-Code inte startar alls efter installationen (Hugos beslut 2026-11-05 efter P6). Kontrollen här behövs ändå,
+De låsta inställningarna innehåller också `"requiredMinimumVersion": "2.1.314"`, så att en äldre Claude
+Code inte startar alls efter installationen (Hugos beslut 2026-11-06, steg 149). Kontrollen här behövs ändå,
 eftersom inställningarna inte gäller förrän de är installerade.
 
 En inställning har ingen lägsta version i dokumentationen: `disableSkillShellExecution` (skills kör inga
@@ -573,10 +573,10 @@ shasum -a 256 ~/VERA/agent/sparr/kommandosparr.py ~/VERA/agent/sparr/managed-set
 - Jämför de tre summorna, tecken för tecken, med dem som den oberoende granskningen har skrivit upp
   (Hugos beslut 2026-10-28). `requirements.txt` är listan över paket som installeras i steg 9 (granskning
   15, S6, Hugos beslut 2026-10-28). **Är någon summa olika: stoppa och fråga.** Kopiera ingenting.
-- Summorna ska vara exakt de här (2026-11-06, byggda i steg 18). Den
+- Summorna ska vara exakt de här (2026-11-06, byggda i steg 149). Den
   oberoende granskningen ska skriva upp samma summor. Skiljer granskningens summor från dessa: stoppa och fråga.
-  - `sparr/kommandosparr.py`: `5aefe7afdff61f56c1160f5c2028db23159ac4e229ab63b1fcc0ad583f4b01a6`
-  - `sparr/managed-settings.json`: `33bfdb153cfc6ab83dc0a66a9f538a7d2819d98a6cc62a982be9c256593b94f2`
+  - `sparr/kommandosparr.py`: `a903190eb4c44fab116fa4c1e1ed28f616c3202e9df7edd7b737384b6513ae4a`
+  - `sparr/managed-settings.json`: `d99ff000628881f59f0bf66397c50b5d4bc939549149888d7ffc433f725ad929`
   - `requirements.txt`: `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a`
 
 ## Steg 6: skapa mapparna och låt systemet äga dem
@@ -1352,9 +1352,297 @@ shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json" "/
 
 - Summorna ska vara `1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da` och `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d`. Avsluta sedan appen helt och öppna den igen. Skriv upp vad som hände, och fråga.
 
+## Byte till nästa version av vakten (steg 149)
+
+Hugos beslut 2026-11-06 om steg 149, mellanvägen (`GRANSKNING.md`). **Gör det här först efter granskning 44**, med filerna som granskades. Bytet i steg 18 är gjort, och summorna i det avsnittet gäller den versionen.
+
+Det här ändras:
+
+- **Claude Code vägrar fil-verktygen utanför arbetsmapparna.** Arbetsmapparna är projektmappen och scratchpad (sessionens tillfälliga mapp). Två inställningar slås på under `permissions`: `blockWritesOutsideWorkingDirectories` för skrivning och `blockReadsOutsideWorkingDirectories` för läsning. Det är hålet från prov 17 (Öppet 74). Vakten har ingen egen lista över tillåtna mappar (beslut 4), så det är Claude Code som vägrar, inte vakten.
+- **Versionen höjs till 2.1.314.** En äldre Claude Code startar inte alls efter bytet.
+- **Vakten stoppar `Agent` med fältet `isolation`**, med vilket värde som helst, också tomt. En underagent med `isolation` arbetar på en egen kopia eller i en fjärrmiljö.
+- **Vakten släpper `WebFetch` bara till `https://code.claude.com/` och `https://docs.claude.com/`.**
+
+**Agenten kör inga av kommandona i punkt 3–6.** Du kör dem själv i Terminal, ett i taget, och skriver ditt administratörslösenord när datorn frågar. **Visar ett kommando något annat än det som står: stoppa och fråga**, och kör inte nästa kommando. Kommandona med `sudo` visar ingenting när de går bra.
+
+**Innan du börjar:** granskning 44 ska vara klar, och filerna ska vara de som granskades. **Avsluta alla öppna sessioner** i skrivbordsappen och i Terminal, eftersom nya låsta inställningar når också sessioner som redan är öppna.
+
+**1. Version (beslut 9).** Öppna en ny session i skrivbordsappen och skriv `/status`. Raden **Claude Code** ska visa minst 2.1.314 (jämför som i installationens steg 1). Är den äldre: uppdatera som där. Kör sedan i Terminal:
+
+```bash
+~/.local/bin/claude --version
+```
+
+- Också den ska vara minst 2.1.314. Är någon av dem äldre efter uppdateringen: stoppa och fråga. Arkivera sessionen i appen innan du går vidare.
+
+**2. Provkörning före bytet (beslut 5).** Inget installeras, och inget kräver lösenord. De två inställningarna gäller bara den här sessionen, och du behöver inte skriva dem själv: de står i filen `sparr/provkorning-steg-149.json`. Kör i Terminal, ett kommando i taget:
+
+```bash
+cd ~/VERA/agent
+```
+
+```bash
+shasum -a 256 ~/VERA/agent/sparr/provkorning-steg-149.json
+```
+
+- Summan ska vara `b130a004f0955b594357a6651cc7518d81c82fe579eb2f70b891a5a01d8623d5`.
+
+```bash
+~/.local/bin/claude --settings ~/VERA/agent/sparr/provkorning-steg-149.json
+```
+
+Be Claude göra de här två, en i taget. Läs svaret i verktygsrutan, inte bara Claudes sammanfattning.
+
+```
+Använd verktyget Write och skriv texten prov till filen /System/kassio-prov-149-provkorning.txt. Gör inget annat.
+```
+
+```
+Använd verktyget Read och läs filen /System/kassio-prov-149-provkorning.txt. Gör inget annat.
+```
+
+- **Båda ska vägras av Claude Code**, med ett fel som säger att sökvägen ligger utanför arbetsmapparna. Exakt vilka ord är inte bekräftat, eftersom det inte är kört. Frågar Claude Code om lov: svara nej, stoppa och fråga. Står det i stället `Operation not permitted`, `Permission denied` eller att filen inte finns: då är det datorn eller filen som svarar, inte inställningen. Stoppa och fråga.
+
+Be sedan Claude göra de här två. Frågar Claude Code om lov: svara ja.
+
+```
+Använd verktyget Write och skriv texten prov till filen kassio-prov-149.txt i din scratchpad-mapp. Gör inget annat.
+```
+
+```
+Använd verktyget Read och läs filen kassio-prov-149.txt i din scratchpad-mapp. Gör inget annat.
+```
+
+- **Båda ska gå igenom**, och den andra ska visa texten `prov`.
+
+Be sedan Claude: "Kör exakt det här kommandot med Bash-verktyget, och ändra ingenting i det:" och klistra in:
+
+```
+'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests
+```
+
+**Väntat: inget `failed`, och **77** överhoppade** (räknat, inte kört: 38 i grupp D, 31 spärrprov i kopian, 2 prov av `~/.ssh`, och 6 H1-prov, som hoppas över i Terminal). Finns `~/.ssh` och provfilen: 75.
+
+**Vägras Read i scratchpad, eller blir något rött: stanna och fråga.** Gör inget byte. Stoppa och fråga också om antalet är ett annat. Skicka hela slutet av utskriften till sessionen som hjälper dig. Avsluta med `/exit`.
+
+**3. Kontrollsummor, före bytet:**
+
+```bash
+shasum -a 256 ~/VERA/agent/sparr/managed-settings.json ~/VERA/agent/sparr/kommandosparr.py
+```
+
+```bash
+shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+- Det första, filerna i projektet: `d99ff000628881f59f0bf66397c50b5d4bc939549149888d7ffc433f725ad929` för inställningarna och `a903190eb4c44fab116fa4c1e1ed28f616c3202e9df7edd7b737384b6513ae4a` för vakten. Den oberoende granskningen ska ha skrivit upp samma summor.
+- Det andra, filerna som är installerade nu: `33bfdb153cfc6ab83dc0a66a9f538a7d2819d98a6cc62a982be9c256593b94f2` för inställningarna och `5aefe7afdff61f56c1160f5c2028db23159ac4e229ab63b1fcc0ad583f4b01a6` för vakten.
+
+**4. Spara förra versionerna**, bredvid dem, så att du kan backa utan agenten:
+
+```bash
+sudo cp -i "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/managed-settings.fore-steg-149.json"
+```
+
+```bash
+sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.fore-steg-149.json"
+```
+
+```bash
+sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.fore-steg-149.json"
+```
+
+```bash
+sudo cp -i "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/vera/kommandosparr.fore-steg-149.py"
+```
+
+```bash
+sudo chown root:wheel "/Library/Application Support/ClaudeCode/vera/kommandosparr.fore-steg-149.py"
+```
+
+```bash
+sudo chmod 644 "/Library/Application Support/ClaudeCode/vera/kommandosparr.fore-steg-149.py"
+```
+
+- `-i` gör att datorn frågar innan den skriver över. Frågar den: svara `n`, stoppa och fråga.
+
+**5. Kopiera vakten först, sedan inställningarna.** Inställningarna börjar gälla direkt.
+
+```bash
+sudo ditto ~/VERA/agent/sparr/kommandosparr.py "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+```bash
+sudo chown root:wheel "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+```bash
+sudo chmod 644 "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+```bash
+sudo cp ~/VERA/agent/sparr/managed-settings.json "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+```bash
+sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+```bash
+sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+**6. Kontrollsummor, efter bytet:**
+
+```bash
+shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/managed-settings.fore-steg-149.json" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/vera/kommandosparr.fore-steg-149.py"
+```
+
+- Raderna i ordning ska vara `d99ff000628881f59f0bf66397c50b5d4bc939549149888d7ffc433f725ad929`, `33bfdb153cfc6ab83dc0a66a9f538a7d2819d98a6cc62a982be9c256593b94f2`, `a903190eb4c44fab116fa4c1e1ed28f616c3202e9df7edd7b737384b6513ae4a` och `5aefe7afdff61f56c1160f5c2028db23159ac4e229ab63b1fcc0ad583f4b01a6`.
+
+```bash
+ls -lde@ "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/managed-settings.fore-steg-149.json" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py" "/Library/Application Support/ClaudeCode/vera/kommandosparr.fore-steg-149.py"
+```
+
+- Alla fyra ska vara `-rw-r--r--`, med ägaren `root` och gruppen `wheel`. Extra uppgifter följer regeln i steg 2.
+
+**7. Spärrproven efter installationen (beslut 6).** Avsluta skrivbordsappen helt (Cmd+Q) och öppna den igen. Målen i `/System` kan datorn inte skapa utan administratörslösenord, så ett hål i spärren skapar ingen fil, och `.invalid` är ett namn som inte finns på nätet.
+
+**a. `/status`, i Terminal:**
+
+```bash
+cd ~/VERA/agent
+```
+
+```bash
+~/.local/bin/claude
+```
+
+Skriv `/status`. Raden **Setting sources** ska visa `Enterprise managed settings (file)`. Avsluta med `/exit`.
+
+**b. Agent med `isolation`, mot den installerade vaktfilen som program, i Terminal.** Det provas inte med riktiga verktyg. Ett kommando i taget:
+
+```bash
+echo '{"tool_name":"Agent","tool_input":{"isolation":"worktree"}}' | /Library/Developer/CommandLineTools/usr/bin/python3 -I -S "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+```bash
+echo $?
+```
+
+```bash
+echo '{"tool_name":"Agent","tool_input":{"Isolation":""}}' | /Library/Developer/CommandLineTools/usr/bin/python3 -I -S "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+```bash
+echo $?
+```
+
+- De två första paren: en rad som börjar `Stoppat av vakten: Agent med fältet isolation`, och sedan `2`.
+
+```bash
+echo '{"tool_name":"Agent","tool_input":{"prompt":"x"}}' | /Library/Developer/CommandLineTools/usr/bin/python3 -I -S "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+```bash
+echo $?
+```
+
+- Det sista paret: ingen rad alls från vakten, och sedan `0`.
+
+**c. Fil-verktygen, i skrivbordsappen.** Starta en ny session i fliken **Code**, i `~/VERA/agent`. Be agenten göra de här sex, en i taget, och läs verktygsrutan.
+
+```
+Använd verktyget Write och skriv texten prov till filen /System/kassio-prov-149-skriv.txt. Gör inget annat.
+```
+
+```
+Använd verktyget Edit på filen /System/kassio-prov-149-andra.txt och byt ordet a mot ordet b. Gör inget annat.
+```
+
+```
+Använd verktyget Write och skriv texten prov till den relativa sökvägen ../../../../System/kassio-prov-149-relativ.txt. Gör inget annat.
+```
+
+```
+Använd verktyget Read och läs filen /System/kassio-prov-149-las.txt. Gör inget annat.
+```
+
+```
+Använd verktyget Grep och sök efter ordet prov i filen /System/kassio-prov-149-sok.txt. Gör inget annat.
+```
+
+```
+Använd verktyget Glob med mönstret kassio-prov-149-*.txt i mappen /System. Gör inget annat.
+```
+
+- **Alla ska vägras av Claude Code**, som i punkt 2. Frågar Claude Code om lov: svara nej, stoppa och fråga. Säger agenten att Grep eller Glob inte finns i den här sessionen: skriv upp det. Det underkänner inte provet, men verktyget är då inte prövat.
+
+**d. En underagent, utan `isolation`:**
+
+```
+Starta en underagent utan isolation. Den ska använda verktyget Write och skriva texten prov till filen /System/kassio-prov-149-underagent.txt, och sedan rapportera vad som hände. Gör inget annat.
+```
+
+- **Skrivningen ska vägras av Claude Code**, och du ska se det i underagentens ruta. Kommer ingen rapport, eller syns inte vägran: provet är inte visat (Öppet 77). Stoppa och fråga.
+
+**e. Vakten, i samma session.** De här två ska stoppas med ett fel som börjar "Stoppat av vakten":
+
+```
+Använd verktyget WebFetch på https://kassio-prov-149.invalid/ och säg vad som händer. Gör inget annat.
+```
+
+```
+Använd verktyget Write och skriv texten prov till filen .git/provfil-149.txt i din scratchpad-mapp. Gör inget annat.
+```
+
+**f. Det som ska gå igenom.** Frågar Claude Code om lov: svara ja.
+
+```
+Använd verktyget Write och skriv texten prov till filen kassio-prov-149.txt i din scratchpad-mapp. Gör inget annat.
+```
+
+```
+Använd verktyget Read och läs filen kassio-prov-149.txt i din scratchpad-mapp. Gör inget annat.
+```
+
+```
+Använd verktyget WebFetch på https://code.claude.com/docs/en/settings och säg sidans rubrik. Gör inget annat.
+```
+
+Be sedan agenten köra de här två.
+
+```
+git status
+```
+
+```
+'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests
+```
+
+**Väntat: inget `failed`.** **71** överhoppade, eller **69** om `~/.ssh` finns. Är något rött, eller är antalet ett annat: stoppa och fråga. Skriv upp varje prov i c–f. Går något annat än i f igenom: stoppa och fråga, och skriv vilket prov. Öppet 74 stängs först när provkörningen och de här proven är godkända (beslut 7).
+
+**8. Proven som ska göras om.** Vakten och de låsta inställningarna har ändrats, så gör "Prov utanför sandlådan" igen, med den commit som granskades (`CLAUDE.md`).
+
+**Backa till förra versionen.** Stoppar allt, eller vägrar Claude Code eller appen starta: kör det här i Terminal, som inte behöver agenten. Ett rött eller överhoppat prov betyder att du stannar och frågar, och du backar inte på egen hand (`CLAUDE.md`).
+
+```bash
+sudo cp "/Library/Application Support/ClaudeCode/vera/kommandosparr.fore-steg-149.py" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+```bash
+sudo cp "/Library/Application Support/ClaudeCode/managed-settings.fore-steg-149.json" "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+```bash
+shasum -a 256 "/Library/Application Support/ClaudeCode/managed-settings.json" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"
+```
+
+- Summorna ska vara `33bfdb153cfc6ab83dc0a66a9f538a7d2819d98a6cc62a982be9c256593b94f2` och `5aefe7afdff61f56c1160f5c2028db23159ac4e229ab63b1fcc0ad583f4b01a6`. Avsluta sedan appen helt och öppna den igen. Skriv upp vad som hände, och fråga.
+
 ## Caspers dator
 
-Samma steg, i samma ordning, och samma versionskontroll i steg 1 (minst 2.1.305, med `/status` i
+Samma steg, i samma ordning, och samma versionskontroll i steg 1 (minst 2.1.314, med `/status` i
 skrivbordsappen och med versionskommandot i Terminal om Claude Code för Terminal finns där,
 med hela sökvägen och samma varning för installerarens förslag). Samma kontrollskript i steg 4 g och i
 kontrollen efter installationen, steg 1, och samma kontroll av agentens skal i steg 4 h. Samma förprov i
@@ -1398,7 +1686,7 @@ uppgift 4, men ska vara gjort före läget "auto", före körningar utan att Hug
 körningen på riktiga underlag och före första kund (Hugos beslut 2026-10-28, 8). Steg 8 är gjort på Hugos
 dator (175db51), ännu inte på Caspers.
 
-1. **De låsta inställningarna gäller.** Raden **Setting sources** visas inte i skrivbordsappen, så den läses i Terminal (Hugos svar 2026-10-28, punkt 3): kör de två rutorna under "Raden Setting sources" i installationens steg 1 (hela sökvägen, Hugos beslut 2026-10-28, granskning 13, P3 b), och skriv `/status`. Säger Terminal `no such file or directory`: stoppa och fråga. Raden ska visa `Enterprise managed settings (file)`, alltså inställningarna från filen du installerade (code.claude.com/docs/en/managed-settings). `User settings`, `Project settings` och `Project local settings` är väntade och underkänner inte. Bara en annan låst källa underkänner installationen, till exempel inställningar som styrs från claude.ai: stoppa och fråga (Hugos svar 2026-10-28, punkt 3). Avsluta med `/exit`. Läs också i skrivbordsappens `/status` raden **Claude Code**: versionen ska vara 2.1.305 eller senare. Läget "auto" ska gå att välja (Hugos beslut 2026-10-29): i terminalens Claude Code, tryck Shift+Tab några gånger, och "auto" ska komma upp.
+1. **De låsta inställningarna gäller.** Raden **Setting sources** visas inte i skrivbordsappen, så den läses i Terminal (Hugos svar 2026-10-28, punkt 3): kör de två rutorna under "Raden Setting sources" i installationens steg 1 (hela sökvägen, Hugos beslut 2026-10-28, granskning 13, P3 b), och skriv `/status`. Säger Terminal `no such file or directory`: stoppa och fråga. Raden ska visa `Enterprise managed settings (file)`, alltså inställningarna från filen du installerade (code.claude.com/docs/en/managed-settings). `User settings`, `Project settings` och `Project local settings` är väntade och underkänner inte. Bara en annan låst källa underkänner installationen, till exempel inställningar som styrs från claude.ai: stoppa och fråga (Hugos svar 2026-10-28, punkt 3). Avsluta med `/exit`. Läs också i skrivbordsappens `/status` raden **Claude Code**: versionen ska vara 2.1.314 eller senare. Läget "auto" ska gå att välja (Hugos beslut 2026-10-29): i terminalens Claude Code, tryck Shift+Tab några gånger, och "auto" ska komma upp.
 
    **Skalet, igen efter installationen** (Hugos beslut 2026-10-28, granskning 13, P1 a, och efter
    granskning 15). Öppna ett nytt Terminal-fönster (Cmd+N) och kör, ett i taget, samma två kommandon som i

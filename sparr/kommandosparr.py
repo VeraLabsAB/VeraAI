@@ -21,6 +21,11 @@ Reglerna, i den ordning de prövas (planen i GRANSKNING.md, "Granskning 11 – p
    hemmappen, efter ../ och dit länkarna leder, och med macOS andra namn för samma mapp (till exempel
    /private/etc för /etc). En sökväg vars första del direkt under roten börjar med punkt (till exempel /.vol och
    /.nofollow) stoppas alltid, också i kommandon (granskning 18, I1, Hugos beslut 2026-10-28).
+2 c. Agent stoppas när tool_input har fältet isolation, oavsett stora och små bokstäver i namnet och med vilket värde som
+   helst, också tomt (Hugos beslut 2026-11-06 om steg 149, beslut 2).
+2 d. WebFetch släpps bara till https://code.claude.com/ och https://docs.claude.com/, med värdnamnet exakt så, utan port,
+   användare eller lösenord, och utan ? % @ eller omvänt snedstreck i adressen. Allt annat stoppas (Hugos beslut 2026-11-06
+   om steg 149, beslut 3).
 3. Ingen mapp undantas (Hugos beslut 8). Kommandot ska köras i mappen där sessionen startade
    (CLAUDE_PROJECT_DIR), och den mappen får inte vara hemmappen eller en mapp ovanför den. Där vakten stoppar
    jämförs sökvägar utan hänsyn till stora och små bokstäver, och där den släpper igenom jämförs de exakt
@@ -85,6 +90,12 @@ TILLATNA_VERKTYG = (
     "mcp__ccd_turn__update_plan",
     "mcp__ccd_turn__wrap_up",
 )
+
+# Regel 2 c och 2 d (Hugos beslut 2026-11-06 om steg 149, beslut 2 och 3). Adressen jämförs med hela början, till och med första
+# snedstrecket efter värdnamnet, så värdnamnet är exakt så och kan inte ha port, användare eller lösenord.
+ISOLATION = "isolation"
+WEBFETCH_ADRESSER = ("https://code.claude.com/", "https://docs.claude.com/")
+WEBFETCH_FORBJUDNA_TECKEN = "?%@\\"
 
 # Regel 4: tecken som kopplar ihop kommandon eller styr om utskriften, var de än står.
 IHOPKOPPLING = {
@@ -332,6 +343,12 @@ def _bedom(indata, projektmapp, hemmapp, sokvag):
     # Regel 2 b.
     if verktyg in SKRIVVERKTYG:
         _skrivverktyg(verktyg, verktygsdata, indata.get("cwd"), projektmapp, hemmapp)
+
+    # Regel 2 c och 2 d.
+    if verktyg == "Agent":
+        _agent(verktygsdata)
+    if verktyg == "WebFetch":
+        _webfetch(verktygsdata)
     if verktyg != "Bash":
         return
 
@@ -410,6 +427,27 @@ def _sudo_och_su(kommando):
     forsta = delar[0].strip("'\"\\").rsplit("/", 1)[-1].lower()
     if forsta in SUDO_OCH_SU:
         raise _Stopp("sudo och su stoppas alltid, i alla mappar (Hugos beslut 2026-10-28).")
+
+
+def _agent(verktygsdata):
+    if isinstance(verktygsdata, dict) and any(_jamforbar(falt) == ISOLATION for falt in verktygsdata):
+        raise _Stopp(
+            "Agent med fältet isolation stoppas, med vilket värde som helst. En underagent med isolation arbetar på en egen kopia "
+            "eller i en fjärrmiljö, där vakten inte ser allt (Hugos beslut 2026-11-06 om steg 149, beslut 2)."
+        )
+
+
+def _webfetch(verktygsdata):
+    adress = verktygsdata.get("url") if isinstance(verktygsdata, dict) else None
+    if (
+        not isinstance(adress, str)
+        or not adress.startswith(WEBFETCH_ADRESSER)
+        or any(tecken in adress for tecken in WEBFETCH_FORBJUDNA_TECKEN)
+    ):
+        raise _Stopp(
+            f"WebFetch får bara hämta från {' och '.join(WEBFETCH_ADRESSER)}, med värdnamnet exakt så, utan port, användare eller "
+            "lösenord, och utan ? % @ eller omvänt snedstreck i adressen (Hugos beslut 2026-11-06 om steg 149, beslut 3)."
+        )
 
 
 def _sessionen(projektmapp, hemmapp, cwd, tillfallig):

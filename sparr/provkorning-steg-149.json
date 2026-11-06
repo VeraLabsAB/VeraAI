@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "blockWritesOutsideWorkingDirectories": true,
+    "blockReadsOutsideWorkingDirectories": true
+  }
+}
