@@ -13843,3 +13843,214 @@ Allt som kräver prov 9, 10, 17, 18, 19 eller 20, enligt uppdraget. Att besluten
 7. Exitkriteriet för steg 149: testerna är röda före och gröna efter, provkörningen före bytet är godkänd, och spärrproven efter installationen är godkända. Öppet 74 stängs först då.
 8. Testräkningen görs i del 2. Testet test_beslut_42_b10_… tas bort, eftersom P7 är godtaget.
 9. Skrivbordsappens Claude Code ska vara minst 2.1.314 före bytet. Det kontrolleras i INSTALLERA.md.
+
+## Hugos beslut 2026-11-06 om bygget av steg 149 (2b295f6)
+
+1. Det smalare testet test_granskning_35_p1_installera_namner_inte_den_gamla_provkorningens_version godtas. Beslut 1 om steg 149 krävde att 2.1.314 står i INSTALLERA.md, och testet skyddar fortfarande att den gamla provkörningen och de andra bytena inte nämner den versionen.
+2. Länkar ut ur projektet prövas inte nu. De står kvar under Öppet 79, eftersom agenten inte har något kommando för att skapa en länk.
+
+## Granskning 44 (av 2b295f6) (2026-11-06)
+
+Oberoende granskning, mot 5ea7a31, av steg 149, mellanvägen. Inget är installerat, inget sudo är kört, och inget i `/Library`, i `.git` eller utanför projektmappen och scratchpad är ändrat av den här sessionen. Ingen kod, inget test, ingen inställningsfil och inget i `INSTALLERA.md`, `CLAUDE.md` eller `SPEC.md` är ändrat, och inget fynd är rättat. Agenten committar inte.
+
+**Dom: gult. Provkörningen och installationen får göras, och inget blockerar.** Vakten, inställningarna, testerna och `INSTALLERA.md` gör det besluten säger. Summorna stämmer och sviten är grön. Tre fynd är på nivån medel. P1 gäller en väg ut som steg 149 inte rör och som fanns redan före steget. Den bör avgöras före riktiga underlag. P2 och P3 gäller vad provkörningen och spärrproven kan visa, och de är enkla att hantera före körningen. Resten är låga fynd. Att Claude Code verkligen vägrar är inte visat, eftersom det kräver provkörningen och spärrproven. Öppet 74 står kvar som allvarlig tills beslut 7 är uppfyllt.
+
+**Summorna, räknade här på filerna i 2b295f6.** Hugo jämför med dem i bytets punkt 3.
+
+| Fil | SHA-256 |
+|---|---|
+| `sparr/managed-settings.json` | `d99ff000628881f59f0bf66397c50b5d4bc939549149888d7ffc433f725ad929` |
+| `sparr/kommandosparr.py` | `a903190eb4c44fab116fa4c1e1ed28f616c3202e9df7edd7b737384b6513ae4a` |
+| `sparr/provkorning-steg-149.json` | `b130a004f0955b594357a6651cc7518d81c82fe579eb2f70b891a5a01d8623d5` |
+
+| Punkt | Vad | Besked |
+|---|---|---|
+| 1 | Vakten, regel 2 c och 2 d | **Håller.** Gör det besluten säger. Inget prov når en annan värd. Låga fynd: P4, P10 |
+| 2 | Vägar ut | **Tre vägar finns kvar.** WebSearch stoppas. Se P1 och P6 |
+| 3 | Inställningarna | **Nycklar, plats och versioner stämmer med dokumentationen.** `allowManagedPermissionRulesOnly` ska inte påverka provfilen. Se P2 och P3 |
+| 4 | Lässpärren | **Inget som sviten behöver stoppas** (bedömning utifrån dokumentationen). Sparade stora svar är osäkra, P8 |
+| 5 | Testerna | **Inget svagare** utöver beslut 1 och det borttagna testet. Fyra mutationer och de gamla filerna ger rött |
+| 6 | `INSTALLERA.md` | **Håller**, med P2 och P7. Summor, ordning, version, backning och ordgräns stämmer |
+| 7 | SPEC 7.1, Öppet 74 och 79, steg 149 och statusraderna | **Stämmer.** SPEC 7.1 säger för mycket om andra datorer, P1 |
+| 8 | Sviten och byggplanstestet | **0 failed, 5849 passed, 71 skipped.** Byggplanstestet står i `PROGRESS.md` |
+
+**Så skiljer jag vad som är visat.**
+
+- **Körning, vakten i en kopia:** `sparr/kommandosparr.py` ur 2b295f6 som funktion och som program med `-I -S`, med påhittade mappar. Det visar vad vakten säger, inte vad Claude Code sedan gör.
+- **Mutation:** en ändring med flit i kopian, och testen körda där.
+- **Dokumentation:** Claude Codes sidor, hämtade med WebFetch. Inget av det är prövat här. De fullständiga posterna för de två nycklarna i `settings-reference` hittade jag inte i de delar jag fick. Citaten kommer från sidorna `settings` och `permissions` och från indextabellen i `settings-reference`.
+- **Bedömning:** står uttryckligen.
+
+Provfilen är `test_g44.py` i `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/be127252-f558-4526-b7d7-7eeb596bbc13/scratchpad/g44/`, och utfallen ligger i `res/` bredvid den. Kommandona står i `PROGRESS.md`.
+
+### Punkt 1: vakten
+
+**Regel 2 c, Agent (körning, `res/agent.txt` och `res/programmet.txt`).**
+
+| Fält i `tool_input` | Svar | Kommentar |
+|---|---|---|
+| `isolation`, `ISOLATION`, `Isolation` med text, tal, `null` eller tomt | Stoppas | Som beslut 2 |
+| `isolation` i JSON, och fältet två gånger | Stoppas | JSON läses först |
+| `iſolation` (långt s) | Stoppas | Mer än beslutet, ofarligt |
+| `" isolation"`, `"isolation "`, med tabb, nollbreddstecken, hårt mellanslag eller NUL | Släpps | Inte fältet `isolation` |
+| `İsolation`, `ısolation`, kyrilliskt `і`, helbredds-`ｉ` | Släpps | Se P10 |
+| `isolation` inuti ett annat fält, och i `prompt` eller `subagent_type` | Släpps | Som beslutet, som gäller fältet |
+| `tool_input` som saknas eller inte är ett objekt | Släpps | Se P10 |
+| `subagent_type` med en definition som har `isolation` | Släpps | Vakten ser inte definitionen, se P4 |
+
+**Regel 2 d, WebFetch (körning, `res/webfetch.txt`).** Början av adressen jämförs tecken för tecken, till och med snedstrecket efter värdnamnet. Därför kan inget efter det ändra värden. 26 adresser som börjar likt eller leder annanstans stoppas, bland andra `code.claude.com.evil.invalid`, `code.claude.com@evil.invalid`, `evil.invalid/https://code.claude.com/`, `code.claude.com.`, port, stora bokstäver, `http`, tabb eller radbrytning före snedstrecket, kyrilliskt `о`, helbredds-`／`, `。` och fel antal snedstreck. Fel typ i fälten stoppas: inget fält, `null`, tal, lista och `URL` i stället för `url`. Fält två gånger: den sista gäller (körning), som i Claude Codes eget språk (bedömning). Det som släpps är bara sökvägar på de två värdarna, också `#fragment`, mellanslag, nollbreddstecken, radbrytning, `;`, `&` och 5000 tecken. Inget av det är förbjudet i beslut 3. Se P6.
+
+**Inget annat är ändrat i vakten** (läst, hela diffen): två konstanter, två funktioner, två rader som anropar dem och texten i rubriken.
+
+### Punkt 2: vägar ut
+
+**Stoppas av vakten (körning, `res/vagar_ut.txt`):** `WebSearch`, `Monitor`, `SendMessage`, `SendUserFile`, `Artifact`, `ArtifactData`, `PowerShell`, `RemoteTrigger`, `CronCreate`, `ScheduleWakeup`, `Workflow`, `EnterWorktree`, `Task`, `LSP` och alla `mcp__` som inte står på listan.
+
+| Väg | Läge | Vad som skulle stänga den |
+|---|---|---|
+| Bash, med egen Python eller andra program, ut genom sandlådans nätproxy | **Öppen i läget auto när klassificeraren godkänner värden, och i Manual om Hugo svarar ja.** Se P1 | `sandbox.network.allowManagedDomainsOnly: true` i de låsta inställningarna, och att vakten stoppar fältet `allowed_domains` |
+| WebFetch till de två värdarna | Text kan stå i sökvägen, utan längdgräns, och nå deras server. Inte någon annan värd. Se P6 | En fast början (`/docs/`), en teckenlista och en längdgräns, eller att vägen godtas |
+| `prompt` i WebFetch och allt modellen läser | Går till Anthropic, som hela sessionen. Det är inget vakten kan stänga | Frågan hör till Öppet 70, innan riktig data används |
+| `Agent` | Underagenten har samma vakt (dokumentation), och `isolation` stoppas | Se P4 om definitionerna |
+| `Skill`, `ToolSearch`, `AskUserQuestion`, `mcp__ccd_turn__*`, `Read`, `Write`, `Edit`, `Glob`, `Grep` | Inget av dem skickar själv text till någon annan än användaren och appen (bedömning). Vakten prövar inte vad de innehåller | Inget behövs nu |
+
+### Punkt 3: inställningarna
+
+**Dokumentationen, kort citerad.**
+
+- `permissions.blockWritesOutsideWorkingDirectories`: "the `Write`, `Edit`, and `NotebookEdit` tools refuse writes there". "Requires Claude Code v2.1.314 or later".
+- `permissions.blockReadsOutsideWorkingDirectories`: "the file tools refuse reads there, apart from files Claude Code itself needs", "Requires Claude Code v2.1.257 or later".
+- Båda gäller "in every permission mode", har scope "Any file" och står med full sökväg under `permissions`. Filen stämmer med det (körning, `res/installningarna.txt`).
+- `requiredMinimumVersion` har scope "Managed", och Claude Code läser den bara vid start.
+- `--settings`: "It can set any key your user settings file can set". Båda nycklarna gäller som "`true` from any scope".
+
+**`allowManagedPermissionRulesOnly` och provfilen.** Posten säger: "ignores `allow`, `ask`, and `deny` rules in user, project, local, and `--settings` files". De två nycklarna är inte regler av de sorterna. **Bedömning:** låset påverkar inte provfilen, och dokumentationens lista över undantag pekar åt samma håll. Det är inte prövat.
+
+**Vad Hugo ser om jag har fel.** Claude Code vägrar inte. Då frågar appen om lov (svara nej, stoppa), eller så kommer ett fel från datorn eller att filen inte finns. Punkt 2 i bytet säger att stanna vid de flesta av dem.
+
+**Kan det ge ett falskt godkänt?** Ja, på två sätt, P2 och P3. Sviten i provkörningen visar inget om nycklarna, eftersom de inte gäller skalkommandon: "The key doesn't limit shell commands, MCP tools, or the programs hooks run".
+
+### Punkt 4: lässpärren
+
+| Vad läser utanför projektet och scratchpad i dag | Slag | Stoppas efter bytet? |
+|---|---|---|
+| Vaktens Python och vaktfilen i `/Library` | Program som en hook kör | Nej (dokumentation) |
+| Projektets Python och venv i `/Library`, och allt sviten gör | Skalkommando | Nej (dokumentation) |
+| `grep`, som är Claude Codes `ugrep` | Skalkommando | Nej (dokumentation) |
+| `CLAUDE.md`, inställningar, skills och agentdefinitioner som Claude Code läser själv | Claude Codes eget | Nej ("files Claude Code itself needs", bedömning om vilka filer) |
+| Sparade stora svar i `~/.claude/projects/…/tool-results/` | Read efter ett stort svar | **Inte visat.** Se P8 |
+| Filer som en skill pekar på i `~/.claude` eller appens mappar | Read | Kan stoppas (bedömning) |
+| Utskrift från kommandon i bakgrunden och pytests tillfälliga mappar under `/private/tmp/claude-501/` | Read | Kan stoppas (bedömning). Mappen med `pytest-of-hugolindholmer` är visad i körningen |
+| En annan sessions scratchpad, till exempel en tidigare gransknings provfiler | Read | Bör stoppas (bedömning), och det är avsikten |
+
+**Att känna till (dokumentation):** spärren gäller bara fil-verktygen. En egen testfil kan läsa allt som sandlådan inte förbjuder. Se P1.
+
+### Punkt 5: testerna
+
+**Varje ändrat test mot 5ea7a31 (läst, hela diffen).**
+
+| Test | Besked |
+|---|---|
+| `test_granskning_35_p1_…` | Smalare, godtaget i beslut 1 ovan |
+| `test_beslut_42_b10_…` | Borttaget, beslut 8 |
+| Summorna i `test_sandladan.py` | Lika stränga, med nya värden. De frysta värdena för steg 18 stämmer med filerna i 5ea7a31 (körning) |
+| `test_steg_18_bytet_har_summorna_…` | Jämför nu med frysta värden. Lika strängt, eftersom avsnittet inte ska följa filen |
+| `test_2026_11_05_beslut_1_…` | Tar bort två rader till, och jämför fortfarande byte för byte |
+| `test_inget_annat_i_filen_ar_andrat` | Strängare: nycklarna under `permissions` räknas upp |
+| `test_summan_i_bytet_…`, `test_avsnitten_…`, `test_filen_har_de_avsnitten_…` | Lika stränga, med steg 149 tillagt |
+| De fyra testen av versionen | Strängare: två kräver också att 2.1.305 är borta |
+| `test_alla_verktyg_…`, `test_vanliga_filverktyg_…` | `WebFetch` får en tillåten adress. Allt annat är lika |
+
+**Inget annat är svagare.** `test_installera_ar_kortare_an_fore_granskning_15` är orörd.
+
+**Mutationer i kopian, med `-k test_steg_149_` (körning).** Utan ändring: 216 passed.
+
+| Ändring | Utfall | Test som larmade |
+|---|---|---|
+| Snedstrecket borta ur `https://code.claude.com/` | 7 failed | `…b3_allt_annat_stoppas` för `.invalid`, port och utan snedstreck, samma för programmet, och summan |
+| `%` borta ur tecknen | 5 failed | Samma test, för `%`, och summan |
+| `falt == ISOLATION` i stället för jämförelsen utan bokstavshänsyn | 16 failed tillsammans med nästa rad | `…b2_agent_med_isolation_stoppas` och programmet, för stora bokstäver |
+| `blockWrites…` satt till `false` och `blockReads…` felstavad | Samma körning | `…b1_nycklarna_ar_pa_under_permissions`, `…b1_inget_annat_…`, och summan |
+| Den gamla vakten och de gamla inställningarna ur 5ea7a31 | 114 failed, 102 passed | Besluten 1, 2 och 3. Resten av de 161 i byggsessionens "rött före" gäller texter, som inte var tillbakaändrade i det här provet |
+
+### Punkt 6: `INSTALLERA.md`
+
+- **Summorna** i punkt 2, 3, 6 och backningen är de jag räknade (körning). Summorna för det som är installerat nu är de från 5ea7a31 (körning, `res/summor.txt`).
+- **Ordningen:** sessionerna avslutas, versionen kontrolleras, provkörningen görs, summor, kopior, vakten före inställningarna, summor och ägare, och sedan spärrproven. Ett `sudo` kommer först efter provkörningen (läst, och låst i test).
+- **Skrivbordsappens version** kontrolleras i punkt 1, före provkörningen.
+- **Ofarliga prov (läst, bedömning om `/System`):** målen i `/System` kan inte skapas, `.invalid` finns inte, och den relativa sökvägen leder till `/System` från `~/VERA/agent`. Skrivningen i `.git/` ligger i scratchpad.
+- **Backningen** går utan agenten och säger tydligt att ett rött prov inte är skäl att backa. P8 i granskning 43 är inte upprepat. Dokumentationen säger att `blockReads…` kan ligga kvar i en öppen session, och texten säger att appen ska avslutas helt.
+- **Ordgränsen är orörd:** 984 rader och 9042 ord, mot gränserna 989 och 9043 (körning). Avsnittet för steg 149 har 288 rader och 1563 ord och räknas inte, som bytena före det. Utanför avsnittet är bara versionen och summorna ändrade (körning, `res/installera_diff.txt`).
+- **Kommandona mot den nya vakten (körning, `res/avsnittet.txt`):** `git status` och pytest-kommandot släpps. `WebFetch` på `code.claude.com` släpps, och `.invalid` stoppas. Write och Read i scratchpad släpps, och Write till `.git/` i scratchpad stoppas. Målen i `/System` släpps av vakten, och Claude Code ska vägra dem. Kommandon som Hugo kör i Terminal går inte genom vakten.
+- **77 överhoppade i provkörningen** är rimligt räknat: 38 + 31 + 2 + 6. De 10 spärrtesten från provkörningen i steg 15 hoppas inte över nu, eftersom sandlådan står i de låsta inställningarna. Inte kört.
+
+### Punkt 7: texterna
+
+**SPEC 7.1** stämmer med koden för reglerna från steg 149, versionen och sandlådan (läst). Kommandolistan är oförändrad, och summan är låst. Meningen om andra datorer säger för mycket, P1. **Öppet 74 och 79** stämmer med besluten. **Steg 149** i `BYGGPLAN.md` har besluten och exitkriteriet. **Statusraderna:** 2b295f6 ändrar `BYGGPLAN.md` och `PROGRESS.md` i samma commit, och commitens fillista stämmer med de 11 filerna i `git show --stat`. `git log` säger nu att `origin/main` står på 2b295f6, och raden är uppdaterad i den här sessionen. Ordet "inte granskat" i Öppet 57, 74 och 78 gäller läget när de skrevs, och jag har inte ändrat det.
+
+### Punkt 8: sviten
+
+`'/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rf scripts/tests`, i sandlådan, efter del A och före resten av texterna: **5849 passed, 71 skipped**, inget failed, 214 sekunder. Det är det väntade. Körningen efter texterna står i `PROGRESS.md` och i slutrapporten.
+
+### Fynd
+
+Alla fynd står under Öppet 80. Inget är rättat.
+
+#### P1, medel: en egen testfil kan läsa nästan allt, och Bash kan nå en annan dator
+
+**Vad det är.** Steg 149 gäller fil-verktygen, som beslutet säger. Skalkommandon har andra gränser, och de är lösare än SPEC 7.1 låter.
+
+1. **Läsning:** i den här sessionen är sandlådans läsning öppen utom listan med förbud, där `~/.ssh` står (uppgiften om sandlådan). `ls`, `cat` och `grep` hålls av vakten, men en egen testfil körs med pytest och vakten ser inte vad den gör. Den kan alltså läsa i hemmappen, också där riktiga underlag ligger enligt `PROGRESS.md` (bedömning, inte prövat, eftersom `CLAUDE.md` förbjuder det).
+2. **Nätet:** dokumentationen säger: "The first time a command needs a new network domain, Claude Code prompts for approval; in auto mode, Claude instead names the hosts a command needs on the command itself for the classifier to review with it". Bash-verktyget har fältet `allowed_domains` i den här sessionen. Vakten släpper det (körning: `git status` med `allowed_domains: ["evil.invalid"]` släpps). Dokumentationen säger också att listan nekas med `allowManagedDomainsOnly` eller `strictAllowlist`, och inget av dem står i `sparr/managed-settings.json` (körning). Inte heller `allowedDomains`, så Hugos egna inställningar kan lägga till värdar (dokumentation, jag har inte läst dem).
+3. **Följden (bedömning, inte prövat, enligt uppdraget):** en lurad modell i läget auto kan skriva en testfil som läser något och skickar det till en värd som klassificeraren godkänner. Det är en människas beslut i Manual, och en modells bedömning i auto. SPEC 7.1 säger att andra datorer "stoppas först av sandlådan".
+
+**Inte nytt i steg 149, och det blir inte sämre.** `dangerouslyDisableSandbox` släpps också av vakten, men `allowUnsandboxedCommands: false` ska stänga det (uppgiften om sandlådan i den här sessionen säger att det är av).
+
+**Förslag, Hugos eller Caspers beslut, före första körningen på riktiga underlag:** sätt `sandbox.network.allowManagedDomainsOnly: true`, låt vakten stoppa `allowed_domains` som ett andra lager, ta ställning till vad sandlådan får läsa, och rätta meningen i SPEC 7.1. Det blir en ny version av vakten och ska inte in i den här installationen utan beslut.
+
+#### P2, medel: ett fel från datorn kan se ut som en vägran
+
+Prov mot `/System` är ofarliga för att datorn inte kan skriva där. Samma sak gör att ett hål inte syns som en skapad fil. Om spärren inte gäller är felet troligen `EROFS: read-only file system` (bedömning, `/System` ligger på en skrivskyddad volym i macOS, inte prövat enligt uppdraget). Punkt 2 i bytet räknar upp `Operation not permitted`, `Permission denied` och att filen inte finns, men inte det. Den säger också att orden i Claude Codes vägran inte är bekräftade, och Claudes sammanfattning kan säga "vägrades". **Så kan ett hål bli ett falskt godkänt.** Den allmänna regeln räddar det bara om Hugo läser ordet "utanför". **Förslag:** lägg till `read-only file system` och `EROFS` i listan i punkt 2 och i c, och säg att bara ett fel som nämner arbetsmapparna räknas. Texten där låses inte av något test (läst). **Hugo kan köra ändå:** står det `read-only` eller `EROFS`, stanna och fråga.
+
+#### P3, medel: proven visar inte vilka mappar som räknas, eller vilken fil som gav nyckeln
+
+Dokumentationen säger: "To keep one outside directory reachable while either key is `true`, add it as a working directory". `permissions.additionalDirectories` har scope "Any file", och posten för `allowManagedPermissionRulesOnly` nämner den inte. **Bedömning, inte prövat:** en rad i Hugos `~/.claude/settings.json` eller en mapp som är tillagd i appen vidgar arbetsmapparna, också för hemmappen. Målen i `/System` kan inte visa det. Prov 17 gällde hemmappen, och beslut 6 prövar med flit inte där. Agenten kan inte lägga till en mapp: vakten stoppar `.claude/` och `~/.claude/`, och verktygen för mappar står inte på listan. Nycklarna gäller också som `true` från vilken fil som helst, och i auto "offers" Claude Code att slå på `blockReads…`. Har Hugo sagt ja där kan proven gå igenom också om nyckeln i de låsta inställningarna inte läses. `/status` hjälper inte: "it doesn't show which file supplied each key". **Förslag:** Hugo kör i Terminal före provkörningen `grep -n -e additionalDirectories -e OutsideWorkingDirectories ~/.claude/settings.json`, och tittar på vilka mappar sessionen har i appen. Väntat: ingen rad. Projektet har ingen `.claude/settings.json` eller `settings.local.json` (körning).
+
+#### P4, låg: `isolation` kan också stå i en agents definition
+
+Dokumentationen: "`isolation` | No | Set to `worktree` to run the subagent in a temporary git worktree". Vakten prövar bara fältet i anropet (körning), som beslut 2 säger. Definitioner kan ligga i `.claude/agents/`, som saknas i projektet (körning), `~/.claude/agents/` och plugins (ej tittat). Agenten kan inte skriva dem, eftersom vakten stoppar båda mapparna. Bara `worktree` nämns där, inte `remote`. **Förslag:** skriv det under Öppet 79. En `deny`-regel för en sådan agent kan stänga det om en dyker upp.
+
+#### P5, låg: `docs.claude.com` leder vidare
+
+`WebFetch` på `https://docs.claude.com/` gav `301 Moved Permanently` till `https://platform.claude.com/docs` (körning, den installerade vakten). Claude Code följer inte en sådan länk själv, och den nya vakten stoppar värden. Den andra adressen i beslut 3 ger alltså inget på startsidan. Andra sökvägar är inte prövade. **Förslag:** Hugo avgör om det är godtaget. Inget prov beror på den, eftersom `f` använder `code.claude.com`.
+
+#### P6, låg: en sökväg kan bära text till de två värdarna
+
+`https://code.claude.com/hemlig-text-i-sokvagen` och en sökväg med 5000 tecken släpps (körning). Beslut 3 förbjuder inte det. Bara de två värdarna kan ta emot texten. Det är inte hemligt för Anthropic, som ändå ser hela sessionen, men det hamnar i en annan logg (bedömning). **Förslag:** godta det, eller lägg till en fast början, en teckenlista och en längdgräns.
+
+#### P7, låg: två spärrprov prövar kanske inte det de säger
+
+- **Edit:** Edit brukar kräva att filen har lästs först (verktygets egen beskrivning). Agenten kan då läsa först, få vägran på Read och aldrig anropa Edit, och Hugo räknar det som Edit (bedömning).
+- **Relativ sökväg:** Write vill ha en hel sökväg (verktygets beskrivning). Agenten räknar troligen om den själv, och då är det en vanlig hel sökväg som prövas (bedömning).
+
+Texten säger att läsa verktygsrutan, men inte vad som ska stå där. **Förslag:** säg att rutan ska gälla just det verktyget, och skriv upp vilken sökväg rutan visar.
+
+#### P8, låg: stora svar kan bli oläsbara efter bytet
+
+Tre svar i den här sessionen sparades av Claude Code i `~/.claude/projects/…/tool-results/`, och agenten fick bara början. Jag läste dem inte. Dokumentationen säger inte om de räknas som "files Claude Code itself needs". Inget spärrprov tar upp det. Stoppas de måste kommandon skrivas smalare. Det är inte farligt, men det ändrar hur sessioner arbetar. **Förslag:** skriv upp vad som händer första gången det inträffar. Stanna inte.
+
+#### P9, låg: prov d kan fastna på Öppet 77
+
+Exitkriteriet kräver att spärrproven godkänns, och prov d kräver att Hugo ser vägran i underagentens ruta. I steg 19 kom ingen rapport (Öppet 77). Händer det igen säger texten att stanna, och då kan Öppet 74 inte stängas utan ett nytt beslut. **Förslag:** bestäm i förväg om prov d räknas som godkänt om filen inte finns och underagenten bara visar en vägran, eller om Öppet 77 ska avgöras först.
+
+#### P10, låg: några ofarliga skillnader i vakten
+
+`İsolation` med turkiskt `İ` släpps fast beslutet säger "oavsett stora och små bokstäver", och `Agent` utan `tool_input` släpps, fast rubriken i vakten säger "Allt som vakten inte känner igen stoppas" (körning). **Bedömning:** ofarligt så länge Claude Code jämför namnet exakt och alltid skickar ett objekt. Inte prövat på riktigt, enligt uppdraget. **Förslag:** godta, och ta med det om listan över fält byggs (Öppet 79).
+
+### Stoppat av vakten
+
+Åtta av mina egna läsande kommandon, alla i sökmönster: `\` tre gånger och `|` fem gånger. Alla är omskrivna med `-e`, som uppdraget tillåter. Inget säkerhetsfilter har stoppat något. WebFetch användes bara mot `code.claude.com` och `docs.claude.com`.
+
+### Inte visat
+
+Att Claude Code vägrar utanför arbetsmapparna och släpper scratchpad, och med vilka ord. Att `--settings` gäller tillsammans med de låsta inställningarna. Vad som händer med länkar (beslut 2 ovan), underagenter, Grep och Glob på riktigt, och allt som kräver installationen. Den installerade vaktens summa, eftersom jag inte har läst filerna i `/Library`. Hugos inställningar och vad som finns i hemmappen. Nätet från sandlådan, som inte är prövat, enligt uppdraget. Tre stora svar, en diff och två sidor ur dokumentationen, sparades utanför projektet och är inte lästa. Jag läste i stället diffen fil för fil, och den senare delen av sidan `permissions`. Början av den sidan och slutet av `settings-reference` såg jag bara i en kort förhandsvisning. Besluten i del A är inskrivna ordagrant från uppdraget. Mot Hugos chatt går det inte att visa.
