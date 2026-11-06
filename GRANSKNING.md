@@ -13238,3 +13238,234 @@ Ordagrant ur Hugos uppdrag i chatten 2026-11-06.
 5. Installationen skrivs i INSTALLERA.md men görs inte förrän efter granskning 42. Granskning 42 tar steg 17 (93dec02), sessionen om Öppet 71 (25c8c30), punkt 6 i granskning 41 och bygget av steg 18, i samma omgång. Sedan installation och steg 19.
 
 **Hugos svar i chatten 2026-11-06, i samma session.** Vakten stoppade byggsessionens första sökkommandon, eftersom de hade ett lodstreck i sökmönstret, och sessionen stannade och frågade. Hugo svarade: "Att skriva om ett läsande kommando så att det följer vaktens regler är att följa vakten, inte att gå runt den. Använd grep -n -e ... -e ... utan lodstreck, eller ett kommando per sökning. Gäller bara läsande kommandon som redan står på listan i SPEC 7.1. Stoppar vakten något annat: stanna som förut."
+
+## Granskning 42 (av 93dec02, 25c8c30 och 4281b21) (2026-11-06)
+
+Oberoende granskning, mot 7228e98, enligt Hugos beslut 2026-11-06 om Öppet 72 och steg 18, beslut 5. Inget är installerat, inget sudo är kört, och inget i `/Library`, i `.git` eller utanför projektmappen och scratchpad är ändrat. Ingen kod, inget test och ingen inställningsfil är ändrad. Agenten committar inte.
+
+**Dom: gult. Inget blockerar. Installationen får göras.** Steg 18 gör det besluten 4 a–f säger och inget annat, och summorna stämmer. Ett fynd på nivån medel (P1) bör rättas i sessionen som för in installationen, eftersom tre test annars blir röda vid nästa statusändring. Resten är låga fynd. Installationen själv ändrar inga statusrader, så P1 stoppar den inte.
+
+**Kontrollsummorna, räknade här på filerna i 4281b21. De ska vara desamma som i `sparr/INSTALLERA.md`, steg 5:**
+
+- `sparr/kommandosparr.py`: `5aefe7afdff61f56c1160f5c2028db23159ac4e229ab63b1fcc0ad583f4b01a6`
+- `sparr/managed-settings.json`: `33bfdb153cfc6ab83dc0a66a9f538a7d2819d98a6cc62a982be9c256593b94f2`
+- `requirements.txt`: `bf4dc0555928a3facf67b3370001388d4b65e69a071c339f8b201310bde4486a`
+
+| Punkt | Vad | Besked |
+|---|---|---|
+| 1 | Steg 18 mot besluten 4 a–f | **Håller.** Visat med körning. K3 gäller bara Bash, se P4 |
+| 2 | `-I -S` | **Håller.** Visat med körning, men inte med den installerade filen |
+| 3 | Testerna | **Inget är svagare utan beslut, och inget är borttaget.** Alla 17 ändringar i kopian ger rött. Tre test låser statusord, se P1 |
+| 4 | `INSTALLERA.md` | **Håller.** Summor, ordning, backning och ordgräns stämmer. Två otydligheter, se P2 och P3 |
+| 5 | Steg 17 | **Håller mot koden.** Provet ger 28 passed. Manualen och skalets inställningar är inte prövade |
+| 6 | Öppet 71 | **Håller.** Testet låser Öppet 70 som öppen. Öppet 4 väntar på ett besked, se P6 |
+| 7 | Statusraderna mot git log | **Håller.** Alla 45 commit-nummer finns och stämmer |
+| 8 | Besluten och sviten | **0 failed, 5605 passed, 71 skipped.** Ordagrant mot chatten går inte att visa här |
+| 9 | Frågorna till Hugo | **Ingen av dem måste lösas före installationen** (bedömning) |
+
+**Så skiljer jag vad som är visat.**
+
+- **Körning:** gjort här, i appen, i sandlådan, i kopior i scratchpad. "Gamla vakten" är vakten i 7228e98, "nya vakten" är den i 4281b21. En mutation betyder att jag ändrar något med flit i en kopia och ser om ett test larmar.
+- **Läst:** diffarna och texterna.
+- **Bedömning:** står uttryckligen.
+
+Provfilerna är `test_g42.py`, `test_g42_mut.py` och `test_g42_b.py` i `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/9b1b5254-43e5-4df7-a036-f2b3419d71fa/scratchpad/prov/`, och utfallen ligger i `res/` bredvid `prov/`. Kommandona står i `PROGRESS.md`.
+
+### Punkt 1: steg 18 mot besluten
+
+**Inget annat är ändrat (körning).** En jämförelse av koden, utan kommentarer, visar att bara `_bedom`, `_sessionen` och `_dela_upp` är ändrade, att `_fardigt_ord`, `HISTORIKTECKEN` och `SLUTKLAMMER` är nya, och att inget är borttaget. I `sparr/managed-settings.json` skiljer exakt en rad, och utan `-S` är innehållet detsamma.
+
+**Alla texter mot gamla vakten (körning).** 82 489 texter med `ls` först, alla kombinationer upp till fyra tecken av `ab=}!'" -/.x` och 60 000 slumpade.
+
+| Utfall | Antal |
+|---|---|
+| Båda släpper | 13 066 |
+| Båda stoppar | 56 806 |
+| Nya släpper, gamla stoppade | **0** |
+| Nya stoppar för `!`, gamla släppte | 12 231 |
+| Nya stoppar för ett ord som bara är `}`, gamla släppte | 334 |
+| Nya stoppar för `=`, gamla släppte | 52 |
+| Fel mot min egen läsning av besluten, skriven för sig | **0** |
+
+**Formerna som uppdraget nämner (körning):**
+
+| Form | Nya vakten |
+|---|---|
+| `ls ''=y`, `ls ""=y`, `ls ''''=y`, `ls ''""''=y`, `ls ""''""''=y`, `ls ''=`, `ls ''=''`, `ls x ''=y` | Stoppas |
+| `ls x''=y`, `ls ''x=y`, `ls 'x'=y`, `ls '='=y`, `ls "="y`, `ls x==y`, `ls --include==y`, `git log --format=''=y` | Släpps, som förut |
+| `ls }`, `ls } }`, `ls '' }`, `git log }`, `grep -n -e } SPEC.md` | Stoppas |
+| `ls }''`, `ls ''}`, `ls ""}""`, `ls ''''}''''` | Stoppas. Ordet är bara `}` och `}` står utanför citat, så det följer beslutet. Enligt min bedömning hade zsh inte läst dem som slutet på ett block, men inget som används berörs |
+| `ls }}`, `ls }x`, `ls x}`, `ls -}`, `ls '}'}`, `ls }'}'`, `git log --grep=}` | Släpps. Ordet är inte bara `}`. Att zsh ser det som ett vanligt ord är en bedömning, inte kört |
+| `ls '}'`, `ls "}"`, `ls x '}'` | Släpps |
+| `ls '!'`, `ls "!"`, `ls x!`, `git diff -- ':!x'`, `git log --grep='!x'` | Stoppas. `':!x'` är gits sätt att utesluta en fil, och det går inte längre med `!` (beslutet) |
+| `ls ！x` (ett annat tecken, U+FF01) | Släpps. Inte historik i zsh (bedömning) |
+
+**`cwd`, Bash (körning):**
+
+| `cwd` | Nya vakten |
+|---|---|
+| tom, mellanslag, `.`, `./x`, `./projekt`, `~`, `~/x`, `x`, `projekt`, radbrytning, en hel sökväg med mellanslag, radbrytning eller tabb före | Stoppas som "hel sökväg" |
+| `/`, `//`, projektmappen med radbrytning eller mellanslag efter, andra stora och små bokstäver | Stoppas som annan mapp, som förut |
+| Projektmappen, med `/` efter, med `//` före, med `/.` efter och med `/../projekt` efter | Släpps, som förut |
+| Saknas, ett tal, en lista, ett objekt | Stoppas som oläsbar indata, som förut |
+| Med NUL-tecken, som program | Stoppas med kod 2 |
+
+**Vanliga kommandon (körning):** de fasta kommandona i `CLAUDE.md` och 12 läsande kommandon släpps av båda. `!git status` stoppas av båda, av den gamla för att `!git` inte står på listan. Beslutet ändrar alltså inget för Hugos `!` i sessionen, om det tecknet alls når vakten.
+
+### Punkt 2: `-I -S`
+
+Vaktens Python 3.9.6, flaggorna lästa ur `sparr/managed-settings.json` (körning):
+
+| Flaggor | `sys.flags.no_site` | `isolated` | `site` inläst | `site-packages` i sökvägen |
+|---|---|---|---|---|
+| `-I -S` | 1 | 1 | Nej | Nej |
+| `-I` | 0 | 1 | Ja | Ja |
+
+Med bara `-I` är `/Library/Python/3.9/site-packages` en av tilläggsmapparna, som K1 säger.
+
+| Vakten som program | `git status`, `ls`, `ls '}'`, `ls x=y` | `ls; rm x`, `rm x`, `sudo ls`, inte JSON | `ls !x`, `ls ''=y`, `ls }`, tom `cwd` |
+|---|---|---|---|
+| Ny, `-I -S` | Kod 0 | Kod 2 | Kod 2 |
+| Ny, `-I` | Kod 0 | Kod 2 | Kod 2 |
+| Gammal, `-I -S` | Kod 0 | Kod 2 | Kod 0 |
+| Gammal, `-I` | Kod 0 | Kod 2 | Kod 0 |
+
+Alla fyra kombinationerna går alltså att starta, och det är det bytet och backningen behöver: under bytet körs ny vakt med gamla flaggor, och under backningen gammal vakt med nya flaggor.
+
+**Testerna läser flaggorna ur filen (läst och körning).** `vaktens_flaggor()` läser `args`, `_kor_programmet` och testen med vaktens Python använder den, och inget test har kvar ett fast `-I`. Fyra mutationer av `args` (`-S` borta, `-S` före `-I`, `-I` borta, en flagga till) ger alla rött.
+
+**Inte visat:** en riktig `.pth`-fil, eftersom den skulle behöva läggas utanför scratchpad. Visat är att `site` inte läses in, och det är `site` som läser sådana filer. Den installerade filen och Claude Code som startar den visas bara av Hugos prov efteråt.
+
+### Punkt 3: testerna
+
+**Inget test är borttaget (körning).** Inget testnamn i 7228e98 saknas i 4281b21. 103 är nya: 51 i `test_beslut_steg_18.py` och 52 i `test_sandladan.py`, vilket stämmer med 5573 + 103 = 5676 körda eller överhoppade. Min räkning av namnen ger 5572 och 5675, alltså ett mindre i båda. Skillnaden är densamma, och jag har inte utrett vilket namn som faller bort.
+
+**Varje ändrat test (läst):**
+
+| Test | Ändring | Besked |
+|---|---|---|
+| `test_beslut_steg_16_lage_nu_foljer_beslut_5` | Tre kontroller borta | **Svagare, men beslutat** (beslut 1 om Öppet 71 och Hugos svar). Bara de tre |
+| `_kor_programmet`, `test_systemets_python_…`, `_kor`, `test_j1_vaktens_python_…`, `test_j1_vakten_gar_att_…` | Flaggorna ur filen i stället för fast `-I` | Starkare |
+| `test_installningarna_kor_vakten_…`, `test_j1_installningen_…` | `-I -S` | Lika strängt |
+| `test_2026_11_05_beslut_1_filen_ar_…` | Sätter tillbaka `args` | Lika strängt, jämför fortfarande byte för byte |
+| `VAKTENS_SUMMA`, `INSTALLNINGARNAS_SUMMA` och testen som låser dem | Nya summor | Lika strängt |
+| `test_summan_i_bytet_…` | Prövar den nya summan i bytet i steg 18, den gamla i steg 15 | Lika strängt, båda två gånger |
+| `test_avsnitten_for_steg_15_…`, `test_filen_har_de_avsnitten_…` | Har också det nya avsnittet | Starkare |
+
+**Mutationer av vakten och inställningarna (körning).** Utan ändring ger `test_beslut_steg_18.py` 51 passed.
+
+| Ändring | Rött |
+|---|---|
+| O1 borta, O1 fel tecken | 11 failed i båda |
+| O2 som förut (`not borjat`) | 4 failed |
+| O2 stoppar varje `=` utanför citat | 4 failed |
+| K3 borta, tom släpps, relativ släpps | 7, 2 och 5 failed |
+| O4 borta | 7 failed |
+| O4 också inom citat, `utan_citat` nollställs inte | 3 failed i båda |
+| O4 prövar inte sista ordet, inte ord före mellanslag | 6 och 1 failed |
+| `}` stoppas alltid utanför citat | 3 failed |
+| De fyra ändringarna av `args` | 6 eller 7 failed |
+
+Ingen överlever. Uppdraget bad om minst två.
+
+### Punkt 4: `INSTALLERA.md`
+
+**Summorna (körning, räknat i kopior).** Filerna i 4281b21 ger summorna överst, och de står i steg 5, i punkt 1 och i punkt 4 på rätt plats. Filerna i c49ebf1, den installerade commiten, och i 7228e98 ger `1ba7457615356ff634956cf3f665787d2e74900986aa96001feeaa8ce31a39da` och `314df00b4239877d21e0fef7d8f11c844a75d07276ad0af32baa94db8e92d10d`, som står i punkt 1, punkt 4 och under backningen. **Inte visat:** filerna i `/Library`, som jag inte har läst. Det är Hugos punkt 1.
+
+**Ordningen (läst).** Sessionerna avslutas, summorna kontrolleras, de gamla filerna sparas, vakten byts och inställningarna byts sist. Punkt 2 sparar med `cp -i`, och de sparade filerna kan inte läsas som inställningar eller vakt (bedömning: Claude Code läser `managed-settings.json` och mappen `managed-settings.d`, och vakten pekas ut med hela sökvägen).
+
+**Backningen (läst och körning).** Två `cp` över filer som finns behåller ägare och rättigheter (bedömning, inte kört med sudo), och summorna kontrolleras. Gammal vakt med nya flaggor går att köra, se punkt 2. Inget tar bort de sparade filerna, så ett nytt försök stoppas av `cp -i` och Hugo frågar, vilket är säkert.
+
+**Ordgränsen (körning).** `test_installera_ar_kortare_an_fore_granskning_15` är orörd. Utan bytena har filen 9 042 ord både i 7228e98 och 4281b21, och gränsen är under 9 043, se P8.
+
+**Kommandona (körning, med vaktens Python och `-I -S`).** De tre proven i punkt 5 stoppas, alla med `Stoppat av vakten`. `git status` och pytest-kommandot släpps. Reglerna om `!` och `}` träffar inget annat kommando i avsnittet, och punkt 1–4 körs i Terminal, utan agenten. 69 eller 71 överhoppade stämmer med steg 15 och med den här körningen (71, med texten att `~/.ssh` inte finns).
+
+### Punkt 5: steg 17
+
+**Provet (körning).** Kopierat ur `GRANSKNING.md` i 93dec02, med vakten från samma commit: **28 passed**, som avsnittet säger. Med nya vakten ger samma prov 7 failed, 21 passed, och de röda är de väntade: tabellen och orden för `ls ''=y`, `ls }`, `ls !`, `ls !y`, `ls "!y"` och `ls '!y'`.
+
+**Tabellen (läst mot utfallet).** Kolumnerna för vakten stämmer för varje skrivbart tecken. Unicode 13 och kategorierna stämmer med utfallet. **O1–O5 och O7 mot koden (läst och körning):** `not borjat` stod i `_dela_upp`, och orden för `ls !y`, `ls ''=y`, `x==y`, `--include==y`, `ls }` och `ls 'a''b'` är de som står. O6 var inte visat då, och det står.
+
+**Inte prövat:** manualens avsnitt, startfilerna (uppdraget håller mig inom projektet), och allt i zsh. Hugos kontroll i beslut 2 har jag inte gjort om.
+
+### Punkt 6: Öppet 71
+
+| Beslut | Besked |
+|---|---|
+| P1 | Gjort. De tre kontrollerna är borta och två är kvar, och båda larmar (mutation). "Nästa steg" är omskriven |
+| P3 | Gjort. Testet jämför hela Öppet 70. Stängd, ett svar efter meningen, ett svar inne i texten och en överstruken post ger alla rött (mutation). **Frågan är låst som öppen.** Ett svar i steg 109 eller 118 bredvid "Inget svar finns" ger inget rött, och det står i posten från sessionen |
+| P5 | Gjort. Öppet 4 stängd och Öppet 8 med "inte installerat" ger rött (mutation). Om Öppet 4 ska stängas: se P6 |
+| P6 a | Gjort. Rubrik borta och ändrat svar ger rött (mutation). Hänvisningarna i `BYGGPLAN.md` och under Öppet pekar på rubriken |
+| P6 b | Inskrivet |
+
+### Punkt 7: statusraderna
+
+Alla 45 commit-nummer i "Läge nu" i `BYGGPLAN.md` och i huvudet i `PROGRESS.md` finns i git log, med det datum och det ämne som texten säger (körning). dbe85a9, fe69234, 7228e98, 25c8c30, 93dec02 och 4281b21 ändrar alla både `BYGGPLAN.md` och `PROGRESS.md`, som `CLAUDE.md` kräver. Steg 15 är klart i dbe85a9, 16 i fe69234 och 17 i 4281b21, alla 2026-11-06, och c49ebf1 från 2026-11-05 är den installerade commiten. `origin/main` står nu på 4281b21 enligt `git log`. Det stämmer: raden sa 93dec02 när den skrevs.
+
+**Att känna till:** e4d8cd7 har ämnet "Granskning 12", men raden och rubriken säger granskning 22. Felet finns bara i ett gammalt commit-meddelande.
+
+### Punkt 8: besluten och sviten
+
+**Sviten:** `5605 passed, 71 skipped`, 0 failed. De 71 är 38 `GRUPP D HOPPAS ÖVER`, 31 `SPÄRRPROVET I KOPIAN HOPPAS ÖVER` och 2 om `~/.ssh`.
+
+**Ordagrant (körning och läst):** besluten i testet och i filen är samma text, och Hugos svar om `grep` utan lodstreck står under besluten. Mot chatten går det inte att visa här, eftersom jag inte har sett chatten. Testet låser bara första meningen i svaret, se P5.
+
+### Punkt 9: frågorna till Hugo
+
+Jag avgör dem inte.
+
+- **Text i SPEC 7.1 om de nya reglerna.** Måste inte lösas före installationen (bedömning). SPEC 7.1 säger att den strängaste gäller när texten och vakten säger olika, och vakten är den strängare. Regeln för kommandolistans summa berörs inte så länge listan inte ändras. Att känna till: tabellen överst i `SPEC.md` säger att 7.1 bara kan ändras som en ny version av vakten.
+- **Om Öppet 6 ska stängas.** Måste inte lösas före installationen (bedömning). Det ändrar ingen fil som installeras.
+
+### Fynd
+
+Alla fynd står under Öppet 73.
+
+#### P1, medel: tre test låser statusord som ska ändras
+
+Samma sorts fel som P1 i granskning 41. Mutationer i kopian (körning):
+
+| Ändring i kopian | Rött test |
+|---|---|
+| Raden för steg 18 säger "granskat, inte installerat" eller är klar | `test_steg_18_steg_17_ar_klart_och_steg_18_pagar` |
+| "Pågående steg" säger steg 19, eller "Nästa steg" nämner inte granskning 42 | Samma |
+| Öppet 72 säger att O1, O2 och O4 är granskade | `test_steg_18_oppet_72_star_kvar_oppen_for_histchars` |
+| K1 säger "granskad" | `test_steg_18_k1_och_k3_ar_byggda_men_inte_installerade` |
+
+**Den här granskningen påverkas redan.** Uppdraget säger att steg 18 ska stå som granskat, men jag får inte ändra test. Raden för steg 18 har därför kvar "byggd, väntar på granskning 42, inte installerad", och fortsätter med att granskningen är gjord. Öppet 72, K1 och K3 säger fortfarande "inte granskade", vilket inte längre stämmer. **Stoppar inte installationen:** den ändrar inga statusrader, och sviten i punkt 5 är grön. **Blir rött** när installationen förs in. **Förslag:** ta bort kontrollerna av orden som ändras i samma session, med Hugos eller Caspers beslut, som i beslut 1 om Öppet 71. Besluten är redan låsta under sin rubrik.
+
+#### P2, låg: "den commit som granskades" stämmer inte när granskningen är committad
+
+"Prov utanför sandlådan" säger att `git log -1` ska visa den commit som granskades, annars stoppa och fråga. När granskning 42 är committad är HEAD den commiten, inte 4281b21 (läst). Felet stannar i säkert läge, men Hugo blir stoppad. Vid steg 15 var den installerade commiten c49ebf1, som är granskningens egen. **Förslag:** Hugo säger att det är commiten med granskning 42, som skiljer sig från 4281b21 bara i `GRANSKNING.md`, `PROGRESS.md` och `BYGGPLAN.md`.
+
+#### P3, låg: backningen krockar med regeln om H1-proven
+
+Avsnittet säger "backa" om något i provet blir fel. `CLAUDE.md` och "Spärrprovet i kopian", punkt d, säger att ett rött eller överhoppat H1-prov inte ska backas, utan att Hugo stannar (läst). Punkt 5 säger "stoppa och fråga", så den som läser i ordning frågar först (bedömning). **Förslag:** en mening i punkt 5 som hänvisar till punkt d.
+
+#### P4, låg: K3 gäller bara Bash
+
+`Write`, `Edit` och `Read` med en tom eller relativ `cwd` släpps, om sökvägen inte är förbjuden (körning). Beslut 4 b säger bara "vakten stoppar". K3 i granskning 20 handlade om Bash, och förbuden håller ändå: `.git/config`, `a/.claude/x`, `../hem/.zshrc`, `~/.zshrc` och en hel sökväg under `~/.ssh` stoppas med `cwd` tom, `x`, `./x` och `~` (körning). Att agenten inte själv kan välja `cwd` är en bedömning. **Förslag:** skriv uttryckligen att K3 gäller Bash, eller be om ett beslut.
+
+#### P5, låg: testet låser bara första meningen i Hugos svar
+
+Ändrade ord senare i svaret ger grönt (mutation). **Förslag:** lås hela svaret, som besluten.
+
+#### P6, låg: Öppet 4 kan stängas, men ett test hindrar det
+
+Beslut 3 om Öppet 71 säger att nästa granskning avgör om Öppet 4 ska stängas, och uppdraget nämner det inte. **Min bedömning: den kan stängas.** Sandlådan är installerad och provad, förbuden för appen, appens Claude Code och `~/.local/share/claude` står i inställningarna, skrivning i projektet är godtagen under Öppet 55, och det som är kvar av `trap`, `hash` och `builtin` står under Öppet 8. **Jag har inte stängt den:** `test_beslut_oppet_71_p5_…` ger rött då (mutation), och jag får inte ändra test. **Förslag:** Hugo eller Casper säger ja, och testet och posten ändras i samma session.
+
+#### P7, låg: att `banghist` saknas betyder inte att den är av
+
+Beslut 2 räknar upp `banghist` bland det som saknas i filen. Enligt manualen, som steg 17 citerar, är den på som standard i zsh, så att den saknas betyder troligen på (bedömning, inte kört). O3 och O5 beror inte på den, och O1 stoppar `!` när vakten är installerad. Fram till dess släpper den installerade vakten `!`, så säkerheten vilar på att skalet inte är interaktivt. Det är ett skäl att installera, inte att vänta. **Förslag:** inget utöver installationen.
+
+#### P8, låg: ordgränsen har ingen marginal
+
+9 042 ord mot en gräns under 9 043 (körning). Steg 2 b är kortat för att rymmas: "ändrar ingenting" och "där vakten installeras" är borta. Meningen är densamma (bedömning). Nästa ord i huvuddelen ger rött. **Förslag:** nästa ändring tar bort lika mycket, eller så beslutar Hugo om en ny gräns.
+
+### Stoppat av vakten
+
+Sex av mina `grep`: `\` två gånger, `|` tre gånger och en bakåtfnutt. Bakåtfnutten står inte i uppdragets lista, som har `|`, `\`, `$`, `*` och `!`. Jag läste Hugos svar om läsande kommandon på listan som att det täcker fallet, skrev om sökningen och fortsatte. Hugo kan säga till om han läser regeln annorlunda. Inget säkerhetsfilter stoppade något. **Att känna till:** listan i uppdraget är inte hela listan. `;`, `&`, `<` och `>` stoppas också, och `!` stoppas först när nya vakten är installerad.
+
+### Inte visat
+
+Filerna i `/Library`. Att Claude Code startar den nya vakten med `-I -S`, och proven i punkt 5 och 6, som är Hugos. Grupp D utanför sandlådan och spärrprovet i kopian. Allt i zsh. Manualen. Startfilerna och Hugos kontroll av `~/.claude/shell-snapshots/`. Kassio-intervjun. Att besluten är ordagranna mot chatten.
