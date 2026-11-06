@@ -33,6 +33,7 @@ from test_sandladan import (
     BYTE_149_RUBRIK,
     BYTE_18_RUBRIK,
     BYTET_149,
+    GRANSKNING,
     INSTALLERAD_VAKT_CITERAD,
     INSTALLNINGARNAS_SUMMA_STEG_18,
     PROGRAMMET_149,
@@ -539,8 +540,13 @@ def test_steg_149_p4_oppet_74_raknar_upp_platserna(text):
 
 
 def test_steg_149_b7_oppet_74_star_kvar_oppen_tills_exitkriteriet_ar_uppfyllt():
+    # Exitkriteriet är uppfyllt när Hugos beslut säger det (Hugos beslut 2026-11-06 om granskning 44 och installationen av steg 149,
+    # beslut 3). Utan beslutet ska posten vara öppen, precis som förut. Med beslutet ska den vara stängd.
     post = " ".join(_post_under_oppet(74).split())
-    assert not post.startswith("~~") and "**Stängd" not in post and "**Öppen" in post
+    if "3. Öppet 74 stängs: hålet från prov 17 är stängt av steg 149." in GRANSKNING.read_text(encoding="utf-8"):
+        assert post.startswith("~~") and "**Stängd" in post and "**Öppen" not in post
+    else:
+        assert not post.startswith("~~") and "**Stängd" not in post and "**Öppen" in post
 
 
 @pytest.mark.parametrize("text", ["tillåtelselista", "länkar", "`Agent`", "Öppen"])

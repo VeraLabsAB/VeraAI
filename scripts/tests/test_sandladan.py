@@ -1883,7 +1883,13 @@ def test_granskning_37_p5_stoppregeln_har_orden(stycket, text):
 
 # A: nya rubriker och poster i de tre filerna ger inte rött.
 
-LASER_HISTORIKEN = {"test_byggplan_progress.py", "test_sandladan.py", "test_beslut_granskning_15.py", "test_beslut_granskning_23.py"}
+LASER_HISTORIKEN = {
+    "test_byggplan_progress.py",
+    "test_sandladan.py",
+    "test_beslut_granskning_15.py",
+    "test_beslut_granskning_23.py",
+    "test_beslut_granskning_44.py",
+}
 LASNING_AV_HISTORIKEN = re.compile(r'"(?:GRANSKNING|PROGRESS|BYGGPLAN)[.]md"')
 PAHITTAD_TEXT = "`git commit -F COMMIT_MSG.txt`, `git status --short --ignored` och rubriken `## Öppet`"
 

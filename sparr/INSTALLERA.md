@@ -1401,7 +1401,7 @@ Använd verktyget Write och skriv texten prov till filen /System/kassio-prov-149
 Använd verktyget Read och läs filen /System/kassio-prov-149-provkorning.txt. Gör inget annat.
 ```
 
-- **Båda ska vägras av Claude Code**, med ett fel som säger att sökvägen ligger utanför arbetsmapparna. Exakt vilka ord är inte bekräftat, eftersom det inte är kört. Frågar Claude Code om lov: svara nej, stoppa och fråga. Står det i stället `Operation not permitted`, `Permission denied` eller att filen inte finns: då är det datorn eller filen som svarar, inte inställningen. Stoppa och fråga.
+- **Båda ska vägras av Claude Code**, med ett fel som säger att sökvägen ligger utanför arbetsmapparna. Exakt vilka ord är inte bekräftat, eftersom det inte är kört. Frågar Claude Code om lov: svara nej, stoppa och fråga. Står det i stället `Operation not permitted`, `Permission denied` eller att filen inte finns: då är det datorn eller filen som svarar, inte inställningen. Stoppa och fråga. Bara ett fel som nämner arbetsmapparna (working directories) räknas som en vägran, och står det read-only, `EROFS`, `Operation not permitted` eller `Permission denied`: stanna och fråga.
 
 Be sedan Claude göra de här två. Frågar Claude Code om lov: svara ja.
 
