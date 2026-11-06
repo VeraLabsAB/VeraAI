@@ -708,7 +708,8 @@ def test_granskning_35_p1_antalen_i_installera_stammer_med_testerna():
 @pytest.mark.parametrize(
     "rubrik,text",
     [
-        (SPARRPROV_RUBRIK, "`41 passed`"),
+        # 41 spärrprov och två texttest. Hugos beslut 2026-11-06, beslut 5, och testet som räknar alla filtret väljer nedan.
+        (SPARRPROV_RUBRIK, "`43 passed`"),
         (SPARRPROV_RUBRIK, "flytta hela arbetsmappen"),
         (SPARRPROV_RUBRIK, "`31 passed`"),
         (PROVKORNING_RUBRIK, "`85 skipped`"),
@@ -1793,10 +1794,13 @@ def test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott(tmp_pat
             f"\n## Granskning 99998 (påhittad) (2099-01-01)\n\n{PAHITTAD_TEXT}\n",
             f"\n## Granskning 99999 (påhittad) (2099-01-01)\n\n{PAHITTAD_TEXT}\n",
         )
+        # Ett steg som verkligen pågår. Det var ett fast 15, som blev fel när steg 15 blev klart (Hugos beslut 2026-11-06, beslut 6).
+        pagaende = next(r for r in (rot / "BYGGPLAN.md").read_text(encoding="utf-8").splitlines() if r.startswith("- **Pågående steg:**"))
+        pagar = re.search(r"(?<!\d)(\d+) – ", pagaende, re.ASCII).group(1)
         _lagg_in(
             rot / "PROGRESS.md",
             "\n## Läge",
-            f"\n## Läge 2099-01-01, påhittad post\n\nSteg i byggplanen: 15 (pågår)\n\n- {PAHITTAD_TEXT}\n",
+            f"\n## Läge 2099-01-01, påhittad post\n\nSteg i byggplanen: {pagar} (pågår)\n\n- {PAHITTAD_TEXT}\n",
             f"\n## Påhittad rubrik sist\n\n- {PAHITTAD_TEXT}\n",
         )
         _lagg_in(
@@ -1807,7 +1811,7 @@ def test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott(tmp_pat
         )
     svar = subprocess.run(
         [
-            sys.executable, "-B", "-m", "pytest", "-p", "no:cacheprovider", "-q", "--tb=line",
+            sys.executable, "-B", "-m", "pytest", "-p", "no:cacheprovider", "-q", "--tb=line", "-rs",
             "-k", "not test_sparr_ and not test_granskning_37_a_",
             *[f"scripts/tests/{namn}" for namn in sorted(LASER_HISTORIKEN)],
         ],
@@ -1818,6 +1822,10 @@ def test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott(tmp_pat
         check=False,
     )
     assert svar.returncode == 0, svar.stdout[-6000:] + svar.stderr[-2000:]
+    # Pytest ger returkod 0 också när alla test hoppar över sig (Hugos beslut 2026-11-06, beslut 1, granskning 40, P1).
+    assert re.search(r"[1-9][0-9]* passed", svar.stdout), svar.stdout[-2000:]
+    annat = [r for r in svar.stdout.splitlines() if r.startswith("SKIPPED") and "GRUPP D HOPPAS ÖVER" not in r]
+    assert not annat, annat
 
 
 # B: nästa granskning.
@@ -2553,6 +2561,190 @@ def test_grupp_d_hoppas_inte_over_vid_andra_fel(monkeypatch):
 def test_grupp_d_skapar_mappen_nar_datorn_inte_nekar(tmp_path):
     gor_mapp_eller_hoppa_over(str(tmp_path / "prov" / "mapp"))
     assert (tmp_path / "prov" / "mapp").is_dir()
+
+
+# ---------------------------------------------------------------------------------------------
+# Hugos beslut 2026-11-06 om Öppet 69 och spärrprovet. Namnen på testen här får inte innehålla filtren i INSTALLERA.md, eftersom
+# -k också söker i namnet på en variant. Därför har varianterna egna namn.
+
+BESLUT_06_RUBRIK = "## Hugos beslut 2026-11-06 om Öppet 69 och spärrprovet"
+BESLUT_06 = [
+    '1. P1 (granskning 40) rättas som granskningen föreslår: "-rs" läggs till i kommandot i '
+    "test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott, och efter raden med returncode kontrolleras att "
+    "minst ett test gick igenom och att inget test hoppades över med en annan text än GRUPP D HOPPAS ÖVER. Rött före: visa att "
+    "testet i dag blir grönt när alla test i kopian hoppar över sig av en annan anledning.",
+    "2. P2 (granskning 40) rättas: gor_mapp_eller_hoppa_over hoppar bara över vid Operation not permitted (errno 1), samma "
+    "kontroll av felkoden som de andra i grupp D. Alla andra fel, också Permission denied (errno 13), ger rött. Nytt test för "
+    "errno 13. Rött före.",
+    "3. P3 är klar: Hugo körde git config --get core.quotepath 2026-11-05, standardläge.",
+    "4. P4 och P5 står kvar under Öppet 69.",
+    '5. Det väntade antalet i "Spärrprovet i kopian" i sparr/INSTALLERA.md blir 43 passed i stället för 41. Filtret -k '
+    "test_sparr_ väljer 41 spärrprov och två texttest vars namn innehåller spärrprovens namn: "
+    "test_granskning_36_p6_installera_sager_vad_som_galler[`test_sparr_lasning_av_ssh_stoppas`] och "
+    "test_granskning_37_p3_installera_har_sparrprovet_med_hard_lank[`test_sparr_hard_lank_till_ssh_stoppas`]. Lås antalet med "
+    "ett test som räknar alla test filtret väljer (inte bara de som heter test_sparr_), så att det inte kan glida isär igen. "
+    'Gör likadant för H1-proven (31) och "Prov utanför sandlådan" (39), om de inte redan är låsta så.',
+    "6. Steg 15 är installerat och provat. Hugos körningar 2026-11-06, commit c49ebf1:",
+    "a. Spärrprovet i kopian i Terminal (Claude Code 2.1.318): 43 passed, inget failed, ingen rad med HOPPAS ÖVER.",
+    "b. Samma i skrivbordsappen: 43 passed, inget failed, ingen rad med HOPPAS ÖVER.",
+    "c. H1-proven i appen: 31 passed, inget skipped, inget failed.",
+    'd. Läsförbudet: Read av ~/.ssh/prov nekades ("File is in a directory that is denied by your permission settings"). cat '
+    "~/.ssh/prov stoppades av vakten (tecknet ~ utanför citattecken). kassio-prov visades inte.",
+    "e. ~/.ssh/prov, ~/.ssh och ~/VERA/sparrprov är borttagna (ls: No such file or directory).",
+    "f. Prov utanför sandlådan i ~/VERA/provkopia: 39 passed, inget failed, ingen rad med GRUPP D HOPPAS ÖVER. Kopian är "
+    "borttagen.",
+    "g. Installationen och kontrollen efter bytet, 6.1–6.7, godkändes 2026-11-05.",
+    '7. Raden "Nästa steg" i BYGGPLAN.md och steg 53 och 54 följer Kassio-beslutet 2026-11-05: rådgivare, jurister och '
+    "konsulter kontaktas längre fram, eftersom vi inte har råd nu. Det som krävs innan riktig data används (steg 109 och 118) "
+    "är en öppen fråga. Skriv den som öppen fråga och hitta inte på något svar.",
+    "8. Ingen egen granskning för den här sessionen. Den granskas tillsammans med steg 16.",
+]
+
+
+@pytest.mark.parametrize("beslut", BESLUT_06, ids=[str(n) for n in range(1, len(BESLUT_06) + 1)])
+def test_beslut_2026_11_06_star_ordagrant_i_granskning(beslut):
+    assert beslut in _avsnitt_i_granskning(BESLUT_06_RUBRIK)
+
+
+# Beslut 1: P1. Kopieringen och pytest i kopian byts ut, så att bara det som kontrolleras efter körningen prövas.
+
+GRUPP_D_RAD = 'SKIPPED [36] scripts/tests/test_sandladan.py:1697: GRUPP D HOPPAS ÖVER: datorn nekade, troligen sandlådan.\n'
+ANNAN_RAD = "SKIPPED [{}] scripts/tests/test_byggplan_progress.py:1: annan anledning\n"
+
+
+def _kopian_svarar(monkeypatch, returkod, utskrift):
+    kommandon = []
+
+    def run(argument, *_r, **_k):
+        kommandon.append(argument)
+        return subprocess.CompletedProcess(args=argument, returncode=returkod, stdout=utskrift, stderr="")
+
+    monkeypatch.setattr(shutil, "copytree", lambda *_a, **_k: None)
+    monkeypatch.setattr(subprocess, "run", run)
+    return kommandon
+
+
+@pytest.mark.parametrize(
+    "utskrift",
+    [
+        ANNAN_RAD.format(1074) + "1074 skipped in 1.30s\n",
+        ANNAN_RAD.format(10) + "1064 passed, 10 skipped in 45.00s\n",
+        ANNAN_RAD.format(10) + GRUPP_D_RAD + "1028 passed, 46 skipped in 45.00s\n",
+        GRUPP_D_RAD + "36 skipped in 1.30s\n",
+    ],
+    ids=["alla_hoppar_av_en_annan_anledning", "en_fil_hoppar_av_en_annan_anledning", "bada_sorterna", "alla_hoppar_som_grupp_d"],
+)
+def test_beslut_2026_11_06_p1_kopian_utan_prov_eller_med_annat_hopp_ger_rott(monkeypatch, tmp_path, utskrift):
+    _kopian_svarar(monkeypatch, 0, utskrift)
+    _ska_ge_rott(AssertionError, lambda: test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott(tmp_path))
+
+
+@pytest.mark.parametrize(
+    "utskrift",
+    ["1074 passed in 45.00s\n", GRUPP_D_RAD + "1038 passed, 36 skipped in 45.00s\n"],
+    ids=["utan_sandlada", "i_sandladan"],
+)
+def test_beslut_2026_11_06_p1_kopian_som_provar_nagot_ger_gront(monkeypatch, tmp_path, utskrift):
+    _kopian_svarar(monkeypatch, 0, utskrift)
+    test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott(tmp_path)
+
+
+def test_beslut_2026_11_06_p1_kommandot_visar_vad_som_hoppades_over(monkeypatch, tmp_path):
+    # Utan -rs står inga rader med SKIPPED i utskriften, och då har kontrollen ingenting att läsa.
+    kommandon = _kopian_svarar(monkeypatch, 0, "1074 passed in 45.00s\n")
+    test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott(tmp_path)
+    assert len(kommandon) == 1 and "-rs" in kommandon[0]
+
+
+# Beslut 2: P2. Samma kontroll av felkoden som de andra i grupp D.
+
+
+def test_beslut_2026_11_06_p2_errno_13_ger_rott(monkeypatch):
+    def nekar(_sokvag):
+        raise PermissionError(errno.EACCES, "Permission denied")
+
+    monkeypatch.setattr(os, "makedirs", nekar)
+    assert _ska_ge_rott(PermissionError, lambda: gor_mapp_eller_hoppa_over("/x/.git")).errno == errno.EACCES
+
+
+def test_beslut_2026_11_06_p2_riktigt_permission_denied_ger_rott(tmp_path):
+    # Vanliga rättigheter, i testets tillfälliga mapp: en mapp utan skrivrätt ger errno 13.
+    mapp = tmp_path / "utan_skrivratt"
+    mapp.mkdir()
+    mapp.chmod(0o555)
+    try:
+        fel = _ska_ge_rott(PermissionError, lambda: gor_mapp_eller_hoppa_over(str(mapp / "ny")))
+    finally:
+        mapp.chmod(0o755)
+    assert fel.errno == errno.EACCES
+
+
+# Beslut 5: antalen. Alla test som filtret väljer räknas, som i kommandot i INSTALLERA.md, oavsett vad testen heter. "Prov utanför
+# sandlådan" (39) är redan låst så, i test_granskning_39_b1_antalen_i_installera_stammer_med_testerna.
+
+
+def _alla_som_filtret_valjer(filtret):
+    svar = subprocess.run(
+        [sys.executable, "-B", "-m", "pytest", "-p", "no:cacheprovider", "--collect-only", "-q", "-k", filtret, str(Path(__file__).parent)],
+        cwd=PROJEKTET,
+        capture_output=True,
+        text=True,
+        timeout=300,
+        check=False,
+    )
+    assert svar.returncode == 0, svar.stdout + svar.stderr
+    return [rad for rad in svar.stdout.splitlines() if "::" in rad]
+
+
+@pytest.mark.parametrize("filtret,antal", [("test_sparr_", 43), ("test_h1_", 31)], ids=["sparrprovet", "h1_proven"])
+def test_beslut_2026_11_06_b5_antalet_i_installera_ar_alla_test_filtret_valjer(filtret, antal):
+    prov = _alla_som_filtret_valjer(filtret)
+    avsnitt = _avsnitt(SPARRPROV_RUBRIK)
+    assert len(prov) == antal, prov
+    assert f" -k {filtret} scripts/tests" in avsnitt
+    assert f"`{len(prov)} passed`" in avsnitt
+
+
+def test_beslut_2026_11_06_b5_de_tva_texttesten_ar_de_som_skiljer():
+    # Spärrproven är 41, och de två extra är exakt de två i beslutet. Ett nytt test med filtret i namnet ger rött här.
+    extra = [rad.split("::", 1)[1] for rad in _alla_som_filtret_valjer("test_sparr_") if "::test_sparr_" not in rad]
+    assert sorted(extra) == [
+        "test_granskning_36_p6_installera_sager_vad_som_galler[`test_sparr_lasning_av_ssh_stoppas`]",
+        "test_granskning_37_p3_installera_har_sparrprovet_med_hard_lank[`test_sparr_hard_lank_till_ssh_stoppas`]",
+    ]
+
+
+def test_beslut_2026_11_06_b5_det_gamla_antalet_ar_borta():
+    assert "`41 passed`" not in _avsnitt(SPARRPROV_RUBRIK)
+
+
+# Beslut 6 och 7: raderna i BYGGPLAN.md.
+
+
+def _byggplanens_rad(nummer):
+    rader = (PROJEKTET / "BYGGPLAN.md").read_text(encoding="utf-8").splitlines()
+    return next(rad for rad in rader if rad.startswith(f"| {nummer} |"))
+
+
+def test_beslut_2026_11_06_b6_steg_15_ar_klart():
+    assert "| ✅ 2026-11-06" in _byggplanens_rad(15)
+
+
+@pytest.mark.parametrize("nummer", [53, 54])
+def test_beslut_2026_11_06_b7_radgivarna_kontaktas_langre_fram(nummer):
+    rad = _byggplanens_rad(nummer)
+    assert "längre fram" in rad and "Kassio-beslutet 2026-11-05" in rad
+    assert "den här veckan" not in rad
+
+
+@pytest.mark.parametrize(
+    "nummer,villkoret_star_kvar",
+    [(109, "riktig data först efter juristens svar"), (118, "| 52, 53, 54, 105, 116, 117 |")],
+)
+def test_beslut_2026_11_06_b7_riktig_data_ar_en_oppen_fraga_och_villkoren_star_kvar(nummer, villkoret_star_kvar):
+    rad = _byggplanens_rad(nummer)
+    assert "**Öppen fråga" in rad and "Hugos beslut 2026-11-06, beslut 7" in rad
+    assert villkoret_star_kvar in rad
 
 
 # ---------------------------------------------------------------------------------------------

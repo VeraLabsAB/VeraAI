@@ -1095,7 +1095,7 @@ Frågar Claude Code om du litar på mappen: svara ja. Be Claude: "Kör exakt det
 '/Library/Application Support/ClaudeCode/vera/venv/bin/python' -B -m pytest -p no:cacheprovider -q --tb=short -rfs -k test_sparr_ scripts/tests
 ```
 
-**Väntat: `41 passed`, inget `failed`, och varken `SPÄRRTESTET HOPPAS ÖVER` eller `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`.** Ett av proven kör `cat` på testfilen inne i sandlådan, och ett försöker göra den hårda länken. Avsluta med `/exit`.
+**Väntat: `43 passed`, inget `failed`, och varken `SPÄRRTESTET HOPPAS ÖVER` eller `SPÄRRPROVET I KOPIAN HOPPAS ÖVER`.** Ett av proven kör `cat` på testfilen inne i sandlådan, och ett försöker göra den hårda länken. Avsluta med `/exit`.
 
 **c. Kör samma prov i skrivbordsappen.** Starta en ny session i fliken **Code**, i mappen `sparrprov` i `~/VERA`, inte i en worktree, och be Claude köra samma kommando. Samma väntade resultat. Det här är också provet av att sandlådan körs i skrivbordsappen. Låt sessionen vara kvar till d.
 

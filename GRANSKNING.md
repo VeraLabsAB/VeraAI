@@ -12733,3 +12733,23 @@ Allt i en riktig sandlåda: `85`, `69`, `71`, och att sandlådan nekar `.claude`
 3. **Hugo kör provkörningen igen** (`85 skipped`, inget `failed`).
 4. Hugo installerar och kör spärrprovet direkt, med H1-proven i appen. Den här commiten är senast och ändrar bara tre textfiler mot 81baffc. I "Prov utanför sandlådan", punkt a, är det alltså den här commitens nummer som ska stå.
 5. Min rekommendation (bedömning): rätta P1 och P2 i nästa byggsession. Bara test och en mening, inga låsta filer.
+
+## Hugos beslut 2026-11-06 om Öppet 69 och spärrprovet
+
+Ordagrant ur Hugos uppdrag i chatten 2026-11-06.
+
+1. P1 (granskning 40) rättas som granskningen föreslår: "-rs" läggs till i kommandot i test_granskning_37_a_pahittade_poster_i_de_tre_filerna_ger_inte_rott, och efter raden med returncode kontrolleras att minst ett test gick igenom och att inget test hoppades över med en annan text än GRUPP D HOPPAS ÖVER. Rött före: visa att testet i dag blir grönt när alla test i kopian hoppar över sig av en annan anledning.
+2. P2 (granskning 40) rättas: gor_mapp_eller_hoppa_over hoppar bara över vid Operation not permitted (errno 1), samma kontroll av felkoden som de andra i grupp D. Alla andra fel, också Permission denied (errno 13), ger rött. Nytt test för errno 13. Rött före.
+3. P3 är klar: Hugo körde git config --get core.quotepath 2026-11-05, standardläge.
+4. P4 och P5 står kvar under Öppet 69.
+5. Det väntade antalet i "Spärrprovet i kopian" i sparr/INSTALLERA.md blir 43 passed i stället för 41. Filtret -k test_sparr_ väljer 41 spärrprov och två texttest vars namn innehåller spärrprovens namn: test_granskning_36_p6_installera_sager_vad_som_galler[`test_sparr_lasning_av_ssh_stoppas`] och test_granskning_37_p3_installera_har_sparrprovet_med_hard_lank[`test_sparr_hard_lank_till_ssh_stoppas`]. Lås antalet med ett test som räknar alla test filtret väljer (inte bara de som heter test_sparr_), så att det inte kan glida isär igen. Gör likadant för H1-proven (31) och "Prov utanför sandlådan" (39), om de inte redan är låsta så.
+6. Steg 15 är installerat och provat. Hugos körningar 2026-11-06, commit c49ebf1:
+   a. Spärrprovet i kopian i Terminal (Claude Code 2.1.318): 43 passed, inget failed, ingen rad med HOPPAS ÖVER.
+   b. Samma i skrivbordsappen: 43 passed, inget failed, ingen rad med HOPPAS ÖVER.
+   c. H1-proven i appen: 31 passed, inget skipped, inget failed.
+   d. Läsförbudet: Read av ~/.ssh/prov nekades ("File is in a directory that is denied by your permission settings"). cat ~/.ssh/prov stoppades av vakten (tecknet ~ utanför citattecken). kassio-prov visades inte.
+   e. ~/.ssh/prov, ~/.ssh och ~/VERA/sparrprov är borttagna (ls: No such file or directory).
+   f. Prov utanför sandlådan i ~/VERA/provkopia: 39 passed, inget failed, ingen rad med GRUPP D HOPPAS ÖVER. Kopian är borttagen.
+   g. Installationen och kontrollen efter bytet, 6.1–6.7, godkändes 2026-11-05.
+7. Raden "Nästa steg" i BYGGPLAN.md och steg 53 och 54 följer Kassio-beslutet 2026-11-05: rådgivare, jurister och konsulter kontaktas längre fram, eftersom vi inte har råd nu. Det som krävs innan riktig data används (steg 109 och 118) är en öppen fråga. Skriv den som öppen fråga och hitta inte på något svar.
+8. Ingen egen granskning för den här sessionen. Den granskas tillsammans med steg 16.

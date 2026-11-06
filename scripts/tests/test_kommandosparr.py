@@ -20,6 +20,7 @@ skapas på nytt för varje test, så att inget test rör det riktiga projektet.
 """
 
 import ast
+import errno
 import importlib.util
 import io
 import json
@@ -61,10 +62,13 @@ SYSTEMETS_SOKVAG = "/usr/bin:/bin"
 def gor_mapp_eller_hoppa_over(sokvag):
     """Grupp D (Hugos beslut 2026-11-05 om granskning 34, beslut 3). I sandlådan får ingen mapp som heter .git eller
     .venv skapas, inte heller i testets tillfälliga mapp. Då kan provet inte köras där, och det hoppas över. Utanför
-    sandlådan körs det som vanligt. Bara ett nej från datorn hoppar över, inget annat fel."""
+    sandlådan körs det som vanligt. Bara Operation not permitted (errno 1) hoppar över, samma kontroll av felkoden som de
+    andra i grupp D. Alla andra fel, också Permission denied (errno 13), ger rött (Hugos beslut 2026-11-06, beslut 2)."""
     try:
         os.makedirs(sokvag)
-    except PermissionError:
+    except PermissionError as fel:
+        if fel.errno != errno.EPERM:
+            raise
         pytest.skip(
             f"GRUPP D HOPPAS ÖVER: datorn nekade att skapa {os.path.basename(sokvag) or sokvag} i testets tillfälliga "
             'mapp, troligen sandlådan. Provet körs utanför sandlådan, se INSTALLERA.md, "Prov utanför sandlådan".'
