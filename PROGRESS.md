@@ -8,10 +8,10 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet arbetar mot skuggpiloten (SPEC avsnitt 9 och `BYGGPLAN.md`). Än finns ett testföretag, Syntet Testbutik AB.
 Inget i koden kan i dag bokföra något.
 
-Testsviten: **0 failed, 5 635 passed, 69 skipped** (körd senast 2026-11-06, i sandlådan, i
-projektmappen med kommandot i SPEC 7.1, med Hugos provfil `~/.ssh/prov` på plats. De 69 är 38 i grupp D
-och 31 spärrprov i kopian. Utan `~/.ssh` väntas 0 failed, 5 633 passed, 71 skipped, där 2 prov av
-`~/.ssh` hoppas över). Sedan installationen
+Testsviten: **0 failed, 5 633 passed, 71 skipped** (körd senast 2026-11-06 i granskning 43, i sandlådan, i
+projektmappen med kommandot i SPEC 7.1, när `~/.ssh` är borttagen. De 71 är 38 i grupp D, 31 spärrprov i
+kopian och 2 prov av `~/.ssh`. Med Hugos provfil `~/.ssh/prov` på plats gav sviten 0 failed, 5 635 passed,
+69 skipped). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
 borttagen.
 
@@ -25,6 +25,30 @@ borttagen.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-11-06, granskning 43 av e323025 och steg 19
+
+Steg i byggplanen: 19 (klart)
+
+- **Säkerhet först:** hålet i prov 17 står kvar tills steg 149 är installerat (Öppet 74). Min bedömning, som Hugo eller Casper avgör: tills dess bör ingen session köras utan att Hugo tittar, ingen `Agent` startas med `isolation`, och inget innehåll utifrån tas in i en session som kan skriva. Den här sessionen har inte installerat något, inte kört sudo och inte committat. Inget i `/Library`, i `.git` eller utanför projektmappen och scratchpad är ändrat av sessionen. Claude Code sparade själv två stora svar i `~/.claude/projects/…/tool-results/`, och jag läste dem inte.
+- **Dom: gult, inget blockerar steg 149** (`GRANSKNING.md`, "Granskning 43"). Fynden står under Öppet 78: P1–P3 på nivån medel, P4–P11 låga. Ingen kod, inget test, ingen inställningsfil och inget i `INSTALLERA.md`, `CLAUDE.md` eller `SPEC.md` är ändrat, och inget fynd är rättat.
+- **Stoppet:** vakten stoppade mitt `;`, som inte stod i uppdragets lista. Jag fortsatte först med läsande kommandon, och stannade och frågade sedan. Hugo svarade i chatten 2026-11-06. Stoppet och svaret står under "Stoppat av vakten" i granskningen.
+- **Siffrorna:** hela sviten 0 failed, 5633 passed, 71 skipped, som väntat när `~/.ssh` är borttagen. Inga test är ändrade, och antalen är oförändrade.
+- **Körningar** (`<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`, `<S>` är `/private/tmp/claude-501/-Users-hugolindholmer-VERA-agent/84cf5a45-db1b-443c-9f61-e40434118dcd/scratchpad`). Från projektmappen, ett kommando i taget. Utfallen står i `<S>/res`.
+  1. `git status --short --ignored -uall` (start): 12 rader med `!!`, alla väntade, inga andra.
+  2. `git archive --format=tar -o <S>/head.tar HEAD`, `mkdir -p <S>/kopia <S>/prov <S>/res`, `tar -x -f <S>/head.tar -C <S>/kopia` och `cp -R <S>/kopia <S>/mut`.
+  3. Proven som gjordes om: `date`, `ls; ls`, `ls !x`, `ls ''=y`, `ls }`, `mkdir -p /Users/hugolindholmer/kassio-prov-19`, och Write till `<S>/.git/provfil-43.txt`, `<S>/.GIT/provfil-43.txt`, `<S>/.Git/HOOKS/provfil-43.txt`, `<S>/.claude/provfil-43.txt`, `<S>/.CLAUDE/provfil-43.txt` och `<S>/.Claude/PROVFIL-43.txt`. Alla stoppades av vakten. Prov 9, 10, 17, 18, 19 och 20 är inte gjorda om, enligt uppdraget.
+  4. Provfil för punkt 1, 3 och 4: `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rf -k 'not test_p2' <S>/prov/test_g43.py`. Första körningen: 1 failed, 5 passed, 1 deselected. Felet låg i mitt prov, som valde fel rad i `INSTALLERA.md`. Efter rättelsen av provet: **6 passed, 1 deselected**. Provet kör mutationer i `<S>/mut` med `<python> -B -m pytest -p no:cacheprovider -q --tb=no -rf -k 'test_steg_18_ or test_beslut_42' <S>/mut/scripts/tests/test_sandladan.py`: 53 passed utan ändring.
+  5. Låsprovet för steg 149 och besluten: `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rf -k test_p2 <S>/prov/test_g43.py`: **1 passed**. Inne i provet: `test_sandladan.py` och `test_byggplan_progress.py` i `<S>/mut`, utan ändring 1 failed, 995 passed, 69 skipped, där det röda är `test_sparr_git_status_och_lasning_fungerar_i_projektet`, eftersom en kopia inte har `.git`. Med ändringen 3 failed, 993 passed, 69 skipped.
+  6. Kedjan och raderna om I5: `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rf <S>/prov/test_g43_b.py`: **2 passed**.
+  7. Prov 14: `<python> -B -m pytest -p no:cacheprovider -q --tb=short -k test_steg_18_b_ scripts/tests`: **9 passed, 5695 deselected**.
+  8. Prov 16: `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfs -k test_sparr_ scripts/tests`: **10 passed, 33 skipped, 5661 deselected**, de 2 extra överhoppade med texten att `~/.ssh` inte finns.
+  9. Hela sviten före texterna: `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rf scripts/tests`: **5633 passed, 71 skipped**, 211 sekunder, inget failed.
+  10. `git log -1 --format=%h origin/main`: fe8a2df. `git log -1 --format=%H 86518e3`: 86518e3be931acf2549b19adfeeff88735704e87. `git log --oneline -S test_beslut_42_rubriken_ar_sist_i_granskning -- scripts/tests`: ingen träff.
+  11. WebFetch: `code.claude.com/docs/en/settings`, `/hooks`, `/settings-reference.md` (tre gånger, med `offset`) och `/tools-reference.md`.
+  12. Efter sista texten: kommandot i 9 igen, `<python> -B -m pytest -p no:cacheprovider -q --tb=short -k test_byggplan scripts/tests`, och `git status --short --ignored -uall` sist. Utfallet står i slutrapporten.
+- **Stoppat av vakten:** utöver proven `;` en gång, `|` en gång och `\` fyra gånger. Alla omskrivna. Inget säkerhetsfilter har stoppat något.
+- **Inte visat:** se `GRANSKNING.md`, "Inte visat" under granskning 43.
 
 ## Läge 2026-11-06, steg 19 klart
 
@@ -2650,6 +2674,7 @@ fattade och byggda, se avsnittet ovan.)
 75. **Läsprovet är grönt också när `~/.ssh/prov` saknas** (steg 19, prov 22, Hugos beslut 10). `_lasning_stoppas` i `scripts/tests/test_sandladan.py` räknar `PermissionError` och `FileNotFoundError` lika, och ser ett misslyckat `cat` med tom utskrift som stoppat. Så `test_sparr_lasning_av_ssh_stoppas` var grönt när `~/.ssh` fanns och var tom, utan att läsförbudet prövades (körd: 5634 passed, 70 skipped). Förslag, inte beslutat: när mappen finns ska testet kräva att filen finns och att nekandet är `PermissionError`. Testet är inte ändrat. **Öppen.**
 76. **För stort belopp och förfalskat godkännande** (spärrtesterna i SPEC, Hugos beslut 5). Inget test prövar gränsen för stort belopp i `konteringsforslag.py`, utöver bankavgiften, och inget prov av ett förfalskat godkännande finns. Inget byggs nu. Båda ska ha ett eget steg i `BYGGPLAN.md` innan godkännandet byggs (steg 33). De stegen är inte upplagda än. **Öppen.**
 77. **Underagentens rapport och de 6 anropen** (steg 19, prov 20, Hugos beslut 9). En underagent som skulle köra `date` och `ls` lämnade ingen rapport och gjorde 6 verktygsanrop. Vakten stoppade `SendMessage` när jag bad om rapporten. Vad underagenten gjorde är inte visat. Bedömning, inte visat: varken `SendMessage` eller `SubagentHandback` står på vaktens lista över tillåtna verktyg, så rapporten kan ha stoppats. Då skulle en session inte få rapporter från någon underagent. I spärrtestet 2026-10-29 kom rapporten fram. **Öppen.**
+78. **Fynden i granskning 43** (e323025 och steg 19, `GRANSKNING.md`). Inget blockerar steg 149. Väntar på Hugos eller Caspers besked. **Medel, bör tas med i steg 149: P1** (`Agent` med `isolation` släpps. `worktree` är I5, och `remote` är ny: bedömning, inte prövat, att en sådan underagent arbetar utan vakt och sandlåda). **P2** (exitkriteriet för steg 149 går att pröva men är smalare än hålet: länkar, `cwd`, `Edit`, saknad `scratchpad_dir` och underagenter saknas). **P3** (utredningen om Read gäller bara Read, men `Grep`, `Glob` och `WebFetch` släpps också utan prövning, och `permissions.blockReadsOutsideWorkingDirectories` finns enligt dokumentationen). **Låga: P4** (Öppet 74 säger hela hemmappen, men vakten släpper också andra mappar på datorn, och platser där text kan bli kod som körs senare). **P5** (SPEC 7.1 säger att sandlådan stoppar fil-verktygen utanför förbuden, och det gör den inte). **P6** (besluten 1–11 och steg 149 låses inte av något test). **P7** (`test_beslut_42_b10_…` kan inte längre bli rött, så kontrollen av "Nästa steg" är svagare än den gamla). **P8** (backningen säger två saker, och `CLAUDE.md` har regeln bara för H1-proven). **P9** ("den commit som granskades" är inte förklarad i `INSTALLERA.md`). **P10** (Öppet 75 säger lite för mycket: att mappen inte går att lista prövas när `~/.ssh` finns). **P11** (sandlådans skrivlista har `~/.npm/_logs` och `~/.claude/debug`, som projektet inte nämner). **Öppen.**
 
 ## Nästa steg i byggordningen
 
