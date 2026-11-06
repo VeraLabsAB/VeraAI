@@ -12753,3 +12753,13 @@ Ordagrant ur Hugos uppdrag i chatten 2026-11-06.
    g. Installationen och kontrollen efter bytet, 6.1–6.7, godkändes 2026-11-05.
 7. Raden "Nästa steg" i BYGGPLAN.md och steg 53 och 54 följer Kassio-beslutet 2026-11-05: rådgivare, jurister och konsulter kontaktas längre fram, eftersom vi inte har råd nu. Det som krävs innan riktig data används (steg 109 och 118) är en öppen fråga. Skriv den som öppen fråga och hitta inte på något svar.
 8. Ingen egen granskning för den här sessionen. Den granskas tillsammans med steg 16.
+
+## Hugos beslut 2026-11-06 om steg 16
+
+Ordagrant ur Hugos uppdrag i chatten 2026-11-06.
+
+1. Bash-vägen byggs inte. Bash-verktyget fortsätter i zsh. CLAUDE_CODE_SHELL sätts inte i de låsta inställningarna.
+2. Skäl: dokumentationen bekräftar fortfarande inte att CLAUDE_CODE_SHELL i env i den låsta inställningsfilen gäller i skrivbordsappen (kontrollerat 2026-11-06 på code.claude.com/docs/en/settings, code.claude.com/docs/en/env-vars och claude.com/docs/third-party/claude-desktop/code). zsh-vägen är byggd, installerad och provad i steg 15 (förbud för startfilerna, kontrollskriptet och sandlådan). Bash-vägen skulle kräva en ny version av de låsta inställningarna, ett nytt kontrollskript, förbud för bashs startfiler, ny granskning, ny installation och nya spärrprov, för en vinst som inte är visad.
+3. Öppet 7 stängs med det här beslutet. Öppet 8 (en rad som redan står i en startfil syns inte för sandlådan) står kvar öppen. Den gäller oavsett skal.
+4. Steg 16 är klart: beslutet är zsh.
+5. Nästa steg är en oberoende granskning av commit dbe85a9 (Öppet 69 och spärrprovet) och commiten från den här sessionen, enligt Hugos beslut 2026-11-06, beslut 8. Sedan steg 17.

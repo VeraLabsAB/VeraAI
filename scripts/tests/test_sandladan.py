@@ -2748,6 +2748,86 @@ def test_beslut_2026_11_06_b7_riktig_data_ar_en_oppen_fraga_och_villkoren_star_k
 
 
 # ---------------------------------------------------------------------------------------------
+# Hugos beslut 2026-11-06 om steg 16: bash-vägen byggs inte, Öppet 7 stängs, Öppet 8 står kvar. Att CLAUDE_CODE_SHELL inte står i
+# env i sparr/managed-settings.json prövas redan i test_beslut_granskning_14.py (test_bash_vagen_byggdes_inte_och_bash_filerna_har_kvar_sina_forbud).
+
+BESLUT_16_RUBRIK = "## Hugos beslut 2026-11-06 om steg 16"
+BESLUT_16 = [
+    "1. Bash-vägen byggs inte. Bash-verktyget fortsätter i zsh. CLAUDE_CODE_SHELL sätts inte i de låsta inställningarna.",
+    "2. Skäl: dokumentationen bekräftar fortfarande inte att CLAUDE_CODE_SHELL i env i den låsta inställningsfilen gäller i "
+    "skrivbordsappen (kontrollerat 2026-11-06 på code.claude.com/docs/en/settings, code.claude.com/docs/en/env-vars och "
+    "claude.com/docs/third-party/claude-desktop/code). zsh-vägen är byggd, installerad och provad i steg 15 (förbud för "
+    "startfilerna, kontrollskriptet och sandlådan). Bash-vägen skulle kräva en ny version av de låsta inställningarna, ett nytt "
+    "kontrollskript, förbud för bashs startfiler, ny granskning, ny installation och nya spärrprov, för en vinst som inte är visad.",
+    "3. Öppet 7 stängs med det här beslutet. Öppet 8 (en rad som redan står i en startfil syns inte för sandlådan) står kvar "
+    "öppen. Den gäller oavsett skal.",
+    "4. Steg 16 är klart: beslutet är zsh.",
+    "5. Nästa steg är en oberoende granskning av commit dbe85a9 (Öppet 69 och spärrprovet) och commiten från den här sessionen, "
+    "enligt Hugos beslut 2026-11-06, beslut 8. Sedan steg 17.",
+]
+
+
+def _post_under_oppet(nummer):
+    """Posten med numret under "## Öppet" i PROGRESS.md, fram till nästa post. Rubriken söks som en egen rad."""
+    oppet = (PROJEKTET / "PROGRESS.md").read_text(encoding="utf-8").split("\n## Öppet\n", 1)[1].split("\n## ", 1)[0]
+    return oppet.split(f"\n{nummer}. ", 1)[1].split(f"\n{nummer + 1}. ", 1)[0]
+
+
+def _raden_i_lage_nu(etikett):
+    rader = (PROJEKTET / "BYGGPLAN.md").read_text(encoding="utf-8").splitlines()
+    (rad,) = [r for r in rader if r.startswith(f"- **{etikett}:**")]
+    return rad[len(f"- **{etikett}:**"):].strip()
+
+
+@pytest.mark.parametrize("beslut", BESLUT_16, ids=[str(n) for n in range(1, len(BESLUT_16) + 1)])
+def test_beslut_steg_16_star_ordagrant_i_granskning(beslut):
+    assert beslut in _avsnitt_i_granskning(BESLUT_16_RUBRIK)
+
+
+def test_beslut_steg_16_rubriken_star_efter_besluten_om_oppet_69():
+    text = GRANSKNING.read_text(encoding="utf-8")
+    assert text.count(f"\n{BESLUT_16_RUBRIK}\n") == 1
+    assert text.index(f"\n{BESLUT_16_RUBRIK}\n") > text.index(f"\n{BESLUT_06_RUBRIK}\n")
+
+
+def test_beslut_steg_16_oppet_7_ar_stangd_med_hanvisning_till_beslutet():
+    # Det som inte är överstruket är det som gäller. Den gamla texten står kvar överstruken, som i de andra stängda posterna.
+    post = _post_under_oppet(7)
+    assert post.startswith("~~**Bash-vägen")
+    galler = re.sub(r"~~.*?~~", "", post, flags=re.DOTALL)
+    assert "**Stängd**" in galler and "Hugos beslut 2026-11-06 om steg 16" in galler
+    assert "Öppen" not in galler and "prövas" not in galler
+
+
+def test_beslut_steg_16_oppet_8_ar_fortfarande_oppen():
+    post = _post_under_oppet(8)
+    assert post.startswith("**Det kontrollskriptet inte ser**")
+    assert "~~" not in post and "Stängd" not in post
+    assert "Öppen för det." in post
+
+
+def test_beslut_steg_16_steget_ar_klart_i_byggplanen():
+    rad = _byggplanens_rad(16)
+    assert "| ✅ 2026-11-06" in rad
+    assert "Beslutet är zsh" in rad and "Hugos beslut 2026-11-06 om steg 16" in rad
+
+
+def test_beslut_steg_16_lage_nu_foljer_beslut_5():
+    assert _raden_i_lage_nu("Senast avslutade steg").startswith("16 – ")
+    assert "16 – " not in _raden_i_lage_nu("Pågående steg")
+    nasta = _raden_i_lage_nu("Nästa steg")
+    assert nasta.startswith("En oberoende granskning av commit dbe85a9 (Öppet 69 och spärrprovet) och commiten från sessionen för steg 16")
+    assert "Hugos beslut 2026-11-06, beslut 8" in nasta and "Sedan steg 17" in nasta
+    assert "Bash-vägen prövas" not in nasta
+
+
+def test_beslut_steg_16_progress_har_en_post_for_sessionen():
+    text = (PROJEKTET / "PROGRESS.md").read_text(encoding="utf-8")
+    post = text.split("\n## Läge 2026-11-06, steg 16 klart", 1)[1].split("\n## ", 1)[0]
+    assert "\nSteg i byggplanen: 16 (klart)\n" in post
+
+
+# ---------------------------------------------------------------------------------------------
 # Spärrtestets hjälpfunktioner. De avgör om ett försök räknas som stoppat och städar om det gick.
 
 

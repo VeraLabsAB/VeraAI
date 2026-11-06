@@ -8,7 +8,7 @@ Granskningarna och rättelserna efter dem: `GRANSKNING.md`.
 Projektet arbetar mot skuggpiloten (SPEC avsnitt 9 och `BYGGPLAN.md`). Än finns ett testföretag, Syntet Testbutik AB.
 Inget i koden kan i dag bokföra något.
 
-Testsviten: **0 failed, 5 491 passed, 71 skipped** (körd senast 2026-11-06, i sandlådan, i
+Testsviten: **0 failed, 5 502 passed, 71 skipped** (körd senast 2026-11-06, i sandlådan, i
 projektmappen med kommandot i SPEC 7.1. De 71 är 38 i grupp D, 31 spärrprov i kopian och 2 prov av
 `~/.ssh`, som inte finns). Sedan installationen
 2026-10-28 körs den med `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`. Projektets `.venv` är
@@ -24,6 +24,25 @@ borttagen.
 - **Sandlådan görs direkt efter installationen** (Öppet, punkt 4).
 - **Stoppregel:** vakten installeras när en oberoende granskning inte hittar något allvarligt fynd, eller fynd
   på nivån medel, som inte är rättat. Låga fynd går till "Öppet".
+
+## Läge 2026-11-06, steg 16 klart, beslutet är zsh
+
+Steg i byggplanen: 16 (klart)
+
+- **Hugos beslut 2026-11-06 om steg 16** står ordagrant i `GRANSKNING.md`, under rubriken med samma namn. Bash-vägen byggs inte, Bash-verktyget fortsätter i zsh, och `CLAUDE_CODE_SHELL` sätts inte i de låsta inställningarna.
+- **Öppet 7 är stängd** (beslut 3). **Öppet 8 står kvar öppen**, och posten är inte ändrad.
+- **BYGGPLAN.md:** steg 16 klart, "Läge nu" och "Nästa steg" enligt beslut 5. Raden "Opushat" är också rättad, eftersom den sa att `origin/main` stod på 73b754a och `git log` visar dbe85a9.
+- **Tester:** 11 nya i `scripts/tests/test_sandladan.py` (`test_beslut_steg_16_…`). Inget gammalt test är ändrat eller borttaget. Testet att `CLAUDE_CODE_SHELL` inte står i `env` i `sparr/managed-settings.json` (`test_bash_vagen_byggdes_inte_och_bash_filerna_har_kvar_sina_forbud`) är orört.
+- **Säkerhet:** inget är installerat, inget sudo är kört, och inget i `/Library`, i projektets `.git` eller utanför projektmappen och scratchpad är ändrat. `sparr/managed-settings.json`, `sparr/kommandosparr.py`, `sparr/kontrollera-skalet.zsh`, `.gitignore`, `sparr/INSTALLERA.md`, `CLAUDE.md` och `SPEC.md` är oförändrade. Agenten committar inte: meddelandet står i `COMMIT_MSG.txt`.
+- **Antalen mot körningen före sessionen** (0 failed, 5491 passed, 71 skipped): nu **0 failed, 5502 passed, 71 skipped**, alltså de 11 nya testen och samma 71. De 71 är 38 grupp D, som hoppar här som väntat, 31 spärrprov i kopian och 2 prov av `~/.ssh`, som inte finns.
+- **Körningar** (`<python>` är `'/Library/Application Support/ClaudeCode/vera/venv/bin/python'`). Från projektmappen, ett kommando i taget.
+  1. `git status --short --ignored -uall` (start): 12 rader med `!!`, alla väntade, inga andra.
+  2. Rött före, med de nya testen och utan ändringarna i de andra filerna: `<python> -B -m pytest -p no:cacheprovider -q --tb=line -rf -k test_beslut_steg_16 scripts/tests`: **10 failed, 1 passed**. Det gröna är testet att Öppet 8 är öppen, som den redan var. Det är ett skydd.
+  3. Efter ändringarna: samma kommando med `--tb=short`: **11 passed**.
+  4. `git log -3 --format=%h origin/main`: dbe85a9 först.
+  5. Hela sviten: `<python> -B -m pytest -p no:cacheprovider -q --tb=short -rfs scripts/tests`: **5502 passed, 71 skipped**, inget failed, 219 sekunder. Alla rader med `SKIPPED` har texten `GRUPP D HOPPAS ÖVER`, `SPÄRRPROVET I KOPIAN HOPPAS ÖVER` eller "finns inte på den här datorn".
+  6. Efter sista texten: kommandot i 5 igen, `<python> -B -m pytest -p no:cacheprovider -q --tb=short -k test_byggplan scripts/tests`, och `git status --short --ignored -uall` sist. Utfallet står i slutrapporten.
+- **Inte visat:** att dokumentationen säger det beslut 2 säger. Den här sessionen har inte läst sidorna, utan skrivit in Hugos kontroll ordagrant. Att besluten är ordagranna kan en granskare inte visa utan chatten.
 
 ## Läge 2026-11-06, steg 15 klart, Hugos beslut om Öppet 69 och spärrprovet införda
 
@@ -2094,14 +2113,15 @@ fattade och byggda, se avsnittet ovan.)
    läser ett ord på som skiljer sig från vaktens uppdelning. **Öppen, inte gjord.** Dit hör också skalets
    inställningar (`setopt`), som Claude Code tar med från `~/.zshrc` till agentens kommandon och som
    kontrollen i INSTALLERA.md steg 4 g inte prövar (granskning 14, bygget efter Hugos svar 2026-10-28).
-7. **Bash-vägen: Bash-verktyget i `/bin/bash` i stället för zsh** (`CLAUDE_CODE_SHELL=/bin/bash` i `env` i
+7. ~~**Bash-vägen: Bash-verktyget i `/bin/bash` i stället för zsh** (`CLAUDE_CODE_SHELL=/bin/bash` i `env` i
    den låsta inställningsfilen). Hugos svar 2026-10-28 efter granskning 14, punkt 3: **prövas inte nu.**
    Den prövas **efter installationen, i samma veva som sandlådan** (punkt 4), med ett prov i
    skrivbordsappen. Skälet: dokumentationen bekräftar att variabeln gäller i Terminal och att User-,
    Project- och Local-inställningar inte kan skriva över den, men inte att den gäller i skrivbordsappen,
    eftersom appens startmiljö går före `env` i alla inställningsfiler (svaren med länkar: "Läge 2026-10-28,
    efter Hugos beslut om granskning 14", steg 1). Vilka filer bash läser in (`~/.bash_profile`, `BASH_ENV`)
-   är inte heller bekräftat. **Öppen, inte gjord.**
+   är inte heller bekräftat. **Öppen, inte gjord.**~~ **Stängd** 2026-11-06: bash-vägen byggs inte, och
+   Bash-verktyget fortsätter i zsh (Hugos beslut 2026-11-06 om steg 16, beslut 1–3, `GRANSKNING.md`).
 8. **Det kontrollskriptet inte ser** (granskning 15, S4, godtagen av Hugos beslut 2026-10-28). Fällor satta
    med kommandot `trap` (till exempel `trap '…' DEBUG`, som körs före varje kommando), skalets tabell över
    program (`hash`, till exempel `hash git=…`, som får `git` att köra en annan fil oavsett `PATH`), och en funktion som heter
