@@ -3121,26 +3121,157 @@ def test_steg_18_steg_2_b_sager_i_och_s():
     assert "`-I -S`" in steget and "`-I` (" not in steget
 
 
-def test_steg_18_steg_17_ar_klart_och_steg_18_pagar():
+# De tre testen låste orden för läget före installationen (granskning 42, P1). De låser nu att steg 18 är installerat och provat
+# 2026-11-06 (Hugos beslut 2026-11-06 om granskning 42 och installationen av steg 18, beslut 2). Varje kontroll av ett ord har fått
+# en lika sträng kontroll av det nya läget, och orden från läget före får inte stå kvar. Två av testen har fått nya namn, eftersom
+# de gamla namnen sa "pågår" och "inte installerade".
+
+
+def test_steg_18_steg_17_och_steg_18_ar_klara():
     assert "| ✅ 2026-11-06" in _byggplanens_rad(17)
     rad = _byggplanens_rad(18)
-    assert "| 🔶 2026-11-06" in rad and "byggd, väntar på granskning 42, inte installerad" in rad
-    assert "18 – " in _raden_i_lage_nu("Pågående steg")
-    assert "granskning 42" in _raden_i_lage_nu("Nästa steg")
+    assert "| ✅ 2026-11-06" in rad and "installerat och provat 2026-11-06" in rad.lower()
+    assert "🔶" not in rad and "väntar på granskning 42" not in rad and "inte installerad" not in rad
+    assert not re.search(r"(?<!\d)18 – ", _raden_i_lage_nu("Pågående steg"))
+    assert re.search(r"(?<!\d)18 – ", _raden_i_lage_nu("Senast avslutade steg"))
+    assert "installationen får göras" not in _raden_i_lage_nu("Nästa steg")
+    assert "Sedan installation" not in _raden_i_lage_nu("Nästa steg")
 
 
 def test_steg_18_oppet_72_star_kvar_oppen_for_histchars():
     post = " ".join(_post_under_oppet(72).split())
-    assert "O1, O2 och O4 är byggda, inte granskade och inte installerade" in post
+    assert "O1, O2 och O4 är installerade och provade 2026-11-06" in post
+    assert "inte granskade" not in post and "inte installerade" not in post
     assert "O3 och O5 är godtagna" in post and "histchars" in post
     assert post.endswith("**Öppen.**")
 
 
-def test_steg_18_k1_och_k3_ar_byggda_men_inte_installerade():
+def test_steg_18_k1_och_k3_ar_installerade_och_provade():
     oppet = PROGRESS.read_text(encoding="utf-8")
     for nyckel in ("**K1:**", "**K3:**"):
         stycke = " ".join(oppet.split(nyckel, 1)[1].split("    - **", 1)[0].split())
-        assert "Byggd i steg 18, inte granskad och inte installerad" in stycke, nyckel
+        assert "Byggd i steg 18, granskad i granskning 42, installerad och provad 2026-11-06" in stycke, nyckel
+        assert "inte granskad" not in stycke and "inte installerad" not in stycke, nyckel
+
+
+# ---------------------------------------------------------------------------------------------
+# Hugos beslut 2026-11-06 om granskning 42 och installationen av steg 18. Beslut 2 står ovan. Beslut 3 är ett besked om vad
+# "den commit som granskades" betyder, och beslut 9 prövas i posten för Öppet 73.
+
+BESLUT_42_RUBRIK = "## Hugos beslut 2026-11-06 om granskning 42 och installationen av steg 18"
+BESLUT_42 = [
+    '1. Installationen av steg 18 är gjord och provad 2026-11-06 av Hugo enligt INSTALLERA.md, "Byte till nästa version av vakten '
+    '(steg 18)". Punkt 1: summorna före stämde (projektet 33bfdb15… och 5aefe7af…, installerat 1ba74576… och 314df00b…). Punkt 2: '
+    'kopiorna .fore-steg-18 sparades. Ett kommando föll först bort, så chown och chmod för vaktens kopia gav "No such file or '
+    'directory" utan att ändra något. Kommandot kördes sedan, följt av chown och chmod. En extra kontroll av kopiornas summor gav '
+    "1ba74576… och 314df00b…. Punkt 3: gjord i rätt ordning, utan utskrift. Punkt 4: alla fyra summor stämde, och alla fyra filer "
+    'är -rw-r--r-- root wheel med bara com.apple.provenance. Punkt 5: /status visade "Enterprise managed settings (file)". ls !x, '
+    "ls ''=y och ls } stoppades av vakten utan att Claude Code frågade, med felen för O1, O2 och O4. git status gick igenom. Hela "
+    "sviten i appen: 0 failed, 5605 passed, 71 skipped. Punkt 6: prov utanför sandlådan i en kopia på "
+    '86518e3be931acf2549b19adfeeff88735704e87: 39 passed, ingen rad "GRUPP D HOPPAS ÖVER". Kopian är borttagen.',
+    "2. P1 rättas: testerna som låser orden för läget före installationen låser i stället att steg 18 är installerat och provat "
+    "2026-11-06. Ingen kontroll får bli svagare.",
+    '3. P2: "den commit som granskades" i "Prov utanför sandlådan" är granskningens egen commit när den bara ändrar GRANSKNING.md, '
+    "PROGRESS.md och BYGGPLAN.md. För steg 18 var det 86518e3.",
+    "4. P3: CLAUDE.md gäller. Ett rött eller överhoppat prov betyder att Hugo stannar och frågar. Han backar inte på egen hand. En "
+    'mening i "Byte till nästa version av vakten (steg 18)" hänvisar till regeln.',
+    "5. P4: K3 gäller Bash. Fil-verktygen skyddas av förbuden oavsett cwd. Det står i SPEC 7.1 och PROGRESS.md, inte i vakten.",
+    "6. P7: i Öppet 72 skrivs in att banghist troligen är på, eftersom den är på som standard i zsh. Inget ändras, eftersom ! "
+    "stoppas sedan steg 18.",
+    "7. SPEC 7.1 får text om reglerna från steg 18: ! var det än står, = när ordet hittills är tomt, ett ord som bara är } utanför "
+    "citattecken, och cwd som är tom eller inte börjar med /. Kommandolistan ändras inte.",
+    "8. Öppet 6 stängs: steg 17 är klart, och det som återstår står under Öppet 72.",
+    "9. P5, P6 och P8 står kvar under Öppet 73.",
+    "10. Steg 18 är klart. Nästa steg är steg 19, spärrtestet i en ny session. Den här sessionen granskas tillsammans med steg 19, "
+    "inte för sig.",
+]
+LAGE_18_KLART_RUBRIK = "\n## Läge 2026-11-06, steg 18 klart\n"
+
+
+@pytest.mark.parametrize("beslut", BESLUT_42, ids=[str(n) for n in range(1, len(BESLUT_42) + 1)])
+def test_beslut_42_star_ordagrant_under_sin_rubrik(beslut):
+    assert beslut in _avsnitt_i_granskning(BESLUT_42_RUBRIK)
+
+
+def _lage_18_klart():
+    text = PROGRESS.read_text(encoding="utf-8")
+    assert text.count(LAGE_18_KLART_RUBRIK) == 1
+    return " ".join(text.split(LAGE_18_KLART_RUBRIK, 1)[1].split("\n## ", 1)[0].split())
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Steg i byggplanen: 18 (klart)",
+        "0 failed, 5605 passed, 71 skipped",
+        "39 passed",
+        "86518e3",
+        "den commit som granskades",
+        "K3 gäller Bash. Fil-verktygen skyddas av förbuden oavsett `cwd`",
+    ],
+)
+def test_beslut_42_b1_b3_b5_posten_i_progress_sager_vad_som_gjordes(text):
+    assert text in _lage_18_klart()
+
+
+def test_beslut_42_b4_bytet_hanvisar_till_regeln_i_backningen():
+    avsnitt = _en_rad_text(_avsnitt(BYTE_18_RUBRIK))
+    backningen = avsnitt.split("**Backa till förra versionen.**", 1)[1]
+    assert "Ett rött eller överhoppat prov betyder att du stannar och frågar, och du backar inte på egen hand (`CLAUDE.md`)." in backningen
+
+
+def test_beslut_42_b5_k3_galler_bash_i_progress():
+    oppet = PROGRESS.read_text(encoding="utf-8")
+    stycke = " ".join(oppet.split("**K3:**", 1)[1].split("    - **", 1)[0].split())
+    assert "K3 gäller Bash. Fil-verktygen skyddas av förbuden oavsett `cwd`" in stycke
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "`!` stoppas var det än står, också inom enkla och dubbla citattecken",
+        "`=` stoppas när ordet hittills är tomt",
+        "Ett ord som bara är `}` utanför citattecken stoppas",
+        "En `cwd` (mappen där kommandot körs) som är tom eller inte börjar med `/` stoppas",
+        "K3 gäller Bash. Fil-verktygen skyddas av förbuden oavsett `cwd`",
+    ],
+    ids=["O1", "O2", "O4", "K3", "K3_bash"],
+)
+def test_beslut_42_b5_b7_spec_7_1_har_reglerna_fran_steg_18(text):
+    assert text in _spec_7_1()
+
+
+def test_beslut_42_b7_kommandolistan_ar_oforandrad():
+    assert hashlib.sha256(_kommandolistan().encode("utf-8")).hexdigest() == LISTANS_SUMMA
+
+
+def test_beslut_42_b6_oppet_72_sager_att_banghist_troligen_ar_pa():
+    post = " ".join(_post_under_oppet(72).split())
+    assert "`banghist` är troligen på, eftersom den är på som standard i zsh. Inget ändras, eftersom `!` stoppas sedan steg 18." in post
+
+
+def test_beslut_42_b8_oppet_6_ar_stangd_och_pekar_pa_oppet_72():
+    post = " ".join(_post_under_oppet(6).split())
+    assert post.startswith("~~")
+    (struket, efter) = post[len("~~"):].split("~~", 1)
+    assert "den står kvar tills Hugo eller Casper säger till" in struket
+    assert efter.lstrip().startswith("**Stängd** 2026-11-06")
+    assert "steg 17 är klart" in efter and "Öppet 72" in efter
+
+
+def test_beslut_42_b9_oppet_73_har_kvar_p5_p6_och_p8():
+    post = " ".join(_post_under_oppet(73).split())
+    assert "Kvar: P5, P6 och P8" in post
+    assert "Två frågor väntar också på Hugo" not in post and "Bör rättas i den sessionen" not in post
+    assert post.endswith("**Öppen.**")
+
+
+def test_beslut_42_b10_nasta_steg_ar_steg_19_sa_lange_det_inte_har_borjat():
+    # Villkoret gör att en senare statusändring inte ger rött, vilket var felet i P1. Steg 19 är inte påbörjat när testet skrivs,
+    # så kontrollen körs. Den ger rött om "Nästa steg" inte säger det beslut 10 säger.
+    if "| ⬜ |" in _byggplanens_rad(19):
+        assert "steg 19, spärrtestet i en ny session" in _raden_i_lage_nu("Nästa steg")
+        assert re.search(r"(?<!\d)19 – ", _raden_i_lage_nu("Pågående steg"))
 
 
 # ---------------------------------------------------------------------------------------------

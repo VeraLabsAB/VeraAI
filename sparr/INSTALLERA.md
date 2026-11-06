@@ -1336,7 +1336,7 @@ git status
 
 **6. Proven som ska göras om.** Vakten och de låsta inställningarna har ändrats, så gör "Prov utanför sandlådan" igen, med den commit som granskades (`CLAUDE.md`). Steg 19 i `BYGGPLAN.md`, spärrtestet i en ny session, kommer efter det här.
 
-**Backa till förra versionen.** Stoppar allt, vägrar Claude Code eller appen starta, eller blir något i provet fel. Kör i Terminal, som inte behöver agenten:
+**Backa till förra versionen.** Stoppar allt, vägrar Claude Code eller appen starta, eller blir något i provet fel. Ett rött eller överhoppat prov betyder att du stannar och frågar, och du backar inte på egen hand (`CLAUDE.md`). Kör i Terminal, som inte behöver agenten:
 
 ```bash
 sudo cp "/Library/Application Support/ClaudeCode/vera/kommandosparr.fore-steg-18.py" "/Library/Application Support/ClaudeCode/vera/kommandosparr.py"

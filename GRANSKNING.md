@@ -13469,3 +13469,18 @@ Sex av mina `grep`: `\` två gånger, `|` tre gånger och en bakåtfnutt. Bakåt
 ### Inte visat
 
 Filerna i `/Library`. Att Claude Code startar den nya vakten med `-I -S`, och proven i punkt 5 och 6, som är Hugos. Grupp D utanför sandlådan och spärrprovet i kopian. Allt i zsh. Manualen. Startfilerna och Hugos kontroll av `~/.claude/shell-snapshots/`. Kassio-intervjun. Att besluten är ordagranna mot chatten.
+
+## Hugos beslut 2026-11-06 om granskning 42 och installationen av steg 18
+
+Ordagrant ur Hugos uppdrag i chatten 2026-11-06.
+
+1. Installationen av steg 18 är gjord och provad 2026-11-06 av Hugo enligt INSTALLERA.md, "Byte till nästa version av vakten (steg 18)". Punkt 1: summorna före stämde (projektet 33bfdb15… och 5aefe7af…, installerat 1ba74576… och 314df00b…). Punkt 2: kopiorna .fore-steg-18 sparades. Ett kommando föll först bort, så chown och chmod för vaktens kopia gav "No such file or directory" utan att ändra något. Kommandot kördes sedan, följt av chown och chmod. En extra kontroll av kopiornas summor gav 1ba74576… och 314df00b…. Punkt 3: gjord i rätt ordning, utan utskrift. Punkt 4: alla fyra summor stämde, och alla fyra filer är -rw-r--r-- root wheel med bara com.apple.provenance. Punkt 5: /status visade "Enterprise managed settings (file)". ls !x, ls ''=y och ls } stoppades av vakten utan att Claude Code frågade, med felen för O1, O2 och O4. git status gick igenom. Hela sviten i appen: 0 failed, 5605 passed, 71 skipped. Punkt 6: prov utanför sandlådan i en kopia på 86518e3be931acf2549b19adfeeff88735704e87: 39 passed, ingen rad "GRUPP D HOPPAS ÖVER". Kopian är borttagen.
+2. P1 rättas: testerna som låser orden för läget före installationen låser i stället att steg 18 är installerat och provat 2026-11-06. Ingen kontroll får bli svagare.
+3. P2: "den commit som granskades" i "Prov utanför sandlådan" är granskningens egen commit när den bara ändrar GRANSKNING.md, PROGRESS.md och BYGGPLAN.md. För steg 18 var det 86518e3.
+4. P3: CLAUDE.md gäller. Ett rött eller överhoppat prov betyder att Hugo stannar och frågar. Han backar inte på egen hand. En mening i "Byte till nästa version av vakten (steg 18)" hänvisar till regeln.
+5. P4: K3 gäller Bash. Fil-verktygen skyddas av förbuden oavsett cwd. Det står i SPEC 7.1 och PROGRESS.md, inte i vakten.
+6. P7: i Öppet 72 skrivs in att banghist troligen är på, eftersom den är på som standard i zsh. Inget ändras, eftersom ! stoppas sedan steg 18.
+7. SPEC 7.1 får text om reglerna från steg 18: ! var det än står, = när ordet hittills är tomt, ett ord som bara är } utanför citattecken, och cwd som är tom eller inte börjar med /. Kommandolistan ändras inte.
+8. Öppet 6 stängs: steg 17 är klart, och det som återstår står under Öppet 72.
+9. P5, P6 och P8 står kvar under Öppet 73.
+10. Steg 18 är klart. Nästa steg är steg 19, spärrtestet i en ny session. Den här sessionen granskas tillsammans med steg 19, inte för sig.
